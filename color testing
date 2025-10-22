@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>4 Color Palettes Preview</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Poppins", "Microsoft JhengHei", sans-serif;
+      background-color: #f5f5f5;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 20px;
+      padding: 20px;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+
+    .palette {
+      display: grid;
+      grid-template-rows: repeat(4, 1fr);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .color-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #333;
+      font-size: 16px;
+    }
+
+    /* 🌿 第一组：柔和薄荷绿 */
+    .palette1 .primary { background-color: #A8D5BA; }
+    .palette1 .secondary { background-color: #FFF8E7; }
+    .palette1 .text { background-color: #333333; color: white; }
+    .palette1 .button { background-color: #5AA469; color: white; }
+
+    /* 🌸 第二组：温柔粉 */
+    .palette2 .primary { background-color: #F6B8B8; }
+    .palette2 .secondary { background-color: #FFF5E4; }
+    .palette2 .text { background-color: #4A4A4A; color: white; }
+    .palette2 .button { background-color: #F28585; color: white; }
+
+    /* 🌿 第三组：橄榄绿 */
+    .palette3 .primary { background-color: #88A47C; color: white; }
+    .palette3 .secondary { background-color: #F5EEDC; color: #2F3E46; }
+    .palette3 .text { background-color: #2F3E46; color: white; }
+    .palette3 .button { background-color: #6B8E62; color: white; }
+
+    /* 🌼 第四组：柔黄色 */
+    .palette4 .primary { background-color: #FFD966; }
+    .palette4 .secondary { background-color: #FFF9E6; }
+    .palette4 .text { background-color: #333333; color: white; }
+    .palette4 .button { background-color: #F4B41A; color: white; }
+
+    h3 {
+      text-align: center;
+      margin-top: 10px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 第一组：柔和薄荷绿 -->
+  <div class="palette palette1">
+    <div class="color-box primary">Primary #A8D5BA</div>
+    <div class="color-box secondary">Secondary #FFF8E7</div>
+    <div class="color-box text">Text #333333</div>
+    <div class="color-box button">Button #5AA469</div>
+  </div>
+
+  <!-- 第二组：温柔粉 -->
+  <div class="palette palette2">
+    <div class="color-box primary">Primary #F6B8B8</div>
+    <div class="color-box secondary">Secondary #FFF5E4</div>
+    <div class="color-box text">Text #4A4A4A</div>
+    <div class="color-box button">Button #F28585</div>
+  </div>
+
+  <!-- 第三组：橄榄绿 -->
+  <div class="palette palette3">
+    <div class="color-box primary">Primary #88A47C</div>
+    <div class="color-box secondary">Secondary #F5EEDC</div>
+    <div class="color-box text">Text #2F3E46</div>
+    <div class="color-box button">Button #6B8E62</div>
+  </div>
+
+  <!-- 第四组：柔黄色 -->
+  <div class="palette palette4">
+    <div class="color-box primary">Primary #FFD966</div>
+    <div class="color-box secondary">Secondary #FFF9E6</div>
+    <div class="color-box text">Text #333333</div>
+    <div class="color-box button">Button #F4B41A</div>
+  </div>
+
+</body>
+</html>
