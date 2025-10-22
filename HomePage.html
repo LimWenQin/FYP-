@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>
+</title>
+<style>
+
+    body
+    {
+        background-color: #FFF5E4;    /* 设置背景颜色*/
+        margin: 0px;
+    }
+
+    /* 快捷栏 */
+    .header     /* class=header */
+    {
+        display: flex;    /* 水平面显示*/
+        justify-content: space-between;           /*让所有子元素平均分布在一行中*/
+        align-items: center;       /*上下对齐*/
+        background-color: #F6B8B8;   /* 设置背景颜色*/
+        padding: 20px 50px;   /* 设置元素内部内容和边框之间的距离*/
+    }
+
+    .header .logo     /* class=header 里面的class=logo*/
+    {
+        font-weight: bold;    /* 设置文字的粗细*/
+        flex: 1;
+        font-size: 44px;
+        font-family: Arial;
+        color: #4A4A4A;
+    }
+
+    .header .fucntion-links a /* class=header 里面的class=function-link 里面的a*/
+    {
+        margin-left: 10px;    /* 设置元素外面到别的元素之间的距离（左边）*/
+        text-decoration: none;    /* 设置文字装饰效果*/
+        font-size: 22px;
+        color: #4A4A4A;
+        font-weight: bold;    /* 设置文字的粗细*/
+    }
+
+    .search     /* class=search*/
+    {
+        padding: 5px;         /* 设置元素内部内容和边框之间的距离*/
+        margin-right: 10px;   /* 设置元素外面到别的元素之间的距离（右边）*/
+        font-size: 18px;
+        color: #4A4A4A;              /* 设置字的颜色*/
+    }
+
+    .button-test 
+    {
+        position: fixed;   /* 固定在视窗上 */
+        right: 10px;       /* 距离右边 30px */ 
+        margin-top: 10px; 
+        padding: 12px 20px;
+        background-color: #A8D5BA;
+        color: #4A4A4A;
+        border: none;
+        border-radius: 50px;
+        font-weight: bold;
+        font-size: 18px;
+        cursor: pointer;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+    }
+
+</style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <header class="header">   <!-- 顶部设计 -->
+        <div class="logo" style = "font-family: Arial;"> 品牌名 </div>
+    
+        <div class="fucntion-links">
+            <input type="text" placeholder="Search..." class="search">
+            <a href="shopping cart.html">Home </a>
+            <a href="login.html">About Us </a>
+            <a href="register.html">Contsct Us </a>
+            <a href="wishlist.html">Activities </a>
+            <a href="member register.html">News & Stories </a>
+            <a href="rating form.html">Profile </a>
+        </div>
+    </header>
+
+    <button class="button-test">Donate</button>
+
+</body>
+</html>
