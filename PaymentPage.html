@@ -4,7 +4,8 @@
 <title>Donation Page</title>
 <style>
 
-    body {
+    body 
+    {
         background-color: #FFF5E4;   /* 背景颜色 */
         margin: 0;
         font-family: Arial, sans-serif;
@@ -12,7 +13,8 @@
     }
 
     /* 顶部快捷栏 */
-    .header {
+    .header 
+    {
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -21,12 +23,14 @@
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    .logo {
+    .logo 
+    {
         font-weight: bold;
         font-size: 36px;
     }
 
-    .header .function-links a {
+    .header .function-links a 
+    {
         margin-left: 15px;
         text-decoration: none;
         font-size: 20px;
@@ -34,20 +38,23 @@
         font-weight: bold;
     }
 
-    .search {
+    .search 
+    {
         padding: 6px;
         font-size: 16px;
     }
 
     /* 整体布局区块 */
-    .container {
+    .container 
+    {
         display: flex;
         flex-direction: row;
         padding: 20px;
     }
 
     /* 左侧社交按钮 */
-    .sidebar {
+    .sidebar 
+    {
         width: 60px;
         display: flex;
         flex-direction: column;
@@ -57,7 +64,8 @@
         padding-top: 20px;
     }
 
-    .sidebar button {
+    .sidebar button 
+    {
         background-color: #A8D5BA;
         border: none;
         border-radius: 10px;
@@ -71,7 +79,8 @@
     }
 
     /* 中间内容区（故事、图片） */
-    .story-section {
+    .story-section 
+    {
         flex: 2;
         background-color: white;
         border-radius: 12px;
@@ -79,18 +88,21 @@
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    .story-section img {
+    .story-section img 
+    {
         width: 100%;
         border-radius: 10px;
         margin-bottom: 15px;
     }
 
-    .story-section h2 {
+    .story-section h2 
+    {
         color: #F28585;
     }
 
     /* 右侧捐款区 */
-    .donation-box {
+    .donation-box 
+    {
         flex: 1;
         background-color: white;
         border-radius: 12px;
@@ -99,19 +111,48 @@
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    .donation-box h3 {
+    .donation-box h3 
+    {
         text-align: center;
         color: #F28585;
     }
 
-    .donation-box .amounts {
+    /* 一次性 / 每月 捐款类型按钮 */
+    .donation-box .donation-type 
+    {
+        text-align: center;       /* 水平居中对齐 */
+        margin-bottom: 15px;
+    }
+
+    .donation-box .donation-type button 
+    {
+        background-color: #A8D5BA;     /* 按钮背景 */
+        border: none;                  /* 去掉边框 */
+        border-radius: 25px;           /* 圆角按钮 */
+        padding: 10px 20px;
+        margin: 0 5px;
+        font-weight: bold;
+        color: #4A4A4A;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .donation-box .donation-type button:hover 
+    {
+        background-color: #91C8A8;     /* 悬停时变深 */
+    }
+
+    .donation-box .amounts 
+    {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 10px;
         margin: 15px 0;
     }
 
-    .donation-box .amounts button {
+    .donation-box .amounts button 
+    {
         background-color: #A8D5BA;
         border: none;
         border-radius: 10px;
@@ -119,13 +160,16 @@
         cursor: pointer;
         font-weight: bold;
         transition: 0.2s;
+        color: #4A4A4A;
     }
 
-    .donation-box .amounts button:hover {
+    .donation-box .amounts button:hover 
+    {
         background-color: #91C8A8;
     }
 
-    .donation-box input[type="text"] {
+    .donation-box input[type="text"] 
+    {
         width: 100%;
         padding: 10px;
         border-radius: 6px;
@@ -133,7 +177,8 @@
         margin-bottom: 15px;
     }
 
-    .donation-box .donate-btn {
+    .donation-box .donate-btn 
+    {
         width: 100%;
         padding: 12px;
         background-color: #F6B8B8;
@@ -145,7 +190,8 @@
         box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
 
-    .donation-box .donate-btn:hover {
+    .donation-box .donate-btn:hover 
+    {
         background-color: #F28585;
     }
 
@@ -171,14 +217,22 @@
 
         <!-- 左侧社交栏 -->
         <div class="sidebar">
-            <button>WS</button>
-            <button>FB</button>
-            <button>IG</button>
-            <button>Line</button>
+            <button><img src="yourimage.jpg" alt="Whatsapp"></button>
+            <button><img src="yourimage.jpg" alt="Facebook"></button>
+            <button><img src="yourimage.jpg" alt="Instagram"></button>
+            <button><img src="yourimage.jpg" alt="General Line"></button>
         </div>
 
         <!-- 中间故事区 -->
         <div class="story-section">
+            <img src="yourimage.jpg" alt="Donation Story">
+            <h2>捐赠故事标题</h2>
+            <p>这里可以放捐赠的背景介绍、机构信息、目标和故事内容。例如：本次活动是为了帮助老年人社区改善生活条件。捐款将用于购买生活用品和药品。</p>
+
+            <img src="yourimage.jpg" alt="Donation Story">
+            <h2>捐赠故事标题</h2>
+            <p>这里可以放捐赠的背景介绍、机构信息、目标和故事内容。例如：本次活动是为了帮助老年人社区改善生活条件。捐款将用于购买生活用品和药品。</p>
+
             <img src="yourimage.jpg" alt="Donation Story">
             <h2>捐赠故事标题</h2>
             <p>这里可以放捐赠的背景介绍、机构信息、目标和故事内容。例如：本次活动是为了帮助老年人社区改善生活条件。捐款将用于购买生活用品和药品。</p>
@@ -187,17 +241,17 @@
         <!-- 右侧捐款金额区 -->
         <div class="donation-box">
             <h3>捐款类型</h3>
-            <div style="text-align:center;">
+            <div class="donation-type">
                 <button>一次性</button>
                 <button>每月</button>
             </div>
             <div class="amounts">
+                <button>RM20</button>
                 <button>RM50</button>
                 <button>RM100</button>
                 <button>RM200</button>
                 <button>RM300</button>
                 <button>RM500</button>
-                <button>自定义</button>
             </div>
             <input type="text" placeholder="输入自定义金额">
             <button class="donate-btn">捐款</button>
