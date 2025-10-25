@@ -52,6 +52,7 @@
         padding: 20px; /*内容和边框之间的距离*/
     }
 
+
     /* 左侧社交按钮 */
     .sidebar 
     {
@@ -78,6 +79,7 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.2); /*阴影效果*/
     }
 
+
     /* 中间内容区（故事、图片） */
     .story-section 
     {
@@ -100,6 +102,7 @@
         color: #F28585; /*字体颜色*/
     }
 
+
     /* 右侧捐款区 */
     .donation-box 
     {
@@ -117,33 +120,7 @@
         color: #F28585; /*字体颜色*/
     }
 
-    /* 一次性 / 每月 捐款类型按钮 */
-    .donation-box .donation-type 
-    {
-        text-align: center;       /* 字体水平居中对齐 */
-        margin-bottom: 15px; /*保持的间距*/
-    }
-
-    .donation-box .donation-type button 
-    {
-        background-color: #A8D5BA;     /* 按钮背景 */
-        border: none;                  /* 去掉边框 */
-        border-radius: 25px;           /* 圆角按钮 */
-        padding: 10px 20px; /*内容和边框之间的距离*/
-        margin: 0 15px; /*保持的间距*/
-        font-weight: bold; /*粗体*/
-        color: #4A4A4A; /*字体颜色*/
-        cursor: pointer; /*鼠标变成手指*/
-        /* transition: background-color 1s ease; 按钮逐渐变色*/
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2); /*阴影效果*/
-    }
-
-    .donation-box .donation-type button:hover 
-    {
-        background-color: #91C8A8;     /* 悬停时变深色 */
-    }
-
-    .donation-box .amounts 
+    .donation-box .branch-type 
     {
         display: grid; /*区域变成网格布局*/
         grid-template-columns: repeat(3, 1fr); /*一行平均分成 3 个格子*/
@@ -151,7 +128,7 @@
         margin: 15px 0; /*保持的间距*/
     }
 
-    .donation-box .amounts button 
+    .donation-box .branch-type  button 
     {
         background-color: #A8D5BA; /*背景颜色*/
         border: none; /*移除按钮的默认边框线*/
@@ -163,36 +140,16 @@
         color: #4A4A4A; /*字体颜色*/
     }
 
-    .donation-box .amounts button:hover 
+    .donation-box .branch-type  button:hover 
     {
         background-color: #91C8A8; /* 悬停时变深色 */
     }
 
-    .donation-box input[type="text"] 
+    .donation-box .branch-type img 
     {
-        width: 95%; /*设置侧边栏的宽度*/
-        padding: 10px; /*内容和边框之间的距离*/
-        border-radius: 6px; /*设置按钮的圆角*/
-        border: 1px solid #ccc; /*1px宽、实线、灰色 的边框*/
+        width: 100%;  /*设置侧边栏的宽度*/
+        border-radius: 10px; /*设置按钮的圆角*/
         margin-bottom: 15px; /*保持的间距*/
-    }
-
-    .donation-box .donate-btn 
-    {
-        width: 100%; /*设置侧边栏的宽度*/
-        padding: 12px; /*内容和边框之间的距离*/
-        background-color: #F6B8B8; /*背景颜色*/
-        border: none; /*移除按钮的默认边框线*/
-        border-radius: 8px; /*设置按钮的圆角*/
-        font-size: 18px; /*字体大小*/
-        font-weight: bold; /*粗体*/
-        cursor: pointer; /*鼠标变成手指*/
-        box-shadow: 0 2px 6px rgba(0,0,0,0.2); /*阴影效果*/
-    }
-
-    .donation-box .donate-btn:hover 
-    {
-        background-color: #F28585; /*背景颜色*/
     }
 
 </style>
@@ -240,23 +197,16 @@
 
         <!-- 右侧捐款金额区 -->
         <div class="donation-box">
-            <h3>捐款类型</h3>
-            <div class="donation-type">
-                <button>一次性</button>
-                <button>每月</button>
+            <h3>选择捐款的分行</h3>
+            <div class="branch-type">
+                <img src="yourimage.jpg" alt="Nursing Home">
+                <img src="yourimage.jpg" alt="Orphanage">
+                <img src="yourimage.jpg" alt="Home for disabled people">
+
+                <button>Nursing Home</button>
+                <button>Orphanage</button>
+                <button>Home for disabled people</button>
             </div>
-            <div class="amounts">
-                <button>RM20</button>
-                <button>RM50</button>
-                <button>RM100</button>
-                <button>RM200</button>
-                <button>RM300</button>
-                <button>RM500</button>
-            </div>
-            <input type="text" placeholder="输入自定义金额">
-            <a href="BranchSelection.html">
-                <button class="donate-btn">捐款</button>
-            </a>
         </div>
     </div>
 
