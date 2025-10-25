@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Donation Page</title>
+<style>
+
+    body 
+    {
+        background-color: #FFF5E4;   /* 背景颜色 */
+        margin: 0; /*与周围的间距*/
+        font-family: Arial; /*字体*/
+        color: #4A4A4A; /*字体颜色*/
+    }
+
+    /* 顶部快捷栏 */
+    .header 
+    {
+        display: flex; /*变成弹性盒子Flexbox，自动变成一行排列*/
+        justify-content: space-between; /*子元素第一个贴左边，最后一个贴右边，中间自动留空*/
+        align-items: center; /*将内容上下居中*/
+        background-color: #F6B8B8; /*背景颜色*/
+        padding: 20px 50px; /*内容和边框之间的距离*/
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1); /*阴影效果*/
+    }
+
+    .logo 
+    {
+        font-weight: bold; /*粗体*/
+        font-size: 36px; /*字体大小*/
+    }
+
+    .header .function-links a 
+    {
+        margin-left: 15px; /*保持的间距*/
+        text-decoration: none; /*字体的下划线去掉*/
+        font-size: 20px; /*字体大小*/
+        color: #4A4A4A; /*字体颜色*/
+        font-weight: bold; /*粗体*/
+    }
+
+    .search 
+    {
+        padding: 6px; /*内容和边框之间的距离*/
+        font-size: 16px; /*字体大小*/
+    }
+
+    /* 整体布局区块 */
+    .container 
+    {
+        display: flex; /*变成弹性盒子Flexbox，自动变成一行排列*/
+        flex-direction: row; /*横向排列（从左到右）*/
+        padding: 20px; /*内容和边框之间的距离*/
+    }
+
+
+    /* 左侧社交按钮 */
+    .sidebar 
+    {
+        width: 60px; /*设置侧边栏的宽度*/
+        display: flex; /*变成弹性盒子Flexbox，自动变成一行排列*/
+        flex-direction: column; /*纵向排列（从上到下）*/
+        align-items: center; /*将内容上下居中*/
+        gap: 15px; /*每两个图标之间，自动留出 15px 的空白间距*/
+        margin-right: 20px; /*保持的间距*/
+        padding-top: 20px; /*内容和边框之间的距离*/
+    }
+
+    .sidebar button 
+    {
+        background-color: #A8D5BA; /*背景颜色*/
+        border: none; /*移除按钮的默认边框线*/
+        border-radius: 10px; /*设置按钮的圆角*/
+        padding: 8px; /*内容和边框之间的距离*/
+        width: 50px; /*设置侧边栏的宽度*/
+        height: 50px; /*设置按钮高度*/
+        cursor: pointer; /*鼠标变成手指*/
+        font-weight: bold; /*粗体*/
+        color: #4A4A4A; /*字体颜色*/
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2); /*阴影效果*/
+    }
+
+
+    /* 中间内容区（故事、图片） */
+    .story-section 
+    {
+        flex: 2; /*在弹性盒子Flexbox空间占比例是2*/
+        background-color: white; /*背景颜色*/
+        border-radius: 12px; /*设置按钮的圆角*/
+        padding: 20px; /*内容和边框之间的距离*/
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1); /*阴影效果*/
+    }
+
+    .story-section img 
+    {
+        width: 100%;  /*设置侧边栏的宽度*/
+        border-radius: 10px; /*设置按钮的圆角*/
+        margin-bottom: 15px; /*保持的间距*/
+    }
+
+    .story-section h2 
+    {
+        color: #F28585; /*字体颜色*/
+    }
+
+
+    /* 右侧捐款区 */
+    .donation-box 
+    {
+        flex: 1; /*在弹性盒子Flexbox空间占比例是1*/
+        background-color: white; /*背景颜色*/
+        border-radius: 12px; /*设置按钮的圆角*/
+        margin-left: 20px; /*保持的间距*/
+        padding: 20px; /*内容和边框之间的距离*/
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1); /*阴影效果*/
+    }
+
+    .donation-box h3 
+    {
+        text-align: center; /* 字体水平居中对齐 */
+        color: #F28585; /*字体颜色*/
+    }
+
+    .donation-box .Payment-Ways 
+    {
+        display: grid; /*区域变成网格布局*/
+        grid-template-columns: repeat(2, 1fr); /*一行平均分成 3 个格子*/
+        gap: 10px; /*每两个图标之间，自动留出 10px 的空白间距*/
+        margin: 15px 15px; /*保持的间距*/
+    }
+
+    .donation-box .Payment-Ways  button 
+    {
+        background-color: #A8D5BA; /*背景颜色*/
+        border: none; /*移除按钮的默认边框线*/
+        border-radius: 10px; /*设置按钮的圆角*/
+        padding: 10px; /*内容和边框之间的距离*/
+        cursor: pointer; /*鼠标变成手指*/
+        font-weight: bold; /*粗体*/
+        /* transition: 0.2s; 按钮逐渐变色*/
+        color: #4A4A4A; /*字体颜色*/
+    }
+
+    .donation-box .Payment-Ways  button:hover 
+    {
+        background-color: #91C8A8; /* 悬停时变深色 */
+    }
+
+    .donation-box .Payment-Ways img 
+    {
+        width: 100%;  /*设置侧边栏的宽度*/
+        border-radius: 10px; /*设置按钮的圆角*/
+        margin-bottom: 15px; /*保持的间距*/
+        margin-top: 20px; /*保持的间距*/
+    }
+
+</style>
+</head>
+<body>
+
+    <!-- 顶部导航栏 -->
+    <header class="header">
+        <div class="logo">品牌名</div>
+        <div class="function-links">
+            <input type="text" placeholder="Search..." class="search">
+            <a href="#">Home</a>
+            <a href="#">About Us</a>
+            <a href="#">Contact Us</a>
+            <a href="#">Activities</a>
+            <a href="#">News & Stories</a>
+        </div>
+    </header>
+
+    <!-- 主体内容 -->
+    <div class="container">
+
+        <!-- 左侧社交栏 -->
+        <div class="sidebar">
+            <button><img src="yourimage.jpg" alt="Whatsapp"></button>
+            <button><img src="yourimage.jpg" alt="Facebook"></button>
+            <button><img src="yourimage.jpg" alt="Instagram"></button>
+            <button><img src="yourimage.jpg" alt="General Line"></button>
+        </div>
+
+
+        <!-- 中间故事区 -->
+        <div class="story-section">
+            <img src="yourimage.jpg" alt="Donation Story">
+            <h2>捐赠故事标题</h2>
+            <p>这里可以放捐赠的背景介绍、机构信息、目标和故事内容。例如：本次活动是为了帮助老年人社区改善生活条件。捐款将用于购买生活用品和药品。</p>
+
+            <img src="yourimage.jpg" alt="Donation Story">
+            <h2>捐赠故事标题</h2>
+            <p>这里可以放捐赠的背景介绍、机构信息、目标和故事内容。例如：本次活动是为了帮助老年人社区改善生活条件。捐款将用于购买生活用品和药品。</p>
+
+            <img src="yourimage.jpg" alt="Donation Story">
+            <h2>捐赠故事标题</h2>
+            <p>这里可以放捐赠的背景介绍、机构信息、目标和故事内容。例如：本次活动是为了帮助老年人社区改善生活条件。捐款将用于购买生活用品和药品。</p>
+        </div>
+
+        
+        <!-- 右侧捐款金额区 -->
+        <div class="donation-box">
+            <h3>Payment Ways</h3>
+            <div class="Payment-Ways">
+                <img src="yourimage.jpg" alt="Bank Transfer">
+                <img src="yourimage.jpg" alt="E-Wallet">
+
+                <button>Bank Transfer</button>
+                <button>TNG</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
