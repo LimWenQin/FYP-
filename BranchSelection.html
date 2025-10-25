@@ -126,10 +126,12 @@
         grid-template-columns: repeat(3, 1fr); /*一行平均分成 3 个格子*/
         gap: 10px; /*每两个图标之间，自动留出 10px 的空白间距*/
         margin: 15px 0; /*保持的间距*/
+        text-align: center; /* 字体水平居中对齐 */
     }
 
-    .donation-box .branch-type  button 
+    .donation-box .branch-type .btn 
     {
+        /* display: inline-block; */
         background-color: #A8D5BA; /*背景颜色*/
         border: none; /*移除按钮的默认边框线*/
         border-radius: 10px; /*设置按钮的圆角*/
@@ -138,14 +140,16 @@
         font-weight: bold; /*粗体*/
         /* transition: 0.2s; 按钮逐渐变色*/
         color: #4A4A4A; /*字体颜色*/
+        width: 150px; /*设置侧边栏的宽度*/
+        height: 50px; /*设置按钮高度*/
     }
 
-    .donation-box .branch-type  button:hover 
+    .donation-box .branch-type button:hover 
     {
         background-color: #91C8A8; /* 悬停时变深色 */
     }
 
-    .donation-box .branch-type img 
+    .donation-box .branch-type .branch-item img 
     {
         width: 100%;  /*设置侧边栏的宽度*/
         border-radius: 10px; /*设置按钮的圆角*/
@@ -201,17 +205,28 @@
         <!-- 右侧捐款金额区 -->
         <div class="donation-box">
             <h3>选择捐款的分行</h3>
-            <div class="branch-type">
-                <img src="yourimage.jpg" alt="Nursing Home">
-                <img src="yourimage.jpg" alt="Orphanage">
-                <img src="yourimage.jpg" alt="Home for disabled people">
-
-                <button>Nursing Home</button>
-                <button>Orphanage</button>
-                <button>Home for disabled people</button>
+            <div class="branch-type"> 
+                <img src="yourimage.jpg" alt="Nursing Home"> 
+                <img src="yourimage.jpg" alt="Orphanage"> 
+                <img src="yourimage.jpg" alt="Home for disabled people"> 
+                
+                
+                <a href="PaymentWaysPage.html">
+                    <button class="btn">Nursing Home</button> 
+                </a>
+                
+                <a href="PaymentWaysPage.html">
+                    <button class="btn">Orphanage</button> 
+                </a>
+                
+                <a href="PaymentWaysPage.html">
+                    <button class="btn">Home for disabled people</button> 
+                </a>
             </div>
         </div>
     </div>
 
 </body>
 </html>
+
+<!--<a href="PaymentWaysPage.html"></a>
