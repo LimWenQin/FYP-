@@ -151,7 +151,7 @@
         margin: 15px 0; /*保持的间距*/
     }
 
-    .donation-box .amounts button 
+    .donation-box .amounts .A_btn
     {
         background-color: #A8D5BA; /*背景颜色*/
         border: none; /*移除按钮的默认边框线*/
@@ -166,6 +166,17 @@
     .donation-box .amounts button:hover 
     {
         background-color: #91C8A8; /* 悬停时变深色 */
+    }
+
+    .amounts a 
+    {
+        width: 100%; /*设置侧边栏的宽度*/
+    }
+
+    .amounts .A_btn 
+    {
+        width: 100%; /*设置侧边栏的宽度*/
+        height: 50px; /* 可以自行调整高度 */
     }
 
     .donation-box input[type="text"] 
@@ -247,12 +258,25 @@
                 <button>每月</button>
             </div>
             <div class="amounts">
-                <button>RM20</button>
-                <button>RM50</button>
-                <button>RM100</button>
-                <button>RM200</button>
-                <button>RM300</button>
-                <button>RM500</button>
+                <a href="BranchSelection.html">
+                    <button class="A_btn">RM20</button>
+                </a>
+                <a href="BranchSelection.html">
+                    <button class="A_btn">RM50</button>
+                </a>
+                <a href="BranchSelection.html">
+                    <button class="A_btn">RM100</button>
+                </a>
+                <a href="BranchSelection.html">
+                    <button class="A_btn">RM200</button>
+                </a>
+                <a href="BranchSelection.html">
+                    <button class="A_btn">RM300</button>
+                </a>
+                <a href="BranchSelection.html">
+                    <button class="A_btn">RM500</button>
+                </a>
+
             </div>
             <input type="text" placeholder="输入自定义金额">
             <a href="BranchSelection.html">
