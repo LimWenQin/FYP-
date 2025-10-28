@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Touch 'n Go eWallet Payment</title>
+<style>
+
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background-color: #FFF5E4;
+        color: #4A4A4A;
+    }
+
+    /* 顶部栏 */
+    .header {
+        background-color: #0057B7;
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 40px;
+    }
+
+    .header .title {
+        font-size: 22px;
+        font-weight: bold;
+    }
+
+    .header .call {
+        font-size: 16px;
+    }
+
+    /* 主体内容 */
+    .container {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 40px;
+        gap: 40px;
+    }
+
+    /* 左边付款详情 */
+    .payment-box {
+        background-color: white;
+        border-radius: 10px;
+        padding: 30px;
+        width: 450px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    .payment-box h3 {
+        color: #0057B7;
+        text-align: center;
+    }
+
+    .qr-box {
+        text-align: center;
+        margin-top: 20px;
+    }
+
+    .qr-box img {
+        width: 180px;
+        height: 180px;
+        border: 2px solid #ccc;
+        border-radius: 10px;
+        margin-bottom: 10px;
+    }
+
+    .payment-steps {
+        font-size: 15px;
+        line-height: 1.6;
+    }
+
+    .amount {
+        font-size: 20px;
+        font-weight: bold;
+        color: #F28585;
+        text-align: center;
+        margin-top: 15px;
+    }
+
+    /* 右边订单摘要 */
+    .order-summary {
+        background-color: white;
+        border-radius: 10px;
+        padding: 25px;
+        width: 280px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    .order-summary h3 {
+        color: #0057B7;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #A8D5BA;
+        padding-bottom: 5px;
+    }
+
+    .order-summary p {
+        margin: 8px 0;
+        font-size: 15px;
+    }
+
+    .order-summary .total {
+        font-size: 18px;
+        font-weight: bold;
+        text-align: right;
+        color: #F28585;
+        margin-top: 15px;
+    }
+
+    /* 底部信息 */
+    .footer {
+        text-align: center;
+        font-size: 14px;
+        margin-top: 40px;
+        color: #666;
+    }
+
+    .footer img {
+        height: 30px;
+        margin: 10px;
+    }
+
+</style>
+</head>
+<body>
+
+    <!-- 顶部 -->
+    <div class="header">
+        <div class="title">Touch'N Go eWallet</div>
+        <div class="call">Call Center: +603-5022 3888</div>
+    </div>
+
+    <!-- 主体 -->
+    <div class="container">
+
+        <!-- 左边付款详情 -->
+        <div class="payment-box">
+            <h3>Payment Details</h3>
+            <div class="qr-box">
+                <img src="your_qr_image_here.png" alt="QR Code">
+                <div class="amount">RM 5.00</div>
+                <p>QR Code will expire in <b>60s</b></p>
+            </div>
+
+            <div class="payment-steps">
+                <p><b>Pay with your Touch 'n Go eWallet!</b></p>
+                <ol>
+                    <li>Download and register for the Touch 'n Go eWallet app if you haven’t.</li>
+                    <li>Tap on the “Scan” icon in your TNG eWallet app.</li>
+                    <li>Scan the QR code above to complete the payment.</li>
+                </ol>
+            </div>
+
+            <p style="text-align:center; color:green; font-weight:bold; margin-top:10px;">
+                ✓ Your payment will be processed securely.
+            </p>
+        </div>
+
+        <!-- 右边订单摘要 -->
+        <div class="order-summary">
+            <h3>Order Summary</h3>
+            <p><b>Payment To:</b> CARE FOR MALAYSIA SOCIETY</p>
+            <p><b>Transaction No:</b> 20251028112200</p>
+            <p><b>Payment Details:</b> Donation</p>
+            <p class="total">Total: RM 5.00</p>
+        </div>
+    </div>
+
+    
+
+</body>
+</html>
+
+<!-- 底部 
+    <div class="footer">
+        <p>Your payments will be processed in a safe and secured environment.</p>
+        <p>Get the App:</p>
+        <img src="googleplay.png" alt="Google Play">
+        <img src="appstore.png" alt="App Store">
+    </div>-->
