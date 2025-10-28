@@ -128,7 +128,7 @@
         margin: 15px 15px; /*保持的间距*/
     }
 
-    .donation-box .Payment-Ways  button 
+    .donation-box .Payment-Ways .P_btn
     {
         background-color: #A8D5BA; /*背景颜色*/
         border: none; /*移除按钮的默认边框线*/
@@ -140,7 +140,7 @@
         color: #4A4A4A; /*字体颜色*/
     }
 
-    .donation-box .Payment-Ways  button:hover 
+    .donation-box .Payment-Ways  .P_btn:hover 
     {
         background-color: #91C8A8; /* 悬停时变深色 */
     }
@@ -151,6 +151,17 @@
         border-radius: 10px; /*设置按钮的圆角*/
         margin-bottom: 15px; /*保持的间距*/
         margin-top: 20px; /*保持的间距*/
+    }
+
+    .Payment-Ways a 
+    {
+        width: 100%; /*设置侧边栏的宽度*/
+    }
+
+    .Payment-Ways .P_btn 
+    {
+        width: 100%; /*设置侧边栏的宽度*/
+        height: 50px; /* 可以自行调整高度 */
     }
 
 </style>
@@ -206,8 +217,14 @@
                 <img src="yourimage.jpg" alt="Bank Transfer">
                 <img src="yourimage.jpg" alt="E-Wallet">
 
-                <button>Bank Transfer</button>
-                <button>TNG</button>
+                <a href="BankTransferPage.html">
+                    <button class="P_btn">Bank Transfer</button>
+                </a>
+                
+                <a href="BankTransferPage.html">
+                    <button class="P_btn">TNG</button>
+                </a>
+                
             </div>
         </div>
     </div>
