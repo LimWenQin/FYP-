@@ -43,7 +43,7 @@ CREATE TABLE `achievement` (
 
 CREATE TABLE `activity` (
   `Activity_ID` int(11) NOT NULL,
-  `Acticity_Date` date NOT NULL,
+  `Activity_Date` date NOT NULL,
   `Activity_Details` text NOT NULL,
   `Activity_Picture` varchar(255) NOT NULL,
   `Activity_Status` varchar(50) NOT NULL,
@@ -98,7 +98,7 @@ CREATE TABLE `donor` (
   `Donor_LName` varchar(50) NOT NULL,
   `Donor_ContactNumber` varchar(20) NOT NULL,
   `Donor_ICNumber` varchar(20) NOT NULL,
-  `Donor_Email` date NOT NULL,
+  `Donor_Email` varchar(100) NOT NULL,
   `Donor_Password` varchar(15) NOT NULL,
   `Donor_Address` text NOT NULL,
   `Donor_DOB` date NOT NULL,
@@ -108,10 +108,10 @@ CREATE TABLE `donor` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `donor achievement`
+-- 表的结构 `donor_achievement`
 --
 
-CREATE TABLE `donor achievement` (
+CREATE TABLE `donor_achievement` (
   `DonorAchievement_ID` int(11) NOT NULL,
   `DonorAchievement_AchievedAt` datetime NOT NULL,
   `Donor_ID` int(11) NOT NULL,
@@ -121,10 +121,10 @@ CREATE TABLE `donor achievement` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `item donation`
+-- 表的结构 `item_donation`
 --
 
-CREATE TABLE `item donation` (
+CREATE TABLE `item_donation` (
   `Item_ID` int(11) NOT NULL,
   `Item_Name` varchar(100) NOT NULL,
   `Item_Quantity` int(11) NOT NULL,
@@ -146,7 +146,7 @@ CREATE TABLE `item donation` (
 -- 表的结构 `order`
 --
 
-CREATE TABLE `order` (
+CREATE TABLE `orders` (
   `Order_ID` int(11) NOT NULL,
   `Order_FName` varchar(50) NOT NULL,
   `Order_LName` varchar(50) NOT NULL,
@@ -218,10 +218,10 @@ CREATE TABLE `receipt` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `recurring donation`
+-- 表的结构 `recurring_donation`
 --
 
-CREATE TABLE `recurring donation` (
+CREATE TABLE `recurring_donation` (
   `Recurring_ID` int(11) NOT NULL,
   `Recurring_Amount` decimal(10,2) NOT NULL,
   `Recurring_Payment_Method` varchar(50) NOT NULL,
@@ -235,10 +235,10 @@ CREATE TABLE `recurring donation` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `redemption order`
+-- 表的结构 `redemption_order`
 --
 
-CREATE TABLE `redemption order` (
+CREATE TABLE `redemption_order` (
   `Redemption_ID` int(11) NOT NULL,
   `Redemption_Address` text NOT NULL,
   `Redemption_ContactNumber` varchar(20) NOT NULL,
@@ -252,10 +252,10 @@ CREATE TABLE `redemption order` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `reward item`
+-- 表的结构 `reward_item`
 --
 
-CREATE TABLE `reward item` (
+CREATE TABLE `reward_item` (
   `Reward_ID` int(11) NOT NULL,
   `Reward_ItemName` varchar(100) NOT NULL,
   `Reward_Description` text NOT NULL,
@@ -280,7 +280,7 @@ CREATE TABLE `staff` (
   `Staff_Email` varchar(100) NOT NULL,
   `Staff_Password` varchar(15) NOT NULL,
   `Staff_DOB` date NOT NULL,
-  `Staff_Address` int(11) NOT NULL,
+  `Staff_Address` text NOT NULL,
   `Staff_Commnent` text NOT NULL,
   `Admin_ID` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -288,10 +288,10 @@ CREATE TABLE `staff` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `staff activity`
+-- 表的结构 `staff_activity`
 --
 
-CREATE TABLE `staff activity` (
+CREATE TABLE `staff_activity` (
   `StaffActivity_ID` int(11) NOT NULL,
   `StaffActivity_Role` varchar(50) NOT NULL,
   `Staff_ID` int(11) NOT NULL,
@@ -335,17 +335,17 @@ ALTER TABLE `donor`
   ADD PRIMARY KEY (`Donor_ID`);
 
 --
--- 表的索引 `donor achievement`
+-- 表的索引 `donor_achievement`
 --
-ALTER TABLE `donor achievement`
+ALTER TABLE `donor_achievement`
   ADD PRIMARY KEY (`DonorAchievement_ID`),
   ADD KEY `DonorAchievement_Donor_ID_FK` (`Donor_ID`),
   ADD KEY `DonorAchievement_Achievement_ID_FK` (`Achievement_ID`);
 
 --
--- 表的索引 `item donation`
+-- 表的索引 `item_donation`
 --
-ALTER TABLE `item donation`
+ALTER TABLE `item_donation`
   ADD PRIMARY KEY (`Item_ID`),
   ADD KEY `Item_Donor_ID_FK` (`Donor_ID`),
   ADD KEY `Item_Activity_ID_FK` (`Activity_ID`);
@@ -353,7 +353,7 @@ ALTER TABLE `item donation`
 --
 -- 表的索引 `order`
 --
-ALTER TABLE `order`
+ALTER TABLE `orders`
   ADD PRIMARY KEY (`Order_ID`),
   ADD KEY `Order_Donor_ID_FK` (`Donor_ID`),
   ADD KEY `Order_Activity_ID_FK` (`Activity_ID`),
@@ -381,24 +381,24 @@ ALTER TABLE `receipt`
   ADD KEY `Receipt_Order_ID_FK` (`Order_ID`);
 
 --
--- 表的索引 `recurring donation`
+-- 表的索引 `recurring_donation`
 --
-ALTER TABLE `recurring donation`
+ALTER TABLE `recurring_donation`
   ADD PRIMARY KEY (`Recurring_ID`),
   ADD KEY `RecurringDonation_Donor_ID_FK` (`Donor_ID`);
 
 --
--- 表的索引 `redemption order`
+-- 表的索引 `redemption_order`
 --
-ALTER TABLE `redemption order`
+ALTER TABLE `redemption_order`
   ADD PRIMARY KEY (`Redemption_ID`),
   ADD KEY `RedemptionOrder_Donor_ID_FK` (`Donor_ID`),
   ADD KEY `RedemptionOrder_Reward_ID_FK` (`Reward_ID`);
 
 --
--- 表的索引 `reward item`
+-- 表的索引 `reward_item`
 --
-ALTER TABLE `reward item`
+ALTER TABLE `reward_item`
   ADD PRIMARY KEY (`Reward_ID`);
 
 --
@@ -409,9 +409,9 @@ ALTER TABLE `staff`
   ADD KEY `staff_admin_id_fk` (`Admin_ID`);
 
 --
--- 表的索引 `staff activity`
+-- 表的索引 `staff_activity`
 --
-ALTER TABLE `staff activity`
+ALTER TABLE `staff_activity`
   ADD PRIMARY KEY (`StaffActivity_ID`),
   ADD KEY `StaffActivity_Staff_ID_FK` (`Staff_ID`),
   ADD KEY `StaffActivity_Activity_ID_FK` (`Activity_ID`);
@@ -451,15 +451,15 @@ ALTER TABLE `donor`
   MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- 使用表AUTO_INCREMENT `donor achievement`
+-- 使用表AUTO_INCREMENT `donor_achievement`
 --
-ALTER TABLE `donor achievement`
+ALTER TABLE `donor_achievement`
   MODIFY `DonorAchievement_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- 使用表AUTO_INCREMENT `order`
 --
-ALTER TABLE `order`
+ALTER TABLE `orders`
   MODIFY `Order_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -475,15 +475,15 @@ ALTER TABLE `point`
   MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- 使用表AUTO_INCREMENT `redemption order`
+-- 使用表AUTO_INCREMENT `redemption_order`
 --
-ALTER TABLE `redemption order`
+ALTER TABLE `redemption_order`
   MODIFY `Redemption_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- 使用表AUTO_INCREMENT `reward item`
+-- 使用表AUTO_INCREMENT `reward_item`
 --
-ALTER TABLE `reward item`
+ALTER TABLE `reward_item`
   MODIFY `Reward_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -493,9 +493,9 @@ ALTER TABLE `staff`
   MODIFY `Staff_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- 使用表AUTO_INCREMENT `staff activity`
+-- 使用表AUTO_INCREMENT `staff_activity`
 --
-ALTER TABLE `staff activity`
+ALTER TABLE `staff_activity`
   MODIFY `StaffActivity_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -515,25 +515,25 @@ ALTER TABLE `branch`
   ADD CONSTRAINT `branch_admin_id_fk` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`);
 
 --
--- 限制表 `donor achievement`
+-- 限制表 `donor_achievement`
 --
-ALTER TABLE `donor achievement`
+ALTER TABLE `donor_achievement`
   ADD CONSTRAINT `DonorAchievement_Achievement_ID_FK` FOREIGN KEY (`Achievement_ID`) REFERENCES `achievement` (`Achievement_ID`),
   ADD CONSTRAINT `DonorAchievement_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 --
--- 限制表 `item donation`
+-- 限制表 `item_donation`
 --
-ALTER TABLE `item donation`
+ALTER TABLE `item_donation`
   ADD CONSTRAINT `Item_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
   ADD CONSTRAINT `Item_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 --
 -- 限制表 `order`
 --
-ALTER TABLE `order`
+ALTER TABLE `orders`
   ADD CONSTRAINT `Order_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
-  ADD CONSTRAINT `Order_Branch_ID_FK` FOREIGN KEY (`Payment_ID`) REFERENCES `branch` (`Branch_ID`),
+  ADD CONSTRAINT `Order_Branch_ID_FK` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`),
   ADD CONSTRAINT `Order_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`),
   ADD CONSTRAINT `Order_Payment_ID_FK` FOREIGN KEY (`Payment_ID`) REFERENCES `payment` (`Payment_ID`);
 
@@ -548,20 +548,20 @@ ALTER TABLE `point`
 --
 ALTER TABLE `receipt`
   ADD CONSTRAINT `Receipt_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`),
-  ADD CONSTRAINT `Receipt_Order_ID_FK` FOREIGN KEY (`Order_ID`) REFERENCES `order` (`Order_ID`);
+  ADD CONSTRAINT `Receipt_Order_ID_FK` FOREIGN KEY (`Order_ID`) REFERENCES `orders` (`Order_ID`);
 
 --
--- 限制表 `recurring donation`
+-- 限制表 `recurring_donation`
 --
-ALTER TABLE `recurring donation`
+ALTER TABLE `recurring_donation`
   ADD CONSTRAINT `RecurringDonation_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 --
--- 限制表 `redemption order`
+-- 限制表 `redemption_order`
 --
-ALTER TABLE `redemption order`
+ALTER TABLE `redemption_order`
   ADD CONSTRAINT `RedemptionOrder_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`),
-  ADD CONSTRAINT `RedemptionOrder_Reward_ID_FK` FOREIGN KEY (`Reward_ID`) REFERENCES `reward item` (`Reward_ID`);
+  ADD CONSTRAINT `RedemptionOrder_Reward_ID_FK` FOREIGN KEY (`Reward_ID`) REFERENCES `reward_item` (`Reward_ID`);
 
 --
 -- 限制表 `staff`
@@ -570,9 +570,9 @@ ALTER TABLE `staff`
   ADD CONSTRAINT `staff_admin_id_fk` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`);
 
 --
--- 限制表 `staff activity`
+-- 限制表 `staff_activity`
 --
-ALTER TABLE `staff activity`
+ALTER TABLE `staff_activity`
   ADD CONSTRAINT `StaffActivity_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
   ADD CONSTRAINT `StaffActivity_Staff_ID_FK` FOREIGN KEY (`Staff_ID`) REFERENCES `staff` (`Staff_ID`);
 COMMIT;
