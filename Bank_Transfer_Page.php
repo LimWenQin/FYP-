@@ -1,48 +1,65 @@
 <?php
-// 连接数据库
-$conn = new mysqli("localhost", "root", "", "fyp");
+// ✅ 设置时区（马来西亚时间）
+date_default_timezone_set("Asia/Kuala_Lumpur");
+
+// ✅ 连接数据库
+$conn = new mysqli("localhost", "root", "", "donation system");
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// 当表单提交时执行
+// ✅ 检查表单提交
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-    // 接收来自表单和前一页的数据
-    $donation_type = $_POST['donation_type']; // 一次性 or 每月
+    // 接收来自表单与前一页的数据
+    $donation_type = $_POST['donation_type']; // one-time 或 monthly
     $amount = $_POST['amount'];               // 金额
-    $branch_id = $_POST['branch_id'];         // 捐款分行
-    $bank_name = $_POST['bank'];              // 银行
+    $branch_id = $_POST['branch_id'];         // 分行ID
+    $bank_name = $_POST['bank'];              // 银行名称
     $card_number = $_POST['card'];            // 卡号
     $exp = $_POST['exp'];                     // 到期日
-    $cvc = $_POST['cvc'];                     // CVC
+    $cvc = $_POST['cvc'];                     // 安全码
     $payment_method = "Bank Transfer";
+
+    // ✅ 系统生成交易参考号与时间
     $txn_ref = "TXN-" . date("YmdHis");
     $now = date("Y-m-d H:i:s");
+    $status = "Success";
 
-    // 1️⃣ 插入到 payment 表
+    // ✅ 屏蔽卡号（如：1234 **** **** 5678）
+    $masked_card = substr($card_number, 0, 4) . " **** **** " . substr($card_number, -4);
+
+    // ✅ 1️⃣ 插入到 payment 表
     $stmt = $conn->prepare("INSERT INTO payment 
         (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    $status = "Success";
-    $masked_card = substr($card_number, 0, 4) . " **** **** " . substr($card_number, -4);
     $stmt->bind_param("sssissss", $payment_method, $status, $txn_ref, $amount, $now, $bank_name, $masked_card, $now);
     $stmt->execute();
     $payment_id = $stmt->insert_id;
     $stmt->close();
 
-    // 2️⃣ 插入到 order 表（示例中假设 Donor_ID=1, Activity_ID=1）
-    $stmt = $conn->prepare("INSERT INTO `order` 
-        (Order_FName, Order_LName, Order_ContactNumber, Order_ICNumber, Order_Email, Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, Order_TXN_Ref, Order_Type, Order_Status, Order_Created_At, Order_Updated_At, Donor_ID, Payment_ID, Branch_ID, Activity_ID)
-        VALUES ('John', 'Tan', '0123456789', '990101-10-1234', 'john.tan@email.com', ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 1)");
-
+    // ✅ 2️⃣ 插入到 orders 表
+    // 这里先假设捐赠人 (Donor_ID=1) 和活动 (Activity_ID=1)
     $order_type = ($donation_type == "monthly") ? "Recurring" : "One-time";
     $order_status = "Completed";
-    $stmt->bind_param("dssssssiii", $amount, $payment_method, $status, $txn_ref, $order_type, $order_status, $now, $now, $payment_id, $branch_id);
+
+    $stmt = $conn->prepare("INSERT INTO orders 
+        (Order_FName, Order_LName, Order_ContactNumber, Order_ICNumber, Order_Email, 
+         Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, 
+         Order_TXN_Ref, Order_Type, Order_Status, Order_Created_At, Order_Updated_At, 
+         Donor_ID, Payment_ID, Branch_ID, Activity_ID)
+        VALUES ('John', 'Tan', '0123456789', '990101-10-1234', 'john.tan@email.com',
+         ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 1)");
+
+    $stmt->bind_param("dsssssssiii", 
+        $amount, $payment_method, $status, $txn_ref, 
+        $order_type, $order_status, $now, $now, 
+        $payment_id, $branch_id
+    );
     $stmt->execute();
     $stmt->close();
 
-    // 3️⃣ 若是每月捐款，插入到 recurring_donation 表
+    // ✅ 3️⃣ 如果是每月捐款，插入 recurring_donation 表
     if ($donation_type == "monthly") {
         $deduction_date = date("Y-m-d", strtotime("+1 month"));
         $stmt = $conn->prepare("INSERT INTO recurring_donation 
@@ -53,8 +70,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt->close();
     }
 
-    // 跳转到成功页面
-    header("Location: payment_success.php?txn_ref=$txn_ref");
+    // ✅ 跳转到付款成功页面
+    header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
     exit();
 }
 
@@ -66,29 +83,122 @@ $conn->close();
 <head>
 <title>Bank Transfer</title>
 <style>
-/* 原本你的 CSS 保留不变 */
+/* ✅ 样式区块（保留你的原始美观风格） */
 body {
     background-color: #FFF5E4;
     font-family: Arial;
     color: #4A4A4A;
+    margin: 0;
 }
-.header { display: flex; justify-content: space-between; align-items: center; background-color: #F6B8B8; padding: 20px 50px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);}
-.logo { font-weight: bold; font-size: 36px; }
-.header .function-links a { margin-left: 15px; text-decoration: none; font-size: 20px; color: #4A4A4A; font-weight: bold;}
-.container { display: flex; flex-direction: row; padding: 20px;}
-.sidebar { width: 60px; display: flex; flex-direction: column; align-items: center; gap: 15px; margin-right: 20px; padding-top: 20px;}
-.sidebar button { background-color: #A8D5BA; border: none; border-radius: 10px; padding: 8px; width: 50px; height: 50px; cursor: pointer; font-weight: bold; color: #4A4A4A; box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
-.story-section { flex: 2; background-color: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);}
-.story-section img { width: 100%; border-radius: 10px; margin-bottom: 15px;}
-.story-section h2 { color: #F28585; }
-.donation-box { flex: 1; background-color: white; border-radius: 12px; margin-left: 20px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);}
-.donation-box h3 { text-align: center; color: #F28585;}
-.bank-form label { font-weight: bold; margin-top: 10px;}
-.bank-form select, .bank-form input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px; font-size: 16px;}
-.card-info { display: flex; justify-content: space-between; gap: 10px; margin-top: 10px;}
-.card-info div { flex: 1;}
-.donate-btn { margin-top: 20px; width: 100%; padding: 12px; background-color: #F6B8B8; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.2); color: #4A4A4A;}
-.donate-btn:hover { background-color: #F28585; }
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #F6B8B8;
+    padding: 20px 50px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.logo {
+    font-weight: bold;
+    font-size: 36px;
+}
+.header .function-links a {
+    margin-left: 15px;
+    text-decoration: none;
+    font-size: 20px;
+    color: #4A4A4A;
+    font-weight: bold;
+}
+.container {
+    display: flex;
+    flex-direction: row;
+    padding: 20px;
+}
+.sidebar {
+    width: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-right: 20px;
+    padding-top: 20px;
+}
+.sidebar button {
+    background-color: #A8D5BA;
+    border: none;
+    border-radius: 10px;
+    padding: 8px;
+    width: 50px;
+    height: 50px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #4A4A4A;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+.story-section {
+    flex: 2;
+    background-color: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.story-section img {
+    width: 100%;
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+.story-section h2 {
+    color: #F28585;
+}
+.donation-box {
+    flex: 1;
+    background-color: white;
+    border-radius: 12px;
+    margin-left: 20px;
+    padding: 20px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.donation-box h3 {
+    text-align: center;
+    color: #F28585;
+}
+.bank-form label {
+    font-weight: bold;
+    margin-top: 10px;
+}
+.bank-form select, .bank-form input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    margin-top: 5px;
+    font-size: 16px;
+}
+.card-info {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+}
+.card-info div {
+    flex: 1;
+}
+.donate-btn {
+    margin-top: 20px;
+    width: 100%;
+    padding: 12px;
+    background-color: #F6B8B8;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    color: #4A4A4A;
+}
+.donate-btn:hover {
+    background-color: #F28585;
+}
 </style>
 </head>
 <body>
@@ -103,17 +213,21 @@ body {
 </header>
 
 <div class="container">
+    <!-- 左侧故事区 -->
     <div class="story-section">
+        <img src="yourimage.jpg" alt="Donation Story">
         <h2>Donation Story</h2>
-        <p>Support our cause with your donation.</p>
+        <p>Support our cause with your donation. Your kindness helps improve lives.</p>
     </div>
 
+    <!-- 右侧付款区 -->
     <div class="donation-box">
         <h3>Bank Transfer</h3>
         <form class="bank-form" method="POST" action="">
-            <input type="hidden" name="donation_type" value="<?php echo $_POST['donation_type'] ?? 'one-time'; ?>">
-            <input type="hidden" name="amount" value="<?php echo $_POST['amount'] ?? 50; ?>">
-            <input type="hidden" name="branch_id" value="<?php echo $_POST['branch_id'] ?? 1; ?>">
+            <!-- 从上一页传来的隐藏字段 -->
+            <input type="hidden" name="donation_type" value="<?php echo $_GET['donation_type'] ?? 'one-time'; ?>">
+            <input type="hidden" name="amount" value="<?php echo $_GET['amount'] ?? 50; ?>">
+            <input type="hidden" name="branch_id" value="<?php echo $_GET['branch_id'] ?? 1; ?>">
 
             <label for="bank">Bank Name</label>
             <select id="bank" name="bank" required>
