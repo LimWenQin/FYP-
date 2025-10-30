@@ -183,7 +183,7 @@ function selectAmount(amount) {
 <body>
 
 <header class="header">
-    <div class="logo">品牌名</div>
+    <div class="logo">Brand Name</div>
     <div class="function-links">
         <input type="text" placeholder="Search..." class="search">
         <a href="#">Home</a>
@@ -206,17 +206,17 @@ function selectAmount(amount) {
 
     <div class="story-section">
         <img src="yourimage.jpg" alt="Donation Story">
-        <h2>捐赠故事标题</h2>
-        <p>这是捐赠活动的背景介绍，例如：帮助老年人社区改善生活条件。捐款将用于购买生活用品和药品。</p>
+        <h2>Donation Story Title</h2>
+        <p>This is background information on the donation drive, such as helping to improve living conditions in senior citizen communities. Donations will be used to purchase daily necessities and medicines.</p>
     </div>
 
     <div class="donation-box">
-        <h3>捐款类型</h3>
+        <h3>Types of donations</h3>
 
         <form id="donationForm" method="POST" action="Branch_Selection.php">
             <div class="donation-type">
-                <button type="button" id="onceBtn" onclick="selectType('one-time')">一次性</button>
-                <button type="button" id="monthlyBtn" onclick="selectType('monthly')">每月</button>
+                <button type="button" id="onceBtn" onclick="selectType('one-time')">One-time</button>
+                <button type="button" id="monthlyBtn" onclick="selectType('monthly')">Monthly</button>
             </div>
 
             <input type="hidden" id="donation_type" name="donation_type" value="one-time">
@@ -231,12 +231,12 @@ function selectAmount(amount) {
                 <button type="button" onclick="selectAmount(500)">RM500</button>
             </div>
 
-            <input type="text" id="custom_amount" name="custom_amount" placeholder="输入自定义金额">
+            <input type="text" id="custom_amount" name="custom_amount" placeholder="Enter custom amount">
 
             <button type="submit" class="donate-btn" onclick="
                 document.getElementById('amount').value = 
                 document.getElementById('custom_amount').value || 0;
-            ">捐款</button>
+            ">Donate</button>
         </form>
     </div>
 </div>
