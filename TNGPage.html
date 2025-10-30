@@ -6,136 +6,136 @@
 
     body 
     {
-        margin: 0;
-        font-family: Arial, sans-serif;
-        background-color: #FFF5E4;
-        color: #4A4A4A;
+        margin: 0; /*保持的间距*/
+        font-family: Arial, sans-serif; /*字体*/
+        background-color: #FFF5E4; /* 背景颜色 */
+        color: #4A4A4A; /*字体颜色*/
     }
 
     /* 顶部栏 */
     .header 
     {
-        background-color: #0057B7;
-        color: white;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 15px 40px;
+        background-color: #0057B7; /* 背景颜色 */
+        color: white;  /*字体颜色*/
+        display: flex; /*变成弹性盒子Flexbox，自动变成一行排列*/
+        justify-content: space-between; /*子元素第一个贴左边，最后一个贴右边，中间自动留空*/
+        align-items: center; /*将内容上下居中*/
+        padding: 15px 40px; /*内容和边框之间的距离*/
     }
 
     .header .title 
     {
-        font-size: 22px;
-        font-weight: bold;
+        font-size: 22px; /*字体大小*/
+        font-weight: bold; /*粗体*/
     }
 
     .header .call 
     {
-        font-size: 16px;
+        font-size: 16px; /*字体大小*/
     }
 
     /* 主体内容 */
     .container 
     {
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        padding: 40px;
-        gap: 40px;
+        display: flex; /*变成弹性盒子Flexbox，自动变成一行排列*/
+        justify-content: center;  /*在 横向（左右方向） 把内容放在中间*/
+        align-items: flex-start;  /*在 纵向（上下方向） 对齐内容*/
+        padding: 40px; /*内容和边框之间的距离*/
+        gap: 40px; /*每两个图标之间，自动留出 40px 的空白间距*/
     }
 
     /* 左边付款详情 */
     .payment-box 
     {
-        background-color: white;
-        border-radius: 10px;
-        padding: 30px;
-        width: 450px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        background-color: white; /* 背景颜色 */
+        border-radius: 10px; /*设置按钮的圆角*/
+        padding: 30px; /*内容和边框之间的距离*/
+        width: 450px; /*设置侧边栏的宽度*/
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2); /*阴影效果*/
     }
 
     .payment-box h3 
     {
-        color: #0057B7;
-        text-align: center;
+        color: #0057B7; /*字体颜色*/
+        text-align: center; /* 字体水平居中对齐 */
     }
 
     .qr-box 
     {
-        text-align: center;
-        margin-top: 20px;
+        text-align: center; /* 字体水平居中对齐 */
+        margin-top: 20px; /*保持的间距*/
     }
 
     .qr-box img 
     {
-        width: 180px;
-        height: 180px;
-        border: 2px solid #ccc;
-        border-radius: 10px;
-        margin-bottom: 10px;
+        width: 180px;  /*设置侧边栏的宽度*/
+        height: 180px; /*设置侧边栏的高度*/
+        border: 2px solid #ccc; /*按钮的默认边框线*/
+        border-radius: 10px; /*设置按钮的圆角*/
+        margin-bottom: 10px; /*保持的间距*/
     }
 
     .payment-steps 
     {
-        font-size: 15px;
-        line-height: 1.6;
+        font-size: 15px; /*字体大小*/
+        line-height: 1.6; /*行间距*/
     }
 
     .amount 
     {
-        font-size: 20px;
-        font-weight: bold;
-        color: #F28585;
-        text-align: center;
-        margin-top: 15px;
+        font-size: 20px; /*字体大小*/
+        font-weight: bold; /*粗体*/
+        color: #F28585; /*字体颜色*/
+        text-align: center; /* 字体水平居中对齐 */
+        margin-top: 15px; /*保持的间距*/
     }
 
     /* 右边订单摘要 */
     .order-summary 
     {
-        background-color: white;
-        border-radius: 10px;
-        padding: 25px;
-        width: 280px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        background-color: white; /* 背景颜色 */
+        border-radius: 10px; /*设置按钮的圆角*/
+        padding: 25px; /*内容和边框之间的距离*/
+        width: 280px; /*设置侧边栏的宽度*/
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2); /*阴影效果*/
     }
 
     .order-summary h3 
     {
-        color: #0057B7;
-        margin-bottom: 15px;
-        border-bottom: 2px solid #A8D5BA;
-        padding-bottom: 5px;
+        color: #0057B7; /*字体颜色*/
+        margin-bottom: 15px; /*保持的间距*/
+        border-bottom: 2px solid #A8D5BA; /*按钮的默认边框线*/
+        padding-bottom: 5px; /*内容和边框之间的距离*/
     }
 
     .order-summary p 
     {
-        margin: 8px 0;
-        font-size: 15px;
+        margin: 8px 0; /*保持的间距*/
+        font-size: 15px; /*字体大小*/
     }
 
     .order-summary .total 
     {
-        font-size: 18px;
-        font-weight: bold;
-        text-align: right;
-        color: #F28585;
-        margin-top: 15px;
+        font-size: 18px; /*字体大小*/
+        font-weight: bold; /*粗体*/
+        text-align: right; /* 字体水平靠右对齐 */
+        color: #F28585; /*字体颜色*/
+        margin-top: 15px; /*保持的间距*/
     }
 
     /* 底部信息 */
     .footer 
     {
-        text-align: center;
-        font-size: 14px;
-        margin-top: 40px;
-        color: #666;
+        text-align: center; /* 字体水平居中对齐 */
+        font-size: 14px; /*字体大小*/
+        margin-top: 40px; /*保持的间距*/
+        color: #666; /*字体颜色*/
     }
 
     .footer img 
     {
-        height: 30px;
-        margin: 10px;
+        height: 30px; /*设置侧边栏的高度*/
+        margin: 10px; /*保持的间距*/
     }
 
 </style>
