@@ -11,7 +11,7 @@ if (!isset($_SESSION['admin_id'])) {
 // Include database connection
 include 'dataconnection.php';
 
-// Get statistics
+
 $total_donors = 0;
 $total_donations = 0;
 $total_branches = 0;
