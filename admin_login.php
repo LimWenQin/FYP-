@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Basic validation
     if (!empty($email) && !empty($password)) {
         // Check if connection is successful
-        if (!$conn->connect_error) {
+        if ($conn) {
             // Prevent SQL injection
             $email = $conn->real_escape_string($email);
             $password = $conn->real_escape_string($password);
@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $sql = "SELECT * FROM admin WHERE Admin_Email = '$email' AND Admin_Password = '$password'";
             $result = $conn->query($sql);
             
-            if ($result->num_rows > 0) {
+            if ($result && $result->num_rows > 0) {
                 // Login successful
                 $admin = $result->fetch_assoc();
                 
@@ -97,7 +97,7 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
             overflow: hidden;
             position: relative;
-            z-index: 100; /* 提高z-index确保在动画元素之上 */
+            z-index: 100;
         }
 
         .logo-section {
@@ -159,12 +159,12 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
             width: 100%;
             max-width: 350px;
             position: relative;
-            z-index: 10; /* 确保表单内容在动画之上 */
+            z-index: 10;
         }
 
         .login-box {
             position: relative;
-            z-index: 20; /* 进一步提高表单内容的层级 */
+            z-index: 20;
         }
 
         .login-box h2 {
@@ -242,7 +242,7 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
             font-size: 20px;
             cursor: pointer;
             transition: color 0.3s ease;
-            z-index: 5; /* 确保图标可以点击 */
+            z-index: 5;
         }
 
         .input-box .icon:hover {

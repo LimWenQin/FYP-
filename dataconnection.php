@@ -1,14 +1,19 @@
 <?php
 
-$connect=mysqli_connect("localhost","root","", "eshop");
-//1.server name 2.username 3.password 4.database name
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "donation_system"; 
 
-if($connect)
-{
-    echo "Connect sucessfully";
+// make the connection
+$conn = mysqli_connect($servername, $username, $password, $dbname);
+
+// check the connection
+if (!$conn) {
+    die("Connection failed: " . mysqli_connect_error());
 }
 
-else 
-    die("could not connect".mysqli_error());
+mysqli_set_charset($conn, "utf8");
 
+// echo "Connect successfully";
 ?>
