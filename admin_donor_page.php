@@ -105,76 +105,6 @@ if (isset($_GET['search'])) {
     $sql = "SELECT * FROM donor ORDER BY Donor_ID DESC";
     $result = $conn->query($sql);
 }
-
-// Get statistics for the page
-$total_donors = 0;
-$sql_count = "SELECT COUNT(*) as count FROM donor";
-$result_count = $conn->query($sql_count);
-if ($result_count) {
-    $row = $result_count->fetch_assoc();
-    $total_donors = $row['count'];
-}
-
-$total_donations = 0;
-$sql_donations = "SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus = 'completed'";
-$result_donations = $conn->query($sql_donations);
-if ($result_donations) {
-    $row = $result_donations->fetch_assoc();
-    $total_donations = $row['total'] ?: 0;
-}
-
-$total_branches = 0;
-$sql_branches = "SELECT COUNT(*) as count FROM branch";
-$result_branches = $conn->query($sql_branches);
-if ($result_branches) {
-    $row = $result_branches->fetch_assoc();
-    $total_branches = $row['count'];
-}
-
-$total_activities = 0;
-$sql_activities = "SELECT COUNT(*) as count FROM activity";
-$result_activities = $conn->query($sql_activities);
-if ($result_activities) {
-    $row = $result_activities->fetch_assoc();
-    $total_activities = $row['count'];
-}
-
-$total_items = 0;
-$sql_items = "SELECT COUNT(*) as count FROM item_donation";
-$result_items = $conn->query($sql_items);
-if ($result_items) {
-    $row = $result_items->fetch_assoc();
-    $total_items = $row['count'];
-}
-
-$total_rewards = 0;
-$sql_rewards = "SELECT COUNT(*) as count FROM reward_item";
-$result_rewards = $conn->query($sql_rewards);
-if ($result_rewards) {
-    $row = $result_rewards->fetch_assoc();
-    $total_rewards = $row['count'];
-}
-
-$total_staff = 0;
-$sql_staff = "SELECT COUNT(*) as count FROM staff";
-$result_staff = $conn->query($sql_staff);
-if ($result_staff) {
-    $row = $result_staff->fetch_assoc();
-    $total_staff = $row['count'];
-}
-
-$recent_activities = [];
-$sql_ra = "SELECT a.Activity_ID, a.Activity_Date, a.Activity_Details, a.Activity_Status, b.Branch_Name 
-        FROM activity a 
-        JOIN branch b ON a.Branch_ID = b.Branch_ID 
-        ORDER BY a.Activity_Date DESC 
-        LIMIT 5";
-$result_ra = $conn->query($sql_ra);
-if ($result_ra && $result_ra->num_rows > 0) {
-    while ($row = $result_ra->fetch_assoc()) {
-        $recent_activities[] = $row;
-    }
-}
 ?>
 
 <!DOCTYPE html>
@@ -416,188 +346,6 @@ if ($result_ra && $result_ra->num_rows > 0) {
             padding-bottom: 10px;
         }
 
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 25px;
-            margin-bottom: 40px;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            text-align: center;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            border-top: 4px solid #f28585;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-        }
-
-        .stat-icon {
-            font-size: 40px;
-            margin-bottom: 15px;
-            color: #f28585;
-        }
-
-        .stat-number {
-            font-size: 2.5em;
-            color: #f28585;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-
-        .stat-label {
-            font-size: 16px;
-            color: #7f8c8d;
-        }
-
-        .dashboard-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 30px;
-        }
-
-        .main-content-section {
-            display: flex;
-            flex-direction: column;
-            gap: 30px;
-        }
-
-        .section-card {
-            background: white;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            transition: transform 0.3s ease;
-        }
-
-        .section-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .section-title {
-            font-size: 20px;
-            margin-bottom: 15px;
-            color: #4a4a4a;
-            display: flex;
-            align-items: center;
-        }
-
-        .section-title ion-icon {
-            margin-right: 10px;
-            color: #f28585;
-        }
-
-        .section-list {
-            list-style: none;
-        }
-
-        .section-list li {
-            padding: 10px 0;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .section-list li:last-child {
-            border-bottom: none;
-        }
-
-        .section-list a {
-            color: #f28585;
-            text-decoration: none;
-            transition: color 0.3s ease;
-        }
-
-        .section-list a:hover {
-            color: #e66767;
-            text-decoration: underline;
-        }
-
-        .badge {
-            background: #f6b8b8;
-            color: white;
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 12px;
-        }
-
-        .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .action-btn {
-            background: #f28585;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
-            text-decoration: none;
-            display: block;
-        }
-
-        .action-btn:hover {
-            background: #e66767;
-            transform: translateY(-2px);
-        }
-
-        .activity-item {
-            padding: 15px;
-            border-left: 4px solid #f28585;
-            background: #fff5e4;
-            margin-bottom: 10px;
-            border-radius: 0 8px 8px 0;
-        }
-
-        .activity-date {
-            font-weight: bold;
-            color: #f28585;
-        }
-
-        .activity-details {
-            margin: 5px 0;
-        }
-
-        .activity-branch {
-            color: #7f8c8d;
-            font-size: 14px;
-        }
-
-        .activity-status {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            margin-top: 5px;
-        }
-
-        .status-completed {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status-upcoming {
-            background: #cce7ff;
-            color: #004085;
-        }
-
-        .status-ongoing {
-            background: #fff3cd;
-            color: #856404;
-        }
-
         /* Donor Management Specific Styles */
         .donor-management {
             background: white;
@@ -801,12 +549,6 @@ if ($result_ra && $result_ra->num_rows > 0) {
             border: 1px solid #f5c6cb;
         }
 
-        @media (max-width: 1024px) {
-            .dashboard-content {
-                grid-template-columns: 1fr;
-            }
-        }
-
         @media (max-width: 768px) {
             .dashboard {
                 padding: 15px;
@@ -821,10 +563,6 @@ if ($result_ra && $result_ra->num_rows > 0) {
             .header-left, .header-right {
                 width: 100%;
                 justify-content: center;
-            }
-            
-            .stats {
-                grid-template-columns: 1fr;
             }
             
             .sidebar {
@@ -937,163 +675,64 @@ if ($result_ra && $result_ra->num_rows > 0) {
         <div class="dashboard">
             <h1 class="page-title">Donor Management</h1>
             
-            <div class="stats">
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <ion-icon name="people"></ion-icon>
+            <div class="donor-management">
+                <div class="management-header">
+                    <div class="search-box">
+                        <form method="GET" action="">
+                            <input type="text" name="search" placeholder="Search donors..." value="<?php echo htmlspecialchars($search_query); ?>">
+                            <button type="submit">Search</button>
+                        </form>
                     </div>
-                    <div class="stat-number"><?php echo $total_donors; ?></div>
-                    <div class="stat-label">Total Donors</div>
+                    <button class="add-donor-btn" onclick="openAddModal()">Add New Donor</button>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <ion-icon name="cash"></ion-icon>
-                    </div>
-                    <div class="stat-number">RM <?php echo number_format($total_donations, 2); ?></div>
-                    <div class="stat-label">Total Donations</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <ion-icon name="business"></ion-icon>
-                    </div>
-                    <div class="stat-number"><?php echo $total_branches; ?></div>
-                    <div class="stat-label">Branch Locations</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <ion-icon name="calendar"></ion-icon>
-                    </div>
-                    <div class="stat-number"><?php echo $total_activities; ?></div>
-                    <div class="stat-label">Total Activities</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <ion-icon name="person-circle"></ion-icon>
-                    </div>
-                    <div class="stat-number"><?php echo $total_staff; ?></div>
-                    <div class="stat-label">Total Staff</div>
-                </div>
-            </div>
-            
-            <div class="dashboard-content">
-                <div class="main-content-section">
-                    <div class="donor-management">
-                        <div class="management-header">
-                            <div class="search-box">
-                                <form method="GET" action="">
-                                    <input type="text" name="search" placeholder="Search donors..." value="<?php echo htmlspecialchars($search_query); ?>">
-                                    <button type="submit">Search</button>
-                                </form>
-                            </div>
-                            <button class="add-donor-btn" onclick="openAddModal()">Add New Donor</button>
-                        </div>
 
-                        <?php if (isset($success_message)): ?>
-                            <div class="message success"><?php echo $success_message; ?></div>
-                        <?php endif; ?>
+                <?php if (isset($success_message)): ?>
+                    <div class="message success"><?php echo $success_message; ?></div>
+                <?php endif; ?>
 
-                        <?php if (isset($error_message)): ?>
-                            <div class="message error"><?php echo $error_message; ?></div>
-                        <?php endif; ?>
+                <?php if (isset($error_message)): ?>
+                    <div class="message error"><?php echo $error_message; ?></div>
+                <?php endif; ?>
 
-                        <?php if ($result && $result->num_rows > 0): ?>
-                            <table class="donor-table">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Name</th>
-                                        <th>Contact</th>
-                                        <th>Email</th>
-                                        <th>IC Number</th>
-                                        <th>Date of Birth</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php while ($row = $result->fetch_assoc()): ?>
-                                        <tr>
-                                            <td><?php echo $row['Donor_ID']; ?></td>
-                                            <td><?php echo $row['Donor_FName'] . ' ' . $row['Donor_LName']; ?></td>
-                                            <td><?php echo $row['Donor_ContactNumber']; ?></td>
-                                            <td><?php echo $row['Donor_Email']; ?></td>
-                                            <td><?php echo $row['Donor_ICNumber']; ?></td>
-                                            <td><?php echo $row['Donor_DOB']; ?></td>
-                                            <td class="action-buttons">
-                                                <button class="edit-btn" onclick="openEditModal(<?php echo $row['Donor_ID']; ?>)">Edit</button>
-                                                <form method="POST" style="display:inline;">
-                                                    <input type="hidden" name="donor_id" value="<?php echo $row['Donor_ID']; ?>">
-                                                    <button type="submit" name="delete_donor" class="delete-btn" onclick="return confirm('Are you sure you want to delete this donor?')">Delete</button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    <?php endwhile; ?>
-                                </tbody>
-                            </table>
-                        <?php else: ?>
-                            <div class="no-data">
-                                <h3>No donors found</h3>
-                                <p>There are no donors in the database. Click "Add New Donor" to add one.</p>
-                            </div>
-                        <?php endif; ?>
+                <?php if ($result && $result->num_rows > 0): ?>
+                    <table class="donor-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Contact</th>
+                                <th>Email</th>
+                                <th>IC Number</th>
+                                <th>Date of Birth</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php while ($row = $result->fetch_assoc()): ?>
+                                <tr>
+                                    <td><?php echo $row['Donor_ID']; ?></td>
+                                    <td><?php echo $row['Donor_FName'] . ' ' . $row['Donor_LName']; ?></td>
+                                    <td><?php echo $row['Donor_ContactNumber']; ?></td>
+                                    <td><?php echo $row['Donor_Email']; ?></td>
+                                    <td><?php echo $row['Donor_ICNumber']; ?></td>
+                                    <td><?php echo $row['Donor_DOB']; ?></td>
+                                    <td class="action-buttons">
+                                        <button class="edit-btn" onclick="openEditModal(<?php echo $row['Donor_ID']; ?>)">Edit</button>
+                                        <form method="POST" style="display:inline;">
+                                            <input type="hidden" name="donor_id" value="<?php echo $row['Donor_ID']; ?>">
+                                            <button type="submit" name="delete_donor" class="delete-btn" onclick="return confirm('Are you sure you want to delete this donor?')">Delete</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
+                <?php else: ?>
+                    <div class="no-data">
+                        <h3>No donors found</h3>
+                        <p>There are no donors in the database. Click "Add New Donor" to add one.</p>
                     </div>
-                </div>
-                
-                <div class="sidebar-content">
-                    <div class="section-card">
-                        <h2 class="section-title">
-                            <ion-icon name="time"></ion-icon>
-                            Recent Activities
-                        </h2>
-                        <?php if (!empty($recent_activities)): ?>
-                            <?php foreach ($recent_activities as $activity): ?>
-                                <div class="activity-item">
-                                    <div class="activity-date">
-                                        <?php echo date('M j, Y', strtotime($activity['Activity_Date'])); ?>
-                                    </div>
-                                    <div class="activity-details">
-                                        <?php echo substr($activity['Activity_Details'], 0, 50); ?>...
-                                    </div>
-                                    <div class="activity-branch">
-                                        <?php echo $activity['Branch_Name']; ?>
-                                    </div>
-                                    <div class="activity-status <?php echo 'status-' . strtolower($activity['Activity_Status']); ?>">
-                                        <?php echo $activity['Activity_Status']; ?>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <p>No recent activities found.</p>
-                        <?php endif; ?>
-                        <div class="quick-actions">
-                            <a href="#" class="action-btn">View All Activities</a>
-                        </div>
-                    </div>
-                    
-                    <div class="section-card">
-                        <h2 class="section-title">
-                            <ion-icon name="bar-chart"></ion-icon>
-                            Quick Stats
-                        </h2>
-                        <ul class="section-list">
-                            <li>
-                                <span>Item Donations</span>
-                                <span class="badge"><?php echo $total_items; ?></span>
-                            </li>
-                            <li>
-                                <span>Reward Items</span>
-                                <span class="badge"><?php echo $total_rewards; ?></span>
-                            </li>
-                            <li>
-                                <span>Recurring Donations</span>
-                                <span class="badge">0</span>
-                            </li>
-                            <li>
-                                <span>Achievements</span>
-                                <span class="badge">0</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
