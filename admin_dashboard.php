@@ -11,77 +11,92 @@ if (!isset($_SESSION['admin_id'])) {
 // Include database connection
 include 'dataconnection.php';
 
-
+// Initialize variables
 $total_donors = 0;
 $total_donations = 0;
 $total_branches = 0;
 $total_activities = 0;
 $total_items = 0;
 $total_rewards = 0;
+$total_staff = 0;
 
-// Get total donors
-$sql = "SELECT COUNT(*) as count FROM donor";
-$result = $conn->query($sql);
-if ($result) {
-    $row = $result->fetch_assoc();
-    $total_donors = $row['count'];
-}
-
-// Get total donations (from orders table)
-$sql = "SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus = 'completed'";
-$result = $conn->query($sql);
-if ($result) {
-    $row = $result->fetch_assoc();
-    $total_donations = $row['total'] ?: 0;
-}
-
-// Get total branches
-$sql = "SELECT COUNT(*) as count FROM branch";
-$result = $conn->query($sql);
-if ($result) {
-    $row = $result->fetch_assoc();
-    $total_branches = $row['count'];
-}
-
-// Get total activities
-$sql = "SELECT COUNT(*) as count FROM activity";
-$result = $conn->query($sql);
-if ($result) {
-    $row = $result->fetch_assoc();
-    $total_activities = $row['count'];
-}
-
-// Get total item donations
-$sql = "SELECT COUNT(*) as count FROM item_donation";
-$result = $conn->query($sql);
-if ($result) {
-    $row = $result->fetch_assoc();
-    $total_items = $row['count'];
-}
-
-// Get total rewards
-$sql = "SELECT COUNT(*) as count FROM reward_item";
-$result = $conn->query($sql);
-if ($result) {
-    $row = $result->fetch_assoc();
-    $total_rewards = $row['count'];
-}
-
-// Get recent activities
-$recent_activities = [];
-$sql = "SELECT a.Activity_ID, a.Activity_Date, a.Activity_Details, a.Activity_Status, b.Branch_Name 
-        FROM activity a 
-        JOIN branch b ON a.Branch_ID = b.Branch_ID 
-        ORDER BY a.Activity_Date DESC 
-        LIMIT 5";
-$result = $conn->query($sql);
-if ($result && $result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        $recent_activities[] = $row;
+// Check database connection
+if ($conn) {
+    // Get total donors
+    $sql = "SELECT COUNT(*) as count FROM donor";
+    $result = $conn->query($sql);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        $total_donors = $row['count'];
     }
-}
 
-$conn->close();
+    // Get total donations (from orders table)
+    $sql = "SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus = 'completed'";
+    $result = $conn->query($sql);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        $total_donations = $row['total'] ?: 0;
+    }
+
+    // Get total branches
+    $sql = "SELECT COUNT(*) as count FROM branch";
+    $result = $conn->query($sql);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        $total_branches = $row['count'];
+    }
+
+    // Get total activities
+    $sql = "SELECT COUNT(*) as count FROM activity";
+    $result = $conn->query($sql);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        $total_activities = $row['count'];
+    }
+
+    // Get total item donations
+    $sql = "SELECT COUNT(*) as count FROM item_donation";
+    $result = $conn->query($sql);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        $total_items = $row['count'];
+    }
+
+    // Get total rewards
+    $sql = "SELECT COUNT(*) as count FROM reward_item";
+    $result = $conn->query($sql);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        $total_rewards = $row['count'];
+    }
+
+    // Get total staff
+    $sql = "SELECT COUNT(*) as count FROM staff";
+    $result = $conn->query($sql);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        $total_staff = $row['count'];
+    }
+
+    // Get recent activities
+    $recent_activities = [];
+    $sql = "SELECT a.Activity_ID, a.Activity_Date, a.Activity_Details, a.Activity_Status, b.Branch_Name 
+            FROM activity a 
+            JOIN branch b ON a.Branch_ID = b.Branch_ID 
+            ORDER BY a.Activity_Date DESC 
+            LIMIT 5";
+    $result = $conn->query($sql);
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $recent_activities[] = $row;
+        }
+    }
+
+    $conn->close();
+} else {
+    // Handle database connection error
+    $error_message = "Unable to connect to database. Please check system configuration.";
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -168,6 +183,8 @@ $conn->close();
             transition: all 0.3s ease;
             border-left: 3px solid transparent;
             white-space: nowrap;
+            text-decoration: none;
+            color: white;
         }
 
         .menu-item:hover {
@@ -503,6 +520,15 @@ $conn->close();
             color: #856404;
         }
 
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+        }
+
         @media (max-width: 1024px) {
             .dashboard-content {
                 grid-template-columns: 1fr;
@@ -576,19 +602,23 @@ $conn->close();
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="logo" id="sidebarToggle">
-            <img src="picture" alt="Logo">
+            <img src="picture/logo.png" alt="Logo">
             <div class="logo-text">DonationMS</div>
         </div>
         
         <div class="sidebar-menu">
-            <div class="menu-item active">
+            <a href="admin_dashboard.php" class="menu-item active">
+                <ion-icon name="grid"></ion-icon>
+                <div class="menu-text">Dashboard</div>
+            </a>
+            <a href="admin_donor_page.php" class="menu-item">
                 <ion-icon name="people"></ion-icon>
                 <div class="menu-text">Donor Management</div>
-            </div>
-            <div class="menu-item">
+            </a>
+            <a href="admin_staff_page.php" class="menu-item">
                 <ion-icon name="person-circle"></ion-icon>
                 <div class="menu-text">Staff Management</div>
-            </div>
+            </a>
         </div>
     </aside>
     
@@ -604,7 +634,7 @@ $conn->close();
                 
                 <!-- Logo that links to homepage -->
                 <a href="admin_dashboard.php" class="header-logo">
-                    <img src="picture" alt="Logo">
+                    <img src="picture/logo.png" alt="Logo">
                     <div class="header-logo-text">DonationMS</div>
                 </a>
             </div>
@@ -617,6 +647,12 @@ $conn->close();
         
         <div class="dashboard">
             <h1 class="page-title">System Overview</h1>
+            
+            <?php if (isset($error_message)): ?>
+            <div class="error-message">
+                <?php echo $error_message; ?>
+            </div>
+            <?php endif; ?>
             
             <div class="stats">
                 <div class="stat-card">
@@ -647,6 +683,13 @@ $conn->close();
                     <div class="stat-number"><?php echo $total_activities; ?></div>
                     <div class="stat-label">Total Activities</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <ion-icon name="person-circle"></ion-icon>
+                    </div>
+                    <div class="stat-number"><?php echo $total_staff; ?></div>
+                    <div class="stat-label">Total Staff</div>
+                </div>
             </div>
             
             <div class="dashboard-content">
@@ -658,16 +701,16 @@ $conn->close();
                         </h2>
                         <ul class="section-list">
                             <li>
-                                <a href="#">View All Donors</a>
+                                <a href="admin_donor_page.php">View All Donors</a>
                                 <span class="badge"><?php echo $total_donors; ?></span>
                             </li>
-                            <li><a href="#">Add New Donor</a></li>
-                            <li><a href="#">Donor Points Management</a></li>
-                            <li><a href="#">Donation History</a></li>
+                            <li><a href="admin_donor_page.php">Add New Donor</a></li>
+                            <li><a href="admin_donor_page.php">Donor Points Management</a></li>
+                            <li><a href="admin_donor_page.php">Donation History</a></li>
                         </ul>
                         <div class="quick-actions">
-                            <a href="#" class="action-btn">Add Donor</a>
-                            <a href="#" class="action-btn">Export Data</a>
+                            <a href="admin_donor_page.php" class="action-btn">Add Donor</a>
+                            <a href="admin_donor_page.php" class="action-btn">Export Data</a>
                         </div>
                     </div>
                     
@@ -689,6 +732,26 @@ $conn->close();
                         <div class="quick-actions">
                             <a href="#" class="action-btn">Add Branch</a>
                             <a href="#" class="action-btn">Branch Reports</a>
+                        </div>
+                    </div>
+
+                    <div class="section-card">
+                        <h2 class="section-title">
+                            <ion-icon name="person-circle"></ion-icon>
+                            Staff Management
+                        </h2>
+                        <ul class="section-list">
+                            <li>
+                                <a href="admin_staff_page.php">View All Staff</a>
+                                <span class="badge"><?php echo $total_staff; ?></span>
+                            </li>
+                            <li><a href="admin_staff_page.php">Add New Staff</a></li>
+                            <li><a href="admin_staff_page.php">Staff Roles</a></li>
+                            <li><a href="admin_staff_page.php">Staff Performance</a></li>
+                        </ul>
+                        <div class="quick-actions">
+                            <a href="admin_staff_page.php" class="action-btn">Add Staff</a>
+                            <a href="admin_staff_page.php" class="action-btn">Staff Reports</a>
                         </div>
                     </div>
                 </div>
