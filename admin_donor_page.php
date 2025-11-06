@@ -15,7 +15,6 @@ include 'dataconnection.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Add new donor
     if (isset($_POST['add_donor'])) {
-        // Get form data
         $fname = $_POST['donor_fname'];
         $lname = $_POST['donor_lname'];
         $contact = $_POST['donor_contact'];
@@ -26,7 +25,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dob = $_POST['donor_dob'];
         $description = $_POST['donor_description'];
         
-        // Insert into database
         $sql = "INSERT INTO donor (Donor_FName, Donor_LName, Donor_ContactNumber, Donor_ICNumber, 
                 Donor_Email, Donor_Password, Donor_Address, Donor_DOB, Donor_Description) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -54,7 +52,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dob = $_POST['donor_dob'];
         $description = $_POST['donor_description'];
         
-        // Update database
         $sql = "UPDATE donor SET 
                 Donor_FName = ?, Donor_LName = ?, Donor_ContactNumber = ?, Donor_ICNumber = ?,
                 Donor_Email = ?, Donor_Password = ?, Donor_Address = ?, Donor_DOB = ?, Donor_Description = ?
@@ -74,7 +71,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['delete_donor'])) {
         $donor_id = $_POST['donor_id'];
         
-        // Delete from database
         $sql = "DELETE FROM donor WHERE Donor_ID = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("i", $donor_id);
@@ -110,7 +106,7 @@ if (isset($_GET['search'])) {
     $result = $conn->query($sql);
 }
 
-// Get donor count for stats
+// Get statistics for the page
 $total_donors = 0;
 $sql_count = "SELECT COUNT(*) as count FROM donor";
 $result_count = $conn->query($sql_count);
@@ -119,7 +115,6 @@ if ($result_count) {
     $total_donors = $row['count'];
 }
 
-// Get total donations (from orders table)
 $total_donations = 0;
 $sql_donations = "SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus = 'completed'";
 $result_donations = $conn->query($sql_donations);
@@ -128,7 +123,6 @@ if ($result_donations) {
     $total_donations = $row['total'] ?: 0;
 }
 
-// Get total branches
 $total_branches = 0;
 $sql_branches = "SELECT COUNT(*) as count FROM branch";
 $result_branches = $conn->query($sql_branches);
@@ -137,7 +131,6 @@ if ($result_branches) {
     $total_branches = $row['count'];
 }
 
-// Get total activities
 $total_activities = 0;
 $sql_activities = "SELECT COUNT(*) as count FROM activity";
 $result_activities = $conn->query($sql_activities);
@@ -146,7 +139,6 @@ if ($result_activities) {
     $total_activities = $row['count'];
 }
 
-// Get total items
 $total_items = 0;
 $sql_items = "SELECT COUNT(*) as count FROM item_donation";
 $result_items = $conn->query($sql_items);
@@ -155,7 +147,6 @@ if ($result_items) {
     $total_items = $row['count'];
 }
 
-// Get total rewards
 $total_rewards = 0;
 $sql_rewards = "SELECT COUNT(*) as count FROM reward_item";
 $result_rewards = $conn->query($sql_rewards);
@@ -164,7 +155,6 @@ if ($result_rewards) {
     $total_rewards = $row['count'];
 }
 
-// Get recent activities
 $recent_activities = [];
 $sql_ra = "SELECT a.Activity_ID, a.Activity_Date, a.Activity_Details, a.Activity_Status, b.Branch_Name 
         FROM activity a 
@@ -264,6 +254,8 @@ if ($result_ra && $result_ra->num_rows > 0) {
             transition: all 0.3s ease;
             border-left: 3px solid transparent;
             white-space: nowrap;
+            text-decoration: none;
+            color: white;
         }
 
         .menu-item:hover {
@@ -312,7 +304,6 @@ if ($result_ra && $result_ra->num_rows > 0) {
             position: relative;
         }
 
-        /* Add a decorative line that matches the sidebar width */
         .header::before {
             content: '';
             position: absolute;
@@ -899,28 +890,30 @@ if ($result_ra && $result_ra->num_rows > 0) {
         </div>
         
         <div class="sidebar-menu">
-            <div class="menu-item">
+            <a href="admin_dashboard.php" class="menu-item">
+                <ion-icon name="grid"></ion-icon>
+                <div class="menu-text">Dashboard</div>
+            </a>
+            <a href="admin_donor_management.php" class="menu-item active">
                 <ion-icon name="people"></ion-icon>
                 <div class="menu-text">Donor Management</div>
-            </div>
-            <div class="menu-item">
+            </a>
+            <a href="#" class="menu-item">
                 <ion-icon name="person-circle"></ion-icon>
                 <div class="menu-text">Staff Management</div>
-            </div>
+            </a>
         </div>
     </aside>
     
     <div class="main-content">
         <div class="header">
             <div class="header-left">
-                <!-- Three-line menu toggle -->
                 <div class="menu-toggle" id="menuToggle">
                     <span></span>
                     <span></span>
                     <span></span>
                 </div>
                 
-                <!-- Logo that links to homepage -->
                 <a href="admin_dashboard.php" class="header-logo">
                     <img src="picture" alt="Logo">
                     <div class="header-logo-text">DonationMS</div>
@@ -1237,20 +1230,6 @@ if ($result_ra && $result_ra->num_rows > 0) {
                     !menuToggle.contains(event.target)) {
                     sidebar.classList.remove('active');
                 }
-            });
-            
-            // Handle menu item clicks
-            const menuItems = document.querySelectorAll('.menu-item');
-            menuItems.forEach(item => {
-                item.addEventListener('click', function() {
-                    menuItems.forEach(i => i.classList.remove('active'));
-                    this.classList.add('active');
-                    
-                    // On mobile, close sidebar after selecting a menu item
-                    if (window.innerWidth < 769) {
-                        sidebar.classList.remove('active');
-                    }
-                });
             });
             
             // Handle window resize
