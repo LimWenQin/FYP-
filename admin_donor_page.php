@@ -1,5 +1,5 @@
 <?php
-// admin_donor_management.php - Donor Management Page
+// admin_donor_page.php - Donor Management Page
 session_start();
 
 // Check if user is logged in
@@ -153,6 +153,14 @@ $result_rewards = $conn->query($sql_rewards);
 if ($result_rewards) {
     $row = $result_rewards->fetch_assoc();
     $total_rewards = $row['count'];
+}
+
+$total_staff = 0;
+$sql_staff = "SELECT COUNT(*) as count FROM staff";
+$result_staff = $conn->query($sql_staff);
+if ($result_staff) {
+    $row = $result_staff->fetch_assoc();
+    $total_staff = $row['count'];
 }
 
 $recent_activities = [];
@@ -885,7 +893,7 @@ if ($result_ra && $result_ra->num_rows > 0) {
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="logo" id="sidebarToggle">
-            <img src="picture" alt="Logo">
+            <img src="picture/logo.png" alt="Logo">
             <div class="logo-text">DonationMS</div>
         </div>
         
@@ -894,11 +902,11 @@ if ($result_ra && $result_ra->num_rows > 0) {
                 <ion-icon name="grid"></ion-icon>
                 <div class="menu-text">Dashboard</div>
             </a>
-            <a href="admin_donor_management.php" class="menu-item active">
+            <a href="admin_donor_page.php" class="menu-item active">
                 <ion-icon name="people"></ion-icon>
                 <div class="menu-text">Donor Management</div>
             </a>
-            <a href="#" class="menu-item">
+            <a href="admin_staff_page.php" class="menu-item">
                 <ion-icon name="person-circle"></ion-icon>
                 <div class="menu-text">Staff Management</div>
             </a>
@@ -915,7 +923,7 @@ if ($result_ra && $result_ra->num_rows > 0) {
                 </div>
                 
                 <a href="admin_dashboard.php" class="header-logo">
-                    <img src="picture" alt="Logo">
+                    <img src="picture/logo.png" alt="Logo">
                     <div class="header-logo-text">DonationMS</div>
                 </a>
             </div>
@@ -957,6 +965,13 @@ if ($result_ra && $result_ra->num_rows > 0) {
                     </div>
                     <div class="stat-number"><?php echo $total_activities; ?></div>
                     <div class="stat-label">Total Activities</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <ion-icon name="person-circle"></ion-icon>
+                    </div>
+                    <div class="stat-number"><?php echo $total_staff; ?></div>
+                    <div class="stat-label">Total Staff</div>
                 </div>
             </div>
             
