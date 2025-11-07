@@ -208,7 +208,7 @@ CREATE TABLE `point` (
 
 CREATE TABLE `receipt` (
   `Receipt_ID` int(11) NOT NULL,
-  `Receipt_Receipt_NUmber` varchar(50) NOT NULL,
+  `Receipt_Receipt_Number` varchar(50) NOT NULL,
   `Receipt_Generated_At` datetime NOT NULL,
   `Receipt_Receipt_File` varchar(255) NOT NULL,
   `Donor_ID` int(11) NOT NULL,
@@ -298,6 +298,23 @@ CREATE TABLE `staff_activity` (
   `Activity_ID` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `special_case`
+--
+
+CREATE TABLE special_case (
+  Case_ID INT AUTO_INCREMENT PRIMARY KEY,
+  Case_Title VARCHAR(100) NOT NULL,
+  Case_Description TEXT,
+  Target_Amount DECIMAL(10,2) NOT NULL,
+  Raised_Amount DECIMAL(10,2) DEFAULT 0.00,
+  Case_Status VARCHAR(50) DEFAULT 'Active',   -- Active / Completed
+  Created_At DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
 --
 -- 转储表的索引
 --
@@ -357,7 +374,8 @@ ALTER TABLE `orders`
   ADD PRIMARY KEY (`Order_ID`),
   ADD KEY `Order_Donor_ID_FK` (`Donor_ID`),
   ADD KEY `Order_Activity_ID_FK` (`Activity_ID`),
-  ADD KEY `Order_Payment_ID_FK` (`Payment_ID`);
+  ADD KEY `Order_Payment_ID_FK` (`Payment_ID`),
+  ADD COLUMN `Case_ID` INT NULL;
 
 --
 -- 表的索引 `payment`
@@ -535,7 +553,8 @@ ALTER TABLE `orders`
   ADD CONSTRAINT `Order_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
   ADD CONSTRAINT `Order_Branch_ID_FK` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`),
   ADD CONSTRAINT `Order_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`),
-  ADD CONSTRAINT `Order_Payment_ID_FK` FOREIGN KEY (`Payment_ID`) REFERENCES `payment` (`Payment_ID`);
+  ADD CONSTRAINT `Order_Payment_ID_FK` FOREIGN KEY (`Payment_ID`) REFERENCES `payment` (`Payment_ID`),
+  ADD CONSTRAINT `Order_Case_ID_FK` FOREIGN KEY (`Case_ID`) REFERENCES `special_case`(`Case_ID`);
 
 --
 -- 限制表 `point`
