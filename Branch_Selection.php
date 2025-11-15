@@ -48,9 +48,13 @@ $result = $conn->query($sql);
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    .logo {
-        font-weight: bold;
-        font-size: 36px;
+    .logo 
+    {
+        display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
+        align-items: center;    /* 垂直居中 */
+        font-weight: bold;      /*粗体*/
+        font-size: 36px;        /*字体大小*/
+        gap: 10px;              /* 图片与文字之间的间距 */
     }
 
     .function-links a {
