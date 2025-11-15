@@ -1,6 +1,6 @@
 <?php
 // 连接数据库
-$conn = new mysqli("localhost", "root", "", "fyp_test");
+$conn = new mysqli("localhost", "root", "", "donation_system");
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
