@@ -222,7 +222,7 @@ body {
 
     <!-- 右侧付款区 -->
     <div class="donation-box">
-        <h3>Bank Transfer</h3>
+        <h3>Credit Card / Debit Card</h3>
         <form class="bank-form" method="POST" action="">
             <!-- 从上一页传来的隐藏字段 -->
             <input type="hidden" name="donation_type" value="<?php echo $_GET['donation_type'] ?? 'one-time'; ?>">
