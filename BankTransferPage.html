@@ -25,9 +25,13 @@
 
     .logo 
     {
-        font-weight: bold; /*粗体*/
-        font-size: 36px; /*字体大小*/
+        display: flex;
+        align-items: center;    /* 垂直居中 */
+        font-weight: bold;
+        font-size: 36px;
+        gap: 10px;              /* 图片与文字之间的间距 */
     }
+
 
     .header .function-links a 
     {
@@ -186,7 +190,10 @@
 
     <!-- 顶部导航栏 -->
     <header class="header">
-        <div class="logo">品牌名</div>
+        <div class="logo">
+            <img src="logo.jpg" alt="Logo" width="80" height="80">
+            LOVE BRIDGE
+        </div>
         <div class="function-links">
             <input type="text" placeholder="Search..." class="search">
             <a href="#">Home</a>

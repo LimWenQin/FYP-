@@ -204,7 +204,10 @@ body {
 <body>
 
 <header class="header">
-    <div class="logo">品牌名</div>
+    <div class="logo">
+        LOVE BRIDGE
+        <img src="logo" alt="Logo" width="50" height="50">
+    </div>
     <div class="function-links">
         <a href="#">Home</a>
         <a href="#">About Us</a>
