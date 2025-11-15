@@ -56,30 +56,36 @@ $amountFormatted = "RM " . number_format($row['Order_Amount'], 2);
 <head>
 <title>Payment Summary</title>
 <style>
-    body {
+    body 
+    {
         background-color: #FFF5E4;
         font-family: Arial, sans-serif;
         margin: 0;
         padding: 0;
         color: #4A4A4A;
     }
-    .success-section {
+    .success-section 
+    {
         text-align: center;
         margin-top: 80px;
     }
-    .success-icon {
+    .success-icon 
+    {
         font-size: 80px;
         color: #91C8A8;
     }
-    .success-section h1 {
+    .success-section h1 
+    {
         color: #4A4A4A;
         margin-top: 20px;
     }
-    .success-section p {
+    .success-section p 
+    {
         font-size: 18px;
         color: #666;
     }
-    .order-section {
+    .order-section 
+    {
         max-width: 800px;
         margin: 60px auto;
         background-color: #fff;
@@ -87,26 +93,31 @@ $amountFormatted = "RM " . number_format($row['Order_Amount'], 2);
         border-radius: 12px;
         box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
     }
-    .order-section h2 {
+    .order-section h2 
+    {
         color: #F28585;
         border-bottom: 2px solid #F6B8B8;
         padding-bottom: 10px;
         margin-bottom: 20px;
     }
-    .info-group {
+    .info-group 
+    {
         margin-bottom: 25px;
     }
-    .info-item {
+    .info-item 
+    {
         display: flex;
         justify-content: space-between;
         padding: 8px 0;
         border-bottom: 1px solid #eee;
     }
-    .info-item span:first-child {
+    .info-item span:first-child 
+    {
         font-weight: bold;
         color: #4A4A4A;
     }
-    .back-btn {
+    .back-btn 
+    {
         display: block;
         margin: 40px auto 0;
         background-color: #F6B8B8;
@@ -121,7 +132,8 @@ $amountFormatted = "RM " . number_format($row['Order_Amount'], 2);
         text-align: center;
         width: 180px;
     }
-    .back-btn:hover {
+    .back-btn:hover 
+    {
         background-color: #F28585;
     }
 </style>
