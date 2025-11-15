@@ -5,7 +5,7 @@
 $servername = "localhost";
 $username = "root";
 $password = "";
-$database = "fyp_test";
+$database = "donation_system";
 
 $conn = new mysqli($servername, $username, $password, $database);
 
