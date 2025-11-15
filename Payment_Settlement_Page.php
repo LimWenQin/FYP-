@@ -3,7 +3,7 @@
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
 // ✅ 数据库连接
-$conn = new mysqli("localhost", "root", "", "fyp_test");
+$conn = new mysqli("localhost", "root", "", "donation_system");
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
