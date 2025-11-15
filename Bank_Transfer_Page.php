@@ -84,13 +84,16 @@ $conn->close();
 <title>Bank Transfer</title>
 <style>
 /* ✅ 样式区块（保留你的原始美观风格） */
-body {
+body 
+{
     background-color: #FFF5E4;
     font-family: Arial;
     color: #4A4A4A;
     margin: 0;
 }
-.header {
+
+.header 
+{
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -98,23 +101,34 @@ body {
     padding: 20px 50px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
-.logo {
+
+.logo 
+{
+    display: flex;
+    align-items: center;    /* 垂直居中 */
     font-weight: bold;
     font-size: 36px;
+    gap: 10px;              /* 图片与文字之间的间距 */
 }
-.header .function-links a {
+
+.header .function-links a 
+{
     margin-left: 15px;
     text-decoration: none;
     font-size: 20px;
     color: #4A4A4A;
     font-weight: bold;
 }
-.container {
+
+.container 
+{
     display: flex;
     flex-direction: row;
     padding: 20px;
 }
-.sidebar {
+
+.sidebar 
+{
     width: 60px;
     display: flex;
     flex-direction: column;
@@ -123,7 +137,9 @@ body {
     margin-right: 20px;
     padding-top: 20px;
 }
-.sidebar button {
+
+.sidebar button 
+{
     background-color: #A8D5BA;
     border: none;
     border-radius: 10px;
@@ -135,22 +151,30 @@ body {
     color: #4A4A4A;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
-.story-section {
+
+.story-section 
+{
     flex: 2;
     background-color: white;
     border-radius: 12px;
     padding: 20px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
-.story-section img {
+
+.story-section img 
+{
     width: 100%;
     border-radius: 10px;
     margin-bottom: 15px;
 }
-.story-section h2 {
+
+.story-section h2 
+{
     color: #F28585;
 }
-.donation-box {
+
+.donation-box 
+{
     flex: 1;
     background-color: white;
     border-radius: 12px;
@@ -158,15 +182,21 @@ body {
     padding: 20px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
-.donation-box h3 {
+
+.donation-box h3 
+{
     text-align: center;
     color: #F28585;
 }
-.bank-form label {
+
+.bank-form label 
+{
     font-weight: bold;
     margin-top: 10px;
 }
-.bank-form select, .bank-form input {
+
+.bank-form select, .bank-form input 
+{
     width: 100%;
     padding: 10px;
     border: 1px solid #ccc;
@@ -174,16 +204,22 @@ body {
     margin-top: 5px;
     font-size: 16px;
 }
-.card-info {
+
+.card-info 
+{
     display: flex;
     justify-content: space-between;
     gap: 10px;
     margin-top: 10px;
 }
-.card-info div {
+
+.card-info div 
+{
     flex: 1;
 }
-.donate-btn {
+
+.donate-btn 
+{
     margin-top: 20px;
     width: 100%;
     padding: 12px;
@@ -196,7 +232,9 @@ body {
     box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     color: #4A4A4A;
 }
-.donate-btn:hover {
+
+.donate-btn:hover 
+{
     background-color: #F28585;
 }
 </style>
