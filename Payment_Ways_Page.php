@@ -159,7 +159,7 @@ $branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
 <header class="header">
     <div class="logo">
         LOVE BRIDGE
-        <img src="logo" alt="Logo" width="50" height="50">
+        <img src="logo.jpg" alt="Logo" width="50" height="50">
     </div>
     <div class="function-links">
         <a href="#">Home</a>
