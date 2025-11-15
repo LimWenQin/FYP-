@@ -13,14 +13,16 @@ $branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
 <title>Payment Ways</title>
 <style>
 
-    body {
+    body 
+    {
         background-color: #FFF5E4;
         margin: 0;
         font-family: Arial;
         color: #4A4A4A;
     }
 
-    .header {
+    .header 
+    {
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -29,12 +31,17 @@ $branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    .logo {
-        font-weight: bold;
-        font-size: 36px;
+    .logo 
+    {
+        display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
+        align-items: center;    /* 垂直居中 */
+        font-weight: bold;      /*粗体*/
+        font-size: 36px;        /*字体大小*/
+        gap: 10px;              /* 图片与文字之间的间距 */
     }
 
-    .header .function-links a {
+    .header .function-links a 
+    {
         margin-left: 15px;
         text-decoration: none;
         font-size: 20px;
@@ -42,13 +49,15 @@ $branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
         font-weight: bold;
     }
 
-    .container {
+    .container 
+    {
         display: flex;
         flex-direction: row;
         padding: 20px;
     }
 
-    .sidebar {
+    .sidebar 
+    {
         width: 60px;
         display: flex;
         flex-direction: column;
@@ -58,7 +67,8 @@ $branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
         padding-top: 20px;
     }
 
-    .sidebar button {
+    .sidebar button 
+    {
         background-color: #A8D5BA;
         border: none;
         border-radius: 10px;
@@ -71,7 +81,8 @@ $branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
-    .story-section {
+    .story-section 
+    {
         flex: 2;
         background-color: white;
         border-radius: 12px;
@@ -79,17 +90,20 @@ $branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    .story-section img {
+    .story-section img 
+    {
         width: 100%;
         border-radius: 10px;
         margin-bottom: 15px;
     }
 
-    .story-section h2 {
+    .story-section h2 
+    {
         color: #F28585;
     }
 
-    .donation-box {
+    .donation-box 
+    {
         flex: 1;
         background-color: white;
         border-radius: 12px;
@@ -98,19 +112,22 @@ $branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    .donation-box h3 {
+    .donation-box h3 
+    {
         text-align: center;
         color: #F28585;
     }
 
-    .donation-box .Payment-Ways {
+    .donation-box .Payment-Ways 
+    {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
         gap: 10px;
         margin: 15px 15px;
     }
 
-    .donation-box .Payment-Ways .P_btn {
+    .donation-box .Payment-Ways .P_btn 
+    {
         background-color: #A8D5BA;
         border: none;
         border-radius: 10px;
@@ -122,11 +139,13 @@ $branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
         height: 50px;
     }
 
-    .donation-box .Payment-Ways .P_btn:hover {
+    .donation-box .Payment-Ways .P_btn:hover 
+    {
         background-color: #91C8A8;
     }
 
-    .donation-box .Payment-Ways img {
+    .donation-box .Payment-Ways img 
+    {
         width: 100%;
         border-radius: 10px;
         margin-bottom: 15px;
@@ -138,7 +157,10 @@ $branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
 <body>
 
 <header class="header">
-    <div class="logo">品牌名</div>
+    <div class="logo">
+        LOVE BRIDGE
+        <img src="logo" alt="Logo" width="50" height="50">
+    </div>
     <div class="function-links">
         <a href="#">Home</a>
         <a href="#">About Us</a>
