@@ -217,8 +217,8 @@ function selectAmount(amount) {
 
 <header class="header">
     <div class="logo">
+        <img src="logo.jpg" alt="Logo" width="80" height="80">
         LOVE BRIDGE
-        <img src="logo.jpg" alt="Logo" width="50" height="50">
     </div>
     <div class="function-links">
         <input type="text" placeholder="Search..." class="search">
