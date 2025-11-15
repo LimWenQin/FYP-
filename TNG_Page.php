@@ -63,13 +63,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
 <title>Touch 'n Go eWallet Payment</title>
 <style>
-    body {
+    body 
+    {
         margin: 0;
         font-family: Arial, sans-serif;
         background-color: #FFF5E4;
         color: #4A4A4A;
     }
-    .header {
+    .header 
+    {
         background-color: #0057B7;
         color: white;
         display: flex;
@@ -77,23 +79,96 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         align-items: center;
         padding: 15px 40px;
     }
-    .header .title { font-size: 22px; font-weight: bold; }
-    .header .call { font-size: 16px; }
-    .container { display: flex; justify-content: center; align-items: flex-start; padding: 40px; gap: 40px; }
-    .payment-box, .order-summary {
-        background-color: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    .header .title 
+    { 
+        font-size: 22px; 
+        font-weight: bold; 
     }
-    .payment-box { padding: 30px; width: 450px; }
-    .payment-box h3 { color: #0057B7; text-align: center; }
-    .qr-box { text-align: center; margin-top: 20px; }
-    .qr-box img { width: 180px; height: 180px; border: 2px solid #ccc; border-radius: 10px; margin-bottom: 10px; }
-    .amount { font-size: 20px; font-weight: bold; color: #F28585; text-align: center; margin-top: 15px; }
-    .payment-steps { font-size: 15px; line-height: 1.6; }
-    .order-summary { padding: 25px; width: 280px; }
-    .order-summary h3 { color: #0057B7; margin-bottom: 15px; border-bottom: 2px solid #A8D5BA; padding-bottom: 5px; }
-    .order-summary p { margin: 8px 0; font-size: 15px; }
-    .order-summary .total { font-size: 18px; font-weight: bold; text-align: right; color: #F28585; margin-top: 15px; }
-    .footer { text-align: center; font-size: 14px; margin-top: 40px; color: #666; }
+    .header .call 
+    { 
+        font-size: 16px; 
+    }
+    .container 
+    { 
+        display: flex; 
+        justify-content: center; 
+        align-items: flex-start; 
+        padding: 40px; gap: 40px; 
+    }
+    .payment-box, .order-summary 
+    {
+        background-color: white; 
+        border-radius: 10px; 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .payment-box 
+    { 
+        padding: 30px; 
+        width: 450px; 
+    }
+    .payment-box h3 
+    { 
+        color: #0057B7; 
+        text-align: center; 
+    }
+    .qr-box 
+    { 
+        text-align: center; 
+        margin-top: 20px; 
+    }
+    .qr-box img 
+    { 
+        width: 180px; 
+        height: 180px; 
+        border: 2px solid #ccc; 
+        border-radius: 10px; 
+        margin-bottom: 10px; 
+    }
+    .amount 
+    { 
+        font-size: 20px; 
+        font-weight: bold; 
+        color: #F28585; 
+        text-align: center; 
+        margin-top: 15px; 
+    }
+    .payment-steps 
+    { 
+        font-size: 15px; 
+        line-height: 1.6; 
+    }
+    .order-summary 
+    { 
+        padding: 25px; 
+        width: 280px; 
+    }
+    .order-summary h3 
+    { 
+        color: #0057B7; 
+        margin-bottom: 15px; 
+        border-bottom: 2px solid #A8D5BA; 
+        padding-bottom: 5px; 
+    }
+    .order-summary p 
+    { 
+        margin: 8px 0; 
+        font-size: 15px; 
+    }
+    .order-summary .total 
+    { 
+        font-size: 18px; 
+        font-weight: bold; 
+        text-align: right; 
+        color: #F28585; 
+        margin-top: 15px; 
+    }
+    .footer 
+    { 
+        text-align: center; 
+        font-size: 14px; 
+        margin-top: 40px; 
+        color: #666; 
+    }
 </style>
 </head>
 <body>
