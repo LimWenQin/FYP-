@@ -16,9 +16,11 @@ if ($txn_ref == '') {
 }
 
 // ✅ 查询付款详情
-$sql = "SELECT p.*, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Order_Created_At 
+$sql = "SELECT p.*, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Order_Created_At, 
+               d.Donor_FName, d.Donor_LName, d.Donor_Email, d.Donor_ContactNumber, d.Donor_Address
         FROM payment p 
         JOIN orders o ON p.Payment_ID = o.Payment_ID 
+        JOIN donor d ON o.Donor_ID = d.Donor_ID
         WHERE p.Payment_TXN_Ref = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("s", $txn_ref);
@@ -153,10 +155,10 @@ $amountFormatted = "RM " . number_format($row['Order_Amount'], 2);
 
         <div class="info-group">
             <h3>🧍 Donor Information</h3>
-            <div class="info-item"><span>Name:</span><span>John Tan</span></div>
-            <div class="info-item"><span>Email:</span><span>john.tan@email.com</span></div>
-            <div class="info-item"><span>Contact Number:</span><span>012-3456789</span></div>
-            <div class="info-item"><span>Address:</span><span>123 Jalan Example, Kuala Lumpur</span></div>
+            <div class="info-item"><span>Name:</span><span><?php echo htmlspecialchars($row['Donor_FName'] . ' ' . $row['Donor_LName']); ?></span></div>
+            <div class="info-item"><span>Email:</span><span><?php echo htmlspecialchars($row['Donor_Email']); ?></span></div>
+            <div class="info-item"><span>Contact Number:</span><span><?php echo htmlspecialchars($row['Donor_ContactNumber']); ?></span></div>
+            <div class="info-item"><span>Address:</span><span><?php echo htmlspecialchars($row['Donor_Address']); ?></span></div>
         </div>
 
         <div class="info-group">
