@@ -266,9 +266,9 @@ body
         <h3>Credit Card / Debit Card</h3>
         <form class="bank-form" method="POST" action="">
             <!-- 从上一页传来的隐藏字段 -->
-            <input type="hidden" name="donation_type" value="<?php echo $_GET['donation_type'] ?? 'one-time'; ?>">
-            <input type="hidden" name="amount" value="<?php echo $_GET['amount'] ?? 50; ?>">
-            <input type="hidden" name="branch_id" value="<?php echo $_GET['branch_id'] ?? 1; ?>">
+            <input type="hidden" name="donation_type" value="<?php echo $_POST['donation_type'] ?? 'one-time'; ?>">
+            <input type="hidden" name="amount" value="<?php echo $_POST['amount'] ?? 50; ?>">
+            <input type="hidden" name="branch_id" value="<?php echo $_POST['branch_id'] ?? 1; ?>">
 
             <label for="bank">Bank Name</label>
             <select id="bank" name="bank" required>
