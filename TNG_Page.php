@@ -29,7 +29,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $stmt->close();
 
     // 2️⃣ 插入到 order 表（假设 Donor_ID=1, Activity_ID=1）
-    $stmt = $conn->prepare("INSERT INTO `order` 
+    $stmt = $conn->prepare("INSERT INTO `orders` 
         (Order_FName, Order_LName, Order_ContactNumber, Order_ICNumber, Order_Email, 
          Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, Order_TXN_Ref, 
          Order_Type, Order_Status, Order_Created_At, Order_Updated_At, Donor_ID, Payment_ID, Branch_ID, Activity_ID)
