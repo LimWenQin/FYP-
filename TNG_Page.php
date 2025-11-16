@@ -6,7 +6,8 @@ if ($conn->connect_error) {
 }
 
 // 当表单提交时执行
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+// 检查这是否是一个 POST 请求，并且是否点击了 "confirm_payment" 按钮
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 
     // 从上一页接收数据
     $donation_type = $_POST['donation_type']; 
@@ -202,7 +203,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </ol>
                 </div>
 
-                <button type="submit" style="margin-top:20px; width:100%; padding:12px; background-color:#0057B7; color:white; border:none; border-radius:8px; font-size:16px; font-weight:bold; cursor:pointer;">
+                <button type="submit" name="confirm_payment" style="margin-top:20px; width:100%; padding:12px; background-color:#0057B7; color:white; border:none; border-radius:8px; font-size:16px; font-weight:bold; cursor:pointer;">
                     Confirm Payment
                 </button>
             </form>
