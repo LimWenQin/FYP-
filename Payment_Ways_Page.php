@@ -2,9 +2,9 @@
 // -------------------------
 // ✅ 获取上一个页面传来的数据
 // -------------------------
-$amount = isset($_GET['amount']) ? $_GET['amount'] : 0;
-$donation_type = isset($_GET['donation_type']) ? $_GET['donation_type'] : "One-time";
-$branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
+$amount = isset($_POST['amount']) ? $_POST['amount'] : 0;
+$donation_type = isset($_POST['donation_type']) ? $_POST['donation_type'] : "One-time";
+$branch_id = isset($_POST['branch_id']) ? $_POST['branch_id'] : 0;
 ?>
 
 <!DOCTYPE html>
@@ -201,7 +201,7 @@ $branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
             <img src="tng.jpg" alt="E-Wallet">
 
             <!-- ✅ Bank Transfer -->
-            <form method="GET" action="Bank_Transfer_Page.php">
+            <form method="POST" action="Bank_Transfer_Page.php">
                 <input type="hidden" name="amount" value="<?php echo $amount; ?>">
                 <input type="hidden" name="donation_type" value="<?php echo $donation_type; ?>">
                 <input type="hidden" name="branch_id" value="<?php echo $branch_id; ?>">
@@ -209,7 +209,7 @@ $branch_id = isset($_GET['branch_id']) ? $_GET['branch_id'] : 0;
             </form>
 
             <!-- ✅ TNG -->
-            <form method="GET" action="TNG_Page.php">
+            <form method="POST" action="TNG_Page.php">
                 <input type="hidden" name="amount" value="<?php echo $amount; ?>">
                 <input type="hidden" name="donation_type" value="<?php echo $donation_type; ?>">
                 <input type="hidden" name="branch_id" value="<?php echo $branch_id; ?>">
