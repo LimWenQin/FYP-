@@ -17,8 +17,8 @@ if ($conn->connect_error) {
 // -------------------------
 // ✅ 获取从 Donation Page 传来的数据
 // -------------------------
-$amount = isset($_GET['amount']) ? $_GET['amount'] : 0;
-$donation_type = isset($_GET['donation_type']) ? $_GET['donation_type'] : "One-time";
+$amount = isset($_POST['amount']) ? $_POST['amount'] : 0;
+$donation_type = isset($_POST['donation_type']) ? $_POST['donation_type'] : "One-time";
 
 // -------------------------
 // ✅ 从数据库读取分行资料
