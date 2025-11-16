@@ -52,7 +52,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
         VALUES ('John', 'Tan', '0123456789', '990101-10-1234', 'john.tan@email.com',
          ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 1)");
 
-    $stmt->bind_param("dsssssssiii", 
+    $stmt->bind_param("dsssssssii", 
         $amount, $payment_method, $status, $txn_ref, 
         $order_type, $order_status, $now, $now, 
         $payment_id, $branch_id
