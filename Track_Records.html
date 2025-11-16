@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Track Records</title>
+<style>
+    body {
+        background-color: #FFF5E4;
+        margin: 0;
+        font-family: Arial;
+        color: #4A4A4A;
+    }
+
+    /* ---------------- HEADER ---------------- */
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #F6B8B8;
+        padding: 20px 50px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .logo {
+        display: flex;
+        align-items: center;
+        font-weight: bold;
+        font-size: 36px;
+        gap: 10px;
+    }
+
+    .header .function-links a {
+        margin-left: 15px;
+        text-decoration: none;
+        font-size: 20px;
+        color: #4A4A4A;
+        font-weight: bold;
+    }
+
+    /* ---------------- CONTENT ---------------- */
+    .container {
+        padding: 30px 50px;
+    }
+
+    h2 {
+        color: #F28585;
+    }
+
+    /* Filter Section */
+    .filters {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+        align-items: center;
+    }
+
+    .filters select {
+        padding: 8px;
+        font-size: 16px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+    }
+
+    /* Table Styles */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    th {
+        background-color: #F6B8B8;
+        padding: 15px;
+        font-size: 18px;
+    }
+
+    td {
+        padding: 15px;
+        text-align: center;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .status {
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: bold;
+        color: white;
+    }
+
+    .received { background-color: #91C8A8; }
+    .distributed { background-color: #F28585; }
+    .progress { background-color: #F6B8B8; }
+
+    /* View Details Button */
+    .details-btn {
+        background-color: #A8D5BA;
+        padding: 8px 15px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    .details-btn:hover {
+        background-color: #91C8A8;
+    }
+</style>
+</head>
+
+<body>
+
+<!-- HEADER (保留你的设计) -->
+<header class="header">
+    <div class="logo">
+        <img src="logo.jpg" alt="Logo" width="80" height="80">
+        LOVE BRIDGE
+    </div>
+
+    <div class="function-links">
+        <a href="#">Home</a>
+        <a href="#">About Us</a>
+        <a href="#">Contact Us</a>
+        <a href="#">Activities</a>
+        <a href="#">Track Records</a>
+    </div>
+</header>
+
+<!-- MAIN CONTENT -->
+<div class="container">
+
+    <h2>Track Records</h2>
+    <p>查看您过去的捐款记录、状态及每一笔捐款的真实跟进。</p>
+
+    <!-- Filters Section -->
+    <div class="filters">
+        <label>捐款类别：</label>
+        <select>
+            <option>全部</option>
+            <option>现金捐款</option>
+            <option>物品捐赠</option>
+        </select>
+
+        <label>状态：</label>
+        <select>
+            <option>全部</option>
+            <option>已收到</option>
+            <option>已分发</option>
+            <option>进行中</option>
+        </select>
+    </div>
+
+    <!-- Donation Records Table -->
+    <table>
+        <tr>
+            <th>捐款编号</th>
+            <th>类别</th>
+            <th>金额 / 物品</th>
+            <th>日期</th>
+            <th>状态</th>
+            <th>查看详情</th>
+        </tr>
+
+        <tr>
+            <td>DN001</td>
+            <td>现金</td>
+            <td>RM 100</td>
+            <td>2025-01-10</td>
+            <td><span class="status received">已收到</span></td>
+            <td><button class="details-btn">Details</button></td>
+        </tr>
+
+        <tr>
+            <td>DN002</td>
+            <td>物品</td>
+            <td>衣物 3 包</td>
+            <td>2025-02-02</td>
+            <td><span class="status progress">进行中</span></td>
+            <td><button class="details-btn">Details</button></td>
+        </tr>
+
+        <tr>
+            <td>DN003</td>
+            <td>现金</td>
+            <td>RM 250</td>
+            <td>2025-02-12</td>
+            <td><span class="status distributed">已分发</span></td>
+            <td><button class="details-btn">Details</button></td>
+        </tr>
+    </table>
+
+</div>
+
+</body>
+</html>

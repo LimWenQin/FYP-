@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Gamification Achievements</title>
+<style>
+    body {
+        background-color: #FFF5E4;
+        margin: 0;
+        font-family: Arial;
+        color: #4A4A4A;
+    }
+
+    /* ---------------- HEADER ---------------- */
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #F6B8B8;
+        padding: 20px 50px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .logo {
+        display: flex;
+        align-items: center;
+        font-weight: bold;
+        font-size: 36px;
+        gap: 10px;
+    }
+
+    .header .function-links a {
+        margin-left: 15px;
+        text-decoration: none;
+        font-size: 20px;
+        color: #4A4A4A;
+        font-weight: bold;
+    }
+
+    /* ---------------- CONTENT ---------------- */
+    .container {
+        padding: 30px 50px;
+    }
+
+    h2 {
+        color: #F28585;
+    }
+
+    /* Points Card */
+    .points-box {
+        background: white;
+        padding: 25px;
+        border-radius: 15px;
+        width: 350px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        margin-bottom: 25px;
+        text-align: center;
+    }
+
+    .points-box h3 {
+        color: #F28585;
+        font-size: 22px;
+    }
+
+    .points-value {
+        font-size: 48px;
+        color: #91C8A8;
+        font-weight: bold;
+        margin-top: 10px;
+    }
+
+    /* Badges Section */
+    .badges-container {
+        margin-top: 30px;
+    }
+
+    .badge-grid {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .badge {
+        background: white;
+        width: 150px;
+        border-radius: 12px;
+        padding: 15px;
+        text-align: center;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .badge img {
+        width: 80px;
+        height: 80px;
+        margin-bottom: 10px;
+    }
+
+    /* Achievement Wall */
+    .wall {
+        margin-top: 40px;
+    }
+
+    .wall-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .achievement-card {
+        background: white;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        text-align: center;
+    }
+
+    .achievement-card img {
+        width: 100%;
+        border-radius: 10px;
+        margin-bottom: 10px;
+    }
+
+    .social-share {
+        margin-top: 10px;
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .social-share button {
+        background-color: #A8D5BA;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    .social-share button:hover {
+        background-color: #91C8A8;
+    }
+
+</style>
+</head>
+
+<body>
+
+<!-- HEADER (保持你的设计) -->
+<header class="header">
+    <div class="logo">
+        <img src="logo.jpg" alt="Logo" width="80" height="80">
+        LOVE BRIDGE
+    </div>
+
+    <div class="function-links">
+        <a href="#">Home</a>
+        <a href="#">About Us</a>
+        <a href="#">Contact Us</a>
+        <a href="#">Activities</a>
+        <a href="#">Track Records</a>
+        <a href="#">Achievements</a>
+    </div>
+</header>
+
+<!-- MAIN CONTENT -->
+<div class="container">
+
+    <h2>My Gamification Panel</h2>
+    <p>查看您的积分、捐款勋章以及个人成就墙。</p>
+
+    <!-- Donor Points -->
+    <div class="points-box">
+        <h3>My Points</h3>
+        <div class="points-value">320</div>
+    </div>
+
+    <!-- Badges Section -->
+    <div class="badges-container">
+        <h2>My Badges</h2>
+
+        <div class="badge-grid">
+            <div class="badge">
+                <img src="badge1.png" alt="badge">
+                <p>First Donation</p>
+            </div>
+
+            <div class="badge">
+                <img src="badge2.png" alt="badge">
+                <p>RM 500 Donor</p>
+            </div>
+
+            <div class="badge">
+                <img src="badge3.png" alt="badge">
+                <p>Monthly Hero</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Achievements Wall -->
+    <div class="wall">
+        <h2>Achievements Wall</h2>
+        <p>仅自己可见 · 可分享至社交媒体</p>
+
+        <div class="wall-grid">
+
+            <div class="achievement-card">
+                <img src="img1.jpg" alt="achievement">
+                <p>帮助孤儿院购买学习用品</p>
+
+                <div class="social-share">
+                    <button>WhatsApp</button>
+                    <button>Facebook</button>
+                    <button>Instagram</button>
+                </div>
+            </div>
+
+            <div class="achievement-card">
+                <img src="img2.jpg" alt="achievement">
+                <p>赞助老人院医疗支援</p>
+
+                <div class="social-share">
+                    <button>WhatsApp</button>
+                    <button>Facebook</button>
+                    <button>Instagram</button>
+                </div>
+            </div>
+
+            <div class="achievement-card">
+                <img src="img3.jpg" alt="achievement">
+                <p>参与年度慈善义跑</p>
+
+                <div class="social-share">
+                    <button>WhatsApp</button>
+                    <button>Facebook</button>
+                    <button>Instagram</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

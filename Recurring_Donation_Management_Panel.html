@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Recurring Donation Management</title>
+<style>
+
+    body {
+        background-color: #FFF5E4;
+        margin: 0;
+        font-family: Arial;
+        color: #4A4A4A;
+    }
+
+    /* 顶部导航栏（保持你的设计） */
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #F6B8B8;
+        padding: 20px 50px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .logo {
+        display: flex;
+        align-items: center;
+        font-weight: bold;
+        font-size: 36px;
+        gap: 10px;
+    }
+
+    .header .function-links a {
+        margin-left: 15px;
+        text-decoration: none;
+        font-size: 20px;
+        color: #4A4A4A;
+        font-weight: bold;
+    }
+
+    .search {
+        padding: 6px;
+        font-size: 16px;
+    }
+
+    /* 主体 */
+    .container {
+        max-width: 1100px;
+        margin: 30px auto;
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    }
+
+    h1 {
+        color: #F28585;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .recurring-list {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 30px;
+    }
+
+    .recurring-list th, .recurring-list td {
+        border: 1px solid #ddd;
+        padding: 12px;
+        text-align: center;
+    }
+
+    .recurring-list th {
+        background-color: #F6B8B8;
+        color: #4A4A4A;
+        font-weight: bold;
+    }
+
+    .btn {
+        padding: 8px 14px;
+        border: none;
+        border-radius: 6px;
+        font-size: 15px;
+        cursor: pointer;
+        font-weight: bold;
+        color: #4A4A4A;
+    }
+
+    .edit-btn { background: #A8D5BA; }
+    .edit-btn:hover { background: #91C8A8; }
+
+    .pause-btn { background: #FFD29D; }
+    .pause-btn:hover { background: #FFBD70; }
+
+    .cancel-btn { background: #F6A5A5; }
+    .cancel-btn:hover { background: #F28585; }
+
+    .download-btn { background: #B5C7F2; }
+    .download-btn:hover { background: #9BB2E8; }
+
+    .section-title {
+        font-size: 22px;
+        color: #F28585;
+        margin-top: 30px;
+        margin-bottom: 10px;
+        font-weight: bold;
+    }
+
+    .info-box {
+        background: #FFF0E6;
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 6px solid #F6B8B8;
+        margin-bottom: 20px;
+    }
+
+</style>
+</head>
+
+<body>
+
+<!-- HEADER（保持你的样式） -->
+<header class="header">
+    <div class="logo">
+        <img src="logo.jpg" width="70" height="70">
+        LOVE BRIDGE
+    </div>
+    <div class="function-links">
+        <input type="text" placeholder="Search..." class="search">
+        <a href="#">Home</a>
+        <a href="#">About Us</a>
+        <a href="#">History</a>
+        <a href="#">Activities</a>
+        <a href="#">News & Stories</a>
+    </div>
+</header>
+
+
+<!-- MAIN CONTENT -->
+<div class="container">
+
+    <h1>Recurring Donation Management Panel</h1>
+
+    <div class="info-box">
+        管理您的所有 <strong>每月定期捐款</strong>，包括修改扣款日期、暂停计划、取消计划和下载每月收据。
+    </div>
+
+    <!-- Recurring Donations Table -->
+    <table class="recurring-list">
+        <tr>
+            <th>Plan ID</th>
+            <th>Amount (RM)</th>
+            <th>Next Charge Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+
+        <!-- Example row (未来你会用 PHP 从数据库读出) -->
+        <tr>
+            <td>#1023</td>
+            <td>50</td>
+            <td>2025-12-05</td>
+            <td>Active</td>
+            <td>
+                <button class="btn edit-btn">Modify Date</button>
+                <button class="btn pause-btn">Pause</button>
+                <button class="btn cancel-btn">Cancel</button>
+            </td>
+        </tr>
+
+        <tr>
+            <td>#1050</td>
+            <td>20</td>
+            <td>2025-12-12</td>
+            <td>Paused</td>
+            <td>
+                <button class="btn edit-btn">Modify Date</button>
+                <button class="btn pause-btn">Resume</button>
+                <button class="btn cancel-btn">Cancel</button>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Download Section -->
+    <div class="section-title">Download Monthly Donation Receipts</div>
+
+    <button class="btn download-btn">Download PDF for Last Month</button>
+
+</div>
+
+</body>
+</html>
