@@ -9,7 +9,8 @@ if ($conn->connect_error) {
 }
 
 // ✅ 检查表单提交
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+// 检查这是否是一个 POST 请求，并且它是否包含了 'cvc' 字段
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
 
     // 接收来自表单与前一页的数据
     $donation_type = $_POST['donation_type']; // one-time 或 monthly
