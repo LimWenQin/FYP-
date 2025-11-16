@@ -184,7 +184,7 @@
         border-radius: 8px;
         font-size: 18px;
         font-weight: bold;
-        cursor: pointer;
+        cursor: point
         box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
 
