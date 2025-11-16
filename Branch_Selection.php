@@ -211,7 +211,7 @@ $result = $conn->query($sql);
                     <h4>{$row['Branch_Name']}</h4>
                     <p>Type: {$row['Branch_Type']}</p>
                     <p>{$row['Branch_Description']}</p>
-                    <form method='GET' action='Payment_Ways_Page.php'>
+                    <form method='POST' action='Payment_Ways_Page.php'>
                         <input type='hidden' name='branch_id' value='{$row['Branch_ID']}'>
                         <input type='hidden' name='amount' value='{$amount}'>
                         <input type='hidden' name='donation_type' value='{$donation_type}'>
