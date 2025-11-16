@@ -5,7 +5,7 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-$sql = "SELECT ID, Date, Details, Picture, Status, Get_Amount FROM activity ORDER BY Date DESC";
+$sql = "SELECT Activity_ID, Activity_Date, Activity_Details, Activity_Picture, Activity_Status, Activity_GetAmount FROM activity ORDER BY Activity_Date DESC";
 $result = $conn->query($sql);
 
 if ($result->num_rows > 0) {
