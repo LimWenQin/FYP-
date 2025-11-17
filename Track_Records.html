@@ -3,109 +3,134 @@
 <head>
 <title>Track Records</title>
 <style>
-    body {
-        background-color: #FFF5E4;
-        margin: 0;
-        font-family: Arial;
-        color: #4A4A4A;
+    body 
+    {
+        background-color: #FFF5E4; /* 背景颜色 */
+        margin: 0; /*与周围的间距*/
+        font-family: Arial; /*字体*/
+        color: #4A4A4A; /*字体颜色*/
     }
 
     /* ---------------- HEADER ---------------- */
-    .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background-color: #F6B8B8;
-        padding: 20px 50px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    .header 
+    {
+        display: flex; /*变成弹性盒子Flexbox，自动变成一行排列*/
+        justify-content: space-between; /*子元素第一个贴左边，最后一个贴右边，中间自动留空*/
+        align-items: center; /*将内容上下居中*/
+        background-color: #F6B8B8; /* 背景颜色 */
+        padding: 20px 50px; /*内容和边框之间的距离*/
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1); /*阴影效果*/
     }
 
-    .logo {
-        display: flex;
-        align-items: center;
-        font-weight: bold;
-        font-size: 36px;
-        gap: 10px;
+    .logo 
+    {
+        display: flex; /*变成弹性盒子Flexbox，自动变成一行排列*/
+        align-items: center; /*将内容上下居中*/
+        font-weight: bold; /*粗体*/
+        font-size: 36px; /*字体大小*/
+        gap: 10px; /* 图片与文字之间的间距 */
     }
 
-    .header .function-links a {
-        margin-left: 15px;
-        text-decoration: none;
-        font-size: 20px;
-        color: #4A4A4A;
-        font-weight: bold;
+    .header .function-links a 
+    {
+        margin-left: 15px; /*与周围的间距*/
+        text-decoration: none; /*字体的下划线去掉*/
+        font-size: 20px; /*字体大小*/
+        color: #4A4A4A; /*字体颜色*/
+        font-weight: bold; /*粗体*/
     }
 
     /* ---------------- CONTENT ---------------- */
-    .container {
-        padding: 30px 50px;
+    .container 
+    {
+        padding: 30px 50px;/*内容和边框之间的距离*/
     }
 
-    h2 {
-        color: #F28585;
+    h2 
+    {
+        color: #F28585; /*字体颜色*/
     }
 
     /* Filter Section */
-    .filters {
-        display: flex;
-        gap: 20px;
-        margin-bottom: 20px;
-        align-items: center;
+    .filters 
+    {
+        display: flex; /*变成弹性盒子Flexbox，自动变成一行排列*/
+        gap: 20px; /* 图片与文字之间的间距 */
+        margin-bottom: 20px; /*与周围的间距*/
+        align-items: center; /*将内容上下居中*/
     }
 
-    .filters select {
-        padding: 8px;
-        font-size: 16px;
-        border-radius: 8px;
-        border: 1px solid #ccc;
+    .filters select 
+    {
+        padding: 8px; /*内容和边框之间的距离*/
+        font-size: 16px; /*字体大小*/
+        border-radius: 8px;  /*设置按钮的圆角*/
+        border: 1px solid #ccc; /*按钮的默认边框线*/
     }
 
     /* Table Styles */
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 15px;
-        background: white;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    table 
+    {
+        width: 100%; /*设置侧边栏的宽度*/
+        border-collapse: collapse; /*让表格的边框合并，不会出现双边框*/
+        margin-top: 15px; /*与周围的间距*/
+        background: white; /* 背景颜色 */
+        border-radius: 12px; /*设置按钮的圆角*/
+        overflow: hidden; /*把超出容器范围的内容“裁掉”并隐藏，不会显示出来*/
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1); /*阴影效果*/
     }
 
-    th {
-        background-color: #F6B8B8;
-        padding: 15px;
-        font-size: 18px;
+    th 
+    {
+        background-color: #F6B8B8; /* 背景颜色 */
+        padding: 15px; /*内容和边框之间的距离*/
+        font-size: 18px; /*字体大小*/
     }
 
-    td {
-        padding: 15px;
-        text-align: center;
-        border-bottom: 1px solid #ddd;
+    td 
+    {
+        padding: 15px; /*内容和边框之间的距离*/
+        text-align: center; /* 字体水平居中对齐 */
+        border-bottom: 1px solid #ddd; /*按钮的默认边框线*/
     }
 
-    .status {
-        padding: 6px 12px;
-        border-radius: 8px;
-        font-weight: bold;
-        color: white;
+    .status 
+    {
+        padding: 6px 12px; /*内容和边框之间的距离*/
+        border-radius: 8px; /*设置按钮的圆角*/
+        font-weight: bold; /*粗体*/
+        color: white; /*字体颜色*/
     }
 
-    .received { background-color: #91C8A8; }
-    .distributed { background-color: #F28585; }
-    .progress { background-color: #F6B8B8; }
+    .received 
+    { 
+        background-color: #91C8A8; /* 背景颜色 */
+    }
+
+    .distributed 
+    { 
+        background-color: #F28585; /* 背景颜色 */
+    }
+
+    .progress 
+    { 
+        background-color: #F6B8B8; /* 背景颜色 */
+    }
 
     /* View Details Button */
-    .details-btn {
-        background-color: #A8D5BA;
-        padding: 8px 15px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: bold;
+    .details-btn 
+    {
+        background-color: #A8D5BA; /* 背景颜色 */
+        padding: 8px 15px; /*内容和边框之间的距离*/
+        border: none; /*按钮的默认边框线*/
+        border-radius: 8px; /*设置按钮的圆角*/
+        cursor: pointer; /*鼠标变成手指*/
+        font-weight: bold; /*粗体*/
     }
 
-    .details-btn:hover {
-        background-color: #91C8A8;
+    .details-btn:hover 
+    {
+        background-color: #91C8A8; /* 背景颜色 */
     }
 </style>
 </head>
