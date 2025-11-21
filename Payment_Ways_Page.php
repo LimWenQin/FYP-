@@ -201,7 +201,7 @@ $branch_id = isset($_POST['branch_id']) ? $_POST['branch_id'] : 0;
             <img src="tng.jpg" alt="E-Wallet">
 
             <!-- ✅ Bank Transfer -->
-            <form method="POST" action="Bank_Transfer_Page.php">
+            <form method="POST" action="Credit_Debit_Page.php">
                 <input type="hidden" name="amount" value="<?php echo $amount; ?>">
                 <input type="hidden" name="donation_type" value="<?php echo $donation_type; ?>">
                 <input type="hidden" name="branch_id" value="<?php echo $branch_id; ?>">
