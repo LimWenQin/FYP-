@@ -1,10 +1,45 @@
 <?php
 // -------------------------
-// ✅ 获取上一个页面传来的数据
+// ✅ 1. 数据库连接 (必须连接才能查询名字)
+// -------------------------
+$servername = "localhost";
+$username = "root";
+$password = "";
+$database = "donation_system";
+
+$conn = new mysqli($servername, $username, $password, $database);
+
+if ($conn->connect_error) {
+    die("Database Connection Failed: " . $conn->connect_error);
+}
+
+// -------------------------
+// ✅ 2. 获取上一个页面传来的数据
 // -------------------------
 $amount = isset($_POST['amount']) ? $_POST['amount'] : 0;
 $donation_type = isset($_POST['donation_type']) ? $_POST['donation_type'] : "One-time";
 $branch_id = isset($_POST['branch_id']) ? $_POST['branch_id'] : 0;
+
+// -------------------------
+// ✅ 3. [关键步骤] 使用 ID 去数据库查询分行名字
+// -------------------------
+$branch_name = "Unknown Branch"; // 设置默认值
+
+if ($branch_id > 0) {
+    // 准备 SQL 语句查找名字
+    $stmt = $conn->prepare("SELECT Branch_Name FROM branch WHERE Branch_ID = ?");
+    $stmt->bind_param("i", $branch_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $branch_name = $row['Branch_Name']; // ✅ 成功获取名字！
+    }
+    $stmt->close();
+}
+
+$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -188,7 +223,7 @@ $branch_id = isset($_POST['branch_id']) ? $_POST['branch_id'] : 0;
         <ul>
             <li><strong>捐款金额：</strong> RM <?php echo htmlspecialchars($amount); ?></li>
             <li><strong>捐款类型：</strong> <?php echo htmlspecialchars($donation_type); ?></li>
-            <li><strong>分行编号：</strong> <?php echo htmlspecialchars($branch_id); ?></li>
+            <li><strong>分行名称：</strong> <?php echo htmlspecialchars($branch_name); ?></li>
         </ul>
     </div>
 
