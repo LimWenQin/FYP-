@@ -9,22 +9,28 @@ $database = "donation_system";
 
 $conn = new mysqli($servername, $username, $password, $database);
 
-// 检查连接是否成功
 if ($conn->connect_error) {
     die("Database Connection Failed: " . $conn->connect_error);
 }
 
 // -------------------------
-// ✅ 获取从 Donation Page 传来的数据
+// ✅ 获取数据
 // -------------------------
 $amount = isset($_POST['amount']) ? $_POST['amount'] : 0;
 $donation_type = isset($_POST['donation_type']) ? $_POST['donation_type'] : "One-time";
 
 // -------------------------
-// ✅ 从数据库读取分行资料
+// ✅ 关键修改：把数据存入数组
 // -------------------------
 $sql = "SELECT Branch_ID, Branch_Name, Branch_Type, Branch_Description FROM branch";
 $result = $conn->query($sql);
+
+$branches = []; // 准备一个空数组
+if ($result->num_rows > 0) {
+    while($row = $result->fetch_assoc()) {
+        $branches[] = $row; // 把每一行数据存进去，备用
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -172,8 +178,7 @@ $result = $conn->query($sql);
 
 <header class="header">
     <div class="logo">
-        <img src="logo.jpg" alt="Logo" width="80" height="80">
-        LOVE BRIDGE
+        <img src="logo.jpg" alt="Logo" width="80" height="80"> LOVE BRIDGE
     </div>
     <div class="function-links">
         <a href="#">Home</a>
@@ -184,7 +189,6 @@ $result = $conn->query($sql);
 </header>
 
 <div class="container">
-    <!-- 左侧社交按钮 -->
     <div class="sidebar">
         <button><img src="yourimage.jpg" alt="Whatsapp"></button>
         <button><img src="yourimage.jpg" alt="Facebook"></button>
@@ -192,38 +196,47 @@ $result = $conn->query($sql);
         <button><img src="yourimage.jpg" alt="General Line"></button>
     </div>
 
-    <!-- 中间故事 -->
     <div class="story-section">
         <h2>选择您希望支持的分行</h2>
-        <p>每一个分行都在为不同的群体提供帮助。请选择一个您希望支持的分行来完成捐款。</p>
+        <p>每一间分行都在为不同的群体提供帮助。以下是详细介绍：</p>
+        <hr style="border: 1px solid #eee; margin: 20px 0;">
+
+        <?php if (!empty($branches)): ?>
+            <?php foreach ($branches as $row): ?>
+                <div style="margin-bottom: 30px;">
+                    <img src="yourimage.jpg" alt="Branch Story"> 
+                    
+                    <h3 style="color: #4A4A4A;"><?php echo $row['Branch_Name']; ?></h3>
+                    
+                    <p style="line-height: 1.6;"><?php echo $row['Branch_Description']; ?></p>
+                    
+                    <hr style="border: 1px dashed #ccc; margin-top: 20px;">
+                </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <p>暂无分行资料。</p>
+        <?php endif; ?>
     </div>
 
-    <!-- 右侧分行显示 -->
     <div class="donation-box">
         <h3>Available Branches</h3>
         <div class="branch-type">
 
-        <?php
-        if ($result->num_rows > 0) {
-            while ($row = $result->fetch_assoc()) {
-                echo "
+        <?php if (!empty($branches)): ?>
+            <?php foreach ($branches as $row): ?>
                 <div class='branch-card'>
-                    <h4>{$row['Branch_Name']}</h4>
-                    <p>Type: {$row['Branch_Type']}</p>
-                    <p>{$row['Branch_Description']}</p>
+                    <h4><?php echo $row['Branch_Name']; ?></h4>
+                    <p>Type: <?php echo $row['Branch_Type']; ?></p>
+                    
                     <form method='POST' action='Payment_Ways_Page.php'>
-                        <input type='hidden' name='branch_id' value='{$row['Branch_ID']}'>
-                        <input type='hidden' name='amount' value='{$amount}'>
-                        <input type='hidden' name='donation_type' value='{$donation_type}'>
+                        <input type='hidden' name='branch_id' value='<?php echo $row['Branch_ID']; ?>'>
+                        <input type='hidden' name='amount' value='<?php echo $amount; ?>'>
+                        <input type='hidden' name='donation_type' value='<?php echo $donation_type; ?>'>
                         <button type='submit' class='B_btn'>Select</button>
                     </form>
                 </div>
-                ";
-            }
-        } else {
-            echo "<p>No branches found in database.</p>";
-        }
-        ?>
+            <?php endforeach; ?>
+        <?php endif; ?>
 
         </div>
     </div>
