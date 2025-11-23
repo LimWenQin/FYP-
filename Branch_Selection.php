@@ -76,7 +76,8 @@ if ($result->num_rows > 0) {
         gap: 10px;              /* 图片与文字之间的间距 */
     }
 
-    .function-links a {
+    .header .function-links a 
+    {
         margin-left: 15px;
         text-decoration: none;
         font-size: 20px;
@@ -84,13 +85,20 @@ if ($result->num_rows > 0) {
         font-weight: bold;
     }
 
-    .container {
+    .search 
+    { 
+        padding: 6px; font-size: 16px; 
+    }
+
+    .container 
+    {
         display: flex;
         flex-direction: row;
         padding: 20px;
     }
 
-    .sidebar {
+    .sidebar 
+    {
         width: 60px;
         display: flex;
         flex-direction: column;
@@ -100,7 +108,8 @@ if ($result->num_rows > 0) {
         padding-top: 20px;
     }
 
-    .sidebar button {
+    .sidebar button 
+    {
         background-color: #A8D5BA;
         border: none;
         border-radius: 10px;
@@ -113,7 +122,8 @@ if ($result->num_rows > 0) {
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
-    .story-section {
+    .story-section 
+    {
         flex: 2;
         background-color: white;
         border-radius: 12px;
@@ -121,17 +131,20 @@ if ($result->num_rows > 0) {
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    .story-section img {
+    .story-section img 
+    {
         width: 100%;
         border-radius: 10px;
         margin-bottom: 15px;
     }
 
-    .story-section h2 {
+    .story-section h2 
+    {
         color: #F28585;
     }
 
-    .donation-box {
+    .donation-box 
+    {
         flex: 1;
         background-color: white;
         border-radius: 12px;
@@ -140,19 +153,22 @@ if ($result->num_rows > 0) {
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
 
-    .donation-box h3 {
+    .donation-box h3 
+    {
         text-align: center;
         color: #F28585;
     }
 
-    .branch-type {
+    .branch-type 
+    {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
         gap: 15px;
         margin-top: 20px;
     }
 
-    .branch-card {
+    .branch-card 
+    {
         background-color: #A8D5BA;
         border-radius: 10px;
         padding: 15px;
@@ -160,16 +176,19 @@ if ($result->num_rows > 0) {
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
-    .branch-card h4 {
+    .branch-card h4 
+    {
         margin: 10px 0 5px;
         color: #4A4A4A;
     }
 
-    .branch-card p {
+    .branch-card p 
+    {
         font-size: 14px;
     }
 
-    .B_btn {
+    .B_btn 
+    {
         background-color: #91C8A8;
         border: none;
         padding: 10px;
@@ -181,7 +200,8 @@ if ($result->num_rows > 0) {
         width: 100%;
     }
 
-    .B_btn:hover {
+    .B_btn:hover 
+    {
         background-color: #7CBF99;
     }
 
@@ -191,13 +211,17 @@ if ($result->num_rows > 0) {
 
 <header class="header">
     <div class="logo">
-        <img src="logo.jpg" alt="Logo" width="80" height="80"> LOVE BRIDGE
+        <img src="logo.jpg" alt="Logo" width="80" height="80">
+        LOVE BRIDGE
     </div>
     <div class="function-links">
+        <input type="text" placeholder="Search..." class="search">
         <a href="#">Home</a>
         <a href="#">About Us</a>
-        <a href="#">Contact</a>
+        <a href="#">Contact Us</a>
+        <a href="#">History</a>
         <a href="#">Activities</a>
+        <a href="#">News & Stories</a>
     </div>
 </header>
 
