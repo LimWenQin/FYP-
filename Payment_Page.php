@@ -3,6 +3,22 @@
 // ✅ 当用户点击金额或“捐款”按钮时，把选择传到 BranchSelectionPage.php
 ?>
 
+//<?php 
+//session_start(); // 1. 开启 Session
+
+// 2. 强制登录检查
+//if (!isset($_SESSION['donor_id'])) {
+//    echo "<script>
+//            alert('Please login first to make a donation.');
+//            window.location.href = 'donor_login.php';
+//          </script>";
+//    exit();
+//}
+
+// 3. (可选) 获取用户信息，比如名字，用于显示在Header
+//$donor_name = $_SESSION['donor_name'] ?? 'Donor';
+//?>
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -243,6 +259,12 @@ function selectAmount(amount) {
         <a href="#">History</a>
         <a href="#">Activities</a>
         <a href="#">News & Stories</a>
+        <!--<span style="color:white; margin-right:10px;">
+            Hi, <?php echo htmlspecialchars($donor_name); ?>
+        </span>
+        <a href="logout.php">
+            Logout
+        </a>-->
     </div>
 </header>
 
