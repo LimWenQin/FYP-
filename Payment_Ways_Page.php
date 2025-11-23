@@ -70,9 +70,11 @@ $conn->close();
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background-color: #F6B8B8;
         padding: 20px 50px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        /*应用渐变色背景 --- */
+        background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%);
+        box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2); /* 新的阴影 */
+        color: #fcfcfcff; /* 为了在渐变色上清晰显示，文字改为白色 */
     }
 
     .logo 
@@ -84,16 +86,13 @@ $conn->close();
         gap: 10px;              /* 图片与文字之间的间距 */
     }
 
-    .header 
+    .header .function-links a 
     {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 20px 50px;
-        /*应用渐变色背景 --- */
-        background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%);
-        box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2); /* 新的阴影 */
-        color: #fcfcfcff; /* 为了在渐变色上清晰显示，文字改为白色 */
+        margin-left: 15px;
+        text-decoration: none;
+        font-size: 20px;
+        color: #fcfcfcff;
+        font-weight: bold;
     }
 
     .search 
