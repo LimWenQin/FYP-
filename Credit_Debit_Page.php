@@ -84,160 +84,177 @@ $conn->close();
 <head>
 <title>Bank Transfer</title>
 <style>
-/* ✅ 样式区块（保留你的原始美观风格） */
-body 
-{
-    background-color: #FFF5E4;
-    font-family: Arial;
-    color: #4A4A4A;
-    margin: 0;
-}
 
-.header 
-{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: #F6B8B8;
-    padding: 20px 50px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
+    /* 1. 添加颜色变量定义 */
+    :root 
+    {
+        --gradient-start: #ff6b9d;
+        --gradient-middle: #ff8fab;
+        --gradient-end: #ffb3c6;
+        --white: #ffffff;
+    }
 
-.logo 
-{
-    display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
-    align-items: center;    /* 垂直居中 */
-    font-weight: bold;      /*粗体*/
-    font-size: 36px;        /*字体大小*/
-    gap: 10px;              /* 图片与文字之间的间距 */
-}
+    /* ✅ 样式区块（保留你的原始美观风格） */
+    body 
+    {
+        background-color: #FFF5E4;
+        font-family: Arial;
+        color: #4A4A4A;
+        margin: 0;
+    }
 
-.header .function-links a 
-{
-    margin-left: 15px;
-    text-decoration: none;
-    font-size: 20px;
-    color: #4A4A4A;
-    font-weight: bold;
-}
+    .header 
+    {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 50px;
+        /*应用渐变色背景 --- */
+        background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%);
+        box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2); /* 新的阴影 */
+        color: #fcfcfcff; /* 为了在渐变色上清晰显示，文字改为白色 */
+    }
 
-.container 
-{
-    display: flex;
-    flex-direction: row;
-    padding: 20px;
-}
+    .logo 
+    {
+        display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
+        align-items: center;    /* 垂直居中 */
+        font-weight: bold;      /*粗体*/
+        font-size: 36px;        /*字体大小*/
+        gap: 10px;              /* 图片与文字之间的间距 */
+    }
 
-.sidebar 
-{
-    width: 60px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 15px;
-    margin-right: 20px;
-    padding-top: 20px;
-}
+    .header .function-links a 
+    {
+        margin-left: 15px;
+        text-decoration: none;
+        font-size: 20px;
+        color: #fcfcfcff;
+        font-weight: bold;
+    }
 
-.sidebar button 
-{
-    background-color: #A8D5BA;
-    border: none;
-    border-radius: 10px;
-    padding: 8px;
-    width: 50px;
-    height: 50px;
-    cursor: pointer;
-    font-weight: bold;
-    color: #4A4A4A;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
+    .search 
+    { 
+        padding: 6px; font-size: 16px; 
+    }
 
-.story-section 
-{
-    flex: 2;
-    background-color: white;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
+    .container 
+    {
+        display: flex;
+        flex-direction: row;
+        padding: 20px;
+    }
 
-.story-section img 
-{
-    width: 100%;
-    border-radius: 10px;
-    margin-bottom: 15px;
-}
+    .sidebar 
+    {
+        width: 60px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+        margin-right: 20px;
+        padding-top: 20px;
+    }
 
-.story-section h2 
-{
-    color: #F28585;
-}
+    .sidebar button 
+    {
+        background-color: #A8D5BA;
+        border: none;
+        border-radius: 10px;
+        padding: 8px;
+        width: 50px;
+        height: 50px;
+        cursor: pointer;
+        font-weight: bold;
+        color: #4A4A4A;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
 
-.donation-box 
-{
-    flex: 1;
-    background-color: white;
-    border-radius: 12px;
-    margin-left: 20px;
-    padding: 20px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
+    .story-section 
+    {
+        flex: 2;
+        background-color: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
 
-.donation-box h3 
-{
-    text-align: center;
-    color: #F28585;
-}
+    .story-section img 
+    {
+        width: 100%;
+        border-radius: 10px;
+        margin-bottom: 15px;
+    }
 
-.bank-form label 
-{
-    font-weight: bold;
-    margin-top: 10px;
-}
+    .story-section h2 
+    {
+        color: #F28585;
+    }
 
-.bank-form select, .bank-form input 
-{
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    margin-top: 5px;
-    font-size: 16px;
-}
+    .donation-box 
+    {
+        flex: 1;
+        background-color: white;
+        border-radius: 12px;
+        margin-left: 20px;
+        padding: 20px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
 
-.card-info 
-{
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    margin-top: 10px;
-}
+    .donation-box h3 
+    {
+        text-align: center;
+        color: #F28585;
+    }
 
-.card-info div 
-{
-    flex: 1;
-}
+    .bank-form label 
+    {
+        font-weight: bold;
+        margin-top: 10px;
+    }
 
-.donate-btn 
-{
-    margin-top: 20px;
-    width: 100%;
-    padding: 12px;
-    background-color: #F6B8B8;
-    border: none;
-    border-radius: 8px;
-    font-size: 18px;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    color: #4A4A4A;
-}
+    .bank-form select, .bank-form input 
+    {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        margin-top: 5px;
+        font-size: 16px;
+    }
 
-.donate-btn:hover 
-{
-    background-color: #F28585;
-}
+    .card-info 
+    {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .card-info div 
+    {
+        flex: 1;
+    }
+
+    .donate-btn 
+    {
+        margin-top: 20px;
+        width: 100%;
+        padding: 12px;
+        background-color: #F6B8B8;
+        border: none;
+        border-radius: 8px;
+        font-size: 18px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        color: #4A4A4A;
+    }
+
+    .donate-btn:hover 
+    {
+        background-color: #F28585;
+    }
 </style>
 </head>
 <body>
