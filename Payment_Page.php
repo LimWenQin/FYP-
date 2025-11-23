@@ -36,6 +36,7 @@
         box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2); /* 新的阴影 */
         color: #fcfcfcff; /* 为了在渐变色上清晰显示，文字改为白色 */
     }
+    
     .logo 
     {
         display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
