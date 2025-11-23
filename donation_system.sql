@@ -99,7 +99,7 @@ CREATE TABLE `donor` (
   `Donor_ContactNumber` varchar(20) NOT NULL,
   `Donor_ICNumber` varchar(20) NOT NULL,
   `Donor_Email` varchar(100) NOT NULL,
-  `Donor_Password` varchar(15) NOT NULL,
+  `Donor_Password` varchar(255) NOT NULL,
   `Donor_Address` text NOT NULL,
   `Donor_DOB` date NOT NULL,
   `Donor_Description` text NOT NULL
