@@ -1,4 +1,10 @@
 <?php
+//session_start(); // 1. 开启 Session
+
+//if (!isset($_SESSION['donor_id'])) {
+//    header("Location: donor_login.php");
+//    exit();
+//}
 // -------------------------
 // ✅ 1. 数据库连接 (必须连接才能查询名字)
 // -------------------------
