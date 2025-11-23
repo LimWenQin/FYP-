@@ -1,4 +1,6 @@
 <?php
+//session_start(); // 1. 开启 Session (防止刷新积分重复)
+
 // ✅ 设置时区
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
