@@ -1,4 +1,13 @@
 <?php
+//session_start(); // 1. 开启 Session (必须放在第一行)
+
+// 2. 再次检查登录 (安全起见)
+//if (!isset($_SESSION['donor_id'])) 
+//    {
+//        header("Location: donor_login.php");
+//        exit();
+//    }
+
 // -------------------------
 // ✅ 数据库连接
 // -------------------------
