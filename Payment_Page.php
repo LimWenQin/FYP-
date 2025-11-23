@@ -3,7 +3,7 @@
 // ✅ 当用户点击金额或“捐款”按钮时，把选择传到 BranchSelectionPage.php
 ?>
 
-//<?php 
+<?php 
 //session_start(); // 1. 开启 Session
 
 // 2. 强制登录检查
@@ -17,7 +17,7 @@
 
 // 3. (可选) 获取用户信息，比如名字，用于显示在Header
 //$donor_name = $_SESSION['donor_name'] ?? 'Donor';
-//?>
+?>
 
 <!DOCTYPE html>
 <html>
