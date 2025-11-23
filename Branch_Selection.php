@@ -40,7 +40,8 @@ if ($result->num_rows > 0) {
 <style>
 
     /* 1. 添加颜色变量定义 */
-    :root {
+    :root 
+    {
         --gradient-start: #ff6b9d;
         --gradient-middle: #ff8fab;
         --gradient-end: #ffb3c6;
