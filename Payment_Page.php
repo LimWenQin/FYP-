@@ -8,6 +8,15 @@
 <head>
 <title>Donation Page</title>
 <style>
+
+    /* 1. 添加颜色变量定义 */
+    :root {
+        --gradient-start: #ff6b9d;
+        --gradient-middle: #ff8fab;
+        --gradient-end: #ffb3c6;
+        --white: #ffffff;
+    }
+
     body 
     {
         background-color: #FFF5E4;
@@ -15,14 +24,17 @@
         font-family: Arial;
         color: #4A4A4A;
     }
+    
     .header 
     {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background-color: #F6B8B8;
         padding: 20px 50px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        /*应用渐变色背景 --- */
+        background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%);
+        box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2); /* 新的阴影 */
+        color: #fcfcfcff; /* 为了在渐变色上清晰显示，文字改为白色 */
     }
     .logo 
     {
@@ -32,12 +44,13 @@
         font-size: 36px;        /*字体大小*/
         gap: 10px;              /* 图片与文字之间的间距 */
     }
+
     .header .function-links a 
     {
         margin-left: 15px;
         text-decoration: none;
         font-size: 20px;
-        color: #4A4A4A;
+        color: #fcfcfcff;
         font-weight: bold;
     }
     .search 
