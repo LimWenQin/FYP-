@@ -1,0 +1,252 @@
+:root {
+    /* 使用Admin Common CSS的颜色变量 */
+    --primary: #ff6b9d; /* 替换原来的 #F6B8B8 */
+    --secondary: #fff5f7; /* 替换原来的 #FFF5E4 (使用Admin Light Background) */
+    --text: #4a4a4a; /* 替换原来的 #4A4A4A (使用Admin Dark Text) */
+    --light-text: #7f8c8d; /* 替换原来的 #777777 */
+    --white: #ffffff; /* 保持不变 */
+    --shadow: rgba(255, 107, 157, 0.15); /* 使用Admin Card Shadow的颜色 */
+    --error: #e74c3c; /* 保持不变 */
+    --success: #2ecc71; /* 保持不变 */
+    --gradient-start: #ff6b9d;
+    --gradient-middle: #ff8fab;
+    --gradient-end: #ffb3c6;
+    --light-pink: #ffb3c6;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    /* 采用Admin Common CSS中的字体 */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    /* 采用Admin Common CSS中的背景渐变 */
+    background: linear-gradient(135deg, var(--secondary) 0%, #fff0f5 100%);
+    color: var(--text);
+    line-height: 1.6;
+    display: flex; /* 保持居中布局 */
+    min-height: 100vh;
+    flex-direction: column;
+}
+
+/* --- Header Styles - 采用Admin Header的风格 --- */
+.header {
+    /* 使用Admin Header的渐变背景 */
+    background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%);
+    color: var(--white); /* 文本颜色改为白色 */
+    padding: 20px 50px;
+    box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2); /* 采用Admin的阴影风格 */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    font-weight: bold;
+    font-size: 30px; /* 稍微调小以适应白色文本 */
+    color: var(--white); /* 标志颜色改为白色 */
+}
+
+.header .function-links a {
+    margin-left: 20px;
+    text-decoration: none;
+    font-size: 18px;
+    color: var(--white); /* 链接颜色改为白色 */
+    font-weight: 500;
+    transition: color 0.3s, border-bottom 0.3s;
+    padding-bottom: 2px;
+}
+
+.header .function-links a:hover {
+    color: var(--white);
+    border-bottom: 2px solid var(--white); /* 悬停效果更明显 */
+    opacity: 1;
+}
+
+.search {
+    padding: 8px 12px;
+    font-size: 16px;
+    border: none; /* 移除边框 */
+    border-radius: 20px; /* 更加圆润 */
+    outline: none;
+    background-color: rgba(255, 255, 255, 0.2); /* 透明背景 */
+    color: var(--white);
+    transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.search::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.search:focus {
+    background-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+/* --- Container and Form Styles --- */
+.container {
+    display: flex;
+    flex-direction: row;
+    padding: 30px 20px;
+    flex-grow: 1; /* 占据剩余空间 */
+    align-items: center;
+    justify-content: center;
+}
+
+.form-container {
+    background-color: var(--white);
+    border-radius: 12px;
+    box-shadow: var(--card-shadow); /* 使用Admin Card Shadow */
+    padding: 40px;
+    width: 100%;
+    max-width: 650px; /* 稍微扩大最大宽度 */
+    margin: 20px;
+}
+
+.form-title {
+    text-align: center;
+    margin-bottom: 30px;
+    color: var(--text);
+    font-size: 32px;
+    font-weight: 600;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--light-pink); /* 使用Admin的浅粉色边框 */
+    border-radius: 8px; /* 增加圆角 */
+    font-size: 16px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.form-control:focus {
+    border-color: var(--primary); /* 聚焦时使用主粉色 */
+    box-shadow: 0 0 8px rgba(255, 107, 157, 0.4); /* 匹配Admin风格的阴影 */
+    outline: none;
+}
+
+.btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    /* 使用Admin风格的渐变按钮背景 */
+    background: linear-gradient(90deg, var(--gradient-start) 0%, var(--gradient-middle) 100%);
+    color: var(--white); /* 按钮文字改为白色 */
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s, box-shadow 0.3s;
+    box-shadow: 0 4px 10px rgba(255, 107, 157, 0.3);
+}
+
+.btn:hover {
+    background: linear-gradient(90deg, var(--gradient-middle) 0%, var(--gradient-end) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(255, 107, 157, 0.4);
+}
+
+.btn:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 10px rgba(255, 107, 157, 0.3);
+}
+
+.form-footer {
+    text-align: center;
+    margin-top: 25px;
+    font-size: 15px;
+}
+
+.form-footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: bold;
+    transition: color 0.3s;
+}
+
+.form-footer a:hover {
+    color: #ff8fab; /* 浅粉色悬停 */
+    text-decoration: underline;
+}
+
+.error-message {
+    color: var(--error);
+    font-size: 14px;
+    margin-bottom: 15px; /* 调整间距 */
+    padding: 10px;
+    background-color: rgba(231, 76, 60, 0.08); /* 颜色更淡 */
+    border: 1px solid var(--error);
+    border-radius: 6px;
+    display: <?php echo !empty($error_message) ? 'block' : 'none'; ?>;
+}
+
+.success-message {
+    color: var(--success);
+    font-size: 14px;
+    margin-bottom: 15px; /* 调整间距 */
+    padding: 10px;
+    background-color: rgba(46, 204, 113, 0.08); /* 颜色更淡 */
+    border: 1px solid var(--success);
+    border-radius: 6px;
+    display: <?php echo !empty($success_message) ? 'block' : 'none'; ?>;
+}
+
+.row {
+    display: flex;
+    gap: 20px; /* 增加间距 */
+}
+
+.row .form-group {
+    flex: 1;
+}
+
+/* --- Media Queries --- */
+@media (max-width: 768px) {
+    .header {
+        padding: 15px 20px;
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .logo {
+        font-size: 28px;
+    }
+    
+    .header .function-links a {
+        margin: 0 10px;
+    }
+    
+    .container {
+        padding: 10px;
+    }
+    
+    .form-container {
+        margin: 10px;
+        padding: 25px;
+    }
+    
+    .row {
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    .row .form-group {
+        margin-bottom: 15px;
+    }
+}
