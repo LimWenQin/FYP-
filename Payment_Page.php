@@ -316,3 +316,5 @@ function selectAmount(amount) {
 
 </body>
 </html>
+
+//<?php $conn->close(); ?>
