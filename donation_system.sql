@@ -163,8 +163,8 @@ CREATE TABLE `orders` (
   `Order_Created_At` datetime NOT NULL,
   `Order_Updated_At` datetime NOT NULL,
   `Donor_ID` int(11) NOT NULL,
-  `Payment_ID` int(11) NOT NULL,
-  `Branch_ID` int(11) NOT NULL,
+  `Payment_ID` int(11) NULL,
+  `Branch_ID` int(11) NULL,
   `Activity_ID` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -314,6 +314,13 @@ CREATE TABLE special_case (
   Created_At DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+CREATE TABLE `story` (
+  `Story_ID` int(11) NOT NULL,
+  `Story_Date` date NOT NULL,
+  `Donor_Description` text NOT NULL,
+  `Story_Image` varchar(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 
 --
 -- 转储表的索引
@@ -435,6 +442,12 @@ ALTER TABLE `staff_activity`
   ADD KEY `StaffActivity_Activity_ID_FK` (`Activity_ID`);
 
 --
+-- 表的索引 `story`
+--
+ALTER TABLE `story`
+  ADD PRIMARY KEY (`story_ID`);
+
+--
 -- 在导出的表使用AUTO_INCREMENT
 --
 
@@ -515,6 +528,30 @@ ALTER TABLE `staff`
 --
 ALTER TABLE `staff_activity`
   MODIFY `StaffActivity_ID` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- 使用表AUTO_INCREMENT `story`
+--
+ALTER TABLE `story`
+  MODIFY `story_ID` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- 使用表AUTO_INCREMENT `item_donation`
+--
+ALTER TABLE `item_donation`
+  MODIFY `Item_ID` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- 使用表AUTO_INCREMENT `receipt`
+--
+ALTER TABLE `receipt`
+  MODIFY `Receipt_ID` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- 使用表AUTO_INCREMENT `recurring_donation`
+--
+ALTER TABLE `recurring_donation`
+  MODIFY `Recurring_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- 限制导出的表
