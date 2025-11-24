@@ -241,14 +241,14 @@ $conn->close();
 
     <!-- 中间故事区 -->
     <div class="story-section">
-        <h2>选择您的付款方式</h2>
-        <p>请选择一种您偏好的付款方式来完成捐款。我们支持银行转账和电子钱包。</p>
+        <h2>Choose your payment method</h2>
+        <p>Please select your preferred payment method to complete your donation. We support Credit/Debit cards and e-wallets.</p>
 
-        <h3>当前捐款详情：</h3>
+        <h3>Current donation details:</h3>
         <ul>
-            <li><strong>捐款金额：</strong> RM <?php echo htmlspecialchars($amount); ?></li>
-            <li><strong>捐款类型：</strong> <?php echo htmlspecialchars($donation_type); ?></li>
-            <li><strong>分行名称：</strong> <?php echo htmlspecialchars($branch_name); ?></li>
+            <li><strong>Donation amount:</strong> RM <?php echo htmlspecialchars($amount); ?></li>
+            <li><strong>Donation type  :</strong> <?php echo htmlspecialchars($donation_type); ?></li>
+            <li><strong>Branch name    :</strong> <?php echo htmlspecialchars($branch_name); ?></li>
         </ul>
     </div>
 
