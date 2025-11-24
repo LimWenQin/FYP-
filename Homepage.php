@@ -1,11 +1,20 @@
 <?php
 session_start(); 
-include 'dataconnection.php';
 
-// Check if user is logged in
 $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
 
-// Default donor data (for guests)
+$mock_db_data = [
+    "Donor_FName" => "Jane",
+    "Donor_LName" => "Doe",
+    "Donor_Email" => "jane.doe@example.com",
+    "Donor_ContactNumber" => "012-3456789",
+    "Donor_ICNumber" => "900101-14-5678",
+    "Donor_DOB" => "1990-01-01",
+    "Donor_Address" => "123 Mock St, Kuala Lumpur, 50450",
+    "Donor_Description" => "Loyal donor since 2022."
+];
+
+
 $donor = [
     "Donor_FName" => "Guest",
     "Donor_LName" => "",
@@ -17,26 +26,12 @@ $donor = [
     "Donor_Description" => ""
 ];
 
-// If user logged in → fetch real data
 if ($logged_in && isset($_SESSION['donor_id'])) {
-
-    // IMPORTANT: Change TABLE NAME here to the REAL name in your DB
-    $query = "SELECT * FROM donor WHERE Donor_ID = ?";
-
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param("i", $_SESSION['donor_id']);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    // If record exists
-    if ($result->num_rows > 0) {
-        $donor = $result->fetch_assoc();
-    }
-
-    $stmt->close();
+   
+    $donor = $mock_db_data;
 }
-?>
 
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -68,60 +63,150 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             line-height: 1.6;
         }
         
-        .header {
+        .header-top {
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            background-color: #434141;
+            padding: 6px 50px;
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+        
+        .welcome-text {
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .auth-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .auth-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .login-btn {
+            background-color: white;
+            color: black;
+            border: none;
+        }
+        
+        .login-btn:hover {
+            background-color: #938e8eff;
+        }
+        
+        .register-btn {
+            background-color: var(--text);
+            color: var(--white);
+            border: none;
+        }
+        
+        .register-btn:hover {
+            background-color: #333333;
+        }
+        
+         
+        .header {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr; 
             align-items: center;
             background-color: var(--primary);
             padding: 20px 50px;
             box-shadow: 0 2px 6px var(--shadow);
+            gap: 20px;
         }
         
         .logo {
             font-weight: bold;
             font-size: 36px;
             color: var(--text);
+            text-align: left; 
+            grid-column: 1;
         }
         
-        .header .function-links a {
-            margin-left: 15px;
-            text-decoration: none;
-            font-size: 20px;
-            color: var(--text);
-            font-weight: bold;
-            transition: opacity 0.3s;
-        }
-        
-        .header .function-links a:hover {
-            opacity: 0.8;
-        }
-        
-        .user-info {
+    
+        .header-right { 
+            grid-column: 2;
             display: flex;
             align-items: center;
+            justify-content: center; 
+            gap: 15px;
+        }
+
+        .function-links {
+            display: flex;
             gap: 15px;
         }
         
-        .user-name {
+        .function-links a {
+            text-decoration: none;
+            font-size: 18px;
+            color: var(--text);
             font-weight: bold;
+            transition: opacity 0.3s;
+            white-space: nowrap;
         }
         
-        .login-btn {
+        .function-links a:hover {
+            opacity: 0.8;
+        }
+
+       
+        .header-center { 
+            grid-column: 3;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end; 
+            gap: 15px;
+        }
+        
+        .search-box {
+            display: flex;
+            align-items: center;
             background-color: var(--white);
-            color: var(--text);
+            border-radius: 4px;
+            padding: 4px 8px;
+            width: auto; 
+            max-width: 250px;
+        }
+        
+        .search-box input {
             border: none;
-            padding: 8px 15px;
+            background: transparent;
+            padding: 6px;
+            width: 100%;
+            outline: none;
+        }
+        
+        .donate-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 18px;
             border-radius: 4px;
             cursor: pointer;
             font-weight: bold;
             transition: background-color 0.3s;
+            white-space: nowrap;
+            text-decoration: none;
+            text-align: center;
+            display: inline-block;
+        }
+
+        .donate-btn:hover {
+            background-color: #c0392b;
         }
         
-        .login-btn:hover {
-            background-color: #f0a8a8;
-        }
         
-        .container {
+        .donor-container {
             padding: 30px;
             max-width: 1200px;
             margin: 0 auto;
@@ -173,46 +258,112 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             font-weight: bold;
         }
         
-        @media (max-width: 768px) {
+        .card a {
+            color: var(--primary);
+            text-decoration: none;
+            display: block;
+            margin-bottom: 10px;
+            transition: color 0.3s;
+        }
+        
+        .card a:hover {
+            color: #e74c3c;
+        }
+        
+       
+        
+        @media (max-width: 1024px) {
             .header {
-                padding: 15px 20px;
-                flex-direction: column;
+               
+                grid-template-columns: 1fr 1fr; 
+                grid-template-rows: auto auto; 
                 gap: 15px;
             }
             
-            .logo {
-                font-size: 28px;
+            .logo { 
+                grid-column: 1;
+                grid-row: 1;
+                text-align: left;
             }
             
-            .container {
-                padding: 15px;
+            .header-right { 
+                grid-column: 2;
+                grid-row: 1;
+                justify-content: flex-end; 
             }
-            
-            .dashboard-cards {
+
+            .header-center { 
+                grid-column: 1 / span 2;
+                grid-row: 2;
+                justify-content: center; 
+            }
+        }
+        
+        @media (max-width: 768px) {
+    
+            .header {
                 grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+            }
+            
+            .logo { 
+                grid-row: 1; 
+                text-align: center;
+            }
+            
+            .header-right { 
+                grid-row: 2; 
+                justify-content: center;
+            }
+
+            .header-center { 
+                grid-row: 3; 
+                flex-direction: column;
             }
         }
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="logo">Donor Platform</div>
-        <div class="function-links">
-            <a href="index.php">Home</a>
-            <a href="projects.php">Donation Projects</a>
-            <a href="history.php">Donation History</a>
-            <a href="profile.php">My Profile</a>
+    <header class="header-top">
+        <div class="welcome-text">
+            Welcome, <?php echo isset($_SESSION['donor_name']) ? $_SESSION['donor_name'] : "Guest"; ?>
         </div>
-        <div class="user-info">
-            <span class="user-name">Welcome, 
-    <?php echo isset($_SESSION['donor_name']) ? $_SESSION['donor_name'] : "Guest"; ?>
-</span>
-
-            <a href="donor_login.php" class="login-btn">Login</a>
+        <div class="auth-buttons">
+            <?php if ($logged_in): ?>
+                <a href="donor_logout.php" class="auth-btn login-btn">Log out</a>
+            <?php else: ?>
+                <a href="donor_login.php" class="auth-btn login-btn">Login</a>
+                <a href="donor_register.php" class="auth-btn register-btn">Register</a>
+            <?php endif; ?>
+        </div>
+    </header>
+    
+    <header class="header">
+        
+        <div class="logo">Donor Platform</div>
+        
+       
+        <div class="header-right">
+            <div class="function-links">
+                <a href="Activity Page.php">Activity</a>
+                <a href="History.php">History</a>
+                <a href="New&Story.php">News & Story</a>
+                <a href="Special_case Page.php">Special Case</a>
+                <a href="Branch Page.php">Branch</a>
+                <a href="Profile.php">Profile</a>
+            </div>
+        </div>
+        
+      
+        <div class="header-center">
+            <div class="search-box">
+                <input type="text" placeholder="Search...">
+            </div>
+            <a href="Payment_page.php" class="donate-btn">Donate Now</a>
         </div>
     </header>
 
-    <div class="container">
+    <div class="donor-container">
         <div class="welcome-section">
             <h1>Welcome to Your Dashboard</h1>
             <p>Thank you for being part of our donor community</p>
@@ -259,10 +410,10 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             
             <div class="card">
                 <h3>Quick Actions</h3>
-                <p><a href="profile.php">Edit Profile</a></p>
-                <p><a href="projects.php">Browse Donation Projects</a></p>
-                <p><a href="history.php">View Donation History</a></p>
-                <p><a href="contact.php">Contact Support</a></p>
+                <a href="profile.php">Edit Profile</a>
+                <a href="projects.php">Browse Donation Projects</a>
+                <a href="history.php">View Donation History</a>
+                <a href="contact.php">Contact Support</a>
             </div>
         </div>
     </div>
