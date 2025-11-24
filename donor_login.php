@@ -1,7 +1,9 @@
 <?php
-session_start();
+
 
 include 'dataconnection.php';
+include 'header_function.php';
+
 
 $error_message = "";
 
@@ -29,7 +31,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $_SESSION['donor_name'] = $user['Donor_FName'] . ' ' . $user['Donor_LName'];
                 $_SESSION['logged_in'] = true;
                 
-                // Redirect to dashboard
+                
                 header("Location:homepage.php");
                 exit();
             } else {
@@ -50,6 +52,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Donor Login</title>
     <link rel="stylesheet" href="donor_design.css">
+    <link rel="stylesheet" href="donor_header.css">
     <style>
         :root {
             --primary: #F6B8B8;
@@ -74,40 +77,163 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             line-height: 1.6;
         }
         
-        .header {
+       .header-top {
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            background-color: #434141;
+            padding: 6px 50px;
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+        
+        .welcome-text {
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .auth-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .auth-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .login-btn {
+            background-color: white;
+            color: black;
+            border: none;
+        }
+        
+        .login-btn:hover {
+            background-color: #938e8eff;
+        }
+        
+        .register-btn {
+            background-color: var(--text);
+            color: var(--white);
+            border: none;
+        }
+        
+        .register-btn:hover {
+            background-color: #333333;
+        }
+        
+         
+        .header {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr; 
             align-items: center;
             background-color: var(--primary);
             padding: 20px 50px;
             box-shadow: 0 2px 6px var(--shadow);
+            gap: 20px;
         }
         
         .logo {
             font-weight: bold;
             font-size: 36px;
             color: var(--text);
+            text-align: left; 
+            grid-column: 1;
         }
         
-        .header .function-links a {
-            margin-left: 15px;
+    
+        .header-right { 
+            grid-column: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center; 
+            gap: 15px;
+        }
+
+        .function-links {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .function-links a {
             text-decoration: none;
-            font-size: 20px;
+            font-size: 18px;
             color: var(--text);
             font-weight: bold;
             transition: opacity 0.3s;
+            white-space: nowrap;
         }
         
-        .header .function-links a:hover {
+        .function-links a:hover {
             opacity: 0.8;
         }
+
+       
+        .header-center { 
+            grid-column: 3;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end; 
+            gap: 15px;
+        }
         
-        .search {
-            padding: 6px;
-            font-size: 16px;
-            border: 1px solid var(--primary);
+        .search-box {
+            display: flex;
+            align-items: center;
+            background-color: var(--white);
             border-radius: 4px;
+            padding: 4px 8px;
+            width: auto; 
+            max-width: 250px;
+        }
+        
+        .search-box input {
+            border: none;
+            background: transparent;
+            padding: 6px;
+            width: 100%;
             outline: none;
+        }
+        
+        .donate-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 18px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+            white-space: nowrap;
+            text-decoration: none;
+            text-align: center;
+            display: inline-block;
+        }
+
+        .donate-btn:hover {
+            background-color: #c0392b;
+        }
+        
+        
+        .donor-container {
+            padding: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .welcome-section {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .welcome-section h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
         }
         
         .container {
@@ -233,16 +359,46 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="logo">Donor Platform</div>
-        <div class="function-links">
-            <a href="index.php">Home</a>
-            <a href="about.php">About Us</a>
-            <a href="projects.php">Donation Projects</a>
-            <a href="contact.php">Contact</a>
+
+<header class="header-top">
+        <div class="welcome-text">
+            Welcome, <?php echo isset($_SESSION['donor_name']) ? $_SESSION['donor_name'] : "Guest"; ?>
         </div>
-        <input type="text" class="search" placeholder="Search...">
+        <div class="auth-buttons">
+            <?php if ($logged_in): ?>
+                <a href="donor_logout.php" class="auth-btn login-btn">Log out</a>
+            <?php else: ?>
+                <a href="donor_login.php" class="auth-btn login-btn">Login</a>
+                <a href="donor_register.php" class="auth-btn register-btn">Register</a>
+            <?php endif; ?>
+        </div>
     </header>
+    
+    <header class="header">
+        
+        <div class="logo">Donor Platform</div>
+        
+       
+        <div class="header-right">
+            <div class="function-links">
+                <a href="Activity Page.php">Activity</a>
+                <a href="History.php">History</a>
+                <a href="New&Story.php">News & Story</a>
+                <a href="Special_case Page.php">Special Case</a>
+                <a href="Branch Page.php">Branch</a>
+                <a href="profile.php">Profile</a>
+            </div>
+        </div>
+        
+      
+        <div class="header-center">
+            <div class="search-box">
+                <input type="text" placeholder="Search...">
+            </div>
+            <a href="Payment_page.php" class="donate-btn">Donate Now</a>
+        </div>
+    </header>
+        
 
     <div class="container">
         <div class="form-container">
@@ -276,5 +432,3 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </div>
 </body>
 </html>
-</html>
-
