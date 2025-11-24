@@ -1,7 +1,10 @@
 <?php
-session_start();
+
 
 include 'dataconnection.php';
+include 'header_function.php';
+include 'header_UI.php';
+
 
 $error_message = "";
 $success_message = "";
@@ -278,16 +281,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="logo">Donor Platform</div>
-        <div class="function-links">
-            <a href="homepage.php">Home</a>
-            <a href="about.php">About Us</a>
-            <a href="projects.php">Donation Projects</a>
-            <a href="contact.php">Contact</a>
-        </div>
-        <input type="text" class="search" placeholder="Search...">
-    </header>
+   
 
     <div class="container">
         <div class="form-container">
@@ -323,7 +317,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="form-group">
                     <label for="icnumber">IC Number *</label>
                     <input type="text" class="form-control" id="icnumber" name="icnumber"
-                    pattern="\d{12}" title="IC must be exactly 12 digits" placeholder="123456789012"
+                    pattern="\d{12}" title="IC must be exactly 12 digits" placeholder="XXXXXXXXXXXX"
                     value="<?php echo isset($_POST['icnumber']) ? htmlspecialchars($_POST['icnumber']) : ''; ?>" 
                     required>
 
@@ -338,21 +332,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <div class="form-group">
                     <label for="contact">Contact Number *</label>
-                    <input type="tel" class="form-control" id="contact" name="contact" 
+                    <input type="tel" class="form-control" id="contact" name="contact" placeholder="01X-XXXXXXX"
                            value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>" 
                            required>
                 </div>
                 
                 <div class="form-group">
                     <label for="email">Email Address *</label>
-                    <input type="email" class="form-control" id="email" name="email" 
+                    <input type="email" class="form-control" id="email" name="email" placeholder="example@example.com"
                            value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" 
                            required>
                 </div>
                 
                 <div class="form-group">
                     <label for="address">Address *</label>
-                    <input type="text" class="form-control" id="address" name="address" 
+                    <input type="text" class="form-control" id="address" name="address" placeholder="123 Main St, City, Country"
                            value="<?php echo isset($_POST['address']) ? htmlspecialchars($_POST['address']) : ''; ?>" 
                            required>
                 </div>
@@ -360,11 +354,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="row">
                     <div class="form-group">
                         <label for="password">Password *</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
+                        <input type="password" class="form-control" id="password" name="password" required placeholder="At least 8 characters">
                     </div>
                     <div class="form-group">
                         <label for="confirm_password">Confirm Password *</label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required placeholder="Re-enter your password">
                     </div>
                 </div>
                 
