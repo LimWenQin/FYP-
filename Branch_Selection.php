@@ -244,8 +244,8 @@ if ($result->num_rows > 0) {
     </div>
 
     <div class="story-section">
-        <h2>选择您希望支持的分行</h2>
-        <p>每一间分行都在为不同的群体提供帮助。以下是详细介绍：</p>
+        <h2>Select the branch you wish to support.</h2>
+        <p>Each branch provides assistance to different groups. Here is a detailed introduction: </p>
         <hr style="border: 1px solid #eee; margin: 20px 0;">
 
         <?php if (!empty($branches)): ?>
@@ -261,7 +261,7 @@ if ($result->num_rows > 0) {
                 </div>
             <?php endforeach; ?>
         <?php else: ?>
-            <p>暂无分行资料。</p>
+            <p>No branch information available.</p>
         <?php endif; ?>
     </div>
 
