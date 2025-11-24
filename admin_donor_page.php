@@ -11,6 +11,76 @@ if (!isset($_SESSION['admin_id'])) {
 // Include database connection
 include 'dataconnection.php';
 
+// Set current page for sidebar highlighting
+$current_page = 'admin_donor_page.php';
+
+// Handle AJAX request for donor data
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['get_donor_data'])) {
+    $donor_id = $_POST['donor_id'];
+    $sql = "SELECT * FROM donor WHERE Donor_ID = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $donor_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows > 0) {
+        $donor_data = $result->fetch_assoc();
+        // Remove password from response for security
+        unset($donor_data['Donor_Password']);
+        echo json_encode(['success' => true, 'donor' => $donor_data]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Donor not found']);
+    }
+    $stmt->close();
+    exit();
+}
+
+// Handle AJAX request for payment history
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['get_payment_history'])) {
+    $donor_id = $_POST['donor_id'];
+    $sql = "SELECT o.*, p.Payment_Method, p.Payment_Status, p.Payment_Amount, p.Payment_Paid_At 
+            FROM orders o 
+            LEFT JOIN payment p ON o.Payment_ID = p.Payment_ID 
+            WHERE o.Donor_ID = ? 
+            ORDER BY o.Order_Created_At DESC";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $donor_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $payments = [];
+    while ($row = $result->fetch_assoc()) {
+        $payments[] = $row;
+    }
+    
+    echo json_encode(['success' => true, 'payments' => $payments]);
+    $stmt->close();
+    exit();
+}
+
+// Handle AJAX request for purchase history
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['get_purchase_history'])) {
+    $donor_id = $_POST['donor_id'];
+    $sql = "SELECT ro.*, ri.Reward_ItemName, ri.Reward_Description, ri.Reward_RequiredPoint 
+            FROM redemption_order ro 
+            LEFT JOIN reward_item ri ON ro.Reward_ID = ri.Reward_ID 
+            WHERE ro.Donor_ID = ? 
+            ORDER BY ro.Redemption_Updated_At DESC";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $donor_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $purchases = [];
+    while ($row = $result->fetch_assoc()) {
+        $purchases[] = $row;
+    }
+    
+    echo json_encode(['success' => true, 'purchases' => $purchases]);
+    $stmt->close();
+    exit();
+}
+
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Add new donor
@@ -47,38 +117,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $contact = $_POST['donor_contact'];
         $icnumber = $_POST['donor_icnumber'];
         $email = $_POST['donor_email'];
-        $password = $_POST['donor_password'];
         $address = $_POST['donor_address'];
         $dob = $_POST['donor_dob'];
         $description = $_POST['donor_description'];
         
+        // Update without password and email (email is not editable)
         $sql = "UPDATE donor SET 
                 Donor_FName = ?, Donor_LName = ?, Donor_ContactNumber = ?, Donor_ICNumber = ?,
-                Donor_Email = ?, Donor_Password = ?, Donor_Address = ?, Donor_DOB = ?, Donor_Description = ?
+                Donor_Address = ?, Donor_DOB = ?, Donor_Description = ?
                 WHERE Donor_ID = ?";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("sssssssssi", $fname, $lname, $contact, $icnumber, $email, $password, $address, $dob, $description, $donor_id);
+        $stmt->bind_param("sssssssi", $fname, $lname, $contact, $icnumber, $address, $dob, $description, $donor_id);
         
         if ($stmt->execute()) {
             $success_message = "Donor updated successfully!";
         } else {
             $error_message = "Error updating donor: " . $conn->error;
-        }
-        $stmt->close();
-    }
-    
-    // Delete donor
-    if (isset($_POST['delete_donor'])) {
-        $donor_id = $_POST['donor_id'];
-        
-        $sql = "DELETE FROM donor WHERE Donor_ID = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("i", $donor_id);
-        
-        if ($stmt->execute()) {
-            $success_message = "Donor deleted successfully!";
-        } else {
-            $error_message = "Error deleting donor: " . $conn->error;
         }
         $stmt->close();
     }
@@ -113,245 +167,26 @@ if (isset($_GET['search'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Donor Management - Donation Management System</title>
+    <link rel="stylesheet" href="admin_common.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
-            background: #f9f9f9;
-            color: #4a4a4a;
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* Sidebar Styles */
-        .sidebar {
-            width: 70px;
-            background: #f28585;
-            color: white;
-            transition: all 0.3s ease;
-            position: relative;
-            height: 100vh;
-            overflow-y: auto;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-        }
-
-        .sidebar.expanded {
-            width: 250px;
-        }
-
-        .logo {
-            padding: 20px;
-            text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .logo:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .logo img {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: white;
-            padding: 5px;
-        }
-
-        .logo-text {
-            font-size: 20px;
-            font-weight: bold;
-            margin-top: 10px;
-            opacity: 0;
-            height: 0;
-            overflow: hidden;
-            transition: opacity 0.3s ease;
-        }
-
-        .sidebar.expanded .logo-text {
-            opacity: 1;
-            height: auto;
-        }
-
-        .sidebar-menu {
-            padding: 20px 0;
-        }
-
-        .menu-item {
-            padding: 15px 20px;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border-left: 3px solid transparent;
-            white-space: nowrap;
-            text-decoration: none;
-            color: white;
-        }
-
-        .menu-item:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-left: 3px solid white;
-        }
-
-        .menu-item.active {
-            background: rgba(255, 255, 255, 0.15);
-            border-left: 3px solid white;
-        }
-
-        .menu-item ion-icon {
-            font-size: 20px;
-            margin-right: 15px;
-            min-width: 20px;
-        }
-
-        .menu-text {
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .sidebar.expanded .menu-text {
-            opacity: 1;
-        }
-
-        /* Main Content Styles */
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            transition: all 0.3s ease;
-            margin-left: 0;
-        }
-
-        .header {
-            background: #f28585;
-            color: white;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-            position: relative;
-        }
-
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 70px;
-            height: 100%;
-            background: #e66767;
-            transition: width 0.3s ease;
-            z-index: 1;
-        }
-
-        .sidebar.expanded + .main-content .header::before {
-            width: 250px;
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            position: relative;
-            z-index: 2;
-        }
-
-        .menu-toggle {
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            width: 24px;
-            height: 18px;
-            cursor: pointer;
-        }
-
-        .menu-toggle span {
-            display: block;
-            height: 3px;
-            width: 100%;
-            background-color: white;
-            border-radius: 2px;
-            transition: all 0.3s ease;
-        }
-
-        .header-logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            text-decoration: none;
-            color: white;
-        }
-
-        .header-logo img {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: white;
-            padding: 5px;
-        }
-
-        .header-logo-text {
-            font-size: 20px;
-            font-weight: bold;
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            position: relative;
-            z-index: 2;
-        }
-
-        .welcome {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .logout {
-            color: white;
-            text-decoration: none;
-            background: rgba(255,255,255,0.2);
-            padding: 8px 15px;
-            border-radius: 5px;
-            transition: all 0.3s ease;
-        }
-
-        .logout:hover {
-            background: rgba(255,255,255,0.3);
-        }
-
-        .dashboard {
-            padding: 30px;
-            max-width: 1400px;
-            margin: 0 auto;
-            width: 100%;
-        }
-
-        .page-title {
-            font-size: 28px;
-            margin-bottom: 30px;
-            color: #4a4a4a;
-            border-bottom: 2px solid #f6b8b8;
-            padding-bottom: 10px;
-        }
-
         /* Donor Management Specific Styles */
         .donor-management {
             background: white;
             padding: 25px;
             border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            box-shadow: var(--card-shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .donor-management::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-pink), var(--warm-peach));
         }
 
         .management-header {
@@ -369,27 +204,69 @@ if (isset($_GET['search'])) {
         .search-box input {
             padding: 10px;
             border: 1px solid #ddd;
-            border-radius: 5px;
+            border-radius: 8px;
             width: 300px;
+            transition: all 0.3s ease;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary-pink);
+            box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.2);
         }
 
         .search-box button {
-            background: #f28585;
+            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
             color: white;
             border: none;
             padding: 10px 15px;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            box-shadow: 0 4px 10px rgba(255, 107, 157, 0.3);
+        }
+
+        .search-box button:hover {
+            background: linear-gradient(135deg, var(--warm-orange), var(--primary-pink));
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(255, 107, 157, 0.4);
+        }
+
+        .clear-search-btn {
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            box-shadow: 0 4px 10px rgba(108, 117, 125, 0.3);
+        }
+
+        .clear-search-btn:hover {
+            background: linear-gradient(135deg, #5a6268, #6c757d);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(108, 117, 125, 0.4);
         }
 
         .add-donor-btn {
-            background: #f28585;
+            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
             color: white;
             border: none;
             padding: 10px 15px;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(255, 107, 157, 0.3);
+        }
+
+        .add-donor-btn:hover {
+            background: linear-gradient(135deg, var(--warm-orange), var(--primary-pink));
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(255, 107, 157, 0.4);
         }
 
         .donor-table {
@@ -408,7 +285,7 @@ if (isset($_GET['search'])) {
         .donor-table th {
             background-color: #f9f9f9;
             font-weight: 600;
-            color: #4a4a4a;
+            color: var(--text-dark);
         }
 
         .donor-table tr:hover {
@@ -420,28 +297,138 @@ if (isset($_GET['search'])) {
             gap: 10px;
         }
 
-        .edit-btn, .delete-btn {
-            padding: 5px 10px;
+        /* 修复的下拉菜单样式 */
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropbtn {
+            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
+            color: white;
+            padding: 8px 16px;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(255, 107, 157, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 120px;
+            justify-content: center;
         }
 
-        .edit-btn {
-            background: #4CAF50;
-            color: white;
+        .dropbtn:hover {
+            background: linear-gradient(135deg, var(--warm-orange), var(--primary-pink));
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 157, 0.4);
         }
 
-        .delete-btn {
-            background: #f44336;
-            color: white;
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            background: white;
+            min-width: 200px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            z-index: 1000;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 8px;
+            border: 1px solid #f0f0f0;
+            animation: dropdownFadeIn 0.2s ease-out;
+        }
+
+        @keyframes dropdownFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .dropdown-content.show {
+            display: block;
+        }
+
+        .dropdown-content a {
+            color: var(--text-dark);
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            transition: all 0.2s ease;
+            border-bottom: 1px solid #f8f8f8;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dropdown-content a:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-content a:hover {
+            background: linear-gradient(135deg, #fff5f7, #fff0f3);
+            color: var(--primary-pink);
+            transform: translateX(5px);
+        }
+
+        .dropdown-content a:hover::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 500;
+        }
+
+        .dropdown-icon {
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+            color: var(--text-light);
+            transition: all 0.2s ease;
+        }
+
+        .dropdown-content a:hover .dropdown-icon {
+            color: var(--primary-pink);
+            transform: scale(1.1);
+        }
+
+        /* 添加下拉菜单关闭延迟 */
+        .dropdown-content.delayed-close {
+            pointer-events: none;
+            animation: dropdownFadeOut 0.3s ease-out forwards;
+        }
+
+        @keyframes dropdownFadeOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
         }
 
         .no-data {
             text-align: center;
             padding: 40px;
-            color: #7f8c8d;
+            color: var(--text-light);
         }
 
         /* Modal Styles */
@@ -461,11 +448,23 @@ if (isset($_GET['search'])) {
         .modal-content {
             background: white;
             padding: 30px;
-            border-radius: 10px;
+            border-radius: 15px;
             width: 600px;
             max-width: 90%;
             max-height: 90vh;
             overflow-y: auto;
+            box-shadow: var(--card-shadow);
+            position: relative;
+        }
+
+        .modal-content::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-pink), var(--warm-peach));
         }
 
         .modal-header {
@@ -479,7 +478,7 @@ if (isset($_GET['search'])) {
 
         .modal-title {
             font-size: 24px;
-            color: #4a4a4a;
+            color: var(--text-dark);
         }
 
         .close-btn {
@@ -487,7 +486,12 @@ if (isset($_GET['search'])) {
             border: none;
             font-size: 24px;
             cursor: pointer;
-            color: #7f8c8d;
+            color: var(--text-light);
+            transition: color 0.3s ease;
+        }
+
+        .close-btn:hover {
+            color: var(--primary-pink);
         }
 
         .form-group {
@@ -498,6 +502,7 @@ if (isset($_GET['search'])) {
             display: block;
             margin-bottom: 5px;
             font-weight: 500;
+            color: var(--text-dark);
         }
 
         .form-group input,
@@ -506,8 +511,23 @@ if (isset($_GET['search'])) {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
-            border-radius: 5px;
+            border-radius: 8px;
             font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-pink);
+            box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.2);
+        }
+
+        .form-group input:read-only {
+            background-color: #f5f5f5;
+            color: #666;
+            cursor: not-allowed;
         }
 
         .form-row {
@@ -520,72 +540,146 @@ if (isset($_GET['search'])) {
         }
 
         .submit-btn {
-            background: #f28585;
+            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
             color: white;
             border: none;
             padding: 12px 20px;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
             margin-top: 10px;
             width: 100%;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            box-shadow: 0 4px 10px rgba(255, 107, 157, 0.3);
+        }
+
+        .submit-btn:hover {
+            background: linear-gradient(135deg, var(--warm-orange), var(--primary-pink));
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(255, 107, 157, 0.4);
         }
 
         .message {
             padding: 10px;
-            border-radius: 5px;
+            border-radius: 8px;
             margin-bottom: 20px;
+            border: 1px solid transparent;
         }
 
         .success {
             background: #d4edda;
             color: #155724;
-            border: 1px solid #c3e6cb;
+            border-color: #c3e6cb;
         }
 
         .error {
             background: #f8d7da;
             color: #721c24;
-            border: 1px solid #f5c6cb;
+            border-color: #f5c6cb;
+        }
+
+        /* History Panel Styles */
+        .history-panel {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+            transition: right 0.3s ease;
+            z-index: 999;
+            overflow-y: auto;
+        }
+
+        .history-panel.active {
+            right: 0;
+        }
+
+        .history-header {
+            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .history-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .history-content {
+            padding: 20px;
+        }
+
+        .history-item {
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            background: #f9f9f9;
+        }
+
+        .history-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .history-item-title {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .history-item-date {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+
+        .history-item-details {
+            color: var(--text-dark);
+        }
+
+        .history-item-amount {
+            font-weight: 600;
+            color: var(--primary-pink);
+        }
+
+        .history-item-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
         }
 
         @media (max-width: 768px) {
-            .dashboard {
-                padding: 15px;
-            }
-            
-            .header {
-                flex-direction: column;
-                gap: 15px;
-                text-align: center;
-            }
-            
-            .header-left, .header-right {
-                width: 100%;
-                justify-content: center;
-            }
-            
-            .sidebar {
-                position: fixed;
-                transform: translateX(-100%);
-            }
-            
-            .sidebar.active {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 0;
-            }
-            
-            .menu-toggle {
-                display: flex;
-            }
-            
-            .header::before {
-                display: none;
-            }
-            
             .management-header {
                 flex-direction: column;
                 gap: 15px;
@@ -604,25 +698,15 @@ if (isset($_GET['search'])) {
                 display: block;
                 overflow-x: auto;
             }
-        }
-        
-        @media (min-width: 769px) {
-            .menu-toggle {
-                display: none;
+
+            .history-panel {
+                width: 100%;
+                right: -100%;
             }
-            
-            .sidebar {
-                position: fixed;
-                height: 100vh;
-            }
-            
-            .main-content {
-                margin-left: 70px;
-                transition: margin-left 0.3s ease;
-            }
-            
-            .sidebar.expanded + .main-content {
-                margin-left: 250px;
+
+            .dropdown-content {
+                right: auto;
+                left: 0;
             }
         }
     </style>
@@ -636,17 +720,33 @@ if (isset($_GET['search'])) {
         </div>
         
         <div class="sidebar-menu">
-            <a href="admin_dashboard.php" class="menu-item">
+            <a href="admin_dashboard.php" class="menu-item <?php echo $current_page == 'admin_dashboard.php' ? 'active' : ''; ?>">
                 <ion-icon name="grid"></ion-icon>
                 <div class="menu-text">Dashboard</div>
             </a>
-            <a href="admin_donor_page.php" class="menu-item active">
+            <a href="admin_donor_page.php" class="menu-item <?php echo $current_page == 'admin_donor_page.php' ? 'active' : ''; ?>">
                 <ion-icon name="people"></ion-icon>
                 <div class="menu-text">Donor Management</div>
             </a>
-            <a href="admin_staff_page.php" class="menu-item">
+            <a href="staff_management_page.php" class="menu-item <?php echo $current_page == 'staff_management_page.php' ? 'active' : ''; ?>">
                 <ion-icon name="person-circle"></ion-icon>
                 <div class="menu-text">Staff Management</div>
+            </a>
+            <a href="admin_management_page.php" class="menu-item <?php echo $current_page == 'admin_management_page.php' ? 'active' : ''; ?>">
+                <ion-icon name="shield-checkmark"></ion-icon>
+                <div class="menu-text">Admin Management</div>
+            </a>
+            <a href="branch_management_page.php" class="menu-item <?php echo $current_page == 'branch_management_page.php' ? 'active' : ''; ?>">
+                <ion-icon name="business"></ion-icon>
+                <div class="menu-text">Branch Management</div>
+            </a>
+            <a href="activity_management.php" class="menu-item <?php echo $current_page == 'activity_management.php' ? 'active' : ''; ?>">
+                <ion-icon name="calendar"></ion-icon>
+                <div class="menu-text">Activity Management</div>
+            </a>
+            <a href="payment_management.php" class="menu-item <?php echo $current_page == 'payment_management.php' ? 'active' : ''; ?>">
+                <ion-icon name="card"></ion-icon>
+                <div class="menu-text">Payment Management</div>
             </a>
         </div>
     </aside>
@@ -678,9 +778,10 @@ if (isset($_GET['search'])) {
             <div class="donor-management">
                 <div class="management-header">
                     <div class="search-box">
-                        <form method="GET" action="">
-                            <input type="text" name="search" placeholder="Search donors..." value="<?php echo htmlspecialchars($search_query); ?>">
+                        <form method="GET" action="" id="searchForm">
+                            <input type="text" name="search" id="searchInput" placeholder="Search donors..." value="<?php echo htmlspecialchars($search_query); ?>">
                             <button type="submit">Search</button>
+                            <button type="button" class="clear-search-btn" onclick="clearSearch()">Clear</button>
                         </form>
                     </div>
                     <button class="add-donor-btn" onclick="openAddModal()">Add New Donor</button>
@@ -717,11 +818,38 @@ if (isset($_GET['search'])) {
                                     <td><?php echo $row['Donor_ICNumber']; ?></td>
                                     <td><?php echo $row['Donor_DOB']; ?></td>
                                     <td class="action-buttons">
-                                        <button class="edit-btn" onclick="openEditModal(<?php echo $row['Donor_ID']; ?>)">Edit</button>
-                                        <form method="POST" style="display:inline;">
-                                            <input type="hidden" name="donor_id" value="<?php echo $row['Donor_ID']; ?>">
-                                            <button type="submit" name="delete_donor" class="delete-btn" onclick="return confirm('Are you sure you want to delete this donor?')">Delete</button>
-                                        </form>
+                                        <div class="dropdown" onmouseleave="startDropdownClose(this)">
+                                            <button class="dropbtn" onclick="toggleDropdown(this)">
+                                                <span>Actions</span>
+                                                <ion-icon name="chevron-down-outline"></ion-icon>
+                                            </button>
+                                            <div class="dropdown-content">
+                                                <a href="#" onclick="openEditModal(<?php echo $row['Donor_ID']; ?>)">
+                                                    <div class="dropdown-item">
+                                                        <ion-icon name="create-outline" class="dropdown-icon"></ion-icon>
+                                                        <span>Edit</span>
+                                                    </div>
+                                                </a>
+                                                <a href="#" onclick="openViewModal(<?php echo $row['Donor_ID']; ?>)">
+                                                    <div class="dropdown-item">
+                                                        <ion-icon name="eye-outline" class="dropdown-icon"></ion-icon>
+                                                        <span>View</span>
+                                                    </div>
+                                                </a>
+                                                <a href="#" onclick="openPaymentHistory(<?php echo $row['Donor_ID']; ?>)">
+                                                    <div class="dropdown-item">
+                                                        <ion-icon name="card-outline" class="dropdown-icon"></ion-icon>
+                                                        <span>Payment History</span>
+                                                    </div>
+                                                </a>
+                                                <a href="#" onclick="openPurchaseHistory(<?php echo $row['Donor_ID']; ?>)">
+                                                    <div class="dropdown-item">
+                                                        <ion-icon name="bag-outline" class="dropdown-icon"></ion-icon>
+                                                        <span>Purchase History</span>
+                                                    </div>
+                                                </a>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
@@ -734,6 +862,28 @@ if (isset($_GET['search'])) {
                     </div>
                 <?php endif; ?>
             </div>
+        </div>
+    </div>
+
+    <!-- Payment History Panel -->
+    <div class="history-panel" id="paymentHistoryPanel">
+        <div class="history-header">
+            <h3 class="history-title">Payment History</h3>
+            <button class="history-close" onclick="closePaymentHistory()">&times;</button>
+        </div>
+        <div class="history-content" id="paymentHistoryContent">
+            <!-- Payment history will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Purchase History Panel -->
+    <div class="history-panel" id="purchaseHistoryPanel">
+        <div class="history-header">
+            <h3 class="history-title">Purchase History</h3>
+            <button class="history-close" onclick="closePurchaseHistory()">&times;</button>
+        </div>
+        <div class="history-content" id="purchaseHistoryContent">
+            <!-- Purchase history will be loaded here -->
         </div>
     </div>
 
@@ -817,11 +967,7 @@ if (isset($_GET['search'])) {
                 </div>
                 <div class="form-group">
                     <label for="edit_donor_email">Email</label>
-                    <input type="email" id="edit_donor_email" name="donor_email" required>
-                </div>
-                <div class="form-group">
-                    <label for="edit_donor_password">Password</label>
-                    <input type="password" id="edit_donor_password" name="donor_password" required>
+                    <input type="email" id="edit_donor_email" name="donor_email" required readonly>
                 </div>
                 <div class="form-group">
                     <label for="edit_donor_address">Address</label>
@@ -840,7 +986,135 @@ if (isset($_GET['search'])) {
         </div>
     </div>
 
+    <!-- View Donor Modal -->
+    <div id="viewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Donor Details</h2>
+                <button class="close-btn" onclick="closeViewModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>Donor ID</label>
+                <input type="text" id="view_donor_id" readonly>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>First Name</label>
+                    <input type="text" id="view_donor_fname" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Last Name</label>
+                    <input type="text" id="view_donor_lname" readonly>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Contact Number</label>
+                <input type="text" id="view_donor_contact" readonly>
+            </div>
+            <div class="form-group">
+                <label>IC Number</label>
+                <input type="text" id="view_donor_icnumber" readonly>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="view_donor_email" readonly>
+            </div>
+            <div class="form-group">
+                <label>Address</label>
+                <textarea id="view_donor_address" rows="3" readonly></textarea>
+            </div>
+            <div class="form-group">
+                <label>Date of Birth</label>
+                <input type="date" id="view_donor_dob" readonly>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="view_donor_description" rows="3" readonly></textarea>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // 下拉菜单相关功能
+        let dropdownCloseTimeout;
+        let activeDropdown = null;
+
+        function toggleDropdown(button) {
+            const dropdown = button.parentElement;
+            const dropdownContent = dropdown.querySelector('.dropdown-content');
+            
+            // 关闭其他打开的下拉菜单
+            closeAllDropdowns();
+            
+            if (dropdownContent.classList.contains('show')) {
+                closeDropdown(dropdown);
+            } else {
+                openDropdown(dropdown);
+            }
+        }
+
+        function openDropdown(dropdown) {
+            const dropdownContent = dropdown.querySelector('.dropdown-content');
+            dropdownContent.classList.remove('delayed-close');
+            dropdownContent.classList.add('show');
+            activeDropdown = dropdown;
+        }
+
+        function closeDropdown(dropdown) {
+            const dropdownContent = dropdown.querySelector('.dropdown-content');
+            dropdownContent.classList.add('delayed-close');
+            setTimeout(() => {
+                dropdownContent.classList.remove('show');
+                dropdownContent.classList.remove('delayed-close');
+            }, 300);
+            activeDropdown = null;
+        }
+
+        function closeAllDropdowns() {
+            document.querySelectorAll('.dropdown-content.show').forEach(dropdown => {
+                dropdown.classList.add('delayed-close');
+                setTimeout(() => {
+                    dropdown.classList.remove('show');
+                    dropdown.classList.remove('delayed-close');
+                }, 300);
+            });
+            activeDropdown = null;
+        }
+
+        function startDropdownClose(dropdown) {
+            // 设置延迟关闭，给用户时间移动到下拉菜单
+            dropdownCloseTimeout = setTimeout(() => {
+                if (activeDropdown === dropdown) {
+                    closeDropdown(dropdown);
+                }
+            }, 300);
+        }
+
+        function cancelDropdownClose() {
+            clearTimeout(dropdownCloseTimeout);
+        }
+
+        // 点击页面其他地方关闭所有下拉菜单
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.dropdown')) {
+                closeAllDropdowns();
+            }
+        });
+
+        // 为下拉菜单项添加鼠标事件
+        document.querySelectorAll('.dropdown-content a').forEach(item => {
+            item.addEventListener('mouseenter', cancelDropdownClose);
+            item.addEventListener('mouseleave', function() {
+                const dropdown = this.closest('.dropdown');
+                startDropdownClose(dropdown);
+            });
+        });
+
+        // 为下拉按钮添加鼠标事件
+        document.querySelectorAll('.dropbtn').forEach(button => {
+            button.addEventListener('mouseenter', cancelDropdownClose);
+        });
+
         // Sidebar functionality
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
@@ -894,6 +1168,21 @@ if (isset($_GET['search'])) {
                     sidebar.classList.remove('expanded');
                 }
             });
+
+            // Auto-submit when search input is cleared
+            const searchInput = document.getElementById('searchInput');
+            let searchTimeout;
+            
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                
+                // If the input is empty, submit the form after a short delay
+                if (this.value === '') {
+                    searchTimeout = setTimeout(function() {
+                        document.getElementById('searchForm').submit();
+                    }, 500);
+                }
+            });
         });
 
         // Modal functionality
@@ -906,23 +1195,53 @@ if (isset($_GET['search'])) {
         }
 
         function openEditModal(donorId) {
-            // In a real implementation, you would fetch donor data via AJAX
-            // For this example, we'll just show the modal
-            document.getElementById('editModal').style.display = 'flex';
-            document.getElementById('edit_donor_id').value = donorId;
-            
-            // In a real implementation, you would populate the form with donor data
-            // For this example, we'll just show the modal
+            // Fetch donor data via AJAX
+            fetchDonorData(donorId, 'edit');
         }
 
         function closeEditModal() {
             document.getElementById('editModal').style.display = 'none';
         }
 
+        function openViewModal(donorId) {
+            // Fetch donor data via AJAX
+            fetchDonorData(donorId, 'view');
+        }
+
+        function closeViewModal() {
+            document.getElementById('viewModal').style.display = 'none';
+        }
+
+        // Clear search functionality
+        function clearSearch() {
+            // Clear the search input and submit the form
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchForm').submit();
+        }
+
+        // Payment History functionality
+        function openPaymentHistory(donorId) {
+            fetchPaymentHistory(donorId);
+        }
+
+        function closePaymentHistory() {
+            document.getElementById('paymentHistoryPanel').classList.remove('active');
+        }
+
+        // Purchase History functionality
+        function openPurchaseHistory(donorId) {
+            fetchPurchaseHistory(donorId);
+        }
+
+        function closePurchaseHistory() {
+            document.getElementById('purchaseHistoryPanel').classList.remove('active');
+        }
+
         // Close modals when clicking outside
         window.onclick = function(event) {
             const addModal = document.getElementById('addModal');
             const editModal = document.getElementById('editModal');
+            const viewModal = document.getElementById('viewModal');
             
             if (event.target === addModal) {
                 addModal.style.display = 'none';
@@ -930,6 +1249,197 @@ if (isset($_GET['search'])) {
             
             if (event.target === editModal) {
                 editModal.style.display = 'none';
+            }
+            
+            if (event.target === viewModal) {
+                viewModal.style.display = 'none';
+            }
+        }
+
+        function fetchDonorData(donorId, mode) {
+            // Create a FormData object to send the request
+            const formData = new FormData();
+            formData.append('get_donor_data', 'true');
+            formData.append('donor_id', donorId);
+            
+            fetch('admin_donor_page.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    if (mode === 'edit') {
+                        // Populate the edit form with donor data
+                        document.getElementById('edit_donor_id').value = data.donor.Donor_ID;
+                        document.getElementById('edit_donor_fname').value = data.donor.Donor_FName;
+                        document.getElementById('edit_donor_lname').value = data.donor.Donor_LName;
+                        document.getElementById('edit_donor_contact').value = data.donor.Donor_ContactNumber;
+                        document.getElementById('edit_donor_icnumber').value = data.donor.Donor_ICNumber;
+                        document.getElementById('edit_donor_email').value = data.donor.Donor_Email;
+                        document.getElementById('edit_donor_address').value = data.donor.Donor_Address;
+                        document.getElementById('edit_donor_dob').value = data.donor.Donor_DOB;
+                        document.getElementById('edit_donor_description').value = data.donor.Donor_Description;
+                        
+                        // Show the edit modal
+                        document.getElementById('editModal').style.display = 'flex';
+                    } else if (mode === 'view') {
+                        // Populate the view form with donor data
+                        document.getElementById('view_donor_id').value = data.donor.Donor_ID;
+                        document.getElementById('view_donor_fname').value = data.donor.Donor_FName;
+                        document.getElementById('view_donor_lname').value = data.donor.Donor_LName;
+                        document.getElementById('view_donor_contact').value = data.donor.Donor_ContactNumber;
+                        document.getElementById('view_donor_icnumber').value = data.donor.Donor_ICNumber;
+                        document.getElementById('view_donor_email').value = data.donor.Donor_Email;
+                        document.getElementById('view_donor_address').value = data.donor.Donor_Address;
+                        document.getElementById('view_donor_dob').value = data.donor.Donor_DOB;
+                        document.getElementById('view_donor_description').value = data.donor.Donor_Description;
+                        
+                        // Show the view modal
+                        document.getElementById('viewModal').style.display = 'flex';
+                    }
+                } else {
+                    alert('Error fetching donor data: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error fetching donor data. Please check the console for details.');
+            });
+        }
+
+        function fetchPaymentHistory(donorId) {
+            const formData = new FormData();
+            formData.append('get_payment_history', 'true');
+            formData.append('donor_id', donorId);
+            
+            fetch('admin_donor_page.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayPaymentHistory(data.payments);
+                    document.getElementById('paymentHistoryPanel').classList.add('active');
+                } else {
+                    alert('Error fetching payment history');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error fetching payment history');
+            });
+        }
+
+        function displayPaymentHistory(payments) {
+            const container = document.getElementById('paymentHistoryContent');
+            
+            if (payments.length === 0) {
+                container.innerHTML = '<div class="no-data"><p>No payment history found</p></div>';
+                return;
+            }
+            
+            let html = '';
+            payments.forEach(payment => {
+                const statusClass = getStatusClass(payment.Payment_Status || payment.Order_PaymentStatus);
+                const amount = payment.Payment_Amount || payment.Order_Amount;
+                const date = payment.Payment_Paid_At || payment.Order_Created_At;
+                const method = payment.Payment_Method || payment.Order_PaymentMethod;
+                
+                html += `
+                    <div class="history-item">
+                        <div class="history-item-header">
+                            <div class="history-item-title">${method}</div>
+                            <div class="history-item-amount">RM ${amount}</div>
+                        </div>
+                        <div class="history-item-details">
+                            <div>Status: <span class="history-item-status ${statusClass}">${payment.Payment_Status || payment.Order_PaymentStatus}</span></div>
+                            <div>Date: ${new Date(date).toLocaleDateString()}</div>
+                            <div>Order ID: ${payment.Order_ID}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function fetchPurchaseHistory(donorId) {
+            const formData = new FormData();
+            formData.append('get_purchase_history', 'true');
+            formData.append('donor_id', donorId);
+            
+            fetch('admin_donor_page.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayPurchaseHistory(data.purchases);
+                    document.getElementById('purchaseHistoryPanel').classList.add('active');
+                } else {
+                    alert('Error fetching purchase history');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error fetching purchase history');
+            });
+        }
+
+        function displayPurchaseHistory(purchases) {
+            const container = document.getElementById('purchaseHistoryContent');
+            
+            if (purchases.length === 0) {
+                container.innerHTML = '<div class="no-data"><p>No purchase history found</p></div>';
+                return;
+            }
+            
+            let html = '';
+            purchases.forEach(purchase => {
+                const statusClass = getStatusClass(purchase.Redemption_Status);
+                
+                html += `
+                    <div class="history-item">
+                        <div class="history-item-header">
+                            <div class="history-item-title">${purchase.Reward_ItemName}</div>
+                            <div class="history-item-amount">${purchase.Redemption_PointsSpent} pts</div>
+                        </div>
+                        <div class="history-item-details">
+                            <div>Description: ${purchase.Reward_Description}</div>
+                            <div>Status: <span class="history-item-status ${statusClass}">${purchase.Redemption_Status}</span></div>
+                            <div>Date: ${new Date(purchase.Redemption_Updated_At).toLocaleDateString()}</div>
+                            <div>Address: ${purchase.Redemption_Address}</div>
+                            <div>Contact: ${purchase.Redemption_ContactNumber}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function getStatusClass(status) {
+            switch (status.toLowerCase()) {
+                case 'completed':
+                case 'success':
+                case 'paid':
+                    return 'status-completed';
+                case 'pending':
+                case 'processing':
+                    return 'status-pending';
+                case 'failed':
+                case 'cancelled':
+                    return 'status-failed';
+                default:
+                    return 'status-pending';
             }
         }
     </script>
