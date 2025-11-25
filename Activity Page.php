@@ -273,14 +273,14 @@ $result = $conn->query($query);
         <div class="activities-grid">
             <?php if ($result->num_rows > 0): ?>
                 <?php while($activity = $result->fetch_assoc()): ?>
-                    <div class="activity-card" data-status="<?php echo strtolower($activity['Status']); ?>">
-                        <img src="<?php echo !empty($activity['Picture']) ? $activity['Picture'] : 'images/activity-default.jpg'; ?>" alt="Activity Image" class="activity-image">
+                    <div class="activity-card" data-status="<?php echo strtolower($activity['Activity_Status']); ?>">
+                        <img src="<?php echo !empty($activity['Activity_Picture']) ? $activity['Activity_Picture'] : 'images/activity-default.jpg'; ?>" alt="Activity Image" class="activity-image">
                         <div class="activity-content">
-                            <div class="activity-date"><?php echo date('F j, Y', strtotime($activity['Date'])); ?></div>
-                            <h3 class="activity-title"><?php echo htmlspecialchars($activity['Details']); ?></h3>
-                            <div class="activity-status status-<?php echo strtolower($activity['Status']); ?>"><?php echo $activity['Status']; ?></div>
-                            <div class="activity-amount">Raised: RM <?php echo number_format($activity['Get_Amount'], 2); ?></div>
-                            <a href="activity_detail.php?id=<?php echo $activity['ID']; ?>" class="btn btn-full">View Details</a>
+                            <div class="activity-date"><?php echo date('F j, Y', strtotime($activity['Activity_Date'])); ?></div>
+                            <h3 class="activity-title"><?php echo htmlspecialchars($activity['Activity_Details']); ?></h3>
+                            <div class="activity-status status-<?php echo strtolower($activity['Activity_Status']); ?>"><?php echo $activity['Activity_Status']; ?></div>
+                            <div class="activity-amount">Raised: RM <?php echo number_format($activity['Activity_GetAmount'], 2); ?></div>
+                            <a href="activity_detail.php?id=<?php echo $activity['Activity_ID']; ?>" class="btn btn-full">View Details</a>
                         </div>
                     </div>
                 <?php endwhile; ?>
