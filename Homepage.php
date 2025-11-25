@@ -365,7 +365,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
 
     <div class="donor-container">
         <div class="welcome-section">
-            <h1>Welcome to Your Dashboard</h1>
+            <h1>Welcome to Dashboard</h1>
             <p>Thank you for being part of our donor community</p>
         </div>
         
@@ -408,13 +408,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 <?php endif; ?>
             </div>
             
-            <div class="card">
-                <h3>Quick Actions</h3>
-                <a href="profile.php">Edit Profile</a>
-                <a href="projects.php">Browse Donation Projects</a>
-                <a href="history.php">View Donation History</a>
-                <a href="contact.php">Contact Support</a>
-            </div>
+            
         </div>
     </div>
 </body>
