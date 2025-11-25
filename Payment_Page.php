@@ -4,6 +4,9 @@
 ?>
 
 <?php 
+include 'dataconnection.php';
+include 'header_function.php';
+include 'header_UI.php';
 //session_start(); // 1. 开启 Session
 
 // 2. 强制登录检查
@@ -246,27 +249,6 @@ function selectAmount(amount) {
 </head>
 <body>
 
-<header class="header">
-    <div class="logo">
-        <img src="logo.jpg" alt="Logo" width="80" height="80">
-        LOVE BRIDGE
-    </div>
-    <div class="function-links">
-        <input type="text" placeholder="Search..." class="search">
-        <a href="#">Home</a>
-        <a href="#">About Us</a>
-        <a href="#">Contact Us</a>
-        <a href="#">History</a>
-        <a href="#">Activities</a>
-        <a href="#">News & Stories</a>
-        <!--<span style="color:white; margin-right:10px;">
-            Hi, <?php echo htmlspecialchars($donor_name); ?>
-        </span>
-        <a href="logout.php">
-            Logout
-        </a>-->
-    </div>
-</header>
 
 <div class="container">
 
