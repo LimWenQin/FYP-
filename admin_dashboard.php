@@ -1,5 +1,4 @@
 <?php
-// admin_dashboard.php - Admin Dashboard
 session_start();
 
 // Check if user is logged in
@@ -19,6 +18,111 @@ $total_activities = 0;
 $total_items = 0;
 $total_rewards = 0;
 $total_staff = 0;
+$total_admins = 0;
+
+// Handle form submissions
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Add new donor
+    if (isset($_POST['add_donor'])) {
+        $fname = $_POST['donor_fname'];
+        $lname = $_POST['donor_lname'];
+        $contact = $_POST['donor_contact'];
+        $icnumber = $_POST['donor_icnumber'];
+        $email = $_POST['donor_email'];
+        $password = $_POST['donor_password'];
+        $address = $_POST['donor_address'];
+        $dob = $_POST['donor_dob'];
+        $description = $_POST['donor_description'];
+        
+        $sql = "INSERT INTO donor (Donor_FName, Donor_LName, Donor_ContactNumber, Donor_ICNumber, 
+                Donor_Email, Donor_Password, Donor_Address, Donor_DOB, Donor_Description) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("sssssssss", $fname, $lname, $contact, $icnumber, $email, $password, $address, $dob, $description);
+        
+        if ($stmt->execute()) {
+            $success_message = "Donor added successfully!";
+        } else {
+            $error_message = "Error adding donor: " . $conn->error;
+        }
+        $stmt->close();
+    }
+    
+    // Add new staff
+    if (isset($_POST['add_staff'])) {
+        $fname = $_POST['staff_fname'];
+        $lname = $_POST['staff_lname'];
+        $contact = $_POST['staff_contact'];
+        $icnumber = $_POST['staff_icnumber'];
+        $email = $_POST['staff_email'];
+        $password = $_POST['staff_password'];
+        $address = $_POST['staff_address'];
+        $dob = $_POST['staff_dob'];
+        $comment = $_POST['staff_comment'];
+        $admin_id = $_SESSION['admin_id'];
+        
+        $sql = "INSERT INTO staff (Staff_FName, Staff_LName, Staff_ContactNumber, Staff_ICNumber, 
+                Staff_Email, Staff_Password, Staff_Address, Staff_DOB, Staff_Commnent, Admin_ID) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("sssssssssi", $fname, $lname, $contact, $icnumber, $email, $password, $address, $dob, $comment, $admin_id);
+        
+        if ($stmt->execute()) {
+            $success_message = "Staff added successfully!";
+        } else {
+            $error_message = "Error adding staff: " . $conn->error;
+        }
+        $stmt->close();
+    }
+    
+    // Add new admin
+    if (isset($_POST['add_admin'])) {
+        $fname = $_POST['admin_fname'];
+        $lname = $_POST['admin_lname'];
+        $contact = $_POST['admin_contact'];
+        $icnumber = $_POST['admin_icnumber'];
+        $email = $_POST['admin_email'];
+        $password = $_POST['admin_password'];
+        $address = $_POST['admin_address'];
+        $dob = $_POST['admin_dob'];
+        $comment = $_POST['admin_comment'];
+        
+        $sql = "INSERT INTO admin (Admin_FName, Admin_LName, Admin_ContactNumber, Admin_ICNUMBER, 
+                Admin_Email, Admin_Password, Admin_Address, Admin_DOB, Admin_Commnent) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("sssssssss", $fname, $lname, $contact, $icnumber, $email, $password, $address, $dob, $comment);
+        
+        if ($stmt->execute()) {
+            $success_message = "Admin added successfully!";
+        } else {
+            $error_message = "Error adding admin: " . $conn->error;
+        }
+        $stmt->close();
+    }
+    
+    // Add new branch
+    if (isset($_POST['add_branch'])) {
+        $name = $_POST['branch_name'];
+        $type = $_POST['branch_type'];
+        $address = $_POST['branch_address'];
+        $contact = $_POST['branch_contact'];
+        $description = $_POST['branch_description'];
+        $admin_id = $_SESSION['admin_id'];
+        
+        $sql = "INSERT INTO branch (Branch_Name, Branch_Type, Branch_Address, Branch_ContactNumber, Branch_Description, Admin_ID) 
+                VALUES (?, ?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("sssssi", $name, $type, $address, $contact, $description, $admin_id);
+        
+        if ($stmt->execute()) {
+            $success_message = "Branch added successfully!";
+        } else {
+            $error_message = "Error adding branch: " . $conn->error;
+        }
+        $stmt->close();
+    }
+}
 
 // Check database connection
 if ($conn) {
@@ -78,6 +182,14 @@ if ($conn) {
         $total_staff = $row['count'];
     }
 
+    // Get total admins
+    $sql = "SELECT COUNT(*) as count FROM admin";
+    $result = $conn->query($sql);
+    if ($result) {
+        $row = $result->fetch_assoc();
+        $total_admins = $row['count'];
+    }
+
     // Get recent activities
     $recent_activities = [];
     $sql = "SELECT a.Activity_ID, a.Activity_Date, a.Activity_Details, a.Activity_Status, b.Branch_Name 
@@ -104,240 +216,8 @@ if ($conn) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Donation Management System</title>
+    <link rel="stylesheet" href="admin_common.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
-            background: #f9f9f9;
-            color: #4a4a4a;
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* Sidebar Styles */
-        .sidebar {
-            width: 70px;
-            background: #f28585;
-            color: white;
-            transition: all 0.3s ease;
-            position: relative;
-            height: 100vh;
-            overflow-y: auto;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-        }
-
-        .sidebar.expanded {
-            width: 250px;
-        }
-
-        .logo {
-            padding: 20px;
-            text-align: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .logo:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .logo img {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: white;
-            padding: 5px;
-        }
-
-        .logo-text {
-            font-size: 20px;
-            font-weight: bold;
-            margin-top: 10px;
-            opacity: 0;
-            height: 0;
-            overflow: hidden;
-            transition: opacity 0.3s ease;
-        }
-
-        .sidebar.expanded .logo-text {
-            opacity: 1;
-            height: auto;
-        }
-
-        .sidebar-menu {
-            padding: 20px 0;
-        }
-
-        .menu-item {
-            padding: 15px 20px;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border-left: 3px solid transparent;
-            white-space: nowrap;
-            text-decoration: none;
-            color: white;
-        }
-
-        .menu-item:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-left: 3px solid white;
-        }
-
-        .menu-item.active {
-            background: rgba(255, 255, 255, 0.15);
-            border-left: 3px solid white;
-        }
-
-        .menu-item ion-icon {
-            font-size: 20px;
-            margin-right: 15px;
-            min-width: 20px;
-        }
-
-        .menu-text {
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .sidebar.expanded .menu-text {
-            opacity: 1;
-        }
-
-        /* Main Content Styles */
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            transition: all 0.3s ease;
-            margin-left: 0;
-        }
-
-        .header {
-            background: #f28585;
-            color: white;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: 100%;
-            position: relative;
-        }
-
-        /* Add a decorative line that matches the sidebar width */
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 70px;
-            height: 100%;
-            background: #e66767;
-            transition: width 0.3s ease;
-            z-index: 1;
-        }
-
-        .sidebar.expanded + .main-content .header::before {
-            width: 250px;
-        }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            position: relative;
-            z-index: 2;
-        }
-
-        .menu-toggle {
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            width: 24px;
-            height: 18px;
-            cursor: pointer;
-        }
-
-        .menu-toggle span {
-            display: block;
-            height: 3px;
-            width: 100%;
-            background-color: white;
-            border-radius: 2px;
-            transition: all 0.3s ease;
-        }
-
-        .header-logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            text-decoration: none;
-            color: white;
-        }
-
-        .header-logo img {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: white;
-            padding: 5px;
-        }
-
-        .header-logo-text {
-            font-size: 20px;
-            font-weight: bold;
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            position: relative;
-            z-index: 2;
-        }
-
-        .welcome {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .logout {
-            color: white;
-            text-decoration: none;
-            background: rgba(255,255,255,0.2);
-            padding: 8px 15px;
-            border-radius: 5px;
-            transition: all 0.3s ease;
-        }
-
-        .logout:hover {
-            background: rgba(255,255,255,0.3);
-        }
-
-        .dashboard {
-            padding: 30px;
-            max-width: 1400px;
-            margin: 0 auto;
-            width: 100%;
-        }
-
-        .page-title {
-            font-size: 28px;
-            margin-bottom: 30px;
-            color: #4a4a4a;
-            border-bottom: 2px solid #f6b8b8;
-            padding-bottom: 10px;
-        }
-
         .stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -349,33 +229,52 @@ if ($conn) {
             background: white;
             padding: 25px;
             border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            box-shadow: var(--card-shadow);
             text-align: center;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
-            border-top: 4px solid #f28585;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            text-decoration: none;
+            display: block;
+            color: inherit;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-pink), var(--warm-orange), var(--warm-yellow));
         }
 
         .stat-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 25px rgba(255, 107, 157, 0.25);
         }
 
         .stat-icon {
             font-size: 40px;
             margin-bottom: 15px;
-            color: #f28585;
+            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .stat-number {
             font-size: 2.5em;
-            color: #f28585;
+            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             font-weight: bold;
             margin-bottom: 10px;
         }
 
         .stat-label {
             font-size: 16px;
-            color: #7f8c8d;
+            color: var(--text-light);
         }
 
         .dashboard-content {
@@ -394,25 +293,40 @@ if ($conn) {
             background: white;
             padding: 25px;
             border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            box-shadow: var(--card-shadow);
             transition: transform 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-pink), var(--warm-peach));
         }
 
         .section-card:hover {
             transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(255, 107, 157, 0.2);
         }
 
         .section-title {
             font-size: 20px;
             margin-bottom: 15px;
-            color: #4a4a4a;
+            color: var(--text-dark);
             display: flex;
             align-items: center;
         }
 
         .section-title ion-icon {
             margin-right: 10px;
-            color: #f28585;
+            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .section-list {
@@ -432,22 +346,24 @@ if ($conn) {
         }
 
         .section-list a {
-            color: #f28585;
+            color: var(--primary-pink);
             text-decoration: none;
             transition: color 0.3s ease;
+            font-weight: 500;
         }
 
         .section-list a:hover {
-            color: #e66767;
+            color: var(--warm-orange);
             text-decoration: underline;
         }
 
         .badge {
-            background: #f6b8b8;
+            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
             color: white;
             padding: 3px 8px;
             border-radius: 10px;
             font-size: 12px;
+            font-weight: 600;
         }
 
         .quick-actions {
@@ -458,7 +374,7 @@ if ($conn) {
         }
 
         .action-btn {
-            background: #f28585;
+            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
             color: white;
             border: none;
             padding: 10px 15px;
@@ -468,24 +384,27 @@ if ($conn) {
             text-align: center;
             text-decoration: none;
             display: block;
+            font-weight: 500;
+            box-shadow: 0 4px 10px rgba(255, 107, 157, 0.3);
         }
 
         .action-btn:hover {
-            background: #e66767;
+            background: linear-gradient(135deg, var(--warm-orange), var(--primary-pink));
             transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(255, 107, 157, 0.4);
         }
 
         .activity-item {
             padding: 15px;
-            border-left: 4px solid #f28585;
-            background: #fff5e4;
+            border-left: 4px solid var(--primary-pink);
+            background: linear-gradient(90deg, rgba(255, 182, 193, 0.1) 0%, rgba(255, 255, 255, 0.5) 100%);
             margin-bottom: 10px;
             border-radius: 0 8px 8px 0;
         }
 
         .activity-date {
             font-weight: bold;
-            color: #f28585;
+            color: var(--primary-pink);
         }
 
         .activity-details {
@@ -493,7 +412,7 @@ if ($conn) {
         }
 
         .activity-branch {
-            color: #7f8c8d;
+            color: var(--text-light);
             font-size: 14px;
         }
 
@@ -503,20 +422,21 @@ if ($conn) {
             border-radius: 12px;
             font-size: 12px;
             margin-top: 5px;
+            font-weight: 600;
         }
 
         .status-completed {
-            background: #d4edda;
+            background: linear-gradient(135deg, #a8e6cf, #6dd5a8);
             color: #155724;
         }
 
         .status-upcoming {
-            background: #cce7ff;
+            background: linear-gradient(135deg, #a8d8ea, #6da8ff);
             color: #004085;
         }
 
         .status-ongoing {
-            background: #fff3cd;
+            background: linear-gradient(135deg, #ffd3b6, #ffaa6d);
             color: #856404;
         }
 
@@ -529,6 +449,138 @@ if ($conn) {
             border: 1px solid #f5c6cb;
         }
 
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #c3e6cb;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            width: 600px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--card-shadow);
+            position: relative;
+        }
+
+        .modal-content::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary-pink), var(--warm-peach));
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            color: var(--text-dark);
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-light);
+            transition: color 0.3s ease;
+        }
+
+        .close-btn:hover {
+            color: var(--primary-pink);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-pink);
+            box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.2);
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+            width: 100%;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            box-shadow: 0 4px 10px rgba(255, 107, 157, 0.3);
+        }
+
+        .submit-btn:hover {
+            background: linear-gradient(135deg, var(--warm-orange), var(--primary-pink));
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(255, 107, 157, 0.4);
+        }
+
         @media (max-width: 1024px) {
             .dashboard-content {
                 grid-template-columns: 1fr;
@@ -536,64 +588,13 @@ if ($conn) {
         }
 
         @media (max-width: 768px) {
-            .dashboard {
-                padding: 15px;
-            }
-            
-            .header {
-                flex-direction: column;
-                gap: 15px;
-                text-align: center;
-            }
-            
-            .header-left, .header-right {
-                width: 100%;
-                justify-content: center;
-            }
-            
             .stats {
                 grid-template-columns: 1fr;
             }
             
-            .sidebar {
-                position: fixed;
-                transform: translateX(-100%);
-            }
-            
-            .sidebar.active {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 0;
-            }
-            
-            .menu-toggle {
-                display: flex;
-            }
-            
-            .header::before {
-                display: none;
-            }
-        }
-        
-        @media (min-width: 769px) {
-            .menu-toggle {
-                display: none;
-            }
-            
-            .sidebar {
-                position: fixed;
-                height: 100vh;
-            }
-            
-            .main-content {
-                margin-left: 70px;
-                transition: margin-left 0.3s ease;
-            }
-            
-            .sidebar.expanded + .main-content {
-                margin-left: 250px;
+            .form-row {
+                flex-direction: column;
+                gap: 0;
             }
         }
     </style>
@@ -615,9 +616,25 @@ if ($conn) {
                 <ion-icon name="people"></ion-icon>
                 <div class="menu-text">Donor Management</div>
             </a>
-            <a href="admin_staff_page.php" class="menu-item">
+            <a href="staff_management_page.php" class="menu-item">
                 <ion-icon name="person-circle"></ion-icon>
                 <div class="menu-text">Staff Management</div>
+            </a>
+            <a href="admin_management_page.php" class="menu-item">
+                <ion-icon name="shield-checkmark"></ion-icon>
+                <div class="menu-text">Admin Management</div>
+            </a>
+            <a href="branch_management_page.php" class="menu-item">
+                <ion-icon name="business"></ion-icon>
+                <div class="menu-text">Branch Management</div>
+            </a>
+            <a href="activity_management.php" class="menu-item">
+                <ion-icon name="calendar"></ion-icon>
+                <div class="menu-text">Activity Management</div>
+            </a>
+            <a href="payment_management.php" class="menu-item">
+                <ion-icon name="card"></ion-icon>
+                <div class="menu-text">Payment Management</div>
             </a>
         </div>
     </aside>
@@ -654,42 +671,55 @@ if ($conn) {
             </div>
             <?php endif; ?>
             
+            <?php if (isset($success_message)): ?>
+            <div class="success-message">
+                <?php echo $success_message; ?>
+            </div>
+            <?php endif; ?>
+            
             <div class="stats">
-                <div class="stat-card">
+                <a href="admin_donor_page.php" class="stat-card">
                     <div class="stat-icon">
                         <ion-icon name="people"></ion-icon>
                     </div>
                     <div class="stat-number"><?php echo $total_donors; ?></div>
                     <div class="stat-label">Total Donors</div>
-                </div>
-                <div class="stat-card">
+                </a>
+                <a href="admin_donor_page.php" class="stat-card">
                     <div class="stat-icon">
                         <ion-icon name="cash"></ion-icon>
                     </div>
                     <div class="stat-number">RM <?php echo number_format($total_donations, 2); ?></div>
                     <div class="stat-label">Total Donations</div>
-                </div>
-                <div class="stat-card">
+                </a>
+                <a href="branch_management_page.php" class="stat-card">
                     <div class="stat-icon">
                         <ion-icon name="business"></ion-icon>
                     </div>
                     <div class="stat-number"><?php echo $total_branches; ?></div>
                     <div class="stat-label">Branch Locations</div>
-                </div>
-                <div class="stat-card">
+                </a>
+                <a href="activity_management.php" class="stat-card">
                     <div class="stat-icon">
                         <ion-icon name="calendar"></ion-icon>
                     </div>
                     <div class="stat-number"><?php echo $total_activities; ?></div>
                     <div class="stat-label">Total Activities</div>
-                </div>
-                <div class="stat-card">
+                </a>
+                <a href="staff_management_page.php" class="stat-card">
                     <div class="stat-icon">
                         <ion-icon name="person-circle"></ion-icon>
                     </div>
                     <div class="stat-number"><?php echo $total_staff; ?></div>
                     <div class="stat-label">Total Staff</div>
-                </div>
+                </a>
+                <a href="admin_management_page.php" class="stat-card">
+                    <div class="stat-icon">
+                        <ion-icon name="shield-checkmark"></ion-icon>
+                    </div>
+                    <div class="stat-number"><?php echo $total_admins; ?></div>
+                    <div class="stat-label">Total Admins</div>
+                </a>
             </div>
             
             <div class="dashboard-content">
@@ -709,7 +739,7 @@ if ($conn) {
                             <li><a href="admin_donor_page.php">Donation History</a></li>
                         </ul>
                         <div class="quick-actions">
-                            <a href="admin_donor_page.php" class="action-btn">Add Donor</a>
+                            <button class="action-btn" onclick="openModal('donorModal')">Add Donor</button>
                             <a href="admin_donor_page.php" class="action-btn">Export Data</a>
                         </div>
                     </div>
@@ -721,17 +751,17 @@ if ($conn) {
                         </h2>
                         <ul class="section-list">
                             <li>
-                                <a href="#">View All Branches</a>
+                                <a href="branch_management_page.php">View All Branches</a>
                                 <span class="badge"><?php echo $total_branches; ?></span>
                             </li>
-                            <li><a href="#">Elderly Homes</a></li>
-                            <li><a href="#">Orphanages</a></li>
-                            <li><a href="#">Disability Centers</a></li>
-                            <li><a href="#">Stray Animal Centers</a></li>
+                            <li><a href="branch_management_page.php?type=elderly">Elderly Homes</a></li>
+                            <li><a href="branch_management_page.php?type=orphanage">Orphanages</a></li>
+                            <li><a href="branch_management_page.php?type=disability">Disability Centers</a></li>
+                            <li><a href="branch_management_page.php?type=animal">Stray Animal Centers</a></li>
                         </ul>
                         <div class="quick-actions">
-                            <a href="#" class="action-btn">Add Branch</a>
-                            <a href="#" class="action-btn">Branch Reports</a>
+                            <button class="action-btn" onclick="openModal('branchModal')">Add Branch</button>
+                            <a href="branch_management_page.php" class="action-btn">Branch Reports</a>
                         </div>
                     </div>
 
@@ -742,16 +772,36 @@ if ($conn) {
                         </h2>
                         <ul class="section-list">
                             <li>
-                                <a href="admin_staff_page.php">View All Staff</a>
+                                <a href="staff_management_page.php">View All Staff</a>
                                 <span class="badge"><?php echo $total_staff; ?></span>
                             </li>
-                            <li><a href="admin_staff_page.php">Add New Staff</a></li>
-                            <li><a href="admin_staff_page.php">Staff Roles</a></li>
-                            <li><a href="admin_staff_page.php">Staff Performance</a></li>
+                            <li><a href="staff_management_page.php?action=add">Add New Staff</a></li>
+                            <li><a href="staff_management_page.php?view=roles">Staff Roles</a></li>
+                            <li><a href="staff_management_page.php?view=performance">Staff Performance</a></li>
                         </ul>
                         <div class="quick-actions">
-                            <a href="admin_staff_page.php" class="action-btn">Add Staff</a>
-                            <a href="admin_staff_page.php" class="action-btn">Staff Reports</a>
+                            <button class="action-btn" onclick="openModal('staffModal')">Add Staff</button>
+                            <a href="staff_management_page.php" class="action-btn">Staff Reports</a>
+                        </div>
+                    </div>
+
+                    <div class="section-card">
+                        <h2 class="section-title">
+                            <ion-icon name="shield-checkmark"></ion-icon>
+                            Admin Management
+                        </h2>
+                        <ul class="section-list">
+                            <li>
+                                <a href="admin_management_page.php">View All Admins</a>
+                                <span class="badge"><?php echo $total_admins; ?></span>
+                            </li>
+                            <li><a href="admin_management_page.php?action=add">Add New Admin</a></li>
+                            <li><a href="admin_management_page.php?view=roles">Admin Roles</a></li>
+                            <li><a href="admin_management_page.php?view=activity">Admin Activity Log</a></li>
+                        </ul>
+                        <div class="quick-actions">
+                            <button class="action-btn" onclick="openModal('adminModal')">Add Admin</button>
+                            <a href="admin_management_page.php" class="action-btn">Admin Reports</a>
                         </div>
                     </div>
                 </div>
@@ -783,7 +833,7 @@ if ($conn) {
                             <p>No recent activities found.</p>
                         <?php endif; ?>
                         <div class="quick-actions">
-                            <a href="#" class="action-btn">View All Activities</a>
+                            <a href="activity_management.php" class="action-btn">View All Activities</a>
                         </div>
                     </div>
                     
@@ -813,6 +863,198 @@ if ($conn) {
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Add Donor Modal -->
+    <div id="donorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add New Donor</h2>
+                <button class="close-btn" onclick="closeModal('donorModal')">&times;</button>
+            </div>
+            <form method="POST" action="">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="donor_fname">First Name</label>
+                        <input type="text" id="donor_fname" name="donor_fname" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="donor_lname">Last Name</label>
+                        <input type="text" id="donor_lname" name="donor_lname" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="donor_contact">Contact Number</label>
+                    <input type="text" id="donor_contact" name="donor_contact" required>
+                </div>
+                <div class="form-group">
+                    <label for="donor_icnumber">IC Number</label>
+                    <input type="text" id="donor_icnumber" name="donor_icnumber" required>
+                </div>
+                <div class="form-group">
+                    <label for="donor_email">Email</label>
+                    <input type="email" id="donor_email" name="donor_email" required>
+                </div>
+                <div class="form-group">
+                    <label for="donor_password">Password</label>
+                    <input type="password" id="donor_password" name="donor_password" required>
+                </div>
+                <div class="form-group">
+                    <label for="donor_address">Address</label>
+                    <textarea id="donor_address" name="donor_address" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="donor_dob">Date of Birth</label>
+                    <input type="date" id="donor_dob" name="donor_dob" required>
+                </div>
+                <div class="form-group">
+                    <label for="donor_description">Description</label>
+                    <textarea id="donor_description" name="donor_description" rows="3"></textarea>
+                </div>
+                <button type="submit" name="add_donor" class="submit-btn">Add Donor</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Staff Modal -->
+    <div id="staffModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add New Staff</h2>
+                <button class="close-btn" onclick="closeModal('staffModal')">&times;</button>
+            </div>
+            <form method="POST" action="">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="staff_fname">First Name</label>
+                        <input type="text" id="staff_fname" name="staff_fname" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="staff_lname">Last Name</label>
+                        <input type="text" id="staff_lname" name="staff_lname" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="staff_contact">Contact Number</label>
+                    <input type="text" id="staff_contact" name="staff_contact" required>
+                </div>
+                <div class="form-group">
+                    <label for="staff_icnumber">IC Number</label>
+                    <input type="text" id="staff_icnumber" name="staff_icnumber" required>
+                </div>
+                <div class="form-group">
+                    <label for="staff_email">Email</label>
+                    <input type="email" id="staff_email" name="staff_email" required>
+                </div>
+                <div class="form-group">
+                    <label for="staff_password">Password</label>
+                    <input type="password" id="staff_password" name="staff_password" required>
+                </div>
+                <div class="form-group">
+                    <label for="staff_address">Address</label>
+                    <textarea id="staff_address" name="staff_address" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="staff_dob">Date of Birth</label>
+                    <input type="date" id="staff_dob" name="staff_dob" required>
+                </div>
+                <div class="form-group">
+                    <label for="staff_comment">Comment</label>
+                    <textarea id="staff_comment" name="staff_comment" rows="3"></textarea>
+                </div>
+                <button type="submit" name="add_staff" class="submit-btn">Add Staff</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Admin Modal -->
+    <div id="adminModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add New Admin</h2>
+                <button class="close-btn" onclick="closeModal('adminModal')">&times;</button>
+            </div>
+            <form method="POST" action="">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="admin_fname">First Name</label>
+                        <input type="text" id="admin_fname" name="admin_fname" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="admin_lname">Last Name</label>
+                        <input type="text" id="admin_lname" name="admin_lname" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="admin_contact">Contact Number</label>
+                    <input type="text" id="admin_contact" name="admin_contact" required>
+                </div>
+                <div class="form-group">
+                    <label for="admin_icnumber">IC Number</label>
+                    <input type="text" id="admin_icnumber" name="admin_icnumber" required>
+                </div>
+                <div class="form-group">
+                    <label for="admin_email">Email</label>
+                    <input type="email" id="admin_email" name="admin_email" required>
+                </div>
+                <div class="form-group">
+                    <label for="admin_password">Password</label>
+                    <input type="password" id="admin_password" name="admin_password" required>
+                </div>
+                <div class="form-group">
+                    <label for="admin_address">Address</label>
+                    <textarea id="admin_address" name="admin_address" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="admin_dob">Date of Birth</label>
+                    <input type="date" id="admin_dob" name="admin_dob" required>
+                </div>
+                <div class="form-group">
+                    <label for="admin_comment">Comment</label>
+                    <textarea id="admin_comment" name="admin_comment" rows="3"></textarea>
+                </div>
+                <button type="submit" name="add_admin" class="submit-btn">Add Admin</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Branch Modal -->
+    <div id="branchModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add New Branch</h2>
+                <button class="close-btn" onclick="closeModal('branchModal')">&times;</button>
+            </div>
+            <form method="POST" action="">
+                <div class="form-group">
+                    <label for="branch_name">Branch Name</label>
+                    <input type="text" id="branch_name" name="branch_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="branch_type">Branch Type</label>
+                    <select id="branch_type" name="branch_type" required>
+                        <option value="">Select Type</option>
+                        <option value="elderly">Elderly Home</option>
+                        <option value="orphanage">Orphanage</option>
+                        <option value="disability">Disability Center</option>
+                        <option value="animal">Stray Animal Center</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="branch_address">Address</label>
+                    <textarea id="branch_address" name="branch_address" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="branch_contact">Contact Number</label>
+                    <input type="text" id="branch_contact" name="branch_contact" required>
+                </div>
+                <div class="form-group">
+                    <label for="branch_description">Description</label>
+                    <textarea id="branch_description" name="branch_description" rows="3"></textarea>
+                </div>
+                <button type="submit" name="add_branch" class="submit-btn">Add Branch</button>
+            </form>
         </div>
     </div>
 
@@ -884,6 +1126,33 @@ if ($conn) {
                 }
             });
         });
+
+        // Modal functionality
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'flex';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+
+        // Auto-hide success/error messages after 5 seconds
+        setTimeout(function() {
+            const messages = document.querySelectorAll('.success-message, .error-message');
+            messages.forEach(message => {
+                message.style.display = 'none';
+            });
+        }, 5000);
     </script>
 
     <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
