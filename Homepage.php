@@ -49,15 +49,6 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             --white: #FFFFFF;
             --shadow: rgba(0, 0, 0, 0.1);
         }
-
-        .logo 
-        {
-            display: flex;          /变成弹性盒子Flexbox，自动变成一行排列/
-            align-items: center;    /* 垂直居中 */
-            font-weight: bold;      /粗体/
-            font-size: 36px;        /字体大小/
-            gap: 10px;              /* 图片与文字之间的间距 */
-        }
         
         * {
             margin: 0;
@@ -133,6 +124,17 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             gap: 20px;
         }
         
+        .logo 
+        {
+            display: flex;          /变成弹性盒子Flexbox，自动变成一行排列/
+            align-items: center;    /* 垂直居中 */
+            font-weight: bold;      /粗体/
+            font-size: 36px;        /字体大小/
+            gap: 10px;              /* 图片与文字之间的间距 */
+         }
+
+        
+    
         .header-right { 
             grid-column: 2;
             display: flex;
@@ -280,13 +282,17 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 gap: 15px;
             }
             
-            .logo { 
+            .logo 
+            { 
                 grid-column: 1;
                 grid-row: 1;
                 text-align: left;
             }
             
-            .header-right { 
+
+
+            .header-right 
+            { 
                 grid-column: 2;
                 grid-row: 1;
                 justify-content: flex-end; 
@@ -352,7 +358,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 <a href="History.php">History</a>
                 <a href="New&Story.php">News & Story</a>
                 <a href="Special_case Page.php">Special Case</a>
-                <a href="Branch Page.php">Branch</a>
+               
                 <a href="Profile.php">Profile</a>
             </div>
         </div>
@@ -368,7 +374,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
 
     <div class="donor-container">
         <div class="welcome-section">
-            <h1>Welcome to Dashboard</h1>
+            <h1>Welcome to LOVE BRIDGE</h1>
             <p>Thank you for being part of our donor community</p>
         </div>
         
@@ -411,7 +417,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 <?php endif; ?>
             </div>
             
-            
+           
         </div>
     </div>
 </body>
