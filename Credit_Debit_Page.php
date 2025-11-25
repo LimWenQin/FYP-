@@ -1,7 +1,5 @@
 <?php
 include 'dataconnection.php';
-include 'header_function.php';
-include 'header_UI.php';
 // ✅ 设置时区（马来西亚时间）
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
@@ -78,6 +76,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
     header("Location: Payment_Settlement_Page.php?txn_reZf=$txn_ref");
     exit();
 }
+include 'header_function.php';
+include 'header_UI.php';
 
 $conn->close();
 ?>
