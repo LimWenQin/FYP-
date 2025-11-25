@@ -8,6 +8,7 @@ session_destroy();
 $_SESSION['logged_in'] = false;
 
 
-header("Location: homepage.php");
+header("Location: donor_login.php");
 exit();
 ?>
+
