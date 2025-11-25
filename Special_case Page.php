@@ -4,7 +4,7 @@ include 'header_function.php';
 include 'header_UI.php';
 
 
-$query = "SELECT * FROM special_cases WHERE Case_Status = 'active' ORDER BY case_created_at DESC";
+$query = "SELECT * FROM special_case WHERE Case_Status = 'active' ORDER BY created_at DESC";
 $result = $conn->query($query);
 ?>
 
