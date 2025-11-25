@@ -1,6 +1,7 @@
 <?php
-session_start(); 
 include 'dataconnection.php';
+include 'header_function.php';
+include 'header_UI.php';
 
 $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
 
@@ -462,7 +463,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in) {
                 <a href="History.php">History</a>
                 <a href="New&Story.php">News & Story</a>
                 <a href="Special_case Page.php">Special Case</a>
-                <a href="Branch Page.php">Branch</a>
                 <a href="profile.php" style="color: #e74c3c;">Profile</a>
             </div>
         </div>
