@@ -126,10 +126,10 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         
         .logo 
         {
-            display: flex;          /变成弹性盒子Flexbox，自动变成一行排列/
+            display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
             align-items: center;    /* 垂直居中 */
-            font-weight: bold;      /粗体/
-            font-size: 36px;        /字体大小/
+            font-weight: bold;      /*粗体*/
+            font-size: 36px;        /*字体大小*/
             gap: 10px;              /* 图片与文字之间的间距 */
          }
 
