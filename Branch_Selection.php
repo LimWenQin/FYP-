@@ -1,4 +1,7 @@
 <?php
+include 'dataconnection.php';
+include 'header_function.php';
+include 'header_UI.php';
 //session_start(); // 1. 开启 Session (必须放在第一行)
 
 // 2. 再次检查登录 (安全起见)
@@ -11,7 +14,8 @@
 // -------------------------
 // ✅ 数据库连接
 // -------------------------
-$servername = "localhost";
+
+/*$servername = "localhost";
 $username = "root";
 $password = "";
 $database = "donation_system";
@@ -20,7 +24,7 @@ $conn = new mysqli($servername, $username, $password, $database);
 
 if ($conn->connect_error) {
     die("Database Connection Failed: " . $conn->connect_error);
-}
+}*/
 
 // -------------------------
 // ✅ 获取数据
@@ -63,41 +67,6 @@ if ($result->num_rows > 0) {
         margin: 0;
         font-family: Arial;
         color: #4A4A4A;
-    }
-
-    .header 
-    {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 20px 50px;
-        /*应用渐变色背景 --- */
-        background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%);
-        box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2); /* 新的阴影 */
-        color: #fcfcfcff; /* 为了在渐变色上清晰显示，文字改为白色 */
-    }
-
-    .logo 
-    {
-        display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
-        align-items: center;    /* 垂直居中 */
-        font-weight: bold;      /*粗体*/
-        font-size: 36px;        /*字体大小*/
-        gap: 10px;              /* 图片与文字之间的间距 */
-    }
-
-    .header .function-links a 
-    {
-        margin-left: 15px;
-        text-decoration: none;
-        font-size: 20px;
-        color: #fcfcfcff;
-        font-weight: bold;
-    }
-
-    .search 
-    { 
-        padding: 6px; font-size: 16px; 
     }
 
     .container 
@@ -219,21 +188,7 @@ if ($result->num_rows > 0) {
 </head>
 <body>
 
-<header class="header">
-    <div class="logo">
-        <img src="logo.jpg" alt="Logo" width="80" height="80">
-        LOVE BRIDGE
-    </div>
-    <div class="function-links">
-        <input type="text" placeholder="Search..." class="search">
-        <a href="#">Home</a>
-        <a href="#">About Us</a>
-        <a href="#">Contact Us</a>
-        <a href="#">History</a>
-        <a href="#">Activities</a>
-        <a href="#">News & Stories</a>
-    </div>
-</header>
+
 
 <div class="container">
     <div class="sidebar">
