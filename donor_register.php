@@ -1,6 +1,4 @@
 <?php
-
-
 include 'dataconnection.php';
 include 'header_function.php';
 include 'header_UI.php';
