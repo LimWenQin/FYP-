@@ -385,7 +385,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <a href="History.php">History</a>
                 <a href="New&Story.php">News & Story</a>
                 <a href="Special_case Page.php">Special Case</a>
-                <a href="Branch Page.php">Branch</a>
                 <a href="profile.php">Profile</a>
             </div>
         </div>
@@ -432,3 +431,4 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </div>
 </body>
 </html>
+
