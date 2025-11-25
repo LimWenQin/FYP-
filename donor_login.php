@@ -138,13 +138,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             gap: 20px;
         }
         
-        .logo {
-            font-weight: bold;
-            font-size: 36px;
-            color: var(--text);
-            text-align: left; 
-            grid-column: 1;
-        }
+            .logo 
+    {
+        display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
+        align-items: center;    /* 垂直居中 */
+        font-weight: bold;      /*粗体*/
+        font-size: 36px;        /*字体大小*/
+        gap: 10px;              /* 图片与文字之间的间距 */
+    }
         
     
         .header-right { 
