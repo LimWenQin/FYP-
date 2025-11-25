@@ -4,7 +4,7 @@ include 'dataconnection.php';
 
 $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
 
-// 默认用户数据
+
 $donor = [
     "Donor_FName" => "Guest",
     "Donor_LName" => "",
@@ -16,7 +16,7 @@ $donor = [
     "Donor_Description" => ""
 ];
 
-// 如果用户已登录，获取真实数据
+
 if ($logged_in && isset($_SESSION['donor_id'])) {
     $query = "SELECT * FROM donor WHERE Donor_ID = ?";
     $stmt = $conn->prepare($query);
@@ -30,7 +30,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
     $stmt->close();
 }
 
-// 处理表单提交
+
 $update_success = false;
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in) {
     $fname = $_POST['fname'];
@@ -46,9 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in) {
     
     if ($stmt->execute()) {
         $update_success = true;
-        // 更新session中的用户名
+       
         $_SESSION['donor_name'] = $fname . ' ' . $lname;
-        // 重新获取更新后的数据
+        
         $donor['Donor_FName'] = $fname;
         $donor['Donor_LName'] = $lname;
         $donor['Donor_Email'] = $email;
@@ -549,4 +549,5 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in) {
         <?php endif; ?>
     </div>
 </body>
+
 </html>
