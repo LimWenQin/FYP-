@@ -340,7 +340,10 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
     
     <header class="header">
         
-        <div class="logo">Donor Platform</div>
+        <div class="logo">
+            <img src="logo.jpg" alt="Logo" width="80" height="80">
+            LOVE BRIDGE
+        </div>
         
        
         <div class="header-right">
