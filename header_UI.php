@@ -240,7 +240,6 @@
                 <a href="History.php">History</a>
                 <a href="New&Story.php">News & Story</a>
                 <a href="Special_case Page.php">Special Case</a>
-                <a href="Branch Page.php">Branch</a>
                 <a href="Profile.php">Profile</a>
             </div>
         </div>
@@ -251,4 +250,5 @@
             </div>
             <a href="Payment_page.php" class="donate-btn">Donate Now</a>
         </div>
+
     </header>
