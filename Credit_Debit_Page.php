@@ -1,12 +1,15 @@
 <?php
+include 'dataconnection.php';
+include 'header_function.php';
+include 'header_UI.php';
 // ✅ 设置时区（马来西亚时间）
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
 // ✅ 连接数据库
-$conn = new mysqli("localhost", "root", "", "donation_system");
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+//$conn = new mysqli("localhost", "root", "", "donation_system");
+//if ($conn->connect_error) {
+//   die("Connection failed: " . $conn->connect_error);
+//}
 
 // ✅ 检查表单提交
 // 检查这是否是一个 POST 请求，并且它是否包含了 'cvc' 字段
@@ -258,18 +261,6 @@ $conn->close();
 </style>
 </head>
 <body>
-
-<header class="header">
-    <div class="logo">
-        <img src="logo.jpg" alt="Logo" width="80" height="80">
-        LOVE BRIDGE
-    </div>
-    <div class="function-links">
-        <a href="#">Home</a>
-        <a href="#">About Us</a>
-        <a href="#">Contact Us</a>
-    </div>
-</header>
 
 <div class="container">
     <!-- 左侧故事区 -->

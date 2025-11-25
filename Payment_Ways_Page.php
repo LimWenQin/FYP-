@@ -1,4 +1,7 @@
 <?php
+include 'dataconnection.php';
+include 'header_function.php';
+include 'header_UI.php';
 //session_start(); // 1. 开启 Session
 
 //if (!isset($_SESSION['donor_id'])) {
@@ -8,16 +11,16 @@
 // -------------------------
 // ✅ 1. 数据库连接 (必须连接才能查询名字)
 // -------------------------
-$servername = "localhost";
-$username = "root";
-$password = "";
-$database = "donation_system";
+//$servername = "localhost";
+//$username = "root";
+//$password = "";
+//$database = "donation_system";
 
-$conn = new mysqli($servername, $username, $password, $database);
+//$conn = new mysqli($servername, $username, $password, $database);
 
-if ($conn->connect_error) {
-    die("Database Connection Failed: " . $conn->connect_error);
-}
+//if ($conn->connect_error) {
+//    die("Database Connection Failed: " . $conn->connect_error);
+//}
 
 // -------------------------
 // ✅ 2. 获取上一个页面传来的数据
@@ -212,22 +215,6 @@ $conn->close();
 </style>
 </head>
 <body>
-
-<header class="header">
-    <div class="logo">
-        <img src="logo.jpg" alt="Logo" width="80" height="80">
-        LOVE BRIDGE
-    </div>
-    <div class="function-links">
-        <input type="text" placeholder="Search..." class="search">
-        <a href="#">Home</a>
-        <a href="#">About Us</a>
-        <a href="#">Contact Us</a>
-        <a href="#">History</a>
-        <a href="#">Activities</a>
-        <a href="#">News & Stories</a>
-    </div>
-</header>
 
 <div class="container">
 
