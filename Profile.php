@@ -1,11 +1,10 @@
 <?php
+session_start(); 
 include 'dataconnection.php';
-include 'header_function.php';
-include 'header_UI.php';
 
 $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
 
-
+// 默认用户数据
 $donor = [
     "Donor_FName" => "Guest",
     "Donor_LName" => "",
@@ -17,7 +16,7 @@ $donor = [
     "Donor_Description" => ""
 ];
 
-
+// 如果用户已登录，获取真实数据
 if ($logged_in && isset($_SESSION['donor_id'])) {
     $query = "SELECT * FROM donor WHERE Donor_ID = ?";
     $stmt = $conn->prepare($query);
@@ -31,7 +30,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
     $stmt->close();
 }
 
-
+// 处理表单提交
 $update_success = false;
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in) {
     $fname = $_POST['fname'];
@@ -47,9 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in) {
     
     if ($stmt->execute()) {
         $update_success = true;
-       
+        // 更新session中的用户名
         $_SESSION['donor_name'] = $fname . ' ' . $lname;
-        
+        // 重新获取更新后的数据
         $donor['Donor_FName'] = $fname;
         $donor['Donor_LName'] = $lname;
         $donor['Donor_Email'] = $email;
@@ -151,13 +150,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in) {
             gap: 20px;
         }
         
-        .logo {
-            font-weight: bold;
-            font-size: 36px;
-            color: var(--text);
-            text-align: left; 
-            grid-column: 1;
-        }
+        .logo 
+    {
+        display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
+        align-items: center;    /* 垂直居中 */
+        font-weight: bold;      /*粗体*/
+        font-size: 36px;        /*字体大小*/
+        gap: 10px;              /* 图片与文字之间的间距 */
+    }
         
         .header-right { 
             grid-column: 2;
@@ -455,7 +455,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in) {
     </header>
     
     <header class="header">
-        <div class="logo">Donor Platform</div>
+         <div class="logo">
+            <img src="logo.jpg" alt="Logo" width="80" height="80">
+            LOVE BRIDGE
+        </div>
         
         <div class="header-right">
             <div class="function-links">
@@ -463,6 +466,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in) {
                 <a href="History.php">History</a>
                 <a href="New&Story.php">News & Story</a>
                 <a href="Special_case Page.php">Special Case</a>
+                
                 <a href="profile.php" style="color: #e74c3c;">Profile</a>
             </div>
         </div>
@@ -549,5 +553,4 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in) {
         <?php endif; ?>
     </div>
 </body>
-
 </html>
