@@ -64,10 +64,10 @@ CREATE TABLE `admin` (
   `Admin_ContactNumber` varchar(20) NOT NULL,
   `Admin_ICNUMBER` varchar(20) NOT NULL,
   `Admin_Email` varchar(100) NOT NULL,
-  `Admin_Password` varchar(15) NOT NULL,
+  `Admin_Password` varchar(255) NOT NULL,
   `Admin_DOB` date NOT NULL,
   `Admin_Address` text NOT NULL,
-  `Admin_Commnent` text NOT NULL
+  `Admin_Comment` text NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -138,6 +138,23 @@ CREATE TABLE `item_donation` (
   `Item_Updated_At` datetime NOT NULL,
   `Donor_ID` int(11) NOT NULL,
   `Activity_ID` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `login_attempts`
+--
+
+CREATE TABLE `login_attempts` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `email` varchar(255) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `attempt_time` datetime NOT NULL,
+  `status` enum('failed','locked') NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_email_time` (`email`,`attempt_time`),
+  KEY `idx_ip_time` (`ip_address`,`attempt_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -314,12 +331,74 @@ CREATE TABLE special_case (
   Created_At DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `story`
+--
+
 CREATE TABLE `story` (
   `Story_ID` int(11) NOT NULL,
   `Story_Date` date NOT NULL,
   `Donor_Description` text NOT NULL,
   `Story_Image` varchar(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `address`
+--
+
+CREATE TABLE `address` (
+  `Address_ID` int(11) NOT NULL,
+  `Address_Line1` varchar(255) NOT NULL,
+  `Address_Line2` varchar(255) DEFAULT NULL,
+  `Address_Line3` varchar(255) DEFAULT NULL,
+  `City` varchar(100) NOT NULL,
+  `State` varchar(100) NOT NULL,
+  `Postal_Code` varchar(20) NOT NULL,
+  `Country` varchar(100) DEFAULT 'Malaysia',
+  `Donor_ID` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `headquarters`
+--
+
+CREATE TABLE `headquarters` (
+  `HQ_ID` int(11) NOT NULL,
+  `HQ_Name` varchar(100) NOT NULL DEFAULT 'Love Bridge Foundation',
+  `HQ_ContactNumber` varchar(30) NOT NULL,
+  `HQ_Email` varchar(100) NOT NULL,
+  `HQ_Address` text NOT NULL,
+  `HQ_Description` text NOT NULL,
+  `HQ_Story` longtext NOT NULL,
+  `HQ_FoundingDate` date DEFAULT NULL,
+  `HQ_Image` varchar(255) DEFAULT NULL,
+  `Updated_At` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+--
+-- 转储表中的数据
+--
+
+--
+-- 转储表中的数据 `headquarters`
+--
+
+INSERT INTO `headquarters` (`HQ_ID`, `HQ_Name`, `HQ_ContactNumber`, `HQ_Email`, `HQ_Address`, `HQ_Description`, `HQ_Story`, `HQ_FoundingDate`, `HQ_Image`, `Updated_At`) VALUES
+(1, 'Love Bridge Headquarters', '+603-1234 5678', 'info@lovebridge.org.my', 'Level 12, Menara Love Bridge, Jalan Charity, 50450 Kuala Lumpur, Malaysia', 'Love Bridge is a non-profit organization dedicated to helping those in need.', 'Founded in 2010, Love Bridge started with a small group of volunteers who wanted to make a difference. Over the years, we have grown into a nationwide organization supporting various causes including elderly care, orphanages, and disaster relief.', '2010-01-01', NULL, '2025-11-26 12:00:00');
+
+--
+-- 转储表中的数据 `admin`
+--
+
+INSERT INTO `admin` (`Admin_ID`, `Admin_FName`, `Admin_LName`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address`, `Admin_Commnent`) VALUES
+(1, 'Super', 'Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Love Bridge HQ', 'System Super Administrator');
 
 
 --
@@ -448,6 +527,20 @@ ALTER TABLE `story`
   ADD PRIMARY KEY (`story_ID`);
 
 --
+-- 表的索引 `address`
+--
+ALTER TABLE `address`
+  ADD PRIMARY KEY (`Address_ID`),
+  ADD KEY `Address_Donor_ID_FK` (`Donor_ID`);
+
+--
+-- 表的索引 `headquarters`
+--
+ALTER TABLE `headquarters`
+  ADD PRIMARY KEY (`HQ_ID`);
+
+
+--
 -- 在导出的表使用AUTO_INCREMENT
 --
 
@@ -467,7 +560,7 @@ ALTER TABLE `activity`
 -- 使用表AUTO_INCREMENT `admin`
 --
 ALTER TABLE `admin`
-  MODIFY `Admin_ID` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `Admin_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- 使用表AUTO_INCREMENT `branch`
@@ -554,6 +647,19 @@ ALTER TABLE `recurring_donation`
   MODIFY `Recurring_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- 使用表AUTO_INCREMENT `address`
+--
+ALTER TABLE `address`
+  MODIFY `Address_ID` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- 使用表AUTO_INCREMENT `headquarters`
+--
+ALTER TABLE `headquarters`
+  MODIFY `HQ_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+
+--
 -- 限制导出的表
 --
 
@@ -631,6 +737,12 @@ ALTER TABLE `staff`
 ALTER TABLE `staff_activity`
   ADD CONSTRAINT `StaffActivity_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
   ADD CONSTRAINT `StaffActivity_Staff_ID_FK` FOREIGN KEY (`Staff_ID`) REFERENCES `staff` (`Staff_ID`);
+
+--
+-- 限制表 `address`
+--
+ALTER TABLE `address`
+  ADD CONSTRAINT `Address_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`) ON DELETE CASCADE ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
