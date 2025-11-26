@@ -298,7 +298,7 @@ CREATE TABLE `staff` (
   `Staff_Password` varchar(15) NOT NULL,
   `Staff_DOB` date NOT NULL,
   `Staff_Address` text NOT NULL,
-  `Staff_Commnent` text NOT NULL,
+  `Staff_Comment` text NOT NULL,
   `Admin_ID` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -397,7 +397,7 @@ INSERT INTO `headquarters` (`HQ_ID`, `HQ_Name`, `HQ_ContactNumber`, `HQ_Email`, 
 -- 转储表中的数据 `admin`
 --
 
-INSERT INTO `admin` (`Admin_ID`, `Admin_FName`, `Admin_LName`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address`, `Admin_Commnent`) VALUES
+INSERT INTO `admin` (`Admin_ID`, `Admin_FName`, `Admin_LName`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address`, `Admin_Comment`) VALUES
 (1, 'Super', 'Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Love Bridge HQ', 'System Super Administrator');
 
 
