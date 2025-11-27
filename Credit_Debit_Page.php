@@ -73,7 +73,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
     }
 
     // ✅ 跳转到付款成功页面
-    header("Location: Payment_Settlement_Page.php?txn_reZf=$txn_ref");
+    header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
     exit();
 }
 include 'header_function.php';
