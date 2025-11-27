@@ -2,7 +2,6 @@
 // ✅ 这个页面只是收集用户选择，还没有连数据库
 // ✅ 当用户点击金额或“捐款”按钮时，把选择传到 BranchSelectionPage.php
 ?>
-
 <?php 
 include 'dataconnection.php';
 include 'header_function.php';
