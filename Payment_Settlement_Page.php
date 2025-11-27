@@ -1,5 +1,5 @@
 <?php
-//session_start(); // 1. 开启 Session (防止刷新积分重复)
+session_start(); // 1. 开启 Session (防止刷新积分重复)
 
 // ✅ 设置时区
 date_default_timezone_set("Asia/Kuala_Lumpur");
@@ -17,8 +17,8 @@ if ($txn_ref == '') {
     die("<h2 style='text-align:center;color:red;'>Invalid transaction reference.</h2>");
 }
 
-// ✅ 查询付款详情
-$sql = "SELECT p.*, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Order_Created_At, 
+// ✅ 查询付款详情 (同时也获取 Donor_ID 用于加分)
+$sql = "SELECT p.*, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Order_Created_At, o.Donor_ID,
                d.Donor_FName, d.Donor_LName, d.Donor_Email, d.Donor_ContactNumber, d.Donor_Address
         FROM payment p 
         JOIN orders o ON p.Payment_ID = o.Payment_ID 
@@ -36,18 +36,75 @@ if ($result->num_rows == 0) {
 $row = $result->fetch_assoc();
 $stmt->close();
 
+// ==========================================
+// ⭐ 积分系统逻辑 (POINT SYSTEM)
+// ==========================================
+$calc_amount = $row['Order_Amount'];
+$calc_donor_id = $row['Donor_ID'];
+$calc_status = $row['Payment_Status']; 
+
+// 计算积分 (每 RM10 = 1 分)
+$points_to_add = floor($calc_amount / 10);
+
+// 执行加分逻辑
+// 条件：1. 积分>0  2. 付款成功  3. Session里没记录过这次交易
+$is_success = (stripos($calc_status, 'Success') !== false); 
+
+if ($points_to_add > 0 && $is_success && !isset($_SESSION['points_awarded_' . $txn_ref])) {
+
+    // 1. 检查该 Donor 在 point 表有没有记录
+    $chk_sql = "SELECT Points_ID FROM point WHERE Donor_ID = ?";
+    $stmt_chk = $conn->prepare($chk_sql);
+    $stmt_chk->bind_param("i", $calc_donor_id);
+    $stmt_chk->execute();
+    $res_chk = $stmt_chk->get_result();
+    $stmt_chk->close();
+
+    if ($res_chk->num_rows > 0) {
+        // 情况 A: 有记录 -> 更新 (UPDATE)
+        $upd_sql = "UPDATE point 
+                    SET Points_Total = Points_Total + ?, 
+                        Points_Earned = Points_Earned + ?, 
+                        Points_Updated_At = NOW() 
+                    WHERE Donor_ID = ?";
+        $stmt_upd = $conn->prepare($upd_sql);
+        $stmt_upd->bind_param("iii", $points_to_add, $points_to_add, $calc_donor_id);
+        $stmt_upd->execute();
+        $stmt_upd->close();
+    } else {
+        // 情况 B: 没记录 -> 插入 (INSERT)
+        $ins_sql = "INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) 
+                    VALUES (?, ?, NOW(), ?)";
+        $stmt_ins = $conn->prepare($ins_sql);
+        $stmt_ins->bind_param("iii", $points_to_add, $points_to_add, $calc_donor_id);
+        $stmt_ins->execute();
+        $stmt_ins->close();
+    }
+
+    // 2. 标记 Session，防止用户刷新网页重复加分
+    $_SESSION['points_awarded_' . $txn_ref] = true;
+}
+// ==========================================
+// ⭐ 积分逻辑结束
+// ==========================================
+
+
 // ✅ 查询分行名称
 $branchName = "Unknown Branch";
 $branch_id = $row['Branch_ID'];
-$branch_sql = "SELECT Branch_Name FROM branch WHERE Branch_ID = ?";
-$stmt = $conn->prepare($branch_sql);
-$stmt->bind_param("i", $branch_id);
-$stmt->execute();
-$branch_result = $stmt->get_result();
-if ($branch_result->num_rows > 0) {
-    $branchName = $branch_result->fetch_assoc()['Branch_Name'];
+
+// 只有当 branch_id 有效时才查询
+if (!empty($branch_id)) {
+    $branch_sql = "SELECT Branch_Name FROM branch WHERE Branch_ID = ?";
+    $stmt = $conn->prepare($branch_sql);
+    $stmt->bind_param("i", $branch_id);
+    $stmt->execute();
+    $branch_result = $stmt->get_result();
+    if ($branch_result->num_rows > 0) {
+        $branchName = $branch_result->fetch_assoc()['Branch_Name'];
+    }
+    $stmt->close();
 }
-$stmt->close();
 
 $conn->close();
 
@@ -144,14 +201,18 @@ $amountFormatted = "RM " . number_format($row['Order_Amount'], 2);
 </head>
 <body>
 
-    <!-- 成功提示 -->
     <div class="success-section">
         <div class="success-icon">✅</div>
         <h1>Payment Successful!</h1>
         <p>Thank you for your donation. Your payment has been received successfully.</p>
+        
+        <?php if($points_to_add > 0): ?>
+            <p style="color: #F28585; font-size: 18px; font-weight: bold; margin-top: 10px;">
+                🎉 You have earned <?php echo $points_to_add; ?> Love Points!
+            </p>
+        <?php endif; ?>
     </div>
 
-    <!-- 订单详情 -->
     <div class="order-section">
         <h2>Order Summary</h2>
 
@@ -179,7 +240,7 @@ $amountFormatted = "RM " . number_format($row['Order_Amount'], 2);
             <div class="info-item"><span>Branch:</span><span><?php echo $branchName; ?></span></div>
         </div>
 
-        <a href="HomePage.html" class="back-btn">Back to Home</a>
+        <a href="HomePage.php" class="back-btn">Back to Home</a>
     </div>
 
 </body>
