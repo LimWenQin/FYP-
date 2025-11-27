@@ -1,55 +1,62 @@
 <?php
-// 获取从 URL 传来的 'case_id'
+// 1. 引入必要的设置和头部文件 (这就包含了 Session 和 导航栏)
+include 'dataconnection.php';
+include 'header_function.php';
+include 'header_UI_2.php';
+
+// 2. 特殊个案逻辑：获取从 URL 传来的 'case_id'
 $case_id = isset($_GET['case_id']) ? (int)$_GET['case_id'] : 0;
 
 if ($case_id == 0) {
-    die("错误：未指定有效的特殊个案。必须通过 ?case_id=... 传入ID。");
+    die("Error: Invalid Special Case ID. Please return to the previous page.");
 }
 ?>
+
 <!DOCTYPE html>
 <html>
 <head>
-<title>Donation Page</title>
-
+<title>Special Case Donation</title>
 <style>
-    body {
+    /* ✅ 1. 使用与 Payment_Page 一样的颜色变量 */
+    :root 
+    {
+        --gradient-start: #ff6b9d;
+        --gradient-middle: #ff8fab;
+        --gradient-end: #ffb3c6;
+        --white: #ffffff;
+    }
+
+    body 
+    {
         background-color: #FFF5E4;
         margin: 0;
         font-family: Arial;
         color: #4A4A4A;
     }
-    .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background-color: #F6B8B8;
-        padding: 20px 50px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+
+    /* 这里的 .header 样式主要用于覆盖 header_UI_2 中的默认样式，使其变成渐变色 */
+    .header 
+    {
+        display: flex; /* 注意：header_UI_2 可能是 grid，这里覆盖为 flex 可能会影响布局，建议保留背景色修改即可 */
+        background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%) !important;
+        box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2);
     }
-    .logo {
-        display: flex;
-        align-items: center;
-        font-weight: bold;
-        font-size: 36px;
-        gap: 10px;
+    
+    /* 强制修改 header_UI_2 中的文字颜色为白色以适配渐变背景 */
+    .header .function-links a, 
+    .header .logo {
+        color: var(--white) !important;
     }
-    .header .function-links a {
-        margin-left: 15px;
-        text-decoration: none;
-        font-size: 20px;
-        color: #4A4A4A;
-        font-weight: bold;
-    }
-    .search {
-        padding: 6px;
-        font-size: 16px;
-    }
-    .container {
+
+    .container 
+    {
         display: flex;
         flex-direction: row;
         padding: 20px;
     }
-    .sidebar {
+
+    .sidebar 
+    {
         width: 60px;
         display: flex;
         flex-direction: column;
@@ -58,7 +65,9 @@ if ($case_id == 0) {
         margin-right: 20px;
         padding-top: 20px;
     }
-    .sidebar button {
+
+    .sidebar button 
+    {
         background-color: #A8D5BA;
         border: none;
         border-radius: 10px;
@@ -70,22 +79,28 @@ if ($case_id == 0) {
         color: #4A4A4A;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
-    .story-section {
+
+    .story-section 
+    {
         flex: 2;
         background-color: white;
         border-radius: 12px;
         padding: 20px;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-    .story-section img {
+    .story-section img 
+    {
         width: 100%;
         border-radius: 10px;
         margin-bottom: 15px;
     }
-    .story-section h2 {
-        color: #F28585;
+    .story-section h2 
+    { 
+        color: #F28585; 
     }
-    .donation-box {
+
+    .donation-box 
+    {
         flex: 1;
         background-color: white;
         border-radius: 12px;
@@ -93,15 +108,21 @@ if ($case_id == 0) {
         padding: 20px;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-    .donation-box h3 {
+
+    .donation-box h3 
+    {
         text-align: center;
         color: #F28585;
     }
-    .donation-type {
+
+    .donation-box .donation-type 
+    {
         text-align: center;
         margin-bottom: 15px;
     }
-    .donation-type button {
+
+    .donation-box .donation-type button 
+    {
         background-color: #A8D5BA;
         border: none;
         border-radius: 25px;
@@ -112,19 +133,27 @@ if ($case_id == 0) {
         cursor: pointer;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
-    .donation-type button.active {
+
+    .donation-box .donation-type button.active 
+    {
         background-color: #91C8A8;
     }
-    .donation-type button:hover {
+
+    .donation-box .donation-type button:hover 
+    {
         background-color: #91C8A8;
     }
-    .amounts {
+
+    .donation-box .amounts 
+    {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 10px;
         margin: 15px 0;
     }
-    .amounts button {
+
+    .donation-box .amounts button 
+    {
         background-color: #A8D5BA;
         border: none;
         border-radius: 10px;
@@ -134,18 +163,23 @@ if ($case_id == 0) {
         color: #4A4A4A;
         height: 50px;
     }
-    .amounts button:hover {
+
+    .donation-box .amounts button:hover 
+    {
         background-color: #91C8A8;
     }
-    input[type="text"] {
+
+    .donation-box input[type="text"] 
+    {
         width: 95%;
         padding: 10px;
         border-radius: 6px;
         border: 1px solid #ccc;
         margin-bottom: 15px;
-        box-sizing: border-box;
     }
-    .donate-btn {
+
+    .donation-box .donate-btn 
+    {
         width: 100%;
         padding: 12px;
         background-color: #F6B8B8;
@@ -156,13 +190,15 @@ if ($case_id == 0) {
         cursor: pointer;
         box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
-    .donate-btn:hover {
+
+    .donation-box .donate-btn:hover 
+    {
         background-color: #F28585;
     }
 </style>
 
 <script>
-// 修正：选择捐款类型
+// ✅ 保留原有的 JS 逻辑
 function selectType(type) {
     document.getElementById("donation_type").value = type;
 
@@ -176,13 +212,11 @@ function selectType(type) {
     }
 }
 
-// 修正：不会自动提交 + 让按钮变为选中金额
 function selectAmount(amount) {
     document.getElementById("amount").value = amount;
-    document.getElementById("custom_amount").value = "";
+    document.getElementById("custom_amount").value = ""; // 清空自定义金额
 }
 
-// 修正：提交前检查金额
 function beforeSubmit() {
     let selected = document.getElementById("amount").value;
     let custom = document.getElementById("custom_amount").value;
@@ -206,35 +240,19 @@ function beforeSubmit() {
 </head>
 <body>
 
-<header class="header">
-    <div class="logo">
-        <img src="logo.jpg" alt="Logo" width="80" height="80">
-        LOVE BRIDGE
-    </div>
-    <div class="function-links">
-        <input type="text" placeholder="Search..." class="search">
-        <a href="#">Home</a>
-        <a href="#">About Us</a>
-        <a href="#">Contact Us</a>
-        <a href="#">History</a>
-        <a href="#">Activities</a>
-        <a href="#">News & Stories</a>
-    </div>
-</header>
-
 <div class="container">
 
     <div class="sidebar">
-        <button><img src="yourimage.jpg"></button>
-        <button><img src="yourimage.jpg"></button>
-        <button><img src="yourimage.jpg"></button>
-        <button><img src="yourimage.jpg"></button>
+        <button><img src="yourimage.jpg" alt="Whatsapp"></button>
+        <button><img src="yourimage.jpg" alt="Facebook"></button>
+        <button><img src="yourimage.jpg" alt="Instagram"></button>
+        <button><img src="yourimage.jpg" alt="General Line"></button>
     </div>
 
     <div class="story-section">
-        <img src="yourimage.jpg">
+        <img src="yourimage.jpg" alt="Case Image">
         <h2>Donation Story (Case ID: <?php echo $case_id; ?>)</h2>
-        <p>This is a special case donation description text...</p>
+        <p>This is a special case donation description text. Your donation will directly support this specific case.</p>
     </div>
 
     <div class="donation-box">
