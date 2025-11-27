@@ -77,7 +77,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
     exit();
 }
 include 'header_function.php';
-include 'header_UI.php';
+include 'header_UI_2.php';
 
 $conn->close();
 ?>
