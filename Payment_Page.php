@@ -6,7 +6,7 @@
 <?php 
 include 'dataconnection.php';
 include 'header_function.php';
-include 'header_UI.php';
+include 'header_UI_2.php';
 //session_start(); // 1. 开启 Session
 
 // 2. 强制登录检查
