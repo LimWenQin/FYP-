@@ -1,7 +1,6 @@
 <?php
 include 'dataconnection.php';
 include 'header_function.php';
-include 'header_UI.php';
 
 
 $error_message = "";
@@ -61,6 +60,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $stmt->close();
     }
 }
+include 'header_UI.php';
 ?>
 
 <!DOCTYPE html>
