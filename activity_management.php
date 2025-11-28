@@ -1,1060 +1,857 @@
 <?php
+// activity_management.php
 session_start();
 
-// Check if user is logged in
+// 检查用户是否已登录
 if (!isset($_SESSION['admin_id'])) {
     header("Location: admin_login.php");
     exit();
 }
 
-// Include database connection
+// 包含数据库连接
 include 'dataconnection.php';
 
-// Initialize variables
-$error_message = '';
-$success_message = '';
-$activities = [];
+// 获取统计数据
+function getTotalRaised($conn) {
+    $sql = "SELECT SUM(Activity_GetAmount) as total FROM activity";
+    $result = $conn->query($sql);
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        return $row['total'] ? number_format($row['total'], 2) : '0.00';
+    }
+    return '0.00';
+}
 
-// Handle form submissions
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Add new activity
-    if (isset($_POST['add_activity'])) {
-        $activity_date = $_POST['activity_date'];
-        $activity_details = $_POST['activity_details'];
-        $activity_status = $_POST['activity_status'];
-        $activity_getamount = $_POST['activity_getamount'];
-        $branch_id = $_POST['branch_id'];
-        
-        // Handle image upload
-        $activity_picture = '';
-        if (isset($_FILES['activity_picture']) && $_FILES['activity_picture']['error'] == 0) {
-            $target_dir = "uploads/activity/";
-            if (!file_exists($target_dir)) {
-                mkdir($target_dir, 0777, true);
-            }
-            
-            $file_extension = pathinfo($_FILES["activity_picture"]["name"], PATHINFO_EXTENSION);
-            $new_filename = "activity_" . time() . "." . $file_extension;
-            $target_file = $target_dir . $new_filename;
-            
-            // Check if image file is an actual image
-            $check = getimagesize($_FILES["activity_picture"]["tmp_name"]);
-            if ($check !== false) {
-                if (move_uploaded_file($_FILES["activity_picture"]["tmp_name"], $target_file)) {
-                    $activity_picture = $target_file;
-                } else {
-                    $error_message = "Sorry, there was an error uploading your file.";
-                }
-            } else {
-                $error_message = "File is not an image.";
-            }
-        }
-        
-        $sql = "INSERT INTO activity (Activity_Date, Activity_Details, Activity_Picture, Activity_Status, Activity_GetAmount, Branch_ID) 
-                VALUES (?, ?, ?, ?, ?, ?)";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssssdi", $activity_date, $activity_details, $activity_picture, $activity_status, $activity_getamount, $branch_id);
-        
-        if ($stmt->execute()) {
-            $success_message = "Activity added successfully!";
-            // Refresh the page to show the new activity
-            echo "<script>window.location.href = 'activity_management.php?success=1';</script>";
-            exit();
-        } else {
-            $error_message = "Error adding activity: " . $conn->error;
-        }
-        $stmt->close();
+function getActiveEvents($conn) {
+    $sql = "SELECT COUNT(*) as total FROM activity WHERE Activity_Status = 'Ongoing'";
+    $result = $conn->query($sql);
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        return $row['total'];
+    }
+    return 0;
+}
+
+function getUpcomingEvents($conn) {
+    $sql = "SELECT COUNT(*) as total FROM activity WHERE Activity_Status = 'Upcoming'";
+    $result = $conn->query($sql);
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        return $row['total'];
+    }
+    return 0;
+}
+
+function getCompletedEvents($conn) {
+    $sql = "SELECT COUNT(*) as total FROM activity WHERE Activity_Status = 'Completed'";
+    $result = $conn->query($sql);
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        return $row['total'];
+    }
+    return 0;
+}
+
+// 获取活动数据
+function getActivities($conn, $status = 'all', $search = '') {
+    $sql = "SELECT a.*, b.Branch_Name 
+            FROM activity a 
+            LEFT JOIN branch b ON a.Branch_ID = b.Branch_ID 
+            WHERE 1=1";
+    
+    if ($status !== 'all') {
+        $sql .= " AND a.Activity_Status = '$status'";
     }
     
-    // Update activity
-    if (isset($_POST['update_activity'])) {
-        $activity_id = $_POST['activity_id'];
-        $activity_date = $_POST['activity_date'];
-        $activity_details = $_POST['activity_details'];
-        $activity_status = $_POST['activity_status'];
-        $activity_getamount = $_POST['activity_getamount'];
-        $branch_id = $_POST['branch_id'];
-        
-        // Handle image upload
-        $activity_picture = $_POST['current_picture'];
-        if (isset($_FILES['activity_picture']) && $_FILES['activity_picture']['error'] == 0) {
-            $target_dir = "uploads/activity/";
-            if (!file_exists($target_dir)) {
-                mkdir($target_dir, 0777, true);
-            }
-            
-            $file_extension = pathinfo($_FILES["activity_picture"]["name"], PATHINFO_EXTENSION);
-            $new_filename = "activity_" . time() . "." . $file_extension;
-            $target_file = $target_dir . $new_filename;
-            
-            // Check if image file is an actual image
-            $check = getimagesize($_FILES["activity_picture"]["tmp_name"]);
-            if ($check !== false) {
-                if (move_uploaded_file($_FILES["activity_picture"]["tmp_name"], $target_file)) {
-                    // Delete old picture if exists
-                    if (!empty($_POST['current_picture']) && file_exists($_POST['current_picture'])) {
-                        unlink($_POST['current_picture']);
-                    }
-                    $activity_picture = $target_file;
-                } else {
-                    $error_message = "Sorry, there was an error uploading your file.";
-                }
-            } else {
-                $error_message = "File is not an image.";
-            }
-        }
-        
-        $sql = "UPDATE activity SET Activity_Date = ?, Activity_Details = ?, Activity_Picture = ?, 
-                Activity_Status = ?, Activity_GetAmount = ?, Branch_ID = ? WHERE Activity_ID = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssssdii", $activity_date, $activity_details, $activity_picture, 
-                         $activity_status, $activity_getamount, $branch_id, $activity_id);
-        
-        if ($stmt->execute()) {
-            $success_message = "Activity updated successfully!";
-            // Refresh the page
-            echo "<script>window.location.href = 'activity_management.php?success=1';</script>";
-            exit();
-        } else {
-            $error_message = "Error updating activity: " . $conn->error;
-        }
-        $stmt->close();
+    if (!empty($search)) {
+        $sql .= " AND (a.Activity_Name LIKE '%$search%' OR a.Activity_Details LIKE '%$search%')";
     }
     
-    // Delete activity
-    if (isset($_POST['delete_activity'])) {
-        $activity_id = $_POST['activity_id'];
-        
-        // Get activity picture path to delete the file
-        $sql = "SELECT Activity_Picture FROM activity WHERE Activity_ID = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("i", $activity_id);
-        $stmt->execute();
-        $stmt->bind_result($picture_path);
-        $stmt->fetch();
-        $stmt->close();
-        
-        // Delete activity
-        $sql = "DELETE FROM activity WHERE Activity_ID = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("i", $activity_id);
-        
-        if ($stmt->execute()) {
-            // Delete picture file if exists
-            if (!empty($picture_path) && file_exists($picture_path)) {
-                unlink($picture_path);
-            }
-            $success_message = "Activity deleted successfully!";
-            // Refresh the page
-            echo "<script>window.location.href = 'activity_management.php?success=1';</script>";
-            exit();
-        } else {
-            $error_message = "Error deleting activity: " . $conn->error;
+    // 修复：使用正确的日期字段进行排序
+    $sql .= " ORDER BY COALESCE(a.Activity_StartDate, a.Activity_Date) DESC";
+    
+    $result = $conn->query($sql);
+    $activities = [];
+    if ($result && $result->num_rows > 0) {
+        while($row = $result->fetch_assoc()) {
+            $activities[] = $row;
         }
-        $stmt->close();
     }
+    return $activities;
 }
 
-// Fetch all activities
-$sql = "SELECT a.*, b.Branch_Name, b.Branch_Type 
-        FROM activity a 
-        JOIN branch b ON a.Branch_ID = b.Branch_ID 
-        ORDER BY a.Activity_Date DESC";
-$result = $conn->query($sql);
+// 获取数据
+$totalRaised = getTotalRaised($conn);
+$activeEvents = getActiveEvents($conn);
+$upcomingEvents = getUpcomingEvents($conn);
+$completedEvents = getCompletedEvents($conn);
+
+// 获取筛选参数
+$statusFilter = isset($_GET['status']) ? $_GET['status'] : 'all';
+$searchQuery = isset($_GET['search']) ? $_GET['search'] : '';
+
+// 获取活动列表
+$activities = getActivities($conn, $statusFilter, $searchQuery);
+
+// 获取管理员信息
+$adminId = $_SESSION['admin_id'];
+$adminName = $_SESSION['admin_name'];
+$adminEmail = $_SESSION['admin_email'];
+
+// 获取管理员头像
+$adminProfilePicture = null;
+$sql = "SELECT Admin_ProfilePicture FROM admin WHERE Admin_ID = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("i", $adminId);
+$stmt->execute();
+$result = $stmt->get_result();
 if ($result && $result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        $activities[] = $row;
-    }
+    $row = $result->fetch_assoc();
+    $adminProfilePicture = $row['Admin_ProfilePicture'];
 }
+$stmt->close();
 
-// Fetch branches for dropdown
-$branches = [];
-$sql = "SELECT Branch_ID, Branch_Name, Branch_Type FROM branch ORDER BY Branch_Name";
-$result = $conn->query($sql);
-if ($result && $result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        $branches[] = $row;
-    }
-}
-
+// 关闭数据库连接
 $conn->close();
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Activity Management - Donation Management System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin_common.css">
     <style>
-        .page-title {
-            font-size: 28px;
+        /* Activity Management Specific Styles */
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
             margin-bottom: 30px;
-            color: var(--text-dark);
-            border-bottom: 2px solid var(--light-pink);
-            padding-bottom: 10px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: transform 0.3s;
         }
 
-        .add-btn {
-            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            font-weight: 500;
-            box-shadow: 0 4px 10px rgba(255, 107, 157, 0.3);
+        .stat-card:hover {
+            transform: translateY(-5px);
         }
 
-        .add-btn:hover {
-            background: linear-gradient(135deg, var(--warm-orange), var(--primary-pink));
-            transform: translateY(-2px);
-            box-shadow: 0 6px 15px rgba(255, 107, 157, 0.4);
+        .stat-info h3 {
+            font-size: 14px;
+            color: var(--gray);
+            margin-bottom: 5px;
         }
 
-        .activities-table {
-            background: white;
-            border-radius: 15px;
-            box-shadow: var(--card-shadow);
-            overflow: hidden;
-            margin-bottom: 30px;
-        }
-
-        .table-header {
-            display: grid;
-            grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr 1fr;
-            background: linear-gradient(90deg, var(--primary-pink), var(--warm-peach));
-            color: white;
-            padding: 15px 20px;
+        .stat-info h2 {
+            font-size: 24px;
             font-weight: 600;
+            margin-bottom: 5px;
         }
 
-        .table-row {
-            display: grid;
-            grid-template-columns: 1fr 2fr 1fr 1fr 1fr 1fr 1fr;
-            padding: 15px 20px;
-            border-bottom: 1px solid #eee;
+        .stat-info p {
+            font-size: 12px;
+            color: var(--success);
+            display: flex;
             align-items: center;
         }
 
-        .table-row:nth-child(even) {
-            background: rgba(255, 182, 193, 0.05);
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
         }
 
-        .table-row:last-child {
-            border-bottom: none;
+        .stat-card:nth-child(1) .stat-icon {
+            background: rgba(242, 133, 133, 0.2);
+            color: var(--primary);
         }
 
-        .table-row:hover {
-            background: rgba(255, 182, 193, 0.1);
+        .stat-card:nth-child(2) .stat-icon {
+            background: rgba(40, 167, 69, 0.2);
+            color: var(--success);
+        }
+
+        .stat-card:nth-child(3) .stat-icon {
+            background: rgba(23, 162, 184, 0.2);
+            color: var(--info);
+        }
+
+        .stat-card:nth-child(4) .stat-icon {
+            background: rgba(255, 193, 7, 0.2);
+            color: var(--warning);
+        }
+
+        /* Search and Filter Section */
+        .search-filter-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+        }
+
+        .search-container {
+            display: flex;
+            margin-bottom: 20px;
+        }
+
+        .search-bar {
+            display: flex;
+            align-items: center;
+            background: var(--gray-light);
+            border-radius: 8px;
+            padding: 10px 15px;
+            flex: 1;
+            margin-right: 15px;
+        }
+
+        .search-bar input {
+            border: none;
+            background: transparent;
+            outline: none;
+            width: 100%;
+            margin-left: 10px;
+            font-size: 14px;
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 10px;
+        }
+
+        .filter-tab {
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: var(--gray-light);
+            color: var(--dark);
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .filter-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Activity Cards */
+        .activities-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .activity-card {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s;
+        }
+
+        .activity-card:hover {
+            transform: translateY(-5px);
         }
 
         .activity-image {
-            width: 60px;
-            height: 60px;
-            border-radius: 8px;
-            object-fit: cover;
-            border: 2px solid var(--light-pink);
-        }
-
-        .no-image {
-            width: 60px;
-            height: 60px;
-            border-radius: 8px;
-            background: var(--very-light-pink);
+            height: 180px;
+            background: var(--primary-light);
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--text-light);
-            font-size: 12px;
-            text-align: center;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 8px;
-        }
-
-        .action-btn {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .edit-btn {
-            background: linear-gradient(135deg, #a8e6cf, #6dd5a8);
-            color: #155724;
-        }
-
-        .edit-btn:hover {
-            background: linear-gradient(135deg, #6dd5a8, #a8e6cf);
-        }
-
-        .delete-btn {
-            background: linear-gradient(135deg, #ff8fab, #ff6b9d);
             color: white;
+            font-size: 48px;
         }
 
-        .delete-btn:hover {
-            background: linear-gradient(135deg, #ff6b9d, #ff8fab);
+        .activity-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
-        .status-badge {
-            display: inline-block;
-            padding: 5px 10px;
-            border-radius: 12px;
-            font-size: 12px;
+        .activity-content {
+            padding: 20px;
+        }
+
+        .activity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .activity-title {
+            font-size: 18px;
             font-weight: 600;
+            margin-bottom: 5px;
         }
 
-        .status-completed {
-            background: linear-gradient(135deg, #a8e6cf, #6dd5a8);
-            color: #155724;
-        }
-
-        .status-upcoming {
-            background: linear-gradient(135deg, #a8d8ea, #6da8ff);
-            color: #004085;
+        .activity-status {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
         }
 
         .status-ongoing {
-            background: linear-gradient(135deg, #ffd3b6, #ffaa6d);
-            color: #856404;
+            background: rgba(40, 167, 69, 0.1);
+            color: var(--success);
         }
 
-        .status-cancelled {
-            background: linear-gradient(135deg, #ffb3c6, #ff6b9d);
-            color: #721c24;
+        .status-upcoming {
+            background: rgba(23, 162, 184, 0.1);
+            color: var(--info);
         }
 
-        .error-message {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border: 1px solid #f5c6cb;
+        .status-completed {
+            background: rgba(108, 117, 125, 0.1);
+            color: var(--gray);
         }
 
-        .success-message {
-            background: #d4edda;
-            color: #155724;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border: 1px solid #c3e6cb;
+        .activity-description {
+            color: var(--gray);
+            font-size: 14px;
+            margin-bottom: 15px;
+            line-height: 1.5;
         }
 
-        .no-data-message {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-light);
-            font-size: 16px;
-        }
-
-        .no-data-message a {
-            color: var(--primary-pink);
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        .no-data-message a:hover {
-            text-decoration: underline;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 15px;
-            width: 700px;
-            max-width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: var(--card-shadow);
-            position: relative;
-        }
-
-        .modal-content::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 5px;
-            background: linear-gradient(90deg, var(--primary-pink), var(--warm-peach));
-        }
-
-        .modal-header {
+        .activity-details {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
-
-        .modal-title {
-            font-size: 24px;
-            color: var(--text-dark);
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: var(--text-light);
-            transition: color 0.3s ease;
-        }
-
-        .close-btn:hover {
-            color: var(--primary-pink);
-        }
-
-        .form-group {
+            flex-direction: column;
+            gap: 8px;
             margin-bottom: 15px;
         }
 
-        .form-group label {
-            display: block;
+        .activity-detail {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            color: var(--dark);
+        }
+
+        .activity-detail i {
+            margin-right: 8px;
+            width: 16px;
+            color: var(--primary);
+        }
+
+        .activity-progress {
+            margin-bottom: 15px;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
             margin-bottom: 5px;
-            font-weight: 500;
-            color: var(--text-dark);
+            font-size: 14px;
         }
 
-        .form-group input,
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: all 0.3s ease;
+        .progress-bar {
+            height: 6px;
+            background: var(--gray-light);
+            border-radius: 3px;
+            overflow: hidden;
         }
 
-        .form-group input:focus,
-        .form-group textarea:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: var(--primary-pink);
-            box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.2);
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 3px;
         }
 
-        .form-row {
+        .activity-actions {
             display: flex;
-            gap: 15px;
+            justify-content: space-between;
         }
 
-        .form-row .form-group {
-            flex: 1;
-        }
-
-        .image-preview {
-            margin-top: 10px;
-            text-align: center;
-        }
-
-        .image-preview img {
-            max-width: 200px;
-            max-height: 150px;
-            border-radius: 8px;
-            border: 2px solid var(--light-pink);
-        }
-
-        .submit-btn {
-            background: linear-gradient(135deg, var(--primary-pink), var(--warm-orange));
-            color: white;
+        .btn {
+            padding: 8px 15px;
             border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 10px;
-            width: 100%;
-            transition: all 0.3s ease;
+            border-radius: 6px;
+            font-size: 14px;
             font-weight: 500;
-            box-shadow: 0 4px 10px rgba(255, 107, 157, 0.3);
+            cursor: pointer;
+            transition: all 0.3s;
         }
 
-        .submit-btn:hover {
-            background: linear-gradient(135deg, var(--warm-orange), var(--primary-pink));
-            transform: translateY(-2px);
-            box-shadow: 0 6px 15px rgba(255, 107, 157, 0.4);
+        .btn-primary {
+            background: var(--primary);
+            color: white;
         }
 
-        .delete-modal-content {
+        .btn-primary:hover {
+            background: #e07575;
+        }
+
+        .btn-secondary {
+            background: var(--gray-light);
+            color: var(--dark);
+        }
+
+        .btn-secondary:hover {
+            background: #d8d8d8;
+        }
+
+        /* Empty State */
+        .empty-state {
             text-align: center;
+            padding: 40px 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
-        .delete-modal-content p {
-            margin-bottom: 20px;
+        .empty-state i {
+            font-size: 48px;
+            color: var(--gray-light);
+            margin-bottom: 15px;
+        }
+
+        .empty-state h3 {
             font-size: 18px;
+            margin-bottom: 10px;
+            color: var(--dark);
         }
 
-        .delete-confirm-buttons {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
+        .empty-state p {
+            color: var(--gray);
+            margin-bottom: 20px;
         }
 
-        .cancel-btn {
-            background: #6c757d;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s ease;
-        }
-
-        .cancel-btn:hover {
-            background: #5a6268;
-        }
-
-        .confirm-delete-btn {
-            background: linear-gradient(135deg, #ff6b9d, #ff4757);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s ease;
-        }
-
-        .confirm-delete-btn:hover {
-            background: linear-gradient(135deg, #ff4757, #ff6b9d);
-        }
-
-        @media (max-width: 1024px) {
-            .table-header, .table-row {
-                grid-template-columns: 1fr 2fr 1fr 1fr 1fr;
-            }
-            
-            .activity-image, .no-image {
-                display: none;
-            }
-        }
-
+        /* Responsive Styles */
         @media (max-width: 768px) {
-            .table-header, .table-row {
-                grid-template-columns: 1fr 2fr 1fr;
+            .stats-cards {
+                grid-template-columns: repeat(2, 1fr);
             }
             
-            .activity-getamount, .activity-branch {
-                display: none;
+            .activities-grid {
+                grid-template-columns: 1fr;
             }
             
-            .form-row {
+            .search-container {
                 flex-direction: column;
-                gap: 0;
+            }
+            
+            .search-bar {
+                margin-right: 0;
+                margin-bottom: 15px;
+            }
+            
+            .filter-tabs {
+                overflow-x: auto;
+                padding-bottom: 10px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .stats-cards {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
     <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-        <div class="logo" id="sidebarToggle">
-            <img src="picture/logo.png" alt="Logo">
-            <div class="logo-text">DonationMS</div>
-        </div>
-        
+    <div class="sidebar collapsed" id="sidebar">
         <div class="sidebar-menu">
-            <a href="admin_dashboard.php" class="menu-item">
-                <ion-icon name="grid"></ion-icon>
-                <div class="menu-text">Dashboard</div>
-            </a>
-            <a href="admin_donor_page.php" class="menu-item">
-                <ion-icon name="people"></ion-icon>
-                <div class="menu-text">Donor Management</div>
-            </a>
-            <a href="staff_management_page.php" class="menu-item">
-                <ion-icon name="person-circle"></ion-icon>
-                <div class="menu-text">Staff Management</div>
-            </a>
-            <a href="admin_management_page.php" class="menu-item">
-                <ion-icon name="shield-checkmark"></ion-icon>
-                <div class="menu-text">Admin Management</div>
-            </a>
-            <a href="branch_management_page.php" class="menu-item">
-                <ion-icon name="business"></ion-icon>
-                <div class="menu-text">Branch Management</div>
-            </a>
-            <a href="activity_management.php" class="menu-item active">
-                <ion-icon name="calendar"></ion-icon>
-                <div class="menu-text">Activity Management</div>
-            </a>
-            <a href="payment_management.php" class="menu-item">
-                <ion-icon name="card"></ion-icon>
-                <div class="menu-text">Payment Management</div>
-            </a>
+            <ul>
+                <li><a href="admin_dashboard.php"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
+                <li><a href="admin_donor_page.php"><i class="fas fa-users"></i> <span>Donor Management</span></a></li>
+                <li><a href="staff_management_page.php"><i class="fas fa-user-tie"></i> <span>Staff Management</span></a></li>
+                <li><a href="admin_management_page.php"><i class="fas fa-user-shield"></i> <span>Admin Management</span></a></li>
+                <li><a href="branch_management_page.php"><i class="fas fa-map-marker-alt"></i> <span>Branch Management</span></a></li>
+                <li><a href="activity_management.php" class="active"><i class="fas fa-calendar-alt"></i> <span>Activity Management</span></a></li>
+                <li><a href="payment_management.php"><i class="fas fa-credit-card"></i> <span>Payment Management</span></a></li>
+            </ul>
         </div>
-    </aside>
-    
-    <div class="main-content">
-        <div class="header">
-            <div class="header-left">
-                <!-- Three-line menu toggle -->
-                <div class="menu-toggle" id="menuToggle">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </div>
-                
-                <!-- Logo that links to homepage -->
-                <a href="admin_dashboard.php" class="header-logo">
-                    <img src="picture/logo.png" alt="Logo">
-                    <div class="header-logo-text">DonationMS</div>
-                </a>
-            </div>
-            
-            <div class="header-right">
-                <div class="welcome">Welcome back, <?php echo $_SESSION['admin_name']; ?>!</div>
-                <a href="admin_logout.php" class="logout">Logout</a>
-            </div>
-        </div>
-        
-        <div class="dashboard">
-            <h1 class="page-title">
-                Activity Management
-                <button class="add-btn" onclick="openModal('addActivityModal')">
-                    <ion-icon name="add-circle"></ion-icon> Add New Activity
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <!-- Top Navigation -->
+        <div class="top-nav">
+            <div class="nav-left">
+                <button class="menu-toggle" id="menuToggle">
+                    <i class="fas fa-bars"></i>
                 </button>
-            </h1>
-            
-            <?php if (isset($error_message) && !empty($error_message)): ?>
-            <div class="error-message">
-                <?php echo $error_message; ?>
+                <div class="logo">
+                    <a href="admin_dashboard.php">
+                        <img src="logo.jpg" alt="Logo">
+                        <h1>DonationMS</h1>
+                    </a>
+                </div>
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search...">
+                </div>
             </div>
-            <?php endif; ?>
-            
-            <?php if (isset($success_message) && !empty($success_message)): ?>
-            <div class="success-message">
-                <?php echo $success_message; ?>
-            </div>
-            <?php endif; ?>
-            
-            <div class="activities-table">
-                <?php if (!empty($activities)): ?>
-                    <div class="table-header">
-                        <div>Image</div>
-                        <div>Details</div>
-                        <div>Date</div>
-                        <div>Status</div>
-                        <div>Amount Raised</div>
-                        <div>Branch</div>
-                        <div>Actions</div>
+            <div class="nav-right">
+                <div class="notification" id="notificationDropdown">
+                    <i class="far fa-bell"></i>
+                    <span class="notification-count">5</span>
+                    <div class="notification-dropdown" id="notificationMenu">
+                        <div class="notification-header">
+                            <h3>Notifications</h3>
+                            <a href="#" onclick="markAllAsRead()">Mark all as read</a>
+                        </div>
+                        <div class="notification-list" id="notificationList">
+                            <!-- Notifications will be loaded here -->
+                        </div>
+                        <div class="notification-footer">
+                            <a href="notifications.php">View All Notifications</a>
+                        </div>
                     </div>
-                    
-                    <?php foreach ($activities as $activity): ?>
-                        <div class="table-row">
-                            <div>
+                </div>
+                <div class="user-profile" id="userProfileDropdown">
+                    <div class="user-profile-with-avatar">
+                        <div class="user-avatar">
+                            <?php if (!empty($adminProfilePicture)): ?>
+                                <img src="<?php echo htmlspecialchars($adminProfilePicture); ?>" alt="Profile Picture">
+                            <?php else: ?>
+                                <?php echo substr($adminName, 0, 1); ?>
+                            <?php endif; ?>
+                        </div>
+                        <div class="user-details">
+                            <div class="user-name"><?php echo htmlspecialchars($adminName); ?></div>
+                            <div class="user-role">System Administrator</div>
+                        </div>
+                        <i class="fas fa-chevron-down" style="margin-left: 10px; font-size: 12px;"></i>
+                    </div>
+                    <div class="user-profile-dropdown" id="userProfileMenu">
+                        <a href="admin_profile.php">
+                            <i class="fas fa-user"></i> View Profile
+                        </a>
+                        <a href="admin_profile.php?edit=true">
+                            <i class="fas fa-edit"></i> Edit Profile
+                        </a>
+                        <div class="divider"></div>
+                        <a href="admin_logout.php">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div class="dashboard-content">
+            <div class="welcome-section">
+                <h1>Activity Management</h1>
+                <p>Manage your campaigns, track progress, and organize events.</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>TOTAL RAISED</h3>
+                        <h2>$<?php echo $totalRaised; ?></h2>
+                        <p><i class="fas fa-arrow-up"></i> +12.5%</p>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-hand-holding-usd"></i>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>ACTIVE EVENTS</h3>
+                        <h2><?php echo $activeEvents; ?></h2>
+                        <p><i class="fas fa-calendar-check"></i> Ongoing</p>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-calendar-alt"></i>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>UPCOMING</h3>
+                        <h2><?php echo $upcomingEvents; ?></h2>
+                        <p><i class="fas fa-clock"></i> Scheduled</p>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-calendar-plus"></i>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>COMPLETED</h3>
+                        <h2><?php echo $completedEvents; ?></h2>
+                        <p><i class="fas fa-check-circle"></i> Finished</p>
+                    </div>
+                    <div class="stat-icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search and Filter Section -->
+            <div class="search-filter-section">
+                <form method="GET" action="activity_management.php">
+                    <div class="search-container">
+                        <div class="search-bar">
+                            <i class="fas fa-search"></i>
+                            <input type="text" name="search" placeholder="Search activities..." value="<?php echo htmlspecialchars($searchQuery); ?>">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Search</button>
+                    </div>
+                    <div class="filter-tabs">
+                        <a href="activity_management.php?status=all&search=<?php echo urlencode($searchQuery); ?>" class="filter-tab <?php echo $statusFilter === 'all' ? 'active' : ''; ?>">All</a>
+                        <a href="activity_management.php?status=Ongoing&search=<?php echo urlencode($searchQuery); ?>" class="filter-tab <?php echo $statusFilter === 'Ongoing' ? 'active' : ''; ?>">Ongoing</a>
+                        <a href="activity_management.php?status=Upcoming&search=<?php echo urlencode($searchQuery); ?>" class="filter-tab <?php echo $statusFilter === 'Upcoming' ? 'active' : ''; ?>">Upcoming</a>
+                        <a href="activity_management.php?status=Completed&search=<?php echo urlencode($searchQuery); ?>" class="filter-tab <?php echo $statusFilter === 'Completed' ? 'active' : ''; ?>">Completed</a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Activities Grid -->
+            <?php if (count($activities) > 0): ?>
+                <div class="activities-grid">
+                    <?php foreach($activities as $activity): ?>
+                        <?php
+                        // 确定状态类
+                        $statusClass = '';
+                        if ($activity['Activity_Status'] === 'Ongoing') {
+                            $statusClass = 'status-ongoing';
+                        } elseif ($activity['Activity_Status'] === 'Upcoming') {
+                            $statusClass = 'status-upcoming';
+                        } else {
+                            $statusClass = 'status-completed';
+                        }
+                        
+                        // 计算进度百分比
+                        $targetAmount = isset($activity['Activity_TargetAmount']) ? $activity['Activity_TargetAmount'] : 10000;
+                        $raisedAmount = $activity['Activity_GetAmount'] ? $activity['Activity_GetAmount'] : 0;
+                        $progressPercentage = $targetAmount > 0 ? min(100, ($raisedAmount / $targetAmount) * 100) : 0;
+                        
+                        // 格式化日期显示
+                        $dateDisplay = '';
+                        if (!empty($activity['Activity_StartDate']) && !empty($activity['Activity_EndDate'])) {
+                            $dateDisplay = date('m/d/Y', strtotime($activity['Activity_StartDate'])) . ' - ' . date('m/d/Y', strtotime($activity['Activity_EndDate']));
+                        } else {
+                            $dateDisplay = date('m/d/Y', strtotime($activity['Activity_Date']));
+                        }
+                        
+                        // 活动名称
+                        $activityName = isset($activity['Activity_Name']) ? $activity['Activity_Name'] : 'Activity';
+                        ?>
+                        <div class="activity-card">
+                            <div class="activity-image">
                                 <?php if (!empty($activity['Activity_Picture'])): ?>
-                                    <img src="<?php echo $activity['Activity_Picture']; ?>" alt="Activity Image" class="activity-image">
+                                    <img src="<?php echo htmlspecialchars($activity['Activity_Picture']); ?>" alt="<?php echo htmlspecialchars($activityName); ?>">
                                 <?php else: ?>
-                                    <div class="no-image">No Image</div>
+                                    <i class="fas fa-calendar-alt"></i>
                                 <?php endif; ?>
                             </div>
-                            <div><?php echo substr($activity['Activity_Details'], 0, 100) . (strlen($activity['Activity_Details']) > 100 ? '...' : ''); ?></div>
-                            <div><?php echo date('M j, Y', strtotime($activity['Activity_Date'])); ?></div>
-                            <div>
-                                <span class="status-badge status-<?php echo strtolower($activity['Activity_Status']); ?>">
-                                    <?php echo $activity['Activity_Status']; ?>
-                                </span>
-                            </div>
-                            <div class="activity-getamount">RM <?php echo number_format($activity['Activity_GetAmount'], 2); ?></div>
-                            <div class="activity-branch"><?php echo $activity['Branch_Name']; ?></div>
-                            <div class="action-buttons">
-                                <button class="action-btn edit-btn" onclick="editActivity(<?php echo $activity['Activity_ID']; ?>)">
-                                    <ion-icon name="create"></ion-icon> Edit
-                                </button>
-                                <button class="action-btn delete-btn" onclick="confirmDelete(<?php echo $activity['Activity_ID']; ?>, '<?php echo addslashes($activity['Activity_Details']); ?>')">
-                                    <ion-icon name="trash"></ion-icon> Delete
-                                </button>
+                            <div class="activity-content">
+                                <div class="activity-header">
+                                    <div>
+                                        <h3 class="activity-title"><?php echo htmlspecialchars($activityName); ?></h3>
+                                    </div>
+                                    <span class="activity-status <?php echo $statusClass; ?>"><?php echo $activity['Activity_Status']; ?></span>
+                                </div>
+                                <p class="activity-description"><?php echo htmlspecialchars($activity['Activity_Details']); ?></p>
+                                
+                                <div class="activity-details">
+                                    <div class="activity-detail">
+                                        <i class="fas fa-calendar"></i>
+                                        <span><?php echo $dateDisplay; ?></span>
+                                    </div>
+                                    <?php if (!empty($activity['Branch_Name'])): ?>
+                                        <div class="activity-detail">
+                                            <i class="fas fa-map-marker-alt"></i>
+                                            <span><?php echo htmlspecialchars($activity['Branch_Name']); ?></span>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                
+                                <?php if ($activity['Activity_Status'] === 'Ongoing' || $activity['Activity_Status'] === 'Completed'): ?>
+                                    <div class="activity-progress">
+                                        <div class="progress-info">
+                                            <span>Raised: $<?php echo number_format($raisedAmount, 2); ?></span>
+                                            <span>Goal: $<?php echo number_format($targetAmount, 2); ?></span>
+                                        </div>
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" style="width: <?php echo $progressPercentage; ?>%"></div>
+                                        </div>
+                                        <div class="progress-info">
+                                            <span><?php echo number_format($progressPercentage, 0); ?>% Funded</span>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <div class="activity-actions">
+                                    <button class="btn btn-secondary">View Details</button>
+                                    <button class="btn btn-primary">Manage</button>
+                                </div>
                             </div>
                         </div>
                     <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="no-data-message">
-                        No activities found. <a href="#" onclick="openModal('addActivityModal')">Add your first activity</a>.
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-
-    <!-- Add Activity Modal -->
-    <div id="addActivityModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title">Add New Activity</h2>
-                <button class="close-btn" onclick="closeModal('addActivityModal')">&times;</button>
-            </div>
-            <form method="POST" action="" enctype="multipart/form-data" id="addActivityForm">
-                <div class="form-group">
-                    <label for="activity_date">Activity Date</label>
-                    <input type="date" id="activity_date" name="activity_date" required>
                 </div>
-                <div class="form-group">
-                    <label for="activity_details">Activity Details</label>
-                    <textarea id="activity_details" name="activity_details" rows="4" required></textarea>
+            <?php else: ?>
+                <div class="empty-state">
+                    <i class="fas fa-calendar-times"></i>
+                    <h3>No Activities Found</h3>
+                    <p>No activities match your current search criteria.</p>
+                    <button class="btn btn-primary" onclick="window.location.href='activity_management.php'">Clear Filters</button>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="activity_status">Activity Status</label>
-                        <select id="activity_status" name="activity_status" required>
-                            <option value="">Select Status</option>
-                            <option value="Upcoming">Upcoming</option>
-                            <option value="Ongoing">Ongoing</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Cancelled">Cancelled</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="activity_getamount">Amount Raised (RM)</label>
-                        <input type="number" id="activity_getamount" name="activity_getamount" step="0.01" min="0" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="branch_id">Branch</label>
-                    <select id="branch_id" name="branch_id" required>
-                        <option value="">Select Branch</option>
-                        <?php foreach ($branches as $branch): ?>
-                            <option value="<?php echo $branch['Branch_ID']; ?>">
-                                <?php echo $branch['Branch_Name'] . ' (' . $branch['Branch_Type'] . ')'; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="activity_picture">Activity Picture</label>
-                    <input type="file" id="activity_picture" name="activity_picture" accept="image/*">
-                    <div class="image-preview" id="imagePreviewAdd"></div>
-                </div>
-                <button type="submit" name="add_activity" class="submit-btn">Add Activity</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Edit Activity Modal -->
-    <div id="editActivityModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title">Edit Activity</h2>
-                <button class="close-btn" onclick="closeModal('editActivityModal')">&times;</button>
-            </div>
-            <form method="POST" action="" enctype="multipart/form-data" id="editActivityForm">
-                <input type="hidden" id="edit_activity_id" name="activity_id">
-                <input type="hidden" id="edit_current_picture" name="current_picture">
-                <div class="form-group">
-                    <label for="edit_activity_date">Activity Date</label>
-                    <input type="date" id="edit_activity_date" name="activity_date" required>
-                </div>
-                <div class="form-group">
-                    <label for="edit_activity_details">Activity Details</label>
-                    <textarea id="edit_activity_details" name="activity_details" rows="4" required></textarea>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="edit_activity_status">Activity Status</label>
-                        <select id="edit_activity_status" name="activity_status" required>
-                            <option value="">Select Status</option>
-                            <option value="Upcoming">Upcoming</option>
-                            <option value="Ongoing">Ongoing</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Cancelled">Cancelled</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="edit_activity_getamount">Amount Raised (RM)</label>
-                        <input type="number" id="edit_activity_getamount" name="activity_getamount" step="0.01" min="0" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="edit_branch_id">Branch</label>
-                    <select id="edit_branch_id" name="branch_id" required>
-                        <option value="">Select Branch</option>
-                        <?php foreach ($branches as $branch): ?>
-                            <option value="<?php echo $branch['Branch_ID']; ?>">
-                                <?php echo $branch['Branch_Name'] . ' (' . $branch['Branch_Type'] . ')'; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="edit_activity_picture">Activity Picture</label>
-                    <input type="file" id="edit_activity_picture" name="activity_picture" accept="image/*">
-                    <div class="image-preview" id="imagePreviewEdit"></div>
-                </div>
-                <button type="submit" name="update_activity" class="submit-btn">Update Activity</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Delete Confirmation Modal -->
-    <div id="deleteActivityModal" class="modal">
-        <div class="modal-content delete-modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title">Confirm Delete</h2>
-                <button class="close-btn" onclick="closeModal('deleteActivityModal')">&times;</button>
-            </div>
-            <p>Are you sure you want to delete the activity: <strong id="deleteActivityName"></strong>?</p>
-            <form method="POST" action="" id="deleteForm">
-                <input type="hidden" id="delete_activity_id" name="activity_id">
-                <div class="delete-confirm-buttons">
-                    <button type="button" class="cancel-btn" onclick="closeModal('deleteActivityModal')">Cancel</button>
-                    <button type="submit" name="delete_activity" class="confirm-delete-btn">Delete</button>
-                </div>
-            </form>
+            <?php endif; ?>
         </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const sidebar = document.getElementById('sidebar');
-            const menuToggle = document.getElementById('menuToggle');
+        // Sidebar toggle functionality
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('mainContent');
+
+        menuToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
             
-            // Toggle sidebar on menu button click (mobile)
-            menuToggle.addEventListener('click', function() {
-                if (window.innerWidth < 769) {
-                    sidebar.classList.toggle('active');
-                }
-            });
-            
-            // Desktop hover functionality
-            if (window.innerWidth >= 769) {
-                let hoverTimeout;
-                
-                sidebar.addEventListener('mouseenter', function() {
-                    clearTimeout(hoverTimeout);
-                    sidebar.classList.add('expanded');
-                });
-                
-                sidebar.addEventListener('mouseleave', function() {
-                    hoverTimeout = setTimeout(function() {
-                        sidebar.classList.remove('expanded');
-                    }, 300);
-                });
-                
-                // Keep sidebar expanded when hovering over menu items
-                const menuItems = document.querySelectorAll('.menu-item');
-                menuItems.forEach(item => {
-                    item.addEventListener('mouseenter', function() {
-                        clearTimeout(hoverTimeout);
-                    });
-                });
+            // Change icon based on state
+            const icon = menuToggle.querySelector('i');
+            if (sidebar.classList.contains('collapsed')) {
+                icon.className = 'fas fa-bars';
+            } else {
+                icon.className = 'fas fa-times';
             }
-            
-            // Close sidebar when clicking outside on mobile
-            document.addEventListener('click', function(event) {
-                if (window.innerWidth < 769 && 
-                    !sidebar.contains(event.target) && 
-                    !menuToggle.contains(event.target)) {
-                    sidebar.classList.remove('active');
-                }
-            });
-            
-            // Handle menu item clicks
-            const menuItems = document.querySelectorAll('.menu-item');
-            menuItems.forEach(item => {
-                item.addEventListener('click', function() {
-                    menuItems.forEach(i => i.classList.remove('active'));
-                    this.classList.add('active');
-                    
-                    // On mobile, close sidebar after selecting a menu item
-                    if (window.innerWidth < 769) {
-                        sidebar.classList.remove('active');
-                    }
+        });
+
+        // Add active class to sidebar menu items on click
+        document.querySelectorAll('.sidebar-menu a').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.sidebar-menu a').forEach(link => {
+                    link.classList.remove('active');
                 });
-            });
-            
-            // Handle window resize
-            window.addEventListener('resize', function() {
-                if (window.innerWidth >= 769) {
-                    sidebar.classList.remove('active');
-                } else {
-                    sidebar.classList.remove('expanded');
-                }
-            });
-
-            // Image preview for add form
-            document.getElementById('activity_picture').addEventListener('change', function(e) {
-                const preview = document.getElementById('imagePreviewAdd');
-                preview.innerHTML = '';
-                
-                if (this.files && this.files[0]) {
-                    const reader = new FileReader();
-                    
-                    reader.onload = function(e) {
-                        const img = document.createElement('img');
-                        img.src = e.target.result;
-                        preview.appendChild(img);
-                    }
-                    
-                    reader.readAsDataURL(this.files[0]);
-                }
-            });
-
-            // Image preview for edit form
-            document.getElementById('edit_activity_picture').addEventListener('change', function(e) {
-                const preview = document.getElementById('imagePreviewEdit');
-                preview.innerHTML = '';
-                
-                if (this.files && this.files[0]) {
-                    const reader = new FileReader();
-                    
-                    reader.onload = function(e) {
-                        const img = document.createElement('img');
-                        img.src = e.target.result;
-                        preview.appendChild(img);
-                    }
-                    
-                    reader.readAsDataURL(this.files[0]);
-                }
-            });
-
-            // Reset add form when modal is closed
-            document.getElementById('addActivityModal').addEventListener('click', function(e) {
-                if (e.target === this) {
-                    resetAddForm();
-                }
-            });
-
-            // Reset edit form when modal is closed
-            document.getElementById('editActivityModal').addEventListener('click', function(e) {
-                if (e.target === this) {
-                    resetEditForm();
-                }
+                this.classList.add('active');
             });
         });
 
-        // Modal functionality
-        function openModal(modalId) {
-            document.getElementById(modalId).style.display = 'flex';
-        }
+        // Dropdown functionality
+        const notificationDropdown = document.getElementById('notificationDropdown');
+        const notificationMenu = document.getElementById('notificationMenu');
+        const userProfileDropdown = document.getElementById('userProfileDropdown');
+        const userProfileMenu = document.getElementById('userProfileMenu');
 
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
-            
-            // Reset forms when closing modals
-            if (modalId === 'addActivityModal') {
-                resetAddForm();
-            } else if (modalId === 'editActivityModal') {
-                resetEditForm();
-            }
-        }
+        // Toggle notification dropdown
+        notificationDropdown.addEventListener('click', function(e) {
+            e.stopPropagation();
+            notificationMenu.classList.toggle('show');
+            userProfileMenu.classList.remove('show');
+        });
 
-        // Reset add form
-        function resetAddForm() {
-            document.getElementById('addActivityForm').reset();
-            document.getElementById('imagePreviewAdd').innerHTML = '';
-        }
+        // Toggle user profile dropdown
+        userProfileDropdown.addEventListener('click', function(e) {
+            e.stopPropagation();
+            userProfileMenu.classList.toggle('show');
+            notificationMenu.classList.remove('show');
+        });
 
-        // Reset edit form
-        function resetEditForm() {
-            document.getElementById('editActivityForm').reset();
-            document.getElementById('imagePreviewEdit').innerHTML = '';
-        }
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function() {
+            notificationMenu.classList.remove('show');
+            userProfileMenu.classList.remove('show');
+        });
 
-        // Close modals when clicking outside
-        window.onclick = function(event) {
-            const modals = document.querySelectorAll('.modal');
-            modals.forEach(modal => {
-                if (event.target === modal) {
-                    modal.style.display = 'none';
-                    
-                    // Reset forms when closing modals by clicking outside
-                    if (modal.id === 'addActivityModal') {
-                        resetAddForm();
-                    } else if (modal.id === 'editActivityModal') {
-                        resetEditForm();
-                    }
+        // Load notifications
+        function loadNotifications() {
+            const notificationList = document.getElementById('notificationList');
+            const notifications = [
+                {
+                    type: 'success',
+                    icon: 'fas fa-donate',
+                    title: 'New Donation Received',
+                    message: 'John Smith donated RM 500.00',
+                    time: '5 minutes ago',
+                    unread: true
+                },
+                {
+                    type: 'info',
+                    icon: 'fas fa-user-plus',
+                    title: 'New Donor Registered',
+                    message: 'Sarah Johnson registered as a new donor',
+                    time: '1 hour ago',
+                    unread: true
+                },
+                {
+                    type: 'warning',
+                    icon: 'fas fa-exclamation-triangle',
+                    title: 'Low Stock Alert',
+                    message: 'Reward items are running low',
+                    time: '2 hours ago',
+                    unread: false
+                },
+                {
+                    type: 'danger',
+                    icon: 'fas fa-times-circle',
+                    title: 'Payment Failed',
+                    message: 'A recurring donation payment failed',
+                    time: '1 day ago',
+                    unread: false
+                },
+                {
+                    type: 'info',
+                    icon: 'fas fa-calendar-check',
+                    title: 'Activity Reminder',
+                    message: 'Charity event starts tomorrow',
+                    time: '2 days ago',
+                    unread: false
                 }
-            });
-        }
+            ];
 
-        // Edit activity function
-        function editActivity(activityId) {
-            // In a real application, you would fetch the activity data via AJAX
-            // For this example, we'll assume the data is already available in the page
-            // and we'll find it in the activities array
-            const activity = <?php echo json_encode($activities); ?>.find(a => a.Activity_ID == activityId);
+            let html = '';
+            notifications.forEach(notification => {
+                html += `
+                    <div class="notification-item ${notification.unread ? 'unread' : ''}">
+                        <div class="notification-content">
+                            <div class="notification-icon ${notification.type}">
+                                <i class="${notification.icon}"></i>
+                            </div>
+                            <div class="notification-details">
+                                <h4>${notification.title}</h4>
+                                <p>${notification.message}</p>
+                                <div class="notification-time">${notification.time}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
             
-            if (activity) {
-                document.getElementById('edit_activity_id').value = activity.Activity_ID;
-                document.getElementById('edit_activity_date').value = activity.Activity_Date;
-                document.getElementById('edit_activity_details').value = activity.Activity_Details;
-                document.getElementById('edit_activity_status').value = activity.Activity_Status;
-                document.getElementById('edit_activity_getamount').value = activity.Activity_GetAmount;
-                document.getElementById('edit_branch_id').value = activity.Branch_ID;
-                document.getElementById('edit_current_picture').value = activity.Activity_Picture;
-                
-                // Show current image preview
-                const preview = document.getElementById('imagePreviewEdit');
-                preview.innerHTML = '';
-                if (activity.Activity_Picture) {
-                    const img = document.createElement('img');
-                    img.src = activity.Activity_Picture;
-                    preview.appendChild(img);
-                }
-                
-                openModal('editActivityModal');
-            }
+            notificationList.innerHTML = html;
         }
 
-        // Delete confirmation function
-        function confirmDelete(activityId, activityName) {
-            document.getElementById('delete_activity_id').value = activityId;
-            document.getElementById('deleteActivityName').textContent = activityName.substring(0, 50) + (activityName.length > 50 ? '...' : '');
-            openModal('deleteActivityModal');
-        }
-
-        // Auto-hide success/error messages after 5 seconds
-        setTimeout(function() {
-            const messages = document.querySelectorAll('.success-message, .error-message');
-            messages.forEach(message => {
-                message.style.display = 'none';
+        // Mark all as read function
+        function markAllAsRead() {
+            const notificationItems = document.querySelectorAll('.notification-item.unread');
+            notificationItems.forEach(item => {
+                item.classList.remove('unread');
             });
-        }, 5000);
-
-        // Check if we should show success message from URL parameter
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('success')) {
-            // You can add additional success handling here if needed
-            console.log('Activity operation completed successfully');
+            
+            // Update notification count
+            const notificationCount = document.querySelector('.notification-count');
+            notificationCount.textContent = '0';
+            notificationCount.style.display = 'none';
+            
+            // Close dropdown
+            notificationMenu.classList.remove('show');
         }
+
+        // Load notifications when page loads
+        document.addEventListener('DOMContentLoaded', loadNotifications);
     </script>
-
-    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
-    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
 </body>
 </html>
