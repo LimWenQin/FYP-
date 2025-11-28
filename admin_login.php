@@ -1,9 +1,24 @@
 <?php
-// admin_login.php - Complete Login Page
+// admin_login.php - Admin Login Page
 session_start();
 
 // Include database connection
 include 'dataconnection.php';
+
+// Create login_attempts table if it doesn't exist
+$create_table_sql = "CREATE TABLE IF NOT EXISTS login_attempts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(100) NOT NULL,
+    ip_address VARCHAR(45) NOT NULL,
+    attempt_time DATETIME NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    INDEX idx_email (email),
+    INDEX idx_time (attempt_time)
+)";
+
+if ($conn) {
+    $conn->query($create_table_sql);
+}
 
 // Process login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -12,50 +27,133 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $remember = isset($_POST['remember']);
     
+    // Get client IP address for tracking
+    $ip_address = $_SERVER['REMOTE_ADDR'];
+
     // Basic validation
     if (!empty($email) && !empty($password)) {
-        // Check if connection is successful
         if ($conn) {
-            // Prevent SQL injection
-            $email = $conn->real_escape_string($email);
-            $password = $conn->real_escape_string($password);
+            // Check if this EMAIL is currently locked out (only check by email, not IP)
+            $lock_check_sql = "SELECT * FROM login_attempts 
+                              WHERE email = ? 
+                              AND attempt_time > DATE_SUB(NOW(), INTERVAL 30 MINUTE)
+                              AND status = 'locked'
+                              ORDER BY attempt_time DESC 
+                              LIMIT 1";
+            $lock_stmt = $conn->prepare($lock_check_sql);
+            $lock_stmt->bind_param("s", $email);
+            $lock_stmt->execute();
+            $lock_result = $lock_stmt->get_result();
             
-            // Query admin information
-            $sql = "SELECT * FROM admin WHERE Admin_Email = '$email' AND Admin_Password = '$password'";
-            $result = $conn->query($sql);
-            
-            if ($result && $result->num_rows > 0) {
-                // Login successful
-                $admin = $result->fetch_assoc();
+            if ($lock_result && $lock_result->num_rows > 0) {
+                $lock_data = $lock_result->fetch_assoc();
+                $remaining_time = strtotime($lock_data['attempt_time']) + (30 * 60) - time();
+                $remaining_minutes = ceil($remaining_time / 60);
                 
-                // Set session variables
-                $_SESSION['admin_id'] = $admin['Admin_ID'];
-                $_SESSION['admin_name'] = $admin['Admin_FName'] . ' ' . $admin['Admin_LName'];
-                $_SESSION['admin_email'] = $admin['Admin_Email'];
-                $_SESSION['login_time'] = time();
-                
-                // Handle "Remember Me" functionality
-                if ($remember) {
-                    setcookie('admin_email', $email, time() + (86400 * 30), "/");
+                if ($remaining_time > 0) {
+                    $error = "Account temporarily locked. Please try again in " . $remaining_minutes . " minutes.";
+                    $lock_stmt->close();
                 } else {
-                    setcookie('admin_email', '', time() - 3600, "/");
+                    // Lock expired, delete the lock record
+                    $delete_lock_sql = "DELETE FROM login_attempts WHERE id = ?";
+                    $delete_stmt = $conn->prepare($delete_lock_sql);
+                    $delete_stmt->bind_param("i", $lock_data['id']);
+                    $delete_stmt->execute();
+                    $delete_stmt->close();
+                    $lock_stmt->close();
                 }
-                
-                // Redirect to dashboard
-                header("Location: admin_dashboard.php");
-                exit();
             } else {
-                $error = 'Invalid email or password!';
+                $lock_stmt->close();
+            }
+            
+            // If there's no lock or lock expired, proceed with login
+            if (!isset($error)) {
+                // Query admin information using prepared statements
+                $sql = "SELECT * FROM admin WHERE Admin_Email = ?";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("s", $email);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                if ($result && $result->num_rows > 0) {
+                    $admin = $result->fetch_assoc();
+                    
+                    // Simple password verification (no hashing)
+                    if ($password === $admin['Admin_Password']) {
+                        // Login successful - reset attempt counter for this EMAIL
+                        $reset_sql = "DELETE FROM login_attempts WHERE email = ?";
+                        $reset_stmt = $conn->prepare($reset_sql);
+                        $reset_stmt->bind_param("s", $email);
+                        $reset_stmt->execute();
+                        $reset_stmt->close();
+                        
+                        // Set session variables
+                        $_SESSION['admin_id'] = $admin['Admin_ID'];
+                        $_SESSION['admin_name'] = $admin['Admin_FName'] . ' ' . $admin['Admin_LName'];
+                        $_SESSION['admin_email'] = $admin['Admin_Email'];
+                        $_SESSION['login_time'] = time();
+                        
+                        // Handle "Remember me" feature
+                        if ($remember) {
+                            setcookie('admin_email', $email, time() + (86400 * 30), "/");
+                        } else {
+                            setcookie('admin_email', '', time() - 3600, "/");
+                        }
+                        
+                        // Redirect to dashboard
+                        header("Location: admin_dashboard.php");
+                        exit();
+                    } else {
+                        // Login failed - record the attempt for this EMAIL
+                        $record_sql = "INSERT INTO login_attempts (email, ip_address, attempt_time, status) 
+                                      VALUES (?, ?, NOW(), 'failed')";
+                        $record_stmt = $conn->prepare($record_sql);
+                        $record_stmt->bind_param("ss", $email, $ip_address);
+                        $record_stmt->execute();
+                        $record_stmt->close();
+                        
+                        // Check if we need to lock the account for this EMAIL
+                        $count_sql = "SELECT COUNT(*) as attempt_count FROM login_attempts 
+                                     WHERE email = ? 
+                                     AND attempt_time > DATE_SUB(NOW(), INTERVAL 30 MINUTE)";
+                        $count_stmt = $conn->prepare($count_sql);
+                        $count_stmt->bind_param("s", $email);
+                        $count_stmt->execute();
+                        $count_result = $count_stmt->get_result();
+                        $count_data = $count_result->fetch_assoc();
+                        $attempt_count = $count_data['attempt_count'];
+                        $count_stmt->close();
+                        
+                        if ($attempt_count >= 5) {
+                            // Lock the account for this EMAIL
+                            $lock_sql = "INSERT INTO login_attempts (email, ip_address, attempt_time, status) 
+                                        VALUES (?, ?, NOW(), 'locked')";
+                            $lock_stmt = $conn->prepare($lock_sql);
+                            $lock_stmt->bind_param("ss", $email, $ip_address);
+                            $lock_stmt->execute();
+                            $lock_stmt->close();
+                            
+                            $error = 'Too many failed login attempts. Your account has been locked for 30 minutes.';
+                        } else {
+                            $remaining_attempts = 5 - $attempt_count;
+                            $error = 'Invalid email or password! ' . $remaining_attempts . ' attempts remaining.';
+                        }
+                    }
+                } else {
+                    // Email not found
+                    $error = 'Invalid email or password!';
+                }
+                $stmt->close();
             }
         } else {
-            $error = 'Database connection failed!';
+            $error = 'Database connection failed! Please check system configuration.';
         }
     } else {
-        $error = 'Please enter both email and password!';
+        $error = 'Please enter email and password!';
     }
 }
 
-// Check if already logged in, redirect if so
+// Check if already logged in, if yes then redirect
 if (isset($_SESSION['admin_id'])) {
     header("Location: admin_dashboard.php");
     exit();
@@ -63,6 +161,32 @@ if (isset($_SESSION['admin_id'])) {
 
 // Get saved email (if any)
 $saved_email = $_COOKIE['admin_email'] ?? '';
+
+// Check for existing lock on page load for this EMAIL
+$lock_message = '';
+if ($conn && !empty($saved_email)) {
+    $lock_check_sql = "SELECT * FROM login_attempts 
+                      WHERE email = ? 
+                      AND attempt_time > DATE_SUB(NOW(), INTERVAL 30 MINUTE)
+                      AND status = 'locked'
+                      ORDER BY attempt_time DESC 
+                      LIMIT 1";
+    $lock_stmt = $conn->prepare($lock_check_sql);
+    $lock_stmt->bind_param("s", $saved_email);
+    $lock_stmt->execute();
+    $lock_result = $lock_stmt->get_result();
+    
+    if ($lock_result && $lock_result->num_rows > 0) {
+        $lock_data = $lock_result->fetch_assoc();
+        $remaining_time = strtotime($lock_data['attempt_time']) + (30 * 60) - time();
+        $remaining_minutes = ceil($remaining_time / 60);
+        
+        if ($remaining_time > 0) {
+            $lock_message = "Your account is temporarily locked. Please try again in " . $remaining_minutes . " minutes.";
+        }
+    }
+    $lock_stmt->close();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -212,6 +336,13 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
             transform: translateY(-2px);
         }
 
+        .input-box input:disabled {
+            background-color: #f5f5f5;
+            border-color: #ddd;
+            color: #999;
+            cursor: not-allowed;
+        }
+
         .input-box label {
             position: absolute;
             top: 50%;
@@ -282,33 +413,6 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
             transform: scale(1.2);
         }
 
-        .remember-forgot a {
-            color: #f28585;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            position: relative;
-            cursor: pointer;
-        }
-
-        .remember-forgot a::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 0;
-            width: 0;
-            height: 1px;
-            background: #f28585;
-            transition: width 0.3s ease;
-        }
-
-        .remember-forgot a:hover {
-            color: #e66767;
-        }
-
-        .remember-forgot a:hover::after {
-            width: 100%;
-        }
-
         .btn {
             width: 100%;
             padding: 12px;
@@ -324,6 +428,22 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
             overflow: hidden;
         }
 
+        .btn:disabled {
+            background: linear-gradient(135deg, #cccccc, #aaaaaa);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn:disabled::before {
+            display: none;
+        }
+
+        .btn:disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
         .btn::before {
             content: '';
             position: absolute;
@@ -335,18 +455,30 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
             transition: left 0.5s ease;
         }
 
-        .btn:hover {
+        .btn:hover:not(:disabled) {
             transform: translateY(-3px);
             box-shadow: 0 8px 20px rgba(242, 133, 133, 0.4);
         }
 
-        .btn:hover::before {
+        .btn:hover:not(:disabled)::before {
             left: 100%;
         }
 
         .error-message {
             color: #e74c3c;
             background: #fadbd8;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 1px solid #f5b7b1;
+            font-size: 14px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .lock-message {
+            color: #e67e22;
+            background: #fdebd0;
             padding: 12px;
             border-radius: 8px;
             margin-bottom: 20px;
@@ -369,7 +501,7 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* 修复：所有动画元素必须设置 pointer-events: none */
+        /* Fix: All animated elements must have pointer-events: none */
         .floating-elements,
         .floating-element,
         .heart,
@@ -391,7 +523,7 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
             position: absolute;
             width: 100%;
             height: 100%;
-            top: 0;
+            bottom: 0;
             left: 0;
             overflow: hidden;
             z-index: 1;
@@ -756,20 +888,31 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
             }
         }
 
+        /* Improved waves at the bottom */
         .wave {
             position: absolute;
             bottom: 0;
             left: 0;
             width: 100%;
-            height: 100px;
-            background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 1200 120" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z" opacity=".25" fill="%23f28585"/></svg>');
-            background-size: 1200px 100px;
-            animation: wave 10s linear infinite;
+            height: 150px;
+            background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 1200 120" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z" opacity=".25" fill="%23f28585"/><path d="M0,0V15.81C13,36.92,27.64,56.86,47.69,72.05,99.41,111.27,165,111,224.58,91.58c31.15-10.15,60.09-26.07,89.67-39.8,40.92-19,84.73-46,130.83-49.67,36.26-2.85,70.9,9.42,98.6,31.56,31.77,25.39,62.32,62,103.63,73,40.44,10.79,81.35-6.69,119.13-24.28s75.16-39,116.92-43.05c59.73-5.85,113.28,22.88,168.9,38.84,30.2,8.66,59,6.17,87.09-7.5,22.43-10.89,48-26.93,60.65-49.24V0Z" opacity=".5" fill="%23f28585"/><path d="M0,0V5.63C149.93,59,314.09,71.32,475.83,42.57c43-7.64,84.23-20.12,127.61-26.46,59-8.63,112.48,12.24,165.56,35.4C827.93,77.22,886,95.24,951.2,90c86.53-7,172.46-45.71,248.8-84.81V0Z" fill="%23f28585"/></svg>');
+            background-size: 1200px 150px;
+            animation: wave 12s linear infinite;
+            transform: rotate(180deg);
         }
 
         .wave:nth-child(2) {
-            animation-delay: -5s;
-            opacity: 0.5;
+            animation: wave-reverse 16s linear infinite;
+            opacity: 0.7;
+            background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 1200 120" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z" opacity=".25" fill="%23f6b8b8"/><path d="M0,0V15.81C13,36.92,27.64,56.86,47.69,72.05,99.41,111.27,165,111,224.58,91.58c31.15-10.15,60.09-26.07,89.67-39.8,40.92-19,84.73-46,130.83-49.67,36.26-2.85,70.9,9.42,98.6,31.56,31.77,25.39,62.32,62,103.63,73,40.44,10.79,81.35-6.69,119.13-24.28s75.16-39,116.92-43.05c59.73-5.85,113.28,22.88,168.9,38.84,30.2,8.66,59,6.17,87.09-7.5,22.43-10.89,48-26.93,60.65-49.24V0Z" opacity=".5" fill="%23f6b8b8"/><path d="M0,0V5.63C149.93,59,314.09,71.32,475.83,42.57c43-7.64,84.23-20.12,127.61-26.46,59-8.63,112.48,12.24,165.56,35.4C827.93,77.22,886,95.24,951.2,90c86.53-7,172.46-45.71,248.8-84.81V0Z" fill="%23f6b8b8"/></svg>');
+            background-size: 1200px 150px;
+        }
+
+        .wave:nth-child(3) {
+            animation: wave 20s linear infinite;
+            opacity: 0.4;
+            background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 1200 120" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z" opacity=".25" fill="%23fff5e4"/><path d="M0,0V15.81C13,36.92,27.64,56.86,47.69,72.05,99.41,111.27,165,111,224.58,91.58c31.15-10.15,60.09-26.07,89.67-39.8,40.92-19,84.73-46,130.83-49.67,36.26-2.85,70.9,9.42,98.6,31.56,31.77,25.39,62.32,62,103.63,73,40.44,10.79,81.35-6.69,119.13-24.28s75.16-39,116.92-43.05c59.73-5.85,113.28,22.88,168.9,38.84,30.2,8.66,59,6.17,87.09-7.5,22.43-10.89,48-26.93,60.65-49.24V0Z" opacity=".5" fill="%23fff5e4"/><path d="M0,0V5.63C149.93,59,314.09,71.32,475.83,42.57c43-7.64,84.23-20.12,127.61-26.46,59-8.63,112.48,12.24,165.56,35.4C827.93,77.22,886,95.24,951.2,90c86.53-7,172.46-45.71,248.8-84.81V0Z" fill="%23fff5e4"/></svg>');
+            background-size: 1200px 150px;
         }
 
         @keyframes wave {
@@ -778,6 +921,15 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
             }
             100% {
                 background-position-x: 1200px;
+            }
+        }
+
+        @keyframes wave-reverse {
+            0% {
+                background-position-x: 1200px;
+            }
+            100% {
+                background-position-x: 0;
             }
         }
 
@@ -887,7 +1039,8 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
 <body>
     <!-- Background animations (outside login form) -->
     <div class="background-animations" id="backgroundAnimations">
-        <!-- Waves at the bottom -->
+        <!-- Improved waves at the bottom -->
+        <div class="wave"></div>
         <div class="wave"></div>
         <div class="wave"></div>
     </div>
@@ -932,9 +1085,9 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
         <!-- Logo section -->
         <div class="logo-section">
             <div class="logo-container">
-                <img src="picture/logo.png" alt="Donation Management System Logo" class="logo-image">
-                <div class="logo-text">Donation Management System</div>
-                <div class="logo-subtext">Bringing Hope to Those in Need</div>
+                <img src="logo.jpg" alt="Donation Management System Logo" class="logo-image">
+                <div class="logo-text">LOVE BRIDGE</div>
+                <div class="logo-subtext">Donation Management System<br>Bringing hope to those in need</div>
             </div>
         </div>
         
@@ -942,8 +1095,14 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
         <div class="login-section">
             <div class="login-container">
                 <div class="login-box">
-                    <form method="POST" action="">
+                    <form method="POST" action="admin_login.php" id="loginForm">
                         <h2>Admin Login</h2>
+                        
+                        <?php if (!empty($lock_message)): ?>
+                        <div class="lock-message" id="lockMessage">
+                            <?php echo $lock_message; ?>
+                        </div>
+                        <?php endif; ?>
                         
                         <?php if (isset($error)): ?>
                         <div class="error-message">
@@ -952,14 +1111,16 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
                         <?php endif; ?>
                         
                         <div class="input-box">
-                            <input type="email" name="email" value="<?php echo htmlspecialchars($saved_email); ?>" required>
+                            <input type="email" name="email" id="email" value="<?php echo htmlspecialchars($saved_email); ?>" 
+                                   <?php echo !empty($lock_message) ? 'disabled' : 'required'; ?>>
                             <label>Email Address</label>
                             <span class="icon">
                                 <ion-icon name="mail"></ion-icon>
                             </span>
                         </div>
                         <div class="input-box">
-                            <input type="password" name="password" id="password" required>
+                            <input type="password" name="password" id="password" 
+                                   <?php echo !empty($lock_message) ? 'disabled' : 'required'; ?>>
                             <label>Password</label>
                             <span class="icon" id="togglePassword">
                                 <ion-icon name="eye-off"></ion-icon>
@@ -967,14 +1128,17 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
                         </div>
                         <div class="remember-forgot">
                             <label>
-                                <input type="checkbox" name="remember" <?php echo !empty($saved_email) ? 'checked' : ''; ?>> Remember Me
+                                <input type="checkbox" name="remember" <?php echo !empty($saved_email) ? 'checked' : ''; ?>
+                                       <?php echo !empty($lock_message) ? 'disabled' : ''; ?>> Remember me
                             </label>
-                            <a href="admin_forgot_password.php">Forgot Password?</a>
                         </div>
-                        <button type="submit" class="btn">Login</button>
+                        <button type="submit" class="btn" id="loginBtn" 
+                                <?php echo !empty($lock_message) ? 'disabled' : ''; ?>>
+                            <?php echo !empty($lock_message) ? 'Account Locked' : 'Login'; ?>
+                        </button>
                         
                         <div class="system-info">
-                            Donation Management System v1.0 - Supporting Elderly Homes, Orphanages, Disability Centers, and Stray Animal Centers
+                            Donation Management System v1.0 - Supporting nursing homes, orphanages, disability centers, and stray animal centers
                         </div>
                     </form>
                 </div>
@@ -991,23 +1155,25 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
         const password = document.getElementById('password');
         const eyeIcon = togglePassword.querySelector('ion-icon');
         
-        togglePassword.addEventListener('click', function() {
-            // Toggle the type attribute
-            const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
-            password.setAttribute('type', type);
+        if (togglePassword && password) {
+            togglePassword.addEventListener('click', function() {
+                // Toggle the type attribute
+                const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+                password.setAttribute('type', type);
+                
+                // Toggle the eye icon
+                if (type === 'password') {
+                    eyeIcon.setAttribute('name', 'eye-off');
+                } else {
+                    eyeIcon.setAttribute('name', 'eye');
+                }
+            });
             
-            // Toggle the eye icon
-            if (type === 'password') {
-                eyeIcon.setAttribute('name', 'eye-off');
-            } else {
-                eyeIcon.setAttribute('name', 'eye');
-            }
-        });
-        
-        // Optional: Add focus effect to password field when clicking the icon
-        togglePassword.addEventListener('mousedown', function(e) {
-            e.preventDefault(); // Prevent losing focus from the password field
-        });
+            // Optional: Add focus effect to password field when clicking the icon
+            togglePassword.addEventListener('mousedown', function(e) {
+                e.preventDefault(); // Prevent losing focus from the password field
+            });
+        }
 
         // Add subtle animation to form inputs when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -1082,6 +1248,27 @@ $saved_email = $_COOKIE['admin_email'] ?? '';
                 ring.style.animationDelay = `${Math.random() * 4}s`;
                 backgroundAnimations.appendChild(ring);
             }
+        });
+
+        // Auto-refresh lock status every minute
+        setInterval(function() {
+            const lockMessage = document.getElementById('lockMessage');
+            const loginBtn = document.getElementById('loginBtn');
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            const rememberCheckbox = document.querySelector('input[name="remember"]');
+            
+            if (lockMessage) {
+                // Reload the page to check if lock has expired
+                location.reload();
+            }
+        }, 60000); // Check every minute
+
+        // Form submission handler
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            // Form will submit normally to admin_login.php
+            console.log('Login form submitted');
+            // No need to prevent default - let it submit normally
         });
     </script>
 </body>
