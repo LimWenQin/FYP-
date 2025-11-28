@@ -28,6 +28,7 @@
             line-height: 1.6;
         }
         
+        /* 顶部深色条 */
         .header-top {
             display: flex;
             justify-content: space-between;
@@ -78,6 +79,7 @@
             background-color: #333333;
         }
         
+        /* 主 Header */
         .header {
             display: grid;
             grid-template-columns: 1fr 2fr 1fr; 
@@ -88,14 +90,13 @@
             gap: 20px;
         }
         
-        .logo 
-    {
-        display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
-        align-items: center;    /* 垂直居中 */
-        font-weight: bold;      /*粗体*/
-        font-size: 36px;        /*字体大小*/
-        gap: 10px;              /* 图片与文字之间的间距 */
-    }
+        .logo {
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+            font-size: 36px;
+            gap: 10px;
+        }
         
         .header-right { 
             grid-column: 2;
@@ -131,6 +132,7 @@
             gap: 15px;
         }
         
+        /* 搜索框样式 (兼容 Form) */
         .search-box {
             display: flex;
             align-items: center;
@@ -147,6 +149,8 @@
             padding: 6px;
             width: 100%;
             outline: none;
+            font-family: inherit;
+            font-size: inherit;
         }
         
         .donate-btn {
@@ -168,6 +172,7 @@
             background-color: #c0392b;
         }
         
+        /* 响应式设计 */
         @media (max-width: 1024px) {
             .header {
                 grid-template-columns: 1fr 1fr; 
@@ -220,10 +225,10 @@
 <body>
     <header class="header-top">
         <div class="welcome-text">
-            Welcome, <?php echo isset($_SESSION['donor_name']) ? $_SESSION['donor_name'] : "Guest"; ?>
+            Welcome, <?php echo isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor_name']) : "Guest"; ?>
         </div>
         <div class="auth-buttons">
-            <?php if ($logged_in): ?>
+            <?php if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true): ?>
                 <a href="donor_logout.php" class="auth-btn login-btn">Log out</a>
             <?php else: ?>
                 <a href="donor_login.php" class="auth-btn login-btn">Login</a>
@@ -249,9 +254,12 @@
         </div>
         
         <div class="header-center">
-            <div class="search-box">
-                <input type="text" placeholder="Search...">
-            </div>
+            <form class="search-box" action="search_results.php" method="GET">
+                <input type="text" name="query" placeholder="Search..." required>
+            </form>
+            
         </div>
 
     </header>
+</body>
+</html>
