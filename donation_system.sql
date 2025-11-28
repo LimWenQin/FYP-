@@ -410,6 +410,23 @@ CREATE TABLE `story` (
   `Story_Image` varchar(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `contact_messages`
+--
+
+CREATE TABLE `contact_messages` (
+  `Contact_ID` int(11) NOT NULL,
+  `Name` varchar(100) NOT NULL,
+  `Email` varchar(100) NOT NULL,
+  `Phone` varchar(20) DEFAULT NULL,
+  `Subject` varchar(255) NOT NULL,
+  `Message` text NOT NULL,
+  `Status` enum('New','Read','Replied') NOT NULL DEFAULT 'New',
+  `Created_At` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 --
 -- 转储表中的数据
 --
@@ -590,6 +607,12 @@ ALTER TABLE `story`
   ADD PRIMARY KEY (`Story_ID`);
 
 --
+-- 表的索引 `contact_messages`
+--
+ALTER TABLE `contact_messages`
+  ADD PRIMARY KEY (`Contact_ID`);
+
+--
 -- 在导出的表使用AUTO_INCREMENT
 --
 
@@ -724,6 +747,12 @@ ALTER TABLE `staff_activity`
 --
 ALTER TABLE `story`
   MODIFY `Story_ID` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- 使用表AUTO_INCREMENT `contact_messages`
+--
+ALTER TABLE `contact_messages`
+  MODIFY `Contact_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- 限制导出的表
