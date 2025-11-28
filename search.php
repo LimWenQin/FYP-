@@ -11,53 +11,53 @@ $story_results = [];
 
 // 2. 检查是否有搜索关键词
 if (isset($_GET['query'])) {
-    $search_query = trim($_GET['query']); // 获取用户输入，例如 "Old"
+    $search_query = trim($_GET['query']); // 获取用户输入
 
-    // ✅ 关键步骤：把用户输入变成 SQL LIKE 的格式
-    // 如果用户搜 "Old"，这里就会变成 "%Old%"
-    // 意思就是：SELECT * FROM ... WHERE ... LIKE '%Old%'
-    $param = "%" . $search_query . "%";
+    // 如果搜索词不为空，才执行查询
+    if (!empty($search_query)) {
+        // ✅ 关键步骤：把用户输入变成 SQL LIKE 的格式
+        $param = "%" . $search_query . "%";
 
-    // ---------------------------------------------------
-    // 🔍 1. 搜索 Activity 表 (名字 或 详情)
-    // ---------------------------------------------------
-    $sql_act = "SELECT * FROM activity 
-                WHERE Activity_Name LIKE ? 
-                OR Activity_Details LIKE ?";
-    
-    if ($stmt = $conn->prepare($sql_act)) {
-        // 绑定两个参数 (因为有两个问号)
-        $stmt->bind_param("ss", $param, $param);
-        $stmt->execute();
-        $activity_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-    }
+        // ---------------------------------------------------
+        // 🔍 1. 搜索 Activity 表 (名字 或 详情)
+        // ---------------------------------------------------
+        $sql_act = "SELECT * FROM activity 
+                    WHERE Activity_Name LIKE ? 
+                    OR Activity_Details LIKE ?";
+        
+        if ($stmt = $conn->prepare($sql_act)) {
+            $stmt->bind_param("ss", $param, $param);
+            $stmt->execute();
+            $activity_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+        }
 
-    // ---------------------------------------------------
-    // 🔍 2. 搜索 Special Case 表 (标题 或 描述)
-    // ---------------------------------------------------
-    $sql_case = "SELECT * FROM special_case 
-                 WHERE Case_Title LIKE ? 
-                 OR Case_Description LIKE ?";
+        // ---------------------------------------------------
+        // 🔍 2. 搜索 Special Case 表 (标题 或 描述)
+        // ---------------------------------------------------
+        $sql_case = "SELECT * FROM special_case 
+                     WHERE Case_Title LIKE ? 
+                     OR Case_Description LIKE ?";
 
-    if ($stmt = $conn->prepare($sql_case)) {
-        $stmt->bind_param("ss", $param, $param);
-        $stmt->execute();
-        $case_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-    }
+        if ($stmt = $conn->prepare($sql_case)) {
+            $stmt->bind_param("ss", $param, $param);
+            $stmt->execute();
+            $case_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+        }
 
-    // ---------------------------------------------------
-    // 🔍 3. 搜索 Story 表 (描述)
-    // ---------------------------------------------------
-    $sql_story = "SELECT * FROM story 
-                  WHERE Donor_Description LIKE ?";
+        // ---------------------------------------------------
+        // 🔍 3. 搜索 Story 表 (描述)
+        // ---------------------------------------------------
+        $sql_story = "SELECT * FROM story 
+                      WHERE Donor_Description LIKE ?";
 
-    if ($stmt = $conn->prepare($sql_story)) {
-        $stmt->bind_param("s", $param);
-        $stmt->execute();
-        $story_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+        if ($stmt = $conn->prepare($sql_story)) {
+            $stmt->bind_param("s", $param);
+            $stmt->execute();
+            $story_results = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+        }
     }
 }
 ?>
@@ -68,10 +68,12 @@ if (isset($_GET['query'])) {
     <meta charset="UTF-8">
     <title>Search Results</title>
     <style>
-        /* 简单的结果页面样式，您可以根据 donor_design.css 调整 */
-        body { background-color: #FFF5E4; font-family: Arial, sans-serif; color: #4A4A4A; }
+        /* 页面样式 */
+        body { background-color: #FFF5E4; font-family: Arial, sans-serif; color: #4A4A4A; margin: 0; }
         .container { padding: 40px; max-width: 1000px; margin: 0 auto; }
         
+        .page-title { margin-top: 0; margin-bottom: 30px; font-size: 28px; }
+
         .section-title { 
             color: #F28585; 
             border-bottom: 2px solid #F28585; 
@@ -90,28 +92,43 @@ if (isset($_GET['query'])) {
         }
         .result-card:hover { transform: translateY(-3px); }
 
-        .result-card h3 { margin-top: 0; color: #333; font-size: 18px; }
-        .result-card p { color: #666; font-size: 14px; line-height: 1.5; }
+        .result-card h3 { margin-top: 0; color: #333; font-size: 18px; margin-bottom: 10px; }
+        .result-card p { color: #666; font-size: 14px; line-height: 1.5; margin-bottom: 15px; }
         
         .btn-link { 
             display: inline-block; 
-            margin-top: 10px; 
             color: #F28585; 
             text-decoration: none; 
             font-weight: bold; 
+            font-size: 14px;
         }
         .btn-link:hover { text-decoration: underline; }
 
-        .no-results { text-align: center; color: #888; margin-top: 50px; font-size: 18px; }
+        .no-results { text-align: center; margin-top: 60px; padding: 40px; }
+        .no-results i { font-size: 50px; color: #ccc; margin-bottom: 20px; display: block; }
+        .no-results p { font-size: 18px; color: #888; margin-bottom: 20px; }
+        
+        .back-home-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #F6B8B8;
+            color: #4A4A4A;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .back-home-btn:hover { background-color: #f28585; color: white; }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
 
 <div class="container">
-    <h1>Search Results for "<?php echo htmlspecialchars($search_query); ?>"</h1>
+    <h1 class="page-title">Search Results for "<?php echo htmlspecialchars($search_query); ?>"</h1>
 
     <?php if (!empty($activity_results)): ?>
-        <h2 class="section-title">Activities</h2>
+        <h2 class="section-title"><i class="fas fa-calendar-alt"></i> Activities</h2>
         <?php foreach ($activity_results as $row): ?>
             <div class="result-card">
                 <h3><?php echo htmlspecialchars($row['Activity_Name'] ?? 'Unnamed Activity'); ?></h3>
@@ -122,7 +139,7 @@ if (isset($_GET['query'])) {
     <?php endif; ?>
 
     <?php if (!empty($case_results)): ?>
-        <h2 class="section-title">Special Cases</h2>
+        <h2 class="section-title"><i class="fas fa-hand-holding-heart"></i> Special Cases</h2>
         <?php foreach ($case_results as $row): ?>
             <div class="result-card">
                 <h3><?php echo htmlspecialchars($row['Case_Title']); ?></h3>
@@ -133,7 +150,7 @@ if (isset($_GET['query'])) {
     <?php endif; ?>
 
     <?php if (!empty($story_results)): ?>
-        <h2 class="section-title">Stories</h2>
+        <h2 class="section-title"><i class="fas fa-book-open"></i> Stories</h2>
         <?php foreach ($story_results as $row): ?>
             <div class="result-card">
                 <h3>Donation Story</h3>
@@ -145,7 +162,10 @@ if (isset($_GET['query'])) {
 
     <?php if (empty($activity_results) && empty($case_results) && empty($story_results)): ?>
         <div class="no-results">
-            <p>No results found matching your search.</p>
+            <i class="fas fa-search"></i>
+            <p>No results found matching "<?php echo htmlspecialchars($search_query); ?>".</p>
+            <p style="font-size: 14px; color: #999;">Try using different keywords or check your spelling.</p>
+            <a href="Homepage.php" class="back-home-btn">Back to Home</a>
         </div>
     <?php endif; ?>
 
