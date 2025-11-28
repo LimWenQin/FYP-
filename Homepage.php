@@ -3,6 +3,7 @@ session_start();
 
 $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
 
+// 模拟数据库数据（如果未连接真实数据库）
 $mock_db_data = [
     "Donor_FName" => "Jane",
     "Donor_LName" => "Doe",
@@ -14,7 +15,7 @@ $mock_db_data = [
     "Donor_Description" => "Loyal donor since 2022."
 ];
 
-
+// 默认访客数据
 $donor = [
     "Donor_FName" => "Guest",
     "Donor_LName" => "",
@@ -26,11 +27,18 @@ $donor = [
     "Donor_Description" => ""
 ];
 
+// 如果已登录，尝试获取 Session 数据或 Mock 数据
+// 注意：实际项目中这里应该连接数据库查询真实用户信息
 if ($logged_in && isset($_SESSION['donor_id'])) {
-   
+    // 这里为了演示保留了 Mock 数据，您之后可以用 SQL 查询替换它
     $donor = $mock_db_data;
+    // 如果 Session 里有名字，覆盖 Mock 的名字
+    if(isset($_SESSION['donor_name'])) {
+        $name_parts = explode(" ", $_SESSION['donor_name']);
+        $donor['Donor_FName'] = $name_parts[0];
+        $donor['Donor_LName'] = isset($name_parts[1]) ? $name_parts[1] : "";
+    }
 }
-
 ?>
 
 <!DOCTYPE html>
@@ -113,7 +121,6 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             background-color: #333333;
         }
         
-         
         .header {
             display: grid;
             grid-template-columns: 1fr 2fr 1fr; 
@@ -124,17 +131,14 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             gap: 20px;
         }
         
-        .logo 
-        {
-            display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
-            align-items: center;    /* 垂直居中 */
-            font-weight: bold;      /*粗体*/
-            font-size: 36px;        /*字体大小*/
-            gap: 10px;              /* 图片与文字之间的间距 */
-         }
+        .logo {
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+            font-size: 36px;
+            gap: 10px;
+        }
 
-        
-    
         .header-right { 
             grid-column: 2;
             display: flex;
@@ -161,7 +165,6 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             opacity: 0.8;
         }
 
-       
         .header-center { 
             grid-column: 3;
             display: flex;
@@ -170,6 +173,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             gap: 15px;
         }
         
+        /* 确保 search-box 样式同样适用于 form 标签 */
         .search-box {
             display: flex;
             align-items: center;
@@ -186,6 +190,9 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             padding: 6px;
             width: 100%;
             outline: none;
+            /* 继承字体样式 */
+            font-family: inherit;
+            font-size: inherit;
         }
         
         .donate-btn {
@@ -206,7 +213,6 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         .donate-btn:hover {
             background-color: #c0392b;
         }
-        
         
         .donor-container {
             padding: 30px;
@@ -272,32 +278,22 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             color: #e74c3c;
         }
         
-       
-        
         @media (max-width: 1024px) {
             .header {
-               
                 grid-template-columns: 1fr 1fr; 
                 grid-template-rows: auto auto; 
                 gap: 15px;
             }
-            
-            .logo 
-            { 
+            .logo { 
                 grid-column: 1;
                 grid-row: 1;
                 text-align: left;
             }
-            
-
-
-            .header-right 
-            { 
+            .header-right { 
                 grid-column: 2;
                 grid-row: 1;
                 justify-content: flex-end; 
             }
-
             .header-center { 
                 grid-column: 1 / span 2;
                 grid-row: 2;
@@ -306,22 +302,18 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         }
         
         @media (max-width: 768px) {
-    
             .header {
                 grid-template-columns: 1fr;
                 grid-template-rows: auto auto auto;
             }
-            
             .logo { 
                 grid-row: 1; 
                 text-align: center;
             }
-            
             .header-right { 
                 grid-row: 2; 
                 justify-content: center;
             }
-
             .header-center { 
                 grid-row: 3; 
                 flex-direction: column;
@@ -351,23 +343,21 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             LOVE BRIDGE
         </div>
         
-       
         <div class="header-right">
             <div class="function-links">
                 <a href="Activity Page.php">Activity</a>
                 <a href="History.php">History</a>
                 <a href="New&Story.php">News & Story</a>
                 <a href="Special_case Page.php">Special Case</a>
-               
                 <a href="Profile.php">Profile</a>
             </div>
         </div>
         
-      
         <div class="header-center">
-            <div class="search-box">
-                <input type="text" placeholder="Search...">
-            </div>
+            <form class="search-box" action="search_results.php" method="GET">
+                <input type="text" name="query" placeholder="Search..." required>
+            </form>
+            
             <a href="Payment_page.php" class="donate-btn">Donate Now</a>
         </div>
     </header>
@@ -416,8 +406,6 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 </div>
                 <?php endif; ?>
             </div>
-            
-           
         </div>
     </div>
 </body>
