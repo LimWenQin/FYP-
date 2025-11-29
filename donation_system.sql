@@ -3,14 +3,13 @@
 -- https://www.phpmyadmin.net/
 --
 -- 主机： 127.0.0.1
--- 生成日期： 2025-11-28 12:30:00
+-- 生成日期： 2025-11-28 12:45:00
 -- 服务器版本： 10.4.32-MariaDB
 -- PHP 版本： 8.0.30
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+00:00";
-
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -43,34 +42,16 @@ CREATE TABLE `achievement` (
 
 CREATE TABLE `activity` (
   `Activity_ID` int(11) NOT NULL,
-  `Activity_Name` varchar(255) NOT NULL DEFAULT 'Default Activity Name', -- ✅ 新增
+  `Activity_Name` varchar(255) NOT NULL DEFAULT 'Default Activity Name',
   `Activity_Date` date DEFAULT NULL,
-  `Activity_StartDate` date DEFAULT NULL, -- ✅ 新增
-  `Activity_EndDate` date DEFAULT NULL,   -- ✅ 新增
+  `Activity_StartDate` date DEFAULT NULL,
+  `Activity_EndDate` date DEFAULT NULL,
   `Activity_Details` text NOT NULL,
   `Activity_Picture` varchar(255) NOT NULL,
   `Activity_Status` varchar(50) NOT NULL,
   `Activity_GetAmount` decimal(10,2) NOT NULL,
-  `Activity_TargetAmount` decimal(10,2) DEFAULT 0.00, -- ✅ 新增
+  `Activity_TargetAmount` decimal(10,2) DEFAULT 0.00,
   `Branch_ID` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- 表的结构 `address`
---
-
-CREATE TABLE `address` (
-  `Address_ID` int(11) NOT NULL,
-  `Address_Line1` varchar(255) NOT NULL,
-  `Address_Line2` varchar(255) DEFAULT NULL,
-  `Address_Line3` varchar(255) DEFAULT NULL,
-  `City` varchar(100) NOT NULL,
-  `State` varchar(100) NOT NULL,
-  `Postal_Code` varchar(20) NOT NULL,
-  `Country` varchar(100) DEFAULT 'Malaysia',
-  `Donor_ID` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -86,15 +67,23 @@ CREATE TABLE `admin` (
   `Admin_ContactNumber` varchar(20) NOT NULL,
   `Admin_ICNUMBER` varchar(20) NOT NULL,
   `Admin_Email` varchar(100) NOT NULL,
-  `Admin_Password` varchar(255) NOT NULL, -- ✅ 修改：长度改为 255
+  `Admin_Password` varchar(255) NOT NULL,
   `Admin_DOB` date NOT NULL,
-  `Admin_Address` text NOT NULL,
-  `Admin_ProfilePicture` varchar(255) DEFAULT NULL, -- ✅ 新增
-  `Admin_Role` enum('Super Admin','Admin','Moderator') NOT NULL DEFAULT 'Admin', -- ✅ 新增
-  `Admin_Status` enum('Active','Inactive','Pending') NOT NULL DEFAULT 'Active', -- ✅ 新增
-  `Admin_LastLogin` datetime DEFAULT NULL, -- ✅ 新增
-  `Admin_CreatedAt` datetime DEFAULT current_timestamp(), -- ✅ 新增
-  `Admin_UpdatedAt` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(), -- ✅ 新增
+  -- ✅ 修改开始：详细地址字段
+  `Admin_Address1` varchar(255) NOT NULL,
+  `Admin_Address2` varchar(255) DEFAULT NULL,
+  `Admin_Address3` varchar(255) DEFAULT NULL,
+  `Admin_City` varchar(100) NOT NULL,
+  `Admin_State` varchar(100) NOT NULL,
+  `Admin_PostalCode` varchar(20) NOT NULL,
+  `Admin_Country` varchar(100) DEFAULT 'Malaysia',
+  -- ✅ 修改结束
+  `Admin_ProfilePicture` varchar(255) DEFAULT NULL,
+  `Admin_Role` enum('Super Admin','Admin','Moderator') NOT NULL DEFAULT 'Admin',
+  `Admin_Status` enum('Active','Inactive','Pending') NOT NULL DEFAULT 'Active',
+  `Admin_LastLogin` datetime DEFAULT NULL,
+  `Admin_CreatedAt` datetime DEFAULT current_timestamp(),
+  `Admin_UpdatedAt` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `Admin_Comment` text NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -117,6 +106,23 @@ CREATE TABLE `branch` (
 -- --------------------------------------------------------
 
 --
+-- 表的结构 `contact_messages`
+--
+
+CREATE TABLE `contact_messages` (
+  `Contact_ID` int(11) NOT NULL,
+  `Name` varchar(100) NOT NULL,
+  `Email` varchar(100) NOT NULL,
+  `Phone` varchar(20) DEFAULT NULL,
+  `Subject` varchar(255) NOT NULL,
+  `Message` text NOT NULL,
+  `Status` enum('New','Read','Replied') NOT NULL DEFAULT 'New',
+  `Created_At` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- 表的结构 `donor`
 --
 
@@ -128,7 +134,15 @@ CREATE TABLE `donor` (
   `Donor_ICNumber` varchar(20) NOT NULL,
   `Donor_Email` varchar(100) NOT NULL,
   `Donor_Password` varchar(255) NOT NULL,
-  `Donor_Address` text NOT NULL,
+  -- ✅ 修改开始：详细地址字段
+  `Donor_Address1` varchar(255) NOT NULL,
+  `Donor_Address2` varchar(255) DEFAULT NULL,
+  `Donor_Address3` varchar(255) DEFAULT NULL,
+  `Donor_City` varchar(100) NOT NULL,
+  `Donor_State` varchar(100) NOT NULL,
+  `Donor_PostalCode` varchar(20) NOT NULL,
+  `Donor_Country` varchar(100) DEFAULT 'Malaysia',
+  -- ✅ 修改结束
   `Donor_DOB` date NOT NULL,
   `Donor_Description` text NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -215,11 +229,11 @@ CREATE TABLE `orders` (
   `Order_ICNumber` varchar(20) NOT NULL,
   `Order_Email` varchar(100) NOT NULL,
   `Order_Amount` decimal(10,2) NOT NULL,
-  `Order_Points_Earned` int(11) DEFAULT 0, -- ✅ 新增
+  `Order_Points_Earned` int(11) DEFAULT 0,
   `Order_Currency` varchar(10) NOT NULL,
   `Order_PaymentMethod` varchar(50) NOT NULL,
   `Order_PaymentStatus` varchar(50) NOT NULL,
-  `Order_Admin_Status` varchar(50) DEFAULT 'Completed', -- ✅ 新增
+  `Order_Admin_Status` varchar(50) DEFAULT 'Completed',
   `Order_TXN_Ref` varchar(100) NOT NULL,
   `Order_Type` varchar(50) NOT NULL,
   `Order_Status` text NOT NULL,
@@ -376,11 +390,11 @@ CREATE TABLE `staff` (
   `Staff_DOB` date NOT NULL,
   `Staff_Address` text NOT NULL,
   `Staff_Comment` text NOT NULL,
-  `Staff_Role` varchar(50) NOT NULL DEFAULT 'Staff', -- ✅ 新增
-  `Staff_Status` varchar(50) NOT NULL DEFAULT 'Active', -- ✅ 新增
-  `Branch_ID` int(11) DEFAULT NULL, -- ✅ 新增
-  `Staff_JoinDate` date DEFAULT current_timestamp(), -- ✅ 新增
-  `Staff_ProfilePicture` varchar(255) DEFAULT NULL, -- ✅ 新增
+  `Staff_Role` varchar(50) NOT NULL DEFAULT 'Staff',
+  `Staff_Status` varchar(50) NOT NULL DEFAULT 'Active',
+  `Branch_ID` int(11) DEFAULT NULL,
+  `Staff_JoinDate` date DEFAULT current_timestamp(),
+  `Staff_ProfilePicture` varchar(255) DEFAULT NULL,
   `Admin_ID` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -410,23 +424,6 @@ CREATE TABLE `story` (
   `Story_Image` varchar(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
-
---
--- 表的结构 `contact_messages`
---
-
-CREATE TABLE `contact_messages` (
-  `Contact_ID` int(11) NOT NULL,
-  `Name` varchar(100) NOT NULL,
-  `Email` varchar(100) NOT NULL,
-  `Phone` varchar(20) DEFAULT NULL,
-  `Subject` varchar(255) NOT NULL,
-  `Message` text NOT NULL,
-  `Status` enum('New','Read','Replied') NOT NULL DEFAULT 'New',
-  `Created_At` datetime NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
 --
 -- 转储表中的数据
 --
@@ -435,8 +432,8 @@ CREATE TABLE `contact_messages` (
 -- 转储表中的数据 `admin`
 --
 
-INSERT INTO `admin` (`Admin_ID`, `Admin_FName`, `Admin_LName`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address`, `Admin_ProfilePicture`, `Admin_Role`, `Admin_Status`, `Admin_LastLogin`, `Admin_CreatedAt`, `Admin_UpdatedAt`, `Admin_Comment`) VALUES
-(1, 'Super', 'Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Love Bridge HQ', NULL, 'Super Admin', 'Active', NULL, '2025-11-28 12:00:00', '2025-11-28 12:00:00', 'System Super Administrator');
+INSERT INTO `admin` (`Admin_ID`, `Admin_FName`, `Admin_LName`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address1`, `Admin_Address2`, `Admin_Address3`, `Admin_City`, `Admin_State`, `Admin_PostalCode`, `Admin_Country`, `Admin_ProfilePicture`, `Admin_Role`, `Admin_Status`, `Admin_LastLogin`, `Admin_CreatedAt`, `Admin_UpdatedAt`, `Admin_Comment`) VALUES
+(1, 'Super', 'Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Love Bridge HQ', NULL, NULL, 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', NULL, '2025-11-28 12:00:00', '2025-11-28 12:00:00', 'System Super Administrator');
 
 --
 -- 转储表中的数据 `headquarters`
@@ -463,13 +460,6 @@ ALTER TABLE `activity`
   ADD KEY `Activity_BrANCH_ID_FK` (`Branch_ID`);
 
 --
--- 表的索引 `address`
---
-ALTER TABLE `address`
-  ADD PRIMARY KEY (`Address_ID`),
-  ADD KEY `Address_Donor_ID_FK` (`Donor_ID`);
-
---
 -- 表的索引 `admin`
 --
 ALTER TABLE `admin`
@@ -481,6 +471,12 @@ ALTER TABLE `admin`
 ALTER TABLE `branch`
   ADD PRIMARY KEY (`Branch_ID`),
   ADD KEY `branch_admin_id_fk` (`Admin_ID`);
+
+--
+-- 表的索引 `contact_messages`
+--
+ALTER TABLE `contact_messages`
+  ADD PRIMARY KEY (`Contact_ID`);
 
 --
 -- 表的索引 `donor`
@@ -607,12 +603,6 @@ ALTER TABLE `story`
   ADD PRIMARY KEY (`Story_ID`);
 
 --
--- 表的索引 `contact_messages`
---
-ALTER TABLE `contact_messages`
-  ADD PRIMARY KEY (`Contact_ID`);
-
---
 -- 在导出的表使用AUTO_INCREMENT
 --
 
@@ -629,12 +619,6 @@ ALTER TABLE `activity`
   MODIFY `Activity_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- 使用表AUTO_INCREMENT `address`
---
-ALTER TABLE `address`
-  MODIFY `Address_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
 -- 使用表AUTO_INCREMENT `admin`
 --
 ALTER TABLE `admin`
@@ -645,6 +629,12 @@ ALTER TABLE `admin`
 --
 ALTER TABLE `branch`
   MODIFY `Branch_ID` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- 使用表AUTO_INCREMENT `contact_messages`
+--
+ALTER TABLE `contact_messages`
+  MODIFY `Contact_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- 使用表AUTO_INCREMENT `donor`
@@ -749,12 +739,6 @@ ALTER TABLE `story`
   MODIFY `Story_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- 使用表AUTO_INCREMENT `contact_messages`
---
-ALTER TABLE `contact_messages`
-  MODIFY `Contact_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
 -- 限制导出的表
 --
 
@@ -763,12 +747,6 @@ ALTER TABLE `contact_messages`
 --
 ALTER TABLE `activity`
   ADD CONSTRAINT `Activity_BrANCH_ID_FK` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`);
-
---
--- 限制表 `address`
---
-ALTER TABLE `address`
-  ADD CONSTRAINT `Address_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- 限制表 `branch`
