@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- 主机： 127.0.0.1
--- 生成日期： 2025-11-28 12:45:00
+-- 生成日期： 2025-11-28 13:00:00
 -- 服务器版本： 10.4.32-MariaDB
 -- PHP 版本： 8.0.30
 
@@ -51,6 +51,15 @@ CREATE TABLE `activity` (
   `Activity_Status` varchar(50) NOT NULL,
   `Activity_GetAmount` decimal(10,2) NOT NULL,
   `Activity_TargetAmount` decimal(10,2) DEFAULT 0.00,
+  -- ✅ 新增：详细地址字段 (Activity)
+  `Activity_Address1` varchar(255) NOT NULL,
+  `Activity_Address2` varchar(255) DEFAULT NULL,
+  `Activity_Address3` varchar(255) DEFAULT NULL,
+  `Activity_City` varchar(100) NOT NULL,
+  `Activity_State` varchar(100) NOT NULL,
+  `Activity_PostalCode` varchar(20) NOT NULL,
+  `Activity_Country` varchar(100) DEFAULT 'Malaysia',
+  -- ✅ 结束
   `Branch_ID` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -69,7 +78,7 @@ CREATE TABLE `admin` (
   `Admin_Email` varchar(100) NOT NULL,
   `Admin_Password` varchar(255) NOT NULL,
   `Admin_DOB` date NOT NULL,
-  -- ✅ 修改开始：详细地址字段
+  -- ✅ 已修改：详细地址字段 (Admin)
   `Admin_Address1` varchar(255) NOT NULL,
   `Admin_Address2` varchar(255) DEFAULT NULL,
   `Admin_Address3` varchar(255) DEFAULT NULL,
@@ -77,7 +86,7 @@ CREATE TABLE `admin` (
   `Admin_State` varchar(100) NOT NULL,
   `Admin_PostalCode` varchar(20) NOT NULL,
   `Admin_Country` varchar(100) DEFAULT 'Malaysia',
-  -- ✅ 修改结束
+  -- ✅ 结束
   `Admin_ProfilePicture` varchar(255) DEFAULT NULL,
   `Admin_Role` enum('Super Admin','Admin','Moderator') NOT NULL DEFAULT 'Admin',
   `Admin_Status` enum('Active','Inactive','Pending') NOT NULL DEFAULT 'Active',
@@ -97,7 +106,15 @@ CREATE TABLE `branch` (
   `Branch_ID` int(11) NOT NULL,
   `Branch_Name` varchar(100) NOT NULL,
   `Branch_Type` varchar(50) NOT NULL,
-  `Branch_Address` text NOT NULL,
+  -- ✅ 修改：详细地址字段 (Branch)
+  `Branch_Address1` varchar(255) NOT NULL,
+  `Branch_Address2` varchar(255) DEFAULT NULL,
+  `Branch_Address3` varchar(255) DEFAULT NULL,
+  `Branch_City` varchar(100) NOT NULL,
+  `Branch_State` varchar(100) NOT NULL,
+  `Branch_PostalCode` varchar(20) NOT NULL,
+  `Branch_Country` varchar(100) DEFAULT 'Malaysia',
+  -- ✅ 结束
   `Branch_ContactNumber` varchar(20) NOT NULL,
   `Branch_Description` text NOT NULL,
   `Admin_ID` int(11) NOT NULL
@@ -134,7 +151,7 @@ CREATE TABLE `donor` (
   `Donor_ICNumber` varchar(20) NOT NULL,
   `Donor_Email` varchar(100) NOT NULL,
   `Donor_Password` varchar(255) NOT NULL,
-  -- ✅ 修改开始：详细地址字段
+  -- ✅ 已修改：详细地址字段 (Donor)
   `Donor_Address1` varchar(255) NOT NULL,
   `Donor_Address2` varchar(255) DEFAULT NULL,
   `Donor_Address3` varchar(255) DEFAULT NULL,
@@ -142,7 +159,7 @@ CREATE TABLE `donor` (
   `Donor_State` varchar(100) NOT NULL,
   `Donor_PostalCode` varchar(20) NOT NULL,
   `Donor_Country` varchar(100) DEFAULT 'Malaysia',
-  -- ✅ 修改结束
+  -- ✅ 结束
   `Donor_DOB` date NOT NULL,
   `Donor_Description` text NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -171,7 +188,7 @@ CREATE TABLE `headquarters` (
   `HQ_Name` varchar(100) NOT NULL DEFAULT 'Love Bridge Foundation',
   `HQ_ContactNumber` varchar(30) NOT NULL,
   `HQ_Email` varchar(100) NOT NULL,
-  `HQ_Address` text NOT NULL,
+  `HQ_Address` text NOT NULL, -- HQ地址通常用于AboutUs展示，保持Text较方便，也可拆分
   `HQ_Description` text NOT NULL,
   `HQ_Story` longtext NOT NULL,
   `HQ_FoundingDate` date DEFAULT NULL,
@@ -193,7 +210,15 @@ CREATE TABLE `item_donation` (
   `Item_Description` text NOT NULL,
   `Item_PhotoPath` varchar(255) NOT NULL,
   `Item_DropOff_Method` varchar(50) NOT NULL,
-  `Item_Pickup_Address` text NOT NULL,
+  -- ✅ 修改：详细地址字段 (Item Pickup)
+  `Item_Pickup_Address1` varchar(255) DEFAULT NULL,
+  `Item_Pickup_Address2` varchar(255) DEFAULT NULL,
+  `Item_Pickup_Address3` varchar(255) DEFAULT NULL,
+  `Item_Pickup_City` varchar(100) DEFAULT NULL,
+  `Item_Pickup_State` varchar(100) DEFAULT NULL,
+  `Item_Pickup_PostalCode` varchar(20) DEFAULT NULL,
+  `Item_Pickup_Country` varchar(100) DEFAULT 'Malaysia',
+  -- ✅ 结束
   `Item_Status` varchar(50) NOT NULL,
   `Item_ReceivedBy` varchar(100) NOT NULL,
   `Item_Updated_At` datetime NOT NULL,
@@ -332,7 +357,15 @@ CREATE TABLE `recurring_donation` (
 
 CREATE TABLE `redemption_order` (
   `Redemption_ID` int(11) NOT NULL,
-  `Redemption_Address` text NOT NULL,
+  -- ✅ 修改：详细地址字段 (Redemption)
+  `Redemption_Address1` varchar(255) NOT NULL,
+  `Redemption_Address2` varchar(255) DEFAULT NULL,
+  `Redemption_Address3` varchar(255) DEFAULT NULL,
+  `Redemption_City` varchar(100) NOT NULL,
+  `Redemption_State` varchar(100) NOT NULL,
+  `Redemption_PostalCode` varchar(20) NOT NULL,
+  `Redemption_Country` varchar(100) DEFAULT 'Malaysia',
+  -- ✅ 结束
   `Redemption_ContactNumber` varchar(20) NOT NULL,
   `Redemption_PointsSpent` int(11) NOT NULL,
   `Redemption_Status` varchar(50) NOT NULL,
@@ -388,7 +421,15 @@ CREATE TABLE `staff` (
   `Staff_Email` varchar(100) NOT NULL,
   `Staff_Password` varchar(15) NOT NULL,
   `Staff_DOB` date NOT NULL,
-  `Staff_Address` text NOT NULL,
+  -- ✅ 修改：详细地址字段 (Staff)
+  `Staff_Address1` varchar(255) NOT NULL,
+  `Staff_Address2` varchar(255) DEFAULT NULL,
+  `Staff_Address3` varchar(255) DEFAULT NULL,
+  `Staff_City` varchar(100) NOT NULL,
+  `Staff_State` varchar(100) NOT NULL,
+  `Staff_PostalCode` varchar(20) NOT NULL,
+  `Staff_Country` varchar(100) DEFAULT 'Malaysia',
+  -- ✅ 结束
   `Staff_Comment` text NOT NULL,
   `Staff_Role` varchar(50) NOT NULL DEFAULT 'Staff',
   `Staff_Status` varchar(50) NOT NULL DEFAULT 'Active',
@@ -425,15 +466,11 @@ CREATE TABLE `story` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- 转储表中的数据
---
-
---
 -- 转储表中的数据 `admin`
 --
 
 INSERT INTO `admin` (`Admin_ID`, `Admin_FName`, `Admin_LName`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address1`, `Admin_Address2`, `Admin_Address3`, `Admin_City`, `Admin_State`, `Admin_PostalCode`, `Admin_Country`, `Admin_ProfilePicture`, `Admin_Role`, `Admin_Status`, `Admin_LastLogin`, `Admin_CreatedAt`, `Admin_UpdatedAt`, `Admin_Comment`) VALUES
-(1, 'Super', 'Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Love Bridge HQ', NULL, NULL, 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', NULL, '2025-11-28 12:00:00', '2025-11-28 12:00:00', 'System Super Administrator');
+(1, 'Super', 'Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Level 12', 'Menara Love Bridge', 'Jalan Charity', 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', NULL, '2025-11-28 12:00:00', '2025-11-28 12:00:00', 'System Super Administrator');
 
 --
 -- 转储表中的数据 `headquarters`
