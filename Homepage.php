@@ -1,6 +1,8 @@
 <?php
 session_start(); 
 
+
+
 $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
 
 // 模拟数据库数据（如果未连接真实数据库）
@@ -408,5 +410,6 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             </div>
         </div>
     </div>
+    <?php include 'footer.php'; ?>
 </body>
 </html>

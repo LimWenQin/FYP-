@@ -4,7 +4,20 @@ include 'header_function.php';
 include 'header_UI.php';
 
 
-$query = "SELECT * FROM special_case WHERE Case_Status = 'active' ORDER BY created_at DESC";
+
+// 分页逻辑
+$cases_per_page = 4; // 每页显示4个案例(2行)
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$offset = ($page - 1) * $cases_per_page;
+
+// 获取总案例数
+$count_query = "SELECT COUNT(*) as total FROM special_case WHERE Case_Status = 'active'";
+$count_result = $conn->query($count_query);
+$total_cases = $count_result->fetch_assoc()['total'];
+$total_pages = ceil($total_cases / $cases_per_page);
+
+// 获取当前页的案例
+$query = "SELECT * FROM special_case WHERE Case_Status = 'active' ORDER BY created_at DESC LIMIT $cases_per_page OFFSET $offset";
 $result = $conn->query($query);
 ?>
 
@@ -22,6 +35,8 @@ $result = $conn->query($query);
             --light-text: #777777;
             --white: #FFFFFF;
             --shadow: rgba(0, 0, 0, 0.1);
+            --progress-bg: #e0e0e0;
+            --progress-fill: #F6B8B8;
         }
         
         * {
@@ -186,8 +201,6 @@ $result = $conn->query($query);
             font-weight: bold;
         }
         
-       
-        
         .case-container {
             padding: 30px;
             max-width: 1200px;
@@ -211,8 +224,9 @@ $result = $conn->query($query);
         
         .cases-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 30px;
+            margin-bottom: 40px;
         }
         
         .case-card {
@@ -221,6 +235,7 @@ $result = $conn->query($query);
             box-shadow: 0 4px 12px var(--shadow);
             overflow: hidden;
             transition: transform 0.3s;
+            position: relative;
         }
         
         .case-card:hover {
@@ -246,6 +261,31 @@ $result = $conn->query($query);
         .case-description {
             margin-bottom: 15px;
             color: var(--light-text);
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .case-description.expanded {
+            -webkit-line-clamp: unset;
+            overflow: visible;
+            display: block;
+        }
+        
+        .show-more-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 5px;
+            padding: 0;
+        }
+        
+        .show-more-btn:hover {
+            text-decoration: underline;
         }
         
         .progress-container {
@@ -256,6 +296,7 @@ $result = $conn->query($query);
             display: flex;
             justify-content: space-between;
             margin-bottom: 5px;
+            font-size: 14px;
         }
         
         .progress-bar {
@@ -263,6 +304,7 @@ $result = $conn->query($query);
             background-color: var(--progress-bg);
             border-radius: 5px;
             overflow: hidden;
+            margin-bottom: 5px;
         }
         
         .progress-fill {
@@ -270,6 +312,12 @@ $result = $conn->query($query);
             background-color: var(--progress-fill);
             border-radius: 5px;
             transition: width 0.5s ease-in-out;
+        }
+        
+        .progress-percentage {
+            text-align: right;
+            font-size: 12px;
+            color: var(--light-text);
         }
         
         .case-details {
@@ -333,10 +381,34 @@ $result = $conn->query($query);
             border-radius: 20px;
             font-size: 12px;
             font-weight: bold;
+            z-index: 1;
         }
         
-        .case-card {
-            position: relative;
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 30px;
+            gap: 10px;
+        }
+        
+        .pagination a, .pagination span {
+            padding: 8px 16px;
+            text-decoration: none;
+            border: 1px solid #ddd;
+            color: var(--text);
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        
+        .pagination a:hover {
+            background-color: var(--primary);
+        }
+        
+        .pagination .current {
+            background-color: var(--primary);
+            color: white;
+            border: 1px solid var(--primary);
         }
         
         @media (max-width: 768px) {
@@ -350,7 +422,7 @@ $result = $conn->query($query);
                 font-size: 28px;
             }
             
-            .container {
+            .case-container {
                 padding: 15px;
             }
             
@@ -361,7 +433,7 @@ $result = $conn->query($query);
     </style>
 </head>
 <body>
-   
+    <!-- Your header content here -->
 
     <div class="case-container">
         <h1 class="page-title">Special Cases</h1>
@@ -370,38 +442,57 @@ $result = $conn->query($query);
         <div class="cases-grid">
             <?php if ($result->num_rows > 0): ?>
                 <?php while($case = $result->fetch_assoc()): 
-                    $progress = ($case['current_amount'] / $case['target_amount']) * 100;
-                    $is_urgent = $case['urgency'] === 'high';
+                    // 计算进度百分比
+                    $raised = isset($case['Raised_Amount']) ? floatval($case['Raised_Amount']) : 0;
+                    $target = isset($case['Target_Amount']) && floatval($case['Target_Amount']) > 0 ? floatval($case['Target_Amount']) : 1;
+                    
+                    $progress = ($raised / $target) * 100;
+                    $progress = min($progress, 100); // 确保不超过100%
+                    
+                    $is_urgent = isset($case['Urgency']) && $case['Urgency'] === 'high';
+                    $donor_count = isset($case['Donor_Count']) ? $case['Donor_Count'] : 0;
                 ?>
                     <div class="case-card">
                         <?php if ($is_urgent): ?>
                             <div class="urgent-tag">URGENT</div>
                         <?php endif; ?>
-                        <img src="<?php echo !empty($case['image']) ? $case['image'] : 'images/case-default.jpg'; ?>" alt="Case Image" class="case-image">
+                        
+                        <img src="<?php echo !empty($case['image']) ? htmlspecialchars($case['image']) : 'picture/orphan.jpg'; ?>" 
+                             alt="<?php echo htmlspecialchars($case['Case_Title']); ?>" 
+                             class="case-image">
+                             
                         <div class="case-content">
-                            <h3 class="case-title"><?php echo htmlspecialchars($case['title']); ?></h3>
-                            <p class="case-description"><?php echo htmlspecialchars($case['description']); ?></p>
+                            <h3 class="case-title"><?php echo htmlspecialchars($case['Case_Title']); ?></h3>
+                            <div class="case-description-container">
+                                <p class="case-description" id="desc-<?php echo $case['Case_ID']; ?>">
+                                    <?php echo htmlspecialchars($case['Case_Description']); ?>
+                                </p>
+                                <?php if (strlen($case['Case_Description']) > 150): ?>
+                                    <button class="show-more-btn" onclick="toggleDescription(<?php echo $case['Case_ID']; ?>)">Show more</button>
+                                <?php endif; ?>
+                            </div>
                             
+                            <!-- 进度条部分 -->
                             <div class="progress-container">
                                 <div class="progress-info">
-                                    <span>Raised: RM <?php echo number_format($case['current_amount'], 2); ?></span>
-                                    <span>Goal: RM <?php echo number_format($case['target_amount'], 2); ?></span>
+                                    <span>Raised: RM <?php echo number_format($raised, 2); ?></span>
+                                    <span>Goal: RM <?php echo number_format($target, 2); ?></span>
                                 </div>
                                 <div class="progress-bar">
-                                    <div class="progress-fill" style="width: <?php echo min($progress, 100); ?>%"></div>
+                                    <div class="progress-fill" style="width: <?php echo $progress; ?>%"></div>
+                                </div>
+                                <div class="progress-percentage">
+                                    <?php echo number_format($progress, 1); ?>% funded
                                 </div>
                                 <div class="progress-info">
-                                    <span><?php echo number_format($progress, 1); ?>%</span>
-                                    <span><?php echo $case['donors_count']; ?> donors</span>
+                                    <span><?php echo $donor_count; ?> donors</span>
+                                    <span class="case-deadline">
+                                        Deadline: <?php echo date('M j, Y', strtotime($case['Case_Deadline'])); ?>
+                                    </span>
                                 </div>
                             </div>
                             
-                            <div class="case-details">
-                                <div class="case-amount">Target: RM <?php echo number_format($case['target_amount'], 2); ?></div>
-                                <div class="case-deadline">Deadline: <?php echo date('M j, Y', strtotime($case['deadline'])); ?></div>
-                            </div>
-                            
-                            <a href="donate.php?case_id=<?php echo $case['id']; ?>" class="btn btn-full">Donate Now</a>
+                            <a href="S_C_Payment_Page.php?case_id=<?php echo $case['Case_ID']; ?>" class="btn btn-full">Donate Now</a>
                         </div>
                     </div>
                 <?php endwhile; ?>
@@ -412,6 +503,42 @@ $result = $conn->query($query);
                 </div>
             <?php endif; ?>
         </div>
+        
+        <!-- 分页 -->
+        <?php if ($total_pages > 1): ?>
+            <div class="pagination">
+                <?php if ($page > 1): ?>
+                    <a href="?page=<?php echo $page - 1; ?>">&laquo; Previous</a>
+                <?php endif; ?>
+                
+                <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                    <?php if ($i == $page): ?>
+                        <span class="current"><?php echo $i; ?></span>
+                    <?php else: ?>
+                        <a href="?page=<?php echo $i; ?>"><?php echo $i; ?></a>
+                    <?php endif; ?>
+                <?php endfor; ?>
+                
+                <?php if ($page < $total_pages): ?>
+                    <a href="?page=<?php echo $page + 1; ?>">Next &raquo;</a>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
     </div>
+
+    <script>
+        function toggleDescription(caseId) {
+            const description = document.getElementById(`desc-${caseId}`);
+            const button = description.nextElementSibling;
+            
+            if (description.classList.contains('expanded')) {
+                description.classList.remove('expanded');
+                button.textContent = 'Show more';
+            } else {
+                description.classList.add('expanded');
+                button.textContent = 'Show less';
+            }
+        }
+    </script>
 </body>
 </html>

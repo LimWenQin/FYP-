@@ -333,11 +333,12 @@ if ($result && $result->num_rows > 0) {
             <div class="stories-grid">
                 <?php foreach ($stories as $story): ?>
                     <div class="story-card">
-                        <img src="<?php echo htmlspecialchars($story['Image_URL']); ?>" alt="<?php echo htmlspecialchars($story['Title']); ?>" class="story-image">
+
+                        <img src="<?php echo htmlspecialchars($story['Image_URL']); ?>" alt="<?php echo htmlspecialchars($story['Story_Title']); ?>" class="story-image">
                         <div class="story-content">
-                            <h2 class="story-title"><?php echo htmlspecialchars($story['Title']); ?></h2>
-                            <div class="story-date"><?php echo date('F j, Y', strtotime($story['Publish_Date'])); ?></div>
-                            <p class="story-excerpt"><?php echo htmlspecialchars(substr($story['Content'], 0, 150)); ?>...</p>
+                            <h2 class="story-title"><?php echo htmlspecialchars($story['Story_Title']); ?></h2>
+                            <div class="story-date"><?php echo date('F j, Y', strtotime($story['Story_Date'])); ?></div>
+                            <p class="story-excerpt"><?php echo htmlspecialchars(substr($story['Donor_Description'], 0, 150)); ?>...</p>
                             <a href="story_detail.php?id=<?php echo $story['Story_ID']; ?>" class="read-more">Read More</a>
                         </div>
                     </div>

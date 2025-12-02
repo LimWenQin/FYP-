@@ -258,7 +258,7 @@ function beforeSubmit() {
     <div class="donation-box">
         <h3>Types of donations</h3>
 
-        <form id="donationForm" method="POST" action="C_S_Payment_Ways_Page.php" onsubmit="return beforeSubmit();">
+        <form id="donationForm" method="POST" action="S_C_Payment_Ways_Page.php" onsubmit="return beforeSubmit();">
 
             <div class="donation-type">
                 <button type="button" id="onceBtn" class="active" onclick="selectType('one-time')">One-time</button>
