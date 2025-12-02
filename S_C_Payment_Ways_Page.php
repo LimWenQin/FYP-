@@ -5,7 +5,7 @@ include 'header_function.php';
 include 'header_UI_2.php';
 
 // -------------------------
-// 接收 POST 数据 (从 S_C_Payment_Page 传来的)
+// 接收 POST 数据
 // -------------------------
 $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : 0;
 $donation_type = isset($_POST['donation_type']) ? $_POST['donation_type'] : "one-time";
@@ -20,6 +20,25 @@ if ($amount <= 0 || $case_id <= 0) {
             <p>Amount or Case ID is missing.</p>
             <a href='Special_case_Page.php'>Return to Special Cases</a>
          </div>");
+}
+
+// -------------------------
+// ✅ 新增：查询 Special Case 的名字
+// -------------------------
+$case_title = "Unknown Case"; // 默认值
+
+// 连接数据库并查询
+if ($case_id > 0) {
+    $sql = "SELECT Case_Title FROM special_case WHERE Case_ID = ?";
+    if ($stmt = $conn->prepare($sql)) {
+        $stmt->bind_param("i", $case_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($row = $result->fetch_assoc()) {
+            $case_title = $row['Case_Title']; // ✅ 获取到了名字
+        }
+        $stmt->close();
+    }
 }
 ?>
 
@@ -166,17 +185,17 @@ if ($amount <= 0 || $case_id <= 0) {
     </div>
 
     <div class="story-section">
-        <h2>选择您的付款方式</h2>
-        <p>请选择一种您偏好的付款方式来完成捐款。</p>
+        <h2>Choose your payment method</h2>
+        <p>Please select your preferred payment method to complete your donation.</p>
 
         <hr style="border: 1px solid #eee; margin: 20px 0;">
 
         <h3>当前捐款详情：</h3>
-        <ul>
-            <li><strong>特殊个案编号：</strong> <?php echo htmlspecialchars($case_id); ?></li>
-            <li><strong>捐款金额：</strong> RM <?php echo htmlspecialchars(number_format($amount, 2)); ?></li>
-            <li><strong>捐款类型：</strong> <?php echo htmlspecialchars(ucfirst($donation_type)); ?></li>
-        </ul>
+<ul>
+    <li><strong>Special Case Name:</strong> <?php echo htmlspecialchars($case_title); ?></li>
+    <li><strong>Donation Amount:</strong> RM <?php echo htmlspecialchars(number_format($amount, 2)); ?></li>
+    <li><strong>Donation Type:</strong> <?php echo htmlspecialchars(ucfirst($donation_type)); ?></li>
+</ul>
     </div>
 
     <div class="donation-box">
