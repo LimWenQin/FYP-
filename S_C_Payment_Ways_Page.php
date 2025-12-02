@@ -186,12 +186,12 @@ if ($case_id > 0) {
     </div>
 
     <div class="story-section">
-        <h2>选择您的付款方式</h2>
-        <p>请选择一种您偏好的付款方式来完成捐款。</p>
+        <h2>Choose your payment method</h2>
+        <p>Please select your preferred payment method to complete your donation.</p>
 
         <hr style="border: 1px solid #eee; margin: 20px 0;">
 
-        <h3>当前捐款详情：</h3>
+        <h3>Current donation details:</h3>
         <ul>
             <li><strong>Special Case Name:</strong> <?php echo htmlspecialchars($case_title); ?></li>
             
