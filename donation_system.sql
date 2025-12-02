@@ -267,7 +267,7 @@ CREATE TABLE `orders` (
   `Donor_ID` int(11) NOT NULL,
   `Payment_ID` int(11) DEFAULT NULL,
   `Branch_ID` int(11) DEFAULT NULL,
-  `Activity_ID` int(11) NOT NULL,
+  `Activity_ID` int(11) NULL,
   `Case_ID` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
