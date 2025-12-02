@@ -5,7 +5,7 @@ include 'header_function.php';
 include 'header_UI_2.php';
 
 // -------------------------
-// 接收 POST 数据 (从 S_C_Payment_Page 传来的)
+// 接收 POST 数据
 // -------------------------
 $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : 0;
 $donation_type = isset($_POST['donation_type']) ? $_POST['donation_type'] : "one-time";
@@ -21,6 +21,28 @@ if ($amount <= 0 || $case_id <= 0) {
             <a href='Special_case_Page.php'>Return to Special Cases</a>
          </div>");
 }
+
+// -------------------------
+// ✅ 新增：用 ID 查询 Special Case 的名字
+// -------------------------
+$case_title = "Unknown Case"; // 设置一个默认值
+
+if ($case_id > 0) {
+    // 准备 SQL 语句：根据 ID 查 Title
+    $sql = "SELECT Case_Title FROM special_case WHERE Case_ID = ?";
+    
+    if ($stmt = $conn->prepare($sql)) {
+        $stmt->bind_param("i", $case_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($row = $result->fetch_assoc()) {
+            // ✅ 成功获取到了名字！
+            $case_title = $row['Case_Title']; 
+        }
+        $stmt->close();
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -29,7 +51,7 @@ if ($amount <= 0 || $case_id <= 0) {
 <title>Payment Ways - Special Case</title>
 
 <style>
-    /* ✅ 1. 统一的颜色变量 */
+    /* 样式保持不变 */
     :root 
     {
         --gradient-start: #ff6b9d;
@@ -45,13 +67,11 @@ if ($amount <= 0 || $case_id <= 0) {
         color: #4A4A4A;
     }
 
-    /* ✅ 2. 覆盖 header_UI_2 的样式，使其变成粉色渐变 */
     .header {
         background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%) !important;
         box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2);
     }
     
-    /* 强制修改文字颜色为白色 */
     .header .function-links a, 
     .header .logo {
         color: var(--white) !important;
@@ -173,9 +193,10 @@ if ($amount <= 0 || $case_id <= 0) {
 
         <h3>当前捐款详情：</h3>
         <ul>
-            <li><strong>特殊个案编号：</strong> <?php echo htmlspecialchars($case_id); ?></li>
-            <li><strong>捐款金额：</strong> RM <?php echo htmlspecialchars(number_format($amount, 2)); ?></li>
-            <li><strong>捐款类型：</strong> <?php echo htmlspecialchars(ucfirst($donation_type)); ?></li>
+            <li><strong>Special Case Name:</strong> <?php echo htmlspecialchars($case_title); ?></li>
+            
+            <li><strong>Donation Amount:</strong> RM <?php echo htmlspecialchars(number_format($amount, 2)); ?></li>
+            <li><strong>Donation Type:</strong> <?php echo htmlspecialchars(ucfirst($donation_type)); ?></li>
         </ul>
     </div>
 

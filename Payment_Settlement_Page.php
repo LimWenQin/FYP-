@@ -17,8 +17,9 @@ if ($txn_ref == '') {
     die("<h2 style='text-align:center;color:red;'>Invalid transaction reference.</h2>");
 }
 
-// ✅ 查询付款详情 (同时也获取 Donor_ID 用于加分)
-$sql = "SELECT p.*, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Order_Created_At, o.Donor_ID,
+// ✅ 查询付款详情 (同时也获取 Donor_ID, Branch_ID, Case_ID 用于判断)
+// 注意：SQL 中加入了 o.Case_ID
+$sql = "SELECT p.*, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Case_ID, o.Order_Created_At, o.Donor_ID,
                d.Donor_FName, d.Donor_LName, d.Donor_Email, d.Donor_ContactNumber, d.Donor_Address
         FROM payment p 
         JOIN orders o ON p.Payment_ID = o.Payment_ID 
@@ -47,7 +48,6 @@ $calc_status = $row['Payment_Status'];
 $points_to_add = floor($calc_amount / 10);
 
 // 执行加分逻辑
-// 条件：1. 积分>0  2. 付款成功  3. Session里没记录过这次交易
 $is_success = (stripos($calc_status, 'Success') !== false); 
 
 if ($points_to_add > 0 && $is_success && !isset($_SESSION['points_awarded_' . $txn_ref])) {
@@ -61,7 +61,7 @@ if ($points_to_add > 0 && $is_success && !isset($_SESSION['points_awarded_' . $t
     $stmt_chk->close();
 
     if ($res_chk->num_rows > 0) {
-        // 情况 A: 有记录 -> 更新 (UPDATE)
+        // 更新 (UPDATE)
         $upd_sql = "UPDATE point 
                     SET Points_Total = Points_Total + ?, 
                         Points_Earned = Points_Earned + ?, 
@@ -72,7 +72,7 @@ if ($points_to_add > 0 && $is_success && !isset($_SESSION['points_awarded_' . $t
         $stmt_upd->execute();
         $stmt_upd->close();
     } else {
-        // 情况 B: 没记录 -> 插入 (INSERT)
+        // 插入 (INSERT)
         $ins_sql = "INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) 
                     VALUES (?, ?, NOW(), ?)";
         $stmt_ins = $conn->prepare($ins_sql);
@@ -81,7 +81,7 @@ if ($points_to_add > 0 && $is_success && !isset($_SESSION['points_awarded_' . $t
         $stmt_ins->close();
     }
 
-    // 2. 标记 Session，防止用户刷新网页重复加分
+    // 2. 标记 Session
     $_SESSION['points_awarded_' . $txn_ref] = true;
 }
 // ==========================================
@@ -89,21 +89,41 @@ if ($points_to_add > 0 && $is_success && !isset($_SESSION['points_awarded_' . $t
 // ==========================================
 
 
-// ✅ 查询分行名称
-$branchName = "Unknown Branch";
-$branch_id = $row['Branch_ID'];
+// ==========================================
+// ✅ 智能显示：是分行捐款 还是 特殊个案捐款？
+// ==========================================
+$project_label = "Branch"; // 默认显示 Branch
+$project_name = "General Donation"; // 默认内容
 
-// 只有当 branch_id 有效时才查询
-if (!empty($branch_id)) {
-    $branch_sql = "SELECT Branch_Name FROM branch WHERE Branch_ID = ?";
-    $stmt = $conn->prepare($branch_sql);
-    $stmt->bind_param("i", $branch_id);
-    $stmt->execute();
-    $branch_result = $stmt->get_result();
-    if ($branch_result->num_rows > 0) {
-        $branchName = $branch_result->fetch_assoc()['Branch_Name'];
+// 1. 优先检查是否为 Special Case
+if (!empty($row['Case_ID'])) {
+    $case_id = $row['Case_ID'];
+    $c_sql = "SELECT Case_Title FROM special_case WHERE Case_ID = ?";
+    if ($c_stmt = $conn->prepare($c_sql)) {
+        $c_stmt->bind_param("i", $case_id);
+        $c_stmt->execute();
+        $c_res = $c_stmt->get_result();
+        if ($c_row = $c_res->fetch_assoc()) {
+            $project_label = "Special Case";
+            $project_name = $c_row['Case_Title'];
+        }
+        $c_stmt->close();
     }
-    $stmt->close();
+} 
+// 2. 如果不是 Case，再检查 Branch
+else if (!empty($row['Branch_ID'])) {
+    $branch_id = $row['Branch_ID'];
+    $b_sql = "SELECT Branch_Name FROM branch WHERE Branch_ID = ?";
+    if ($b_stmt = $conn->prepare($b_sql)) {
+        $b_stmt->bind_param("i", $branch_id);
+        $b_stmt->execute();
+        $b_res = $b_stmt->get_result();
+        if ($b_row = $b_res->fetch_assoc()) {
+            $project_label = "Branch";
+            $project_name = $b_row['Branch_Name'];
+        }
+        $b_stmt->close();
+    }
 }
 
 $conn->close();
@@ -237,7 +257,11 @@ $amountFormatted = "RM " . number_format($row['Order_Amount'], 2);
             <div class="info-item"><span>Order Type:</span><span><?php echo $row['Order_Type']; ?></span></div>
             <div class="info-item"><span>Status:</span><span><?php echo $row['Order_Status']; ?></span></div>
             <div class="info-item"><span>Amount:</span><span><?php echo $amountFormatted; ?></span></div>
-            <div class="info-item"><span>Branch:</span><span><?php echo $branchName; ?></span></div>
+            
+            <div class="info-item">
+                <span><?php echo htmlspecialchars($project_label); ?>:</span>
+                <span><?php echo htmlspecialchars($project_name); ?></span>
+            </div>
         </div>
 
         <a href="HomePage.php" class="back-btn">Back to Home</a>
