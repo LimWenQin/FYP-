@@ -1,85 +1,97 @@
 <?php
+// 1. 开启 Session (必须放在第一行)
+session_start();
+
+// 2. 检查登录
+if (!isset($_SESSION['donor_id'])) {
+    echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
+    exit();
+}
+
+$current_donor_id = $_SESSION['donor_id'];
+
+// 3. 引入数据库 (这个不输出 HTML，可以放前面)
 include 'dataconnection.php';
-// ✅ 设置时区（马来西亚时间）
+
+// 设置时区
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
-// ✅ 连接数据库
-//$conn = new mysqli("localhost", "root", "", "donation_system");
-//if ($conn->connect_error) {
-//   die("Connection failed: " . $conn->connect_error);
-//}
+// 4. 获取用户真实信息 (逻辑处理，不输出 HTML)
+$user_sql = "SELECT Donor_FName, Donor_LName, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
+$u_stmt = $conn->prepare($user_sql);
+$u_stmt->bind_param("i", $current_donor_id);
+$u_stmt->execute();
+$u_result = $u_stmt->get_result();
+$user_data = $u_result->fetch_assoc();
+$u_stmt->close();
 
-// ✅ 检查表单提交
-// 检查这是否是一个 POST 请求，并且它是否包含了 'cvc' 字段
+// ---------------------------------------------------------
+// 5. ✅ 关键修改：把所有处理逻辑放在 include HTML 之前！
+// ---------------------------------------------------------
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
 
-    // 接收来自表单与前一页的数据
-    $donation_type = $_POST['donation_type']; // one-time 或 monthly
-    $amount = $_POST['amount'];               // 金额
-    $branch_id = $_POST['branch_id'];         // 分行ID
-    $bank_name = $_POST['bank'];              // 银行名称
-    $card_number = $_POST['card'];            // 卡号
-    $exp = $_POST['exp'];                     // 到期日
-    $cvc = $_POST['cvc'];                     // 安全码
-    $payment_method = "Bank Transfer";
-
-    // ✅ 系统生成交易参考号与时间
+    // 接收数据
+    $donation_type = $_POST['donation_type']; 
+    $amount = $_POST['amount'];
+    $bank_name = $_POST['bank'];
+    $card_number = $_POST['card'];
+    
+    // 处理 ID 逻辑 (把 0 转为 NULL)
+    $branch_id = isset($_POST['branch_id']) && $_POST['branch_id'] != '' && $_POST['branch_id'] != '0' ? $_POST['branch_id'] : null;
+    $case_id = isset($_POST['case_id']) && $_POST['case_id'] != '' && $_POST['case_id'] != '0' ? $_POST['case_id'] : null;
+    $activity_id = isset($_POST['activity_id']) && $_POST['activity_id'] != '' && $_POST['activity_id'] != '0' ? $_POST['activity_id'] : null;
+    
     $txn_ref = "TXN-" . date("YmdHis");
     $now = date("Y-m-d H:i:s");
     $status = "Success";
-
-    // ✅ 屏蔽卡号（如：1234 **** **** 5678）
+    $payment_method = "Bank Transfer";
     $masked_card = substr($card_number, 0, 4) . " **** **** " . substr($card_number, -4);
 
-    // ✅ 1️⃣ 插入到 payment 表
-    $stmt = $conn->prepare("INSERT INTO payment 
-        (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    // 1️⃣ 插入 payment
+    $stmt = $conn->prepare("INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("sssissss", $payment_method, $status, $txn_ref, $amount, $now, $bank_name, $masked_card, $now);
     $stmt->execute();
     $payment_id = $stmt->insert_id;
     $stmt->close();
 
-    // ✅ 2️⃣ 插入到 orders 表
-    // 这里先假设捐赠人 (Donor_ID=1) 和活动 (Activity_ID=1)
+    // 2️⃣ 插入 orders
     $order_type = ($donation_type == "monthly") ? "Recurring" : "One-time";
     $order_status = "Completed";
-
+    
     $stmt = $conn->prepare("INSERT INTO orders 
         (Order_FName, Order_LName, Order_ContactNumber, Order_ICNumber, Order_Email, 
          Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, 
          Order_TXN_Ref, Order_Type, Order_Status, Order_Created_At, Order_Updated_At, 
-         Donor_ID, Payment_ID, Branch_ID, Activity_ID)
-        VALUES ('John', 'Tan', '0123456789', '990101-10-1234', 'john.tan@email.com',
-         ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 1)");
+         Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID)
+        VALUES (?, ?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    $stmt->bind_param("dsssssssii", 
-        $amount, $payment_method, $status, $txn_ref, 
-        $order_type, $order_status, $now, $now, 
-        $payment_id, $branch_id
+    $stmt->bind_param("sssssdsssssssiiiii", 
+        $user_data['Donor_FName'], $user_data['Donor_LName'], $user_data['Donor_ContactNumber'], $user_data['Donor_ICNumber'], $user_data['Donor_Email'], 
+        $amount, $payment_method, $status, $txn_ref, $order_type, $order_status, $now, $now, 
+        $current_donor_id, $payment_id, $branch_id, $activity_id, $case_id
     );
     $stmt->execute();
     $stmt->close();
 
-    // ✅ 3️⃣ 如果是每月捐款，插入 recurring_donation 表
+    // 3️⃣ 插入 recurring
     if ($donation_type == "monthly") {
         $deduction_date = date("Y-m-d", strtotime("+1 month"));
-        $stmt = $conn->prepare("INSERT INTO recurring_donation 
-            (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID)
-            VALUES (?, ?, ?, 'Active', ?, ?, 1)");
-        $stmt->bind_param("dssss", $amount, $payment_method, $deduction_date, $now, $now);
+        $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID) VALUES (?, ?, ?, 'Active', ?, ?, ?)");
+        $stmt->bind_param("dssssi", $amount, $payment_method, $deduction_date, $now, $now, $current_donor_id);
         $stmt->execute();
         $stmt->close();
     }
 
-    // ✅ 跳转到付款成功页面
+    // ✅ 跳转 (这里还没有输出 HTML，所以跳转会成功)
     header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
     exit();
 }
-include 'header_function.php';
-include 'header_UI_2.php';
 
-$conn->close();
+// ---------------------------------------------------------
+// 6. ✅ 只有逻辑处理完且没有跳转时，才加载页面 HTML
+// ---------------------------------------------------------
+include 'header_function.php'; 
+include 'header_UI_2.php'; // ⚠️ 这行代码会输出 HTML，必须放在最后！
 ?>
 
 <!DOCTYPE html>
