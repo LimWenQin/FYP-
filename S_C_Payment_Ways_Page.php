@@ -23,19 +23,22 @@ if ($amount <= 0 || $case_id <= 0) {
 }
 
 // -------------------------
-// ✅ 新增：查询 Special Case 的名字
+// ✅ 新增：用 ID 查询 Special Case 的名字
 // -------------------------
-$case_title = "Unknown Case"; // 默认值
+$case_title = "Unknown Case"; // 设置一个默认值
 
-// 连接数据库并查询
 if ($case_id > 0) {
+    // 准备 SQL 语句：根据 ID 查 Title
     $sql = "SELECT Case_Title FROM special_case WHERE Case_ID = ?";
+    
     if ($stmt = $conn->prepare($sql)) {
         $stmt->bind_param("i", $case_id);
         $stmt->execute();
         $result = $stmt->get_result();
+        
         if ($row = $result->fetch_assoc()) {
-            $case_title = $row['Case_Title']; // ✅ 获取到了名字
+            // ✅ 成功获取到了名字！
+            $case_title = $row['Case_Title']; 
         }
         $stmt->close();
     }
@@ -48,7 +51,7 @@ if ($case_id > 0) {
 <title>Payment Ways - Special Case</title>
 
 <style>
-    /* ✅ 1. 统一的颜色变量 */
+    /* 样式保持不变 */
     :root 
     {
         --gradient-start: #ff6b9d;
@@ -64,13 +67,11 @@ if ($case_id > 0) {
         color: #4A4A4A;
     }
 
-    /* ✅ 2. 覆盖 header_UI_2 的样式，使其变成粉色渐变 */
     .header {
         background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%) !important;
         box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2);
     }
     
-    /* 强制修改文字颜色为白色 */
     .header .function-links a, 
     .header .logo {
         color: var(--white) !important;
@@ -185,17 +186,18 @@ if ($case_id > 0) {
     </div>
 
     <div class="story-section">
-        <h2>Choose your payment method</h2>
-        <p>Please select your preferred payment method to complete your donation.</p>
+        <h2>选择您的付款方式</h2>
+        <p>请选择一种您偏好的付款方式来完成捐款。</p>
 
         <hr style="border: 1px solid #eee; margin: 20px 0;">
 
         <h3>当前捐款详情：</h3>
-<ul>
-    <li><strong>Special Case Name:</strong> <?php echo htmlspecialchars($case_title); ?></li>
-    <li><strong>Donation Amount:</strong> RM <?php echo htmlspecialchars(number_format($amount, 2)); ?></li>
-    <li><strong>Donation Type:</strong> <?php echo htmlspecialchars(ucfirst($donation_type)); ?></li>
-</ul>
+        <ul>
+            <li><strong>Special Case Name:</strong> <?php echo htmlspecialchars($case_title); ?></li>
+            
+            <li><strong>Donation Amount:</strong> RM <?php echo htmlspecialchars(number_format($amount, 2)); ?></li>
+            <li><strong>Donation Type:</strong> <?php echo htmlspecialchars(ucfirst($donation_type)); ?></li>
+        </ul>
     </div>
 
     <div class="donation-box">
