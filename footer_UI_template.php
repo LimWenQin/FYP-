@@ -146,7 +146,7 @@
                 <h3 class="footer-heading" style="margin-top: 20px; font-size: 16px;">Follow Us</h3>
                 <div class="social-links">
                     <a href="#" title="Facebook">f</a>
-                    <a href="#" title="WhatsApp">t</a>
+                    <a href="#" title="Twitter">t</a>
                     <a href="#" title="Instagram">in</a>
                 </div>
             </div>

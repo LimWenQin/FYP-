@@ -1,266 +1,189 @@
+<?php
+// 1. PHP 逻辑部分：检查登录状态
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+$logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
+$donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor_name']) : "Guest";
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Donor Platform</title>
-    <link rel="stylesheet" href="donor_design.css">
+    <title>Love Bridge</title>
+    
     <style>
+        /* --- 基础重置 --- */
+        body { margin: 0; padding: 0; font-family: 'Arial', sans-serif; }
+        * { box-sizing: border-box; }
+        a { text-decoration: none; transition: 0.3s; }
+        ul { list-style: none; padding: 0; margin: 0; }
+
+        /* --- 颜色变量 --- */
         :root {
-            --primary: #F6B8B8;
-            --secondary: #FFF5E4;
-            --text: #4A4A4A;
-            --light-text: #777777;
-            --white: #FFFFFF;
-            --shadow: rgba(0, 0, 0, 0.1);
+            --primary-color: #00a651; /* Colorlib 绿色 */
+            --dark-bg: #333;
+            --light-text: #fff;
+            --hover-color: #008f45;
         }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Arial', sans-serif;
+
+        /* --- 1. 顶部深色条 (Top Bar) --- */
+        .header-top-bar {
+            background-color: var(--primary-color);
+            color: var(--light-text);
+            padding: 10px 0;
+            font-size: 14px;
         }
-        
-        body {
-            background-color: var(--secondary);
-            color: var(--text);
-            line-height: 1.6;
-        }
-        
-        /* 顶部深色条 */
-        .header-top {
+        .header-container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background-color: #434141;
-            padding: 6px 50px;
-            box-shadow: 0 2px 4px var(--shadow);
+        }
+        .header-auth-links a {
+            color: var(--light-text);
+            margin-left: 15px;
+            font-weight: bold;
+        }
+        .header-auth-links a:hover { opacity: 0.8; }
+
+        /* --- 2. 主导航栏 (Main Navbar) --- */
+        .header-navbar {
+            background: #fff;
+            padding: 20px 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); /* 底部阴影 */
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
         
-        .welcome-text {
+        .header-nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Logo 样式 */
+        .header-logo a {
+            font-size: 28px;
+            font-weight: 900;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+        }
+        .header-logo img {
+            height: 50px;
+            margin-right: 10px;
+        }
+
+        /* 菜单链接 */
+        .header-menu {
+            display: flex;
+            gap: 25px;
+        }
+        .header-menu a {
+            color: #333;
+            font-weight: 500;
             font-size: 16px;
-            font-weight: bold;
-            color: white;
+            padding: 10px 5px;
+            position: relative;
         }
-        
-        .auth-buttons {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .auth-btn {
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        
-        .login-btn {
-            background-color: white;
-            color: black;
-            border: none;
-        }
-        
-        .login-btn:hover {
-            background-color: #938e8eff;
-        }
-        
-        .register-btn {
-            background-color: white;
-            color: black;
-            border: none;
-        }
-        
-        .register-btn:hover {
-            background-color: #333333;
-        }
-        
-        /* 主 Header */
-        .header {
-            display: grid;
-            grid-template-columns: 1fr 2fr 1fr; 
-            align-items: center;
-            background-color: var(--primary);
-            padding: 20px 50px;
-            box-shadow: 0 2px 6px var(--shadow);
-            gap: 20px;
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            font-weight: bold;
-            font-size: 36px;
-            gap: 10px;
-        }
-        
-        .header-right { 
-            grid-column: 2;
-            display: flex;
-            align-items: center;
-            justify-content: center; 
-            gap: 15px;
-        }
+        .header-menu a:hover { color: var(--primary-color); }
 
-        .function-links {
-            display: flex;
-            gap: 15px;
-        }
-        
-        .function-links a {
-            text-decoration: none;
-            font-size: 18px;
-            color: var(--text);
-            font-weight: bold;
-            transition: opacity 0.3s;
-            white-space: nowrap;
-        }
-        
-        .function-links a:hover {
-            opacity: 0.8;
-        }
-
-        .header-center { 
-            grid-column: 3;
+        /* 搜索框 (嵌入式) */
+        .header-search {
             display: flex;
             align-items: center;
-            justify-content: flex-end; 
-            gap: 15px;
+            border: 1px solid #ddd;
+            border-radius: 30px;
+            padding: 5px 15px;
+            margin-left: 20px;
         }
-        
-        /* 搜索框样式 (兼容 Form) */
-        .search-box {
-            display: flex;
-            align-items: center;
-            background-color: var(--white);
-            border-radius: 4px;
-            padding: 4px 8px;
-            width: auto; 
-            max-width: 250px;
-        }
-        
-        .search-box input {
+        .header-search input {
             border: none;
-            background: transparent;
-            padding: 6px;
-            width: 100%;
             outline: none;
-            font-family: inherit;
-            font-size: inherit;
+            font-size: 14px;
+            width: 120px;
         }
-        
-        .donate-btn {
-            background-color: #e74c3c;
-            color: white;
+        .header-search button {
+            background: none;
             border: none;
-            padding: 6px 18px;
-            border-radius: 4px;
             cursor: pointer;
+            color: #777;
+        }
+
+        /* 捐款按钮 */
+        .header-donate-btn {
+            background-color: var(--primary-color);
+            color: #fff !important;
+            padding: 10px 25px;
+            border-radius: 30px;
             font-weight: bold;
-            transition: background-color 0.3s;
-            white-space: nowrap;
-            text-decoration: none;
-            text-align: center;
-            display: inline-block;
+            margin-left: 15px;
+            box-shadow: 0 4px 10px rgba(0, 166, 81, 0.3);
+        }
+        .header-donate-btn:hover {
+            background-color: var(--hover-color);
+            transform: translateY(-2px);
         }
 
-        .donate-btn:hover {
-            background-color: #c0392b;
-        }
-        
-        /* 响应式设计 */
-        @media (max-width: 1024px) {
-            .header {
-                grid-template-columns: 1fr 1fr; 
-                grid-template-rows: auto auto; 
-                gap: 15px;
-            }
-            
-            .logo { 
-                grid-column: 1;
-                grid-row: 1;
-                text-align: left;
-            }
-            
-            .header-right { 
-                grid-column: 2;
-                grid-row: 1;
-                justify-content: flex-end; 
-            }
-
-            .header-center { 
-                grid-column: 1 / span 2;
-                grid-row: 2;
-                justify-content: center; 
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .header {
-                grid-template-columns: 1fr;
-                grid-template-rows: auto auto auto;
-            }
-            
-            .logo { 
-                grid-row: 1; 
-                text-align: center;
-            }
-            
-            .header-right { 
-                grid-row: 2; 
-                justify-content: center;
-            }
-
-            .header-center { 
-                grid-row: 3; 
-                flex-direction: column;
-            }
+        /* 响应式: 平板/手机端调整 */
+        @media (max-width: 900px) {
+            .header-menu { display: none; } /* 暂时隐藏菜单，可后续加汉堡菜单 */
+            .header-search { display: none; }
         }
     </style>
 </head>
 <body>
-    <header class="header-top">
-        <div class="welcome-text">
-            Welcome, <?php echo isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor_name']) : "Guest"; ?>
-        </div>
-        <div class="auth-buttons">
-            <?php if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true): ?>
-                <a href="donor_logout.php" class="auth-btn login-btn">Log out</a>
-            <?php else: ?>
-                <a href="donor_login.php" class="auth-btn login-btn">Login</a>
-                <a href="donor_register.php" class="auth-btn register-btn">Register</a>
-            <?php endif; ?>
-        </div>
-    </header>
-    
-    <header class="header">
-       <div class="logo">
-        <img src="logo.jpg" alt="Logo" width="80" height="80">
-        LOVE BRIDGE
-    </div>
-        
-        <div class="header-right">
-            <div class="function-links">
-                <a href="Activity Page.php">Activity</a>
-                <a href="History.php">History</a>
-                <a href="New&Story.php">News & Story</a>
-                <a href="Special_case Page.php">Special Case</a>
-                <a href="Profile.php">Profile</a>
+
+    <div class="header-top-bar">
+        <div class="header-container">
+            <div class="header-welcome">
+                Welcome, <b><?php echo $donor_name; ?></b>
+            </div>
+            <div class="header-auth-links">
+                <?php if ($logged_in): ?>
+                    <a href="donor_logout.php">Log out</a>
+                <?php else: ?>
+                    <a href="donor_login.php">Login</a> | <a href="donor_register.php">Register</a>
+                <?php endif; ?>
             </div>
         </div>
-        
-        <div class="header-center">
-            <form class="search-box" action="search_results.php" method="GET">
-                <input type="text" name="query" placeholder="Search..." required>
-            </form>
-            
-            <a href="Payment_page.php" class="donate-btn">Donate Now</a>
-        </div>
+    </div>
 
+    <header class="header-navbar">
+        <div class="header-container header-nav-content">
+            
+            <div class="header-logo">
+                <a href="Homepage.php">
+                    <img src="logo.jpg" alt="Logo" onerror="this.style.display='none'"> 
+                    Love Bridge
+                </a>
+            </div>
+
+            <nav>
+                <ul class="header-menu">
+                    <li><a href="Homepage.php">Home</a></li>
+                    <li><a href="Activity Page.php">Activity</a></li>
+                    <li><a href="History.php">History</a></li>
+                    <li><a href="New&Story.php">News</a></li>
+                    <li><a href="Special_case Page.php">Special Case</a></li>
+                    <li><a href="Profile.php">Profile</a></li>
+                </ul>
+            </nav>
+
+            <div style="display:flex; align-items:center;">
+                <form action="search_results.php" method="GET" class="header-search">
+                    <input type="text" name="query" placeholder="Search...">
+                    <button type="submit">🔍</button>
+                </form>
+
+                <a href="Payment_page.php" class="header-donate-btn">Donate</a>
+            </div>
+
+        </div>
     </header>
-</body>
-</html>
