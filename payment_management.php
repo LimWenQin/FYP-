@@ -147,6 +147,19 @@ $adminId = $_SESSION['admin_id'];
 $adminName = $_SESSION['admin_name'];
 $adminEmail = $_SESSION['admin_email'];
 
+// 获取管理员头像
+$adminProfilePicture = null;
+$sql = "SELECT Admin_ProfilePicture FROM admin WHERE Admin_ID = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("i", $adminId);
+$stmt->execute();
+$result = $stmt->get_result();
+if ($result && $result->num_rows > 0) {
+    $row = $result->fetch_assoc();
+    $adminProfilePicture = $row['Admin_ProfilePicture'];
+}
+$stmt->close();
+
 // 关闭数据库连接
 $conn->close();
 ?>
@@ -542,6 +555,7 @@ $conn->close();
                 <li><a href="branch_management_page.php"><i class="fas fa-map-marker-alt"></i> <span>Branch Management</span></a></li>
                 <li><a href="activity_management.php"><i class="fas fa-calendar-alt"></i> <span>Activity Management</span></a></li>
                 <li><a href="payment_management.php" class="active"><i class="fas fa-credit-card"></i> <span>Payment Management</span></a></li>
+                <li><a href="reward_item_management.php" class="active"><i class="fas fa-gift"></i> <span>Reward Items</span></a></li>
             </ul>
         </div>
     </div>
@@ -551,9 +565,6 @@ $conn->close();
         <!-- Top Navigation -->
         <div class="top-nav">
             <div class="nav-left">
-                <button class="menu-toggle" id="menuToggle">
-                    <i class="fas fa-bars"></i>
-                </button>
                 <div class="logo">
                     <a href="admin_dashboard.php">
                         <img src="logo.jpg" alt="Logo">
@@ -562,13 +573,13 @@ $conn->close();
                 </div>
                 <div class="search-bar">
                     <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Search transactions...">
+                    <input type="text" placeholder="Search...">
                 </div>
             </div>
             <div class="nav-right">
                 <div class="notification" id="notificationDropdown">
                     <i class="far fa-bell"></i>
-                    <span class="notification-count">3</span>
+                    <span class="notification-count">5</span>
                     <div class="notification-dropdown" id="notificationMenu">
                         <div class="notification-header">
                             <h3>Notifications</h3>
@@ -585,14 +596,15 @@ $conn->close();
                 <div class="user-profile" id="userProfileDropdown">
                     <div class="user-profile-with-avatar">
                         <div class="user-avatar">
-                            <?php 
-                            // 这里应该显示管理员头像，简化处理
-                            echo substr($adminName, 0, 1); 
-                            ?>
+                            <?php if (!empty($adminProfilePicture)): ?>
+                                <img src="<?php echo htmlspecialchars($adminProfilePicture); ?>" alt="Profile Picture">
+                            <?php else: ?>
+                                <?php echo substr($adminName, 0, 1); ?>
+                            <?php endif; ?>
                         </div>
                         <div class="user-details">
                             <div class="user-name"><?php echo htmlspecialchars($adminName); ?></div>
-                            <div class="user-role">Payment Manager</div>
+                            <div class="user-role">System Administrator</div>
                         </div>
                         <i class="fas fa-chevron-down" style="margin-left: 10px; font-size: 12px;"></i>
                     </div>
@@ -879,22 +891,18 @@ $conn->close();
     </div>
 
     <script>
-        // Sidebar toggle functionality
-        const menuToggle = document.getElementById('menuToggle');
+        // Sidebar hover functionality
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('mainContent');
 
-        menuToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('collapsed');
-            mainContent.classList.toggle('expanded');
-            
-            // Change icon based on state
-            const icon = menuToggle.querySelector('i');
-            if (sidebar.classList.contains('collapsed')) {
-                icon.className = 'fas fa-bars';
-            } else {
-                icon.className = 'fas fa-times';
-            }
+        sidebar.addEventListener('mouseenter', function() {
+            sidebar.classList.remove('collapsed');
+            mainContent.classList.add('expanded');
+        });
+
+        sidebar.addEventListener('mouseleave', function() {
+            sidebar.classList.add('collapsed');
+            mainContent.classList.remove('expanded');
         });
 
         // Revenue & Points Chart
@@ -1020,19 +1028,35 @@ $conn->close();
                     unread: true
                 },
                 {
-                    type: 'warning',
-                    icon: 'fas fa-exclamation-triangle',
-                    title: 'Payment Processing Delay',
-                    message: '3 payments pending verification',
-                    time: '1 hour ago',
-                    unread: true
-                },
-                {
                     type: 'info',
                     icon: 'fas fa-user-plus',
                     title: 'New Donor Registered',
                     message: 'Sarah Johnson registered as a new donor',
+                    time: '1 hour ago',
+                    unread: true
+                },
+                {
+                    type: 'warning',
+                    icon: 'fas fa-exclamation-triangle',
+                    title: 'Low Stock Alert',
+                    message: 'Reward items are running low',
                     time: '2 hours ago',
+                    unread: false
+                },
+                {
+                    type: 'danger',
+                    icon: 'fas fa-times-circle',
+                    title: 'Payment Failed',
+                    message: 'A recurring donation payment failed',
+                    time: '1 day ago',
+                    unread: false
+                },
+                {
+                    type: 'info',
+                    icon: 'fas fa-calendar-check',
+                    title: 'Activity Reminder',
+                    message: 'Charity event starts tomorrow',
+                    time: '2 days ago',
                     unread: false
                 }
             ];
