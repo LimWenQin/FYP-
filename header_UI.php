@@ -22,13 +22,12 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
 
         /* --- 颜色变量 --- */
         :root {
-            --primary-color: #00a651; /* Colorlib 绿色 */
+            --primary-color: #c82e03ff; /* Colorlib 绿色 */
             --dark-bg: #333;
             --light-text: #fff;
-            --hover-color: #008f45;
+            --hover-color: #8b1a00ff;
         }
-
-        /* --- 1. 顶部深色条 (Top Bar) --- */
+/* --- 1. 顶部深色条 (Top Bar) --- */
         .header-top-bar {
             background-color: var(--primary-color);
             color: var(--light-text);
@@ -43,12 +42,36 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             justify-content: space-between;
             align-items: center;
         }
+        
+        /* 新增：左侧信息容器样式 */
+        .header-info {
+            display: flex;
+            align-items: center;
+            gap: 20px; /* 信息之间的间隔 */
+        }
+        .header-info a {
+            color: var(--light-text);
+            margin-right: 10px;
+        }
+        .header-info span {
+            margin-right: 5px; /* 增加图标和文本的间距 */
+        }
+
+
         .header-auth-links a {
             color: var(--light-text);
             margin-left: 15px;
             font-weight: bold;
         }
         .header-auth-links a:hover { opacity: 0.8; }
+        
+        /* 新增：右侧用户/认证容器样式 */
+        .header-user-auth {
+            display: flex;
+            align-items: center;
+            gap: 15px; /* 欢迎信息和登录按钮之间的间隔 */
+        }
+
 
         /* --- 2. 主导航栏 (Main Navbar) --- */
         .header-navbar {
@@ -124,7 +147,7 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             border-radius: 30px;
             font-weight: bold;
             margin-left: 15px;
-            box-shadow: 0 4px 10px rgba(0, 166, 81, 0.3);
+            box-shadow: 0 4px 10px rgba(209, 47, 2, 0.3);
         }
         .header-donate-btn:hover {
             background-color: var(--hover-color);
@@ -135,22 +158,39 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
         @media (max-width: 900px) {
             .header-menu { display: none; } /* 暂时隐藏菜单，可后续加汉堡菜单 */
             .header-search { display: none; }
+            
+            /* 手机上隐藏顶部信息以节省空间 */
+            .header-info { display: none; }
+            .header-user-auth { 
+                gap: 10px; 
+            }
+            .header-welcome {
+                 font-size: 12px;
+            }
         }
     </style>
 </head>
 <body>
 
-    <div class="header-top-bar">
+   <div class="header-top-bar">
         <div class="header-container">
-            <div class="header-welcome">
-                Welcome, <b><?php echo $donor_name; ?></b>
+            <div class="header-info">
+                <a href="tel:+60123456789"><span>📞</span> +60 12-345 6789</a>
+                <a href="mailto:info@lovebridge.org"><span>✉️</span> info@lovebridge.org</a>
             </div>
-            <div class="header-auth-links">
-                <?php if ($logged_in): ?>
-                    <a href="donor_logout.php">Log out</a>
-                <?php else: ?>
-                    <a href="donor_login.php">Login</a> | <a href="donor_register.php">Register</a>
-                <?php endif; ?>
+            
+            <div class="header-user-auth">
+                 <div class="header-welcome">
+                    Welcome, <b><?php echo $donor_name; ?></b>
+                </div>
+                
+                <div class="header-auth-links">
+                    <?php if ($logged_in): ?>
+                        <a href="donor_logout.php">Log out</a>
+                    <?php else: ?>
+                        <a href="donor_login.php">Login</a> | <a href="donor_register.php">Register</a>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
@@ -187,3 +227,5 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
 
         </div>
     </header>
+</body>
+</html>

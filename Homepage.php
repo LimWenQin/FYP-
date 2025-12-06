@@ -1,46 +1,99 @@
 <?php
 session_start(); 
-
-
+include 'header_UI.php';
 
 $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
 
-// 模拟数据库数据（如果未连接真实数据库）
-$mock_db_data = [
-    "Donor_FName" => "Jane",
-    "Donor_LName" => "Doe",
-    "Donor_Email" => "jane.doe@example.com",
-    "Donor_ContactNumber" => "012-3456789",
-    "Donor_ICNumber" => "900101-14-5678",
-    "Donor_DOB" => "1990-01-01",
-    "Donor_Address" => "123 Mock St, Kuala Lumpur, 50450",
-    "Donor_Description" => "Loyal donor since 2022."
+// 模拟捐赠活动数据 - 每张显示5秒
+$campaigns = [
+    [
+        "id" => 1,
+        "title" => "Emergency Medical and Contingency Reserve Fund",
+        "image" => "https://images.unsplash.com/photo-1579684385127-1ef15d508118?ixlib=rb-1.2.1&auto=format&fit=crop&w=1600&q=80",
+        "description" => "It's not how much we give but how much love we put into giving!",
+        "raised" => 998676.99,
+        "goal" => 2000000.00,
+        "donors" => 5432,
+        "days_active" => 365,
+        "tagline" => "FUND RAISED"
+    ],
+    [
+        "id" => 2,
+        "title" => "Children Education Support Program",
+        "image" => "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1600&q=80",
+        "description" => "Education is the most powerful weapon which you can use to change the world.",
+        "raised" => 756432.50,
+        "goal" => 1500000.00,
+        "donors" => 3215,
+        "days_active" => 240,
+        "tagline" => "FUND RAISED"
+    ],
+    [
+        "id" => 3,
+        "title" => "Food Security and Nutrition Initiative",
+        "image" => "https://images.unsplash.com/photo-1554672408-730436b60dde?ixlib=rb-1.2.1&auto=format&fit=crop&w=1600&q=80",
+        "description" => "No one should go to bed hungry. Together we can end food insecurity.",
+        "raised" => 543210.25,
+        "goal" => 1000000.00,
+        "donors" => 2876,
+        "days_active" => 180,
+        "tagline" => "FUND RAISED"
+    ],
+    [
+        "id" => 4,
+        "title" => "Disaster Relief and Recovery Fund",
+        "image" => "https://images.unsplash.com/photo-1627637454031-58f5ac6a45b9?ixlib=rb-1.2.1&auto=format&fit=crop&w=1600&q=80",
+        "description" => "Helping communities rebuild stronger after natural disasters strike.",
+        "raised" => 1234567.89,
+        "goal" => 2500000.00,
+        "donors" => 6543,
+        "days_active" => 120,
+        "tagline" => "FUND RAISED"
+    ],
+    [
+        "id" => 5,
+        "title" => "Healthcare Access for Underprivileged",
+        "image" => "https://images.unsplash.com/photo-1551601651-2a8555f1a136?ixlib=rb-1.2.1&auto=format&fit=crop&w=1600&q=80",
+        "description" => "Quality healthcare should be accessible to everyone, regardless of income.",
+        "raised" => 876543.21,
+        "goal" => 1800000.00,
+        "donors" => 4321,
+        "days_active" => 300,
+        "tagline" => "FUND RAISED"
+    ]
 ];
 
-// 默认访客数据
-$donor = [
-    "Donor_FName" => "Guest",
-    "Donor_LName" => "",
-    "Donor_Email" => "N/A",
-    "Donor_ContactNumber" => "N/A",
-    "Donor_ICNumber" => "N/A",
-    "Donor_DOB" => "2000-01-01",
-    "Donor_Address" => "N/A",
-    "Donor_Description" => ""
+// 模拟即将举行的活动
+$upcoming_activities = [
+    [
+        "title" => "Charity Run 2024",
+        "date" => "2024-06-15",
+        "time" => "7:00 AM",
+        "location" => "KL City Park",
+        "description" => "Annual 5K charity run to raise funds for medical assistance"
+    ],
+    [
+        "title" => "Food Distribution Day",
+        "date" => "2024-06-22",
+        "time" => "9:00 AM",
+        "location" => "Community Hall",
+        "description" => "Volunteer to distribute food packages to 500 families"
+    ],
+    [
+        "title" => "Blood Donation Camp",
+        "date" => "2024-06-29",
+        "time" => "10:00 AM - 4:00 PM",
+        "location" => "Red Crescent Center",
+        "description" => "Join our blood donation campaign with target of 500 donors"
+    ],
+    [
+        "title" => "Annual Gala Dinner",
+        "date" => "2024-07-05",
+        "time" => "7:30 PM",
+        "location" => "Grand Hotel Ballroom",
+        "description" => "Fundraising dinner with special guests and auction"
+    ]
 ];
-
-// 如果已登录，尝试获取 Session 数据或 Mock 数据
-// 注意：实际项目中这里应该连接数据库查询真实用户信息
-if ($logged_in && isset($_SESSION['donor_id'])) {
-    // 这里为了演示保留了 Mock 数据，您之后可以用 SQL 查询替换它
-    $donor = $mock_db_data;
-    // 如果 Session 里有名字，覆盖 Mock 的名字
-    if(isset($_SESSION['donor_name'])) {
-        $name_parts = explode(" ", $_SESSION['donor_name']);
-        $donor['Donor_FName'] = $name_parts[0];
-        $donor['Donor_LName'] = isset($name_parts[1]) ? $name_parts[1] : "";
-    }
-}
 ?>
 
 <!DOCTYPE html>
@@ -48,368 +101,924 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Donor Dashboard</title>
-    <link rel="stylesheet" href="donor_design.css">
+    <title>Love Bridge - Donation System</title>
     <style>
         :root {
-            --primary: #F6B8B8;
-            --secondary: #FFF5E4;
-            --text: #4A4A4A;
-            --light-text: #777777;
-            --white: #FFFFFF;
-            --shadow: rgba(0, 0, 0, 0.1);
+            --primary-red: #dc2626;
+            --dark-red: #b91c1c;
+            --light-red: #fee2e2;
+            --white: #ffffff;
+            --light-gray: #f5f5f5;
+            --medium-gray: #737373;
+            --dark-gray: #262626;
+            --text-dark: #171717;
         }
-        
-        * {
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-            font-family: 'Arial', sans-serif;
-        }
-        
-        body {
-            background-color: var(--secondary);
-            color: var(--text);
-            line-height: 1.6;
-        }
-        
-        .header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: #434141;
-            padding: 6px 50px;
-            box-shadow: 0 2px 4px var(--shadow);
-        }
-        
-        .welcome-text {
-            font-size: 16px;
-            font-weight: bold;
-            color: white;
-        }
-        
-        .auth-buttons {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .auth-btn {
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        
-        .login-btn {
-            background-color: white;
-            color: black;
-            border: none;
-        }
-        
-        .login-btn:hover {
-            background-color: #938e8eff;
-        }
-        
-        .register-btn {
-            background-color: var(--text);
-            color: var(--white);
-            border: none;
-        }
-        
-        .register-btn:hover {
-            background-color: #333333;
-        }
-        
-        .header {
-            display: grid;
-            grid-template-columns: 1fr 2fr 1fr; 
-            align-items: center;
-            background-color: var(--primary);
-            padding: 20px 50px;
-            box-shadow: 0 2px 6px var(--shadow);
-            gap: 20px;
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            font-weight: bold;
-            font-size: 36px;
-            gap: 10px;
-        }
-
-        .header-right { 
-            grid-column: 2;
-            display: flex;
-            align-items: center;
-            justify-content: center; 
-            gap: 15px;
-        }
-
-        .function-links {
-            display: flex;
-            gap: 15px;
-        }
-        
-        .function-links a {
-            text-decoration: none;
-            font-size: 18px;
-            color: var(--text);
-            font-weight: bold;
-            transition: opacity 0.3s;
-            white-space: nowrap;
-        }
-        
-        .function-links a:hover {
-            opacity: 0.8;
-        }
-
-        .header-center { 
-            grid-column: 3;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end; 
-            gap: 15px;
-        }
-        
-        /* 确保 search-box 样式同样适用于 form 标签 */
-        .search-box {
-            display: flex;
-            align-items: center;
             background-color: var(--white);
-            border-radius: 4px;
-            padding: 4px 8px;
-            width: auto; 
-            max-width: 250px;
+            color: var(--text-dark);
+            overflow-x: hidden;
         }
-        
-        .search-box input {
-            border: none;
-            background: transparent;
-            padding: 6px;
+
+        .main-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        /* Hero Campaign Slider */
+        .campaign-hero {
+            position: relative;
+            height: 70vh;
+            min-height: 100%;
+            overflow: hidden;
+            margin-bottom: 40px;
+        }
+
+        .campaign-slides {
+            position: relative;
             width: 100%;
-            outline: none;
-            /* 继承字体样式 */
-            font-family: inherit;
-            font-size: inherit;
+            height: 100%;
         }
-        
-        .donate-btn {
-            background-color: #e74c3c;
-            color: white;
-            border: none;
-            padding: 6px 18px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s;
-            white-space: nowrap;
-            text-decoration: none;
+
+        .campaign-slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .campaign-slide.active {
+            opacity: 1;
+            z-index: 1;
+        }
+
+        .campaign-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: brightness(0.4);
+        }
+
+        .campaign-content {
+            position: relative;
+            z-index: 2;
+            max-width: 1200px;
+            padding: 0 40px;
             text-align: center;
+            color: white;
+        }
+
+        .days-counter {
+            font-size: 3.5rem;
+            font-weight: 800;
+            color: var(--white);
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        .time-units {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 40px;
+            font-size: 1rem;
+            color: var(--white);
+            font-weight: 500;
+        }
+
+        .fund-raised {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 40px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            border-left: 5px solid var(--primary-red);
+        }
+
+        .fund-tagline {
+            font-size: 1.5rem;
+            color: var(--white);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: 700;
+        }
+
+        .fund-amount {
+            font-size: 4rem;
+            font-weight: 800;
+            color: var(--white);
+            margin-bottom: 15px;
+        }
+
+        .fund-title {
+            font-size: 1.8rem;
+            color: var(--white);
+            margin-bottom: 30px;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        .donate-btn {
             display: inline-block;
+            background: var(--primary-red);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            margin-bottom: 30px;
         }
 
         .donate-btn:hover {
-            background-color: #c0392b;
+            background: var(--dark-red);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         }
-        
-        .donor-container {
-            padding: 30px;
+
+        .campaign-description {
+            font-size: 1.3rem;
+            color: var(--white);
+            font-style: italic;
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.6;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        /* Slider Controls */
+        .slider-controls {
+            position: absolute;
+            bottom: 8px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3;
+            gap: 20px;
+        }
+
+        .slider-dots {
+            display: flex;
+            gap: 10px;
+        }
+
+        .slider-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .slider-dot.active {
+            background: var(--primary-red);
+            border-color: var(--primary-red);
+            transform: scale(1.2);
+        }
+
+        .slider-dot:hover {
+            background: var(--primary-red);
+            border-color: white;
+        }
+
+        /* Progress Bar */
+        .progress-bar-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 3;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--primary-red);
+            width: 0%;
+            transition: width 5s linear;
+        }
+
+        .progress-bar.active {
+            width: 100%;
+        }
+
+        /* Campaign Stats */
+        .campaign-stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+            background: rgba(220, 38, 38, 0.1);
+            padding: 15px 25px;
+            border-radius: 5px;
+            min-width: 140px;
+            border: 1px solid rgba(220, 38, 38, 0.3);
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--white);
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Section Titles */
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            color: var(--primary-red);
+            margin-bottom: 40px;
+            position: relative;
+            font-weight: 800;
+            padding-bottom: 15px;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: var(--primary-red);
+            border-radius: 2px;
+        }
+
+        /* Vision & Mission Section */
+        .vision-mission-section {
+            padding: 60px 40px;
+            background: var(--light-gray);
+            margin-bottom: 60px;
+        }
+
+        .vm-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 40px;
             max-width: 1200px;
             margin: 0 auto;
         }
-        
-        .welcome-section {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-        
-        .welcome-section h1 {
-            font-size: 36px;
-            margin-bottom: 10px;
-        }
-        
-        .dashboard-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-        
-        .card {
-            background-color: var(--white);
+
+        .vm-card {
+            background: var(--white);
             border-radius: 10px;
-            box-shadow: 0 4px 12px var(--shadow);
-            padding: 20px;
-            transition: transform 0.3s;
+            padding: 40px;
+            border-left: 5px solid var(--primary-red);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
         }
-        
-        .card:hover {
+
+        .vm-card:hover {
             transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(220, 38, 38, 0.1);
         }
-        
-        .card h3 {
-            margin-bottom: 15px;
-            color: var(--primary);
-            border-bottom: 2px solid var(--primary);
-            padding-bottom: 10px;
+
+        .vm-card h3 {
+            font-size: 2rem;
+            color: var(--primary-red);
+            margin-bottom: 20px;
+            font-weight: 700;
         }
-        
-        .info-item {
-            margin-bottom: 10px;
+
+        .vm-card p {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: var(--text-dark);
+            margin-bottom: 25px;
+        }
+
+        .vm-points {
+            list-style: none;
+            padding: 0;
+        }
+
+        .vm-points li {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--light-gray);
             display: flex;
-            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-dark);
+            font-size: 1.1rem;
         }
-        
-        .info-label {
+
+        .vm-points li:last-child {
+            border-bottom: none;
+        }
+
+        .point-icon {
+            color: var(--primary-red);
+            font-size: 1.2rem;
             font-weight: bold;
         }
-        
-        .card a {
-            color: var(--primary);
-            text-decoration: none;
-            display: block;
+
+        /* Upcoming Activities */
+        .activities-section {
+            padding: 60px 40px;
+            background: var(--white);
+            margin-bottom: 60px;
+        }
+
+        .activities-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .activity-card {
+            background: var(--light-gray);
+            border-radius: 10px;
+            padding: 30px;
+            border-left: 5px solid var(--primary-red);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .activity-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .activity-date {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--primary-red);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .activity-title {
+            font-size: 1.5rem;
+            color: var(--text-dark);
+            margin-bottom: 20px;
+            font-weight: 700;
+            padding-right: 100px;
+        }
+
+        .activity-details {
+            margin-bottom: 20px;
+        }
+
+        .activity-detail {
+            display: flex;
+            align-items: center;
+            gap: 10px;
             margin-bottom: 10px;
-            transition: color 0.3s;
+            color: var(--medium-gray);
+            font-size: 1rem;
         }
-        
-        .card a:hover {
-            color: #e74c3c;
+
+        .activity-description {
+            color: var(--medium-gray);
+            line-height: 1.6;
+            font-size: 1rem;
         }
-        
+
+        /* Call to Action */
+        .cta-section {
+            padding: 80px 40px;
+            background: var(--primary-red);
+            text-align: center;
+            margin-bottom: 0;
+        }
+
+        .cta-content {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .cta-section h2 {
+            font-size: 3rem;
+            color: white;
+            margin-bottom: 25px;
+            font-weight: 800;
+        }
+
+        .cta-section p {
+            font-size: 1.3rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 50px;
+            line-height: 1.8;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 15px 35px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 180px;
+        }
+
+        .btn-primary {
+            background: white;
+            color: var(--primary-red);
+        }
+
+        .btn-primary:hover {
+            background: var(--light-gray);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-3px);
+        }
+
+        /* Stats Overview */
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto 60px;
+            padding: 0 40px;
+        }
+
+        .stat-card {
+            background: var(--white);
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            border-top: 5px solid var(--primary-red);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-card .number {
+            font-size: 3rem;
+            font-weight: 800;
+            color: var(--primary-red);
+            margin-bottom: 10px;
+        }
+
+        .stat-card .label {
+            font-size: 1.2rem;
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .campaign-hero {
+                height: 65vh;
+                min-height: 450px;
+            }
+        }
+
         @media (max-width: 1024px) {
-            .header {
-                grid-template-columns: 1fr 1fr; 
-                grid-template-rows: auto auto; 
-                gap: 15px;
+            .days-counter {
+                font-size: 3rem;
             }
-            .logo { 
-                grid-column: 1;
-                grid-row: 1;
-                text-align: left;
+            
+            .fund-amount {
+                font-size: 3.5rem;
             }
-            .header-right { 
-                grid-column: 2;
-                grid-row: 1;
-                justify-content: flex-end; 
+            
+            .vm-grid {
+                grid-template-columns: 1fr;
             }
-            .header-center { 
-                grid-column: 1 / span 2;
-                grid-row: 2;
-                justify-content: center; 
+            
+            .campaign-hero {
+                height: 60vh;
+                min-height: 400px;
+            }
+            
+            .section-title {
+                font-size: 2.2rem;
             }
         }
-        
+
         @media (max-width: 768px) {
-            .header {
+            .days-counter {
+                font-size: 2.5rem;
+            }
+            
+            .time-units {
+                gap: 20px;
+                font-size: 0.9rem;
+                flex-wrap: wrap;
+            }
+            
+            .fund-amount {
+                font-size: 2.5rem;
+            }
+            
+            .fund-title {
+                font-size: 1.5rem;
+            }
+            
+            .section-title {
+                font-size: 2rem;
+            }
+            
+            .vm-card {
+                padding: 30px;
+            }
+            
+            .campaign-stats {
+                gap: 20px;
+            }
+            
+            .stat-item {
+                min-width: 120px;
+                padding: 12px 20px;
+            }
+            
+            .stat-value {
+                font-size: 1.5rem;
+            }
+            
+            .donate-btn {
+                padding: 12px 30px;
+                font-size: 1.1rem;
+            }
+            
+            .cta-section h2 {
+                font-size: 2.5rem;
+            }
+            
+            .btn {
+                padding: 14px 30px;
+                min-width: 160px;
+            }
+            
+            .slider-controls {
+                bottom: 15px;
+            }
+            
+            .stats-overview {
+                grid-template-columns: repeat(2, 1fr);
+                padding: 0 20px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .campaign-hero {
+                height: 55vh;
+                min-height: 350px;
+            }
+            
+            .days-counter {
+                font-size: 2rem;
+            }
+            
+            .fund-raised {
+                padding: 25px;
+            }
+            
+            .fund-amount {
+                font-size: 2rem;
+            }
+            
+            .donate-btn {
+                padding: 12px 25px;
+                font-size: 1rem;
+            }
+            
+            .cta-section h2 {
+                font-size: 2rem;
+            }
+            
+            .btn {
+                padding: 12px 25px;
+                min-width: 100%;
+            }
+            
+            .vm-grid {
                 grid-template-columns: 1fr;
-                grid-template-rows: auto auto auto;
             }
-            .logo { 
-                grid-row: 1; 
-                text-align: center;
+            
+            .activities-grid {
+                grid-template-columns: 1fr;
             }
-            .header-right { 
-                grid-row: 2; 
-                justify-content: center;
+            
+            .vm-card, .activity-card {
+                padding: 25px;
             }
-            .header-center { 
-                grid-row: 3; 
+            
+            .cta-buttons {
                 flex-direction: column;
+                align-items: center;
+            }
+            
+            .stats-overview {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-    <header class="header-top">
-        <div class="welcome-text">
-            Welcome, <?php echo isset($_SESSION['donor_name']) ? $_SESSION['donor_name'] : "Guest"; ?>
-        </div>
-        <div class="auth-buttons">
-            <?php if ($logged_in): ?>
-                <a href="donor_logout.php" class="auth-btn login-btn">Log out</a>
-            <?php else: ?>
-                <a href="donor_login.php" class="auth-btn login-btn">Login</a>
-                <a href="donor_register.php" class="auth-btn register-btn">Register</a>
-            <?php endif; ?>
-        </div>
-    </header>
-    
-    <header class="header">
-        
-        <div class="logo">
-            <img src="logo.jpg" alt="Logo" width="80" height="80">
-            LOVE BRIDGE
-        </div>
-        
-        <div class="header-right">
-            <div class="function-links">
-                <a href="Activity Page.php">Activity</a>
-                <a href="History.php">History</a>
-                <a href="New&Story.php">News & Story</a>
-                <a href="Special_case Page.php">Special Case</a>
-                <a href="Profile.php">Profile</a>
+    <div class="main-container">
+        <!-- Hero Campaign Slider -->
+        <section class="campaign-hero">
+            <div class="campaign-slides">
+                <?php foreach ($campaigns as $index => $campaign): ?>
+                <div class="campaign-slide <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>">
+                    <img src="<?php echo $campaign['image']; ?>" alt="<?php echo $campaign['title']; ?>" class="campaign-image">
+                    <div class="campaign-content">
+                        <div class="days-counter">
+                            <?php echo $campaign['days_active']; ?> Days
+                        </div>
+                        <div class="time-units">
+                            <span>Hours | 15 Hours</span>
+                            <span>49 Mins</span>
+                            <span>27 Seconds</span>
+                        </div>
+                        
+                        <div class="fund-raised">
+                            <div class="fund-tagline"><?php echo $campaign['tagline']; ?></div>
+                            <div class="fund-amount">RM <?php echo number_format($campaign['raised'], 2); ?></div>
+                            <div class="fund-title"><?php echo $campaign['title']; ?></div>
+                            <button class="donate-btn" onclick="window.location.href='donate.php?campaign=<?php echo $campaign['id']; ?>'">
+                                DONATE NOW
+                            </button>
+                            <div class="campaign-description">
+                                <?php echo $campaign['description']; ?>
+                            </div>
+                        </div>
+                        
+                        <div class="campaign-stats">
+                            <div class="stat-item">
+                                <div class="stat-value">RM <?php echo number_format($campaign['goal']); ?></div>
+                                <div class="stat-label">Target Goal</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value"><?php echo number_format($campaign['donors']); ?></div>
+                                <div class="stat-label">Total Donors</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value"><?php echo round(($campaign['raised'] / $campaign['goal']) * 100); ?>%</div>
+                                <div class="stat-label">Progress</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
             </div>
-        </div>
-        
-        <div class="header-center">
-            <form class="search-box" action="search_results.php" method="GET">
-                <input type="text" name="query" placeholder="Search..." required>
-            </form>
             
-            <a href="Payment_page.php" class="donate-btn">Donate Now</a>
-        </div>
-    </header>
+            <!-- Progress Bar -->
+            <div class="progress-bar-container">
+                <div class="progress-bar <?php echo 'active'; ?>"></div>
+            </div>
+            
+            <!-- Slider Controls -->
+            <div class="slider-controls">
+                <div class="slider-dots">
+                    <?php foreach ($campaigns as $index => $campaign): ?>
+                    <div class="slider-dot <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>"></div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </section>
 
-    <div class="donor-container">
-        <div class="welcome-section">
-            <h1>Welcome to LOVE BRIDGE</h1>
-            <p>Thank you for being part of our donor community</p>
-        </div>
-        
-        <div class="dashboard-cards">
-            <div class="card">
-                <h3>Personal Information</h3>
-                <div class="info-item">
-                    <span class="info-label">Name:</span>
-                    <span><?php echo htmlspecialchars($donor['Donor_FName'] . ' ' . $donor['Donor_LName']); ?></span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Email:</span>
-                    <span><?php echo htmlspecialchars($donor['Donor_Email']); ?></span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Contact:</span>
-                    <span><?php echo htmlspecialchars($donor['Donor_ContactNumber']); ?></span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">IC Number:</span>
-                    <span><?php echo htmlspecialchars($donor['Donor_ICNumber']); ?></span>
-                </div>
+        <!-- Stats Overview -->
+        <div class="stats-overview">
+            <div class="stat-card">
+                <div class="number">5,432</div>
+                <div class="label">Active Donors</div>
             </div>
-            
-            <div class="card">
-                <h3>Additional Details</h3>
-                <div class="info-item">
-                    <span class="info-label">Date of Birth:</span>
-                    <span><?php echo date('F j, Y', strtotime($donor['Donor_DOB'])); ?></span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Address:</span>
-                    <span><?php echo htmlspecialchars($donor['Donor_Address']); ?></span>
-                </div>
-                <?php if (!empty($donor['Donor_Description'])): ?>
-                <div class="info-item">
-                    <span class="info-label">Description:</span>
-                    <span><?php echo htmlspecialchars($donor['Donor_Description']); ?></span>
-                </div>
-                <?php endif; ?>
+            <div class="stat-card">
+                <div class="number">RM 4.5M</div>
+                <div class="label">Total Raised</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">127</div>
+                <div class="label">Projects Completed</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">23</div>
+                <div class="label">Active Campaigns</div>
             </div>
         </div>
+
+        <!-- Vision & Mission Section -->
+        <section class="vision-mission-section">
+            <h2 class="section-title">Our Purpose</h2>
+            <div class="vm-grid">
+                <div class="vm-card">
+                    <h3>Our Vision</h3>
+                    <p>To create a world where compassion bridges every gap, and no one is left behind in times of need. We envision communities where every individual has access to basic necessities, healthcare, education, and opportunities for a dignified life.</p>
+                    <ul class="vm-points">
+                        <li><span class="point-icon">•</span> Build sustainable support systems for vulnerable communities</li>
+                        <li><span class="point-icon">•</span> Create bridges of hope between donors and recipients</li>
+                        <li><span class="point-icon">•</span> Foster a culture of giving and social responsibility</li>
+                        <li><span class="point-icon">•</span> Ensure every donation creates maximum impact</li>
+                    </ul>
+                </div>
+                
+                <div class="vm-card">
+                    <h3>Our Mission</h3>
+                    <p>To efficiently connect compassionate donors with credible causes through a transparent, secure, and user-friendly platform. We are committed to ensuring that every contribution, big or small, reaches those who need it most.</p>
+                    <ul class="vm-points">
+                        <li><span class="point-icon">•</span> Provide immediate relief during emergencies and crises</li>
+                        <li><span class="point-icon">•</span> Support long-term community development projects</li>
+                        <li><span class="point-icon">•</span> Maintain 100% transparency in fund allocation</li>
+                        <li><span class="point-icon">•</span> Engage and empower volunteers in meaningful work</li>
+                        <li><span class="point-icon">•</span> Educate and raise awareness about social issues</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Upcoming Activities -->
+        <section class="activities-section">
+            <h2 class="section-title">Upcoming Activities</h2>
+            <div class="activities-grid">
+                <?php foreach ($upcoming_activities as $activity): ?>
+                <div class="activity-card">
+                    <div class="activity-date">
+                        <?php echo date('M j', strtotime($activity['date'])); ?>
+                    </div>
+                    <h3 class="activity-title"><?php echo $activity['title']; ?></h3>
+                    <div class="activity-details">
+                        <div class="activity-detail">
+                            <span><?php echo $activity['time']; ?></span>
+                        </div>
+                        <div class="activity-detail">
+                            <span><?php echo $activity['location']; ?></span>
+                        </div>
+                    </div>
+                    <p class="activity-description"><?php echo $activity['description']; ?></p>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </section>
+
+        <!-- Call to Action -->
+        <section class="cta-section">
+            <div class="cta-content">
+                <h2>Be the Bridge of Hope</h2>
+                <p>Your generosity has the power to transform lives. Whether through donations, volunteering, or spreading awareness, you can be part of creating positive change in our community. Join us in building bridges of compassion.</p>
+                <div class="cta-buttons">
+                    <a href="donate.php" class="btn btn-primary">
+                        Make a Donation
+                    </a>
+                    <a href="volunteer.php" class="btn btn-secondary">
+                        Join as Volunteer
+                    </a>
+                    <a href="campaigns.php" class="btn btn-secondary">
+                        View All Campaigns
+                    </a>
+                </div>
+            </div>
+        </section>
     </div>
+    
     <?php include 'footer.php'; ?>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const slides = document.querySelectorAll('.campaign-slide');
+            const dots = document.querySelectorAll('.slider-dot');
+            const progressBar = document.querySelector('.progress-bar');
+            
+            let currentSlide = 0;
+            let slideInterval;
+            const slideDuration = 5000; // 5 seconds
+            
+            function showSlide(index) {
+                // Hide all slides
+                slides.forEach(slide => {
+                    slide.classList.remove('active');
+                });
+                dots.forEach(dot => {
+                    dot.classList.remove('active');
+                });
+                
+                // Show current slide
+                slides[index].classList.add('active');
+                dots[index].classList.add('active');
+                currentSlide = index;
+                
+                // Reset and restart progress bar animation
+                progressBar.classList.remove('active');
+                void progressBar.offsetWidth; // Trigger reflow
+                progressBar.classList.add('active');
+            }
+            
+            function nextSlide() {
+                currentSlide = (currentSlide + 1) % slides.length;
+                showSlide(currentSlide);
+            }
+            
+            function startSlider() {
+                slideInterval = setInterval(nextSlide, slideDuration);
+            }
+            
+            function stopSlider() {
+                clearInterval(slideInterval);
+            }
+            
+            // Initialize
+            showSlide(currentSlide);
+            startSlider();
+            
+            // Dot click events
+            dots.forEach(dot => {
+                dot.addEventListener('click', (e) => {
+                    stopSlider();
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    showSlide(index);
+                    startSlider();
+                });
+            });
+            
+            // Pause on hover
+            const heroSection = document.querySelector('.campaign-hero');
+            heroSection.addEventListener('mouseenter', stopSlider);
+            heroSection.addEventListener('mouseleave', startSlider);
+            
+            // Progress bar animation
+            progressBar.style.transition = `width ${slideDuration}ms linear`;
+        });
+        
+        // Update time units every second
+        function updateTime() {
+            const now = new Date();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+            
+            // Update all time displays
+            document.querySelectorAll('.time-units').forEach(timeUnit => {
+                timeUnit.innerHTML = `
+                    <span>Hours | ${hours} Hours</span>
+                    <span>${minutes} Mins</span>
+                    <span>${seconds} Seconds</span>
+                `;
+            });
+        }
+        
+        // Initial call and set interval
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
 </body>
 </html>

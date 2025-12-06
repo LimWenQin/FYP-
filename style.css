@@ -1,0 +1,246 @@
+/* -------------------------------------------------------
+   TOP UTILITY BAR
+-------------------------------------------------------- */
+.utility-bar {
+  background: #2D3748;
+  color: white;
+  font-size: 11px;
+  padding: 6px 16px;
+  letter-spacing: 0.5px;
+}
+
+.utility-bar-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .utility-bar-inner {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.utility-left,
+.utility-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  opacity: 0.9;
+}
+
+.utility-right a {
+  color: white;
+  transition: color 0.2s;
+}
+
+.utility-right a:hover {
+  color: #ffffff;
+}
+
+.utility-divider {
+  width: 1px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.utility-lang {
+  display: flex;
+  gap: 4px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.utility-lang:hover {
+  color: white;
+}
+
+/* -------------------------------------------------------
+   NAVBAR MAIN
+-------------------------------------------------------- */
+.navbar {
+  background: white;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f3f3;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.navbar-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  height: 80px;
+}
+
+/* -------------------------------------------------------
+   LOGO
+-------------------------------------------------------- */
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  margin-right: 32px;
+  transition: 0.3s;
+}
+
+.logo-icon-wrapper {
+  position: relative;
+  transition: transform 0.3s;
+}
+
+.logo-icon-wrapper:hover {
+  transform: scale(1.05);
+}
+
+.logo-text-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #333333;
+  letter-spacing: -0.5px;
+  line-height: 1;
+  transition: color 0.3s;
+}
+
+.logo-area:hover .logo-text-title {
+  color: #D32F2F;
+}
+
+.logo-text-sub {
+  font-size: 9px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-top: 2px;
+}
+
+/* -------------------------------------------------------
+   NAV LINKS
+-------------------------------------------------------- */
+.nav-links {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.nav-link {
+  white-space: nowrap;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #666;
+  text-transform: uppercase;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  transition: 0.2s;
+}
+
+.nav-link:hover {
+  background: #fee2e2;
+  color: #D32F2F;
+}
+
+/* -------------------------------------------------------
+   RIGHT SECTION
+-------------------------------------------------------- */
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.nav-search {
+  color: #9ca3af;
+  transition: 0.2s;
+  padding: 8px;
+  border-radius: 50%;
+}
+
+.nav-search:hover {
+  color: #D32F2F;
+  background: #f7f7f7;
+}
+
+/* Donate Button */
+.donate-btn {
+  background: #D32F2F;
+  color: white;
+  padding: 10px 24px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  box-shadow: 0px 4px 10px rgba(211, 47, 47, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: 0.2s;
+}
+
+.donate-btn:hover {
+  background: #B71C1C;
+  transform: translateY(-2px);
+}
+
+/* User Mini */
+.user-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: 16px;
+  border-left: 1px solid #f0f0f0;
+}
+
+.user-info {
+  display: none;
+  flex-direction: column;
+  text-align: right;
+}
+
+@media (min-width: 768px) {
+  .user-info {
+    display: flex;
+  }
+}
+
+.user-welcome {
+  font-size: 9px;
+  color: #aaa;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.user-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #222;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  background: #f8f8f8;
+  border: 1px solid #eee;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  transition: 0.2s;
+}
+
+.user-avatar:hover {
+  background: #D32F2F;
+  color: white;
+}

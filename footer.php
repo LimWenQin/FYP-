@@ -37,7 +37,7 @@
             margin-bottom: 20px;
             font-weight: bold;
             display: inline-block;
-            border-bottom: 2px solid #00a651; /* 绿色下划线 */
+            border-bottom: 2px solid #c02a01ff; /* 绿色下划线 */
             padding-bottom: 5px;
         }
 
@@ -60,30 +60,7 @@
             padding-left: 5px; /* 悬停时稍微右移 */
         }
 
-        /* --- 订阅表单 --- */
-        .subscribe-form {
-            display: flex;
-            margin-bottom: 20px;
-        }
-        .subscribe-form input {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 4px 0 0 4px;
-            outline: none;
-        }
-        .subscribe-form button {
-            background-color: #00a651;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 0 4px 4px 0;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .subscribe-form button:hover {
-            background-color: #008f45;
-        }
+        
 
         /* --- 社交媒体图标 (用字符代替) --- */
         .social-links a {
@@ -101,7 +78,7 @@
             transition: 0.3s;
         }
         .social-links a:hover {
-            background: #00a651;
+            background: #c82e03ff;
         }
 
         /* --- 版权信息 --- */
@@ -135,13 +112,7 @@
             </div>
 
             <div class="footer-col">
-                <h3 class="footer-heading">Subscribe</h3>
-                <p>Subscribe to our newsletter to get latest updates.</p>
-                
-                <form action="#" class="subscribe-form">
-                    <input type="email" placeholder="Enter Email">
-                    <button type="submit">Subscribe</button>
-                </form>
+               
 
                 <h3 class="footer-heading" style="margin-top: 20px; font-size: 16px;">Follow Us</h3>
                 <div class="social-links">

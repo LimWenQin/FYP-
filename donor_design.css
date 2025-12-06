@@ -1,252 +1,100 @@
-:root {
-    /* 使用Admin Common CSS的颜色变量 */
-    --primary: #ff6b9d; /* 替换原来的 #F6B8B8 */
-    --secondary: #fff5f7; /* 替换原来的 #FFF5E4 (使用Admin Light Background) */
-    --text: #4a4a4a; /* 替换原来的 #4A4A4A (使用Admin Dark Text) */
-    --light-text: #7f8c8d; /* 替换原来的 #777777 */
-    --white: #ffffff; /* 保持不变 */
-    --shadow: rgba(255, 107, 157, 0.15); /* 使用Admin Card Shadow的颜色 */
-    --error: #e74c3c; /* 保持不变 */
-    --success: #2ecc71; /* 保持不变 */
-    --gradient-start: #ff6b9d;
-    --gradient-middle: #ff8fab;
-    --gradient-end: #ffb3c6;
-    --light-pink: #ffb3c6;
-}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&display=swap');
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    /* 采用Admin Common CSS中的字体 */
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+:root {
+  --color-brand-red: #D32F2F;
+  --color-brand-red-hover: #B71C1C;
+  --color-brand-orange: #FB8C00;
+  
+  --color-text-main: #2D3748; /* Softer dark gray for text */
+  --color-text-muted: #718096;
+  
+  /* Bright & Warm Theme Colors */
+  --color-bg-page: #FDFCF8; /* Very subtle warm cream for page background */
+  --color-bg-card: #FDFBF7; /* Warm Ivory for cards (Not stark white) */
+  --color-border-subtle: #EFEBE5;
 }
 
 body {
-    /* 采用Admin Common CSS中的背景渐变 */
-    background: linear-gradient(135deg, var(--secondary) 0%, #fff0f5 100%);
-    color: var(--text);
-    line-height: 1.6;
-    display: flex; /* 保持居中布局 */
-    min-height: 100vh;
-    flex-direction: column;
+  font-family: 'Inter', sans-serif;
+  color: var(--color-text-main);
+  background-color: var(--color-bg-page);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* --- Header Styles - 采用Admin Header的风格 --- */
-.header {
-    /* 使用Admin Header的渐变背景 */
-    background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%);
-    color: var(--white); /* 文本颜色改为白色 */
-    padding: 20px 50px;
-    box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2); /* 采用Admin的阴影风格 */
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/* --- Utilities --- */
+
+.text-brand-red { color: var(--color-brand-red); }
+.bg-brand-red { background-color: var(--color-brand-red); }
+.border-brand-red { border-color: var(--color-brand-red); }
+
+/* --- Components --- */
+
+/* Warm Card Style */
+.bg-card-warm {
+  background-color: var(--color-bg-card);
+  border: 1px solid var(--color-border-subtle);
 }
 
-.logo {
-    font-weight: bold;
-    font-size: 30px; /* 稍微调小以适应白色文本 */
-    color: var(--white); /* 标志颜色改为白色 */
+.shadow-card {
+  box-shadow: 0 4px 6px -1px rgba(168, 162, 158, 0.1), 0 2px 4px -1px rgba(168, 162, 158, 0.06);
 }
 
-.header .function-links a {
-    margin-left: 20px;
-    text-decoration: none;
-    font-size: 18px;
-    color: var(--white); /* 链接颜色改为白色 */
-    font-weight: 500;
-    transition: color 0.3s, border-bottom 0.3s;
-    padding-bottom: 2px;
+.shadow-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(168, 162, 158, 0.15), 0 4px 6px -2px rgba(168, 162, 158, 0.1);
+  border-color: #E2DBD4;
 }
 
-.header .function-links a:hover {
-    color: var(--white);
-    border-bottom: 2px solid var(--white); /* 悬停效果更明显 */
-    opacity: 1;
+/* Button Components */
+.btn-primary {
+  background-color: var(--color-brand-red);
+  color: white;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px rgba(211, 47, 47, 0.2);
+  cursor: pointer;
+  border: none;
 }
 
-.search {
-    padding: 8px 12px;
-    font-size: 16px;
-    border: none; /* 移除边框 */
-    border-radius: 20px; /* 更加圆润 */
-    outline: none;
-    background-color: rgba(255, 255, 255, 0.2); /* 透明背景 */
-    color: var(--white);
-    transition: background-color 0.3s, box-shadow 0.3s;
+.btn-primary:hover {
+  background-color: var(--color-brand-red-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 8px rgba(211, 47, 47, 0.3);
 }
 
-.search::placeholder {
-    color: rgba(255, 255, 255, 0.7);
+.btn-outline {
+  border: 2px solid #E2E8F0;
+  background-color: transparent;
+  color: var(--color-text-main);
+  transition: all 0.2s ease;
+  cursor: pointer;
 }
 
-.search:focus {
-    background-color: rgba(255, 255, 255, 0.3);
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+.btn-outline:hover {
+  border-color: var(--color-brand-red);
+  color: var(--color-brand-red);
+  background-color: white;
 }
 
-/* --- Container and Form Styles --- */
-.container {
-    display: flex;
-    flex-direction: row;
-    padding: 30px 20px;
-    flex-grow: 1; /* 占据剩余空间 */
-    align-items: center;
-    justify-content: center;
+/* Hero Section - Bright Light Theme */
+.hero-bright-overlay {
+  /* Gradient from Solid Warm White to Transparent */
+  background: linear-gradient(to right, #FDFCF8 0%, #FDFCF8 30%, rgba(253, 252, 248, 0.85) 60%, transparent 100%);
+  pointer-events: none;
 }
 
-.form-container {
-    background-color: var(--white);
-    border-radius: 12px;
-    box-shadow: var(--card-shadow); /* 使用Admin Card Shadow */
-    padding: 40px;
-    width: 100%;
-    max-width: 650px; /* 稍微扩大最大宽度 */
-    margin: 20px;
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .hero-bright-overlay {
+    background: linear-gradient(to top, #FDFCF8 0%, #FDFCF8 40%, rgba(253, 252, 248, 0.7) 100%);
+  }
 }
 
-.form-title {
-    text-align: center;
-    margin-bottom: 30px;
-    color: var(--text);
-    font-size: 32px;
-    font-weight: 600;
+/* Helper class for removing scrollbars in nav */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: var(--text);
-}
-
-.form-control {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid var(--light-pink); /* 使用Admin的浅粉色边框 */
-    border-radius: 8px; /* 增加圆角 */
-    font-size: 16px;
-    transition: border-color 0.3s, box-shadow 0.3s;
-}
-
-.form-control:focus {
-    border-color: var(--primary); /* 聚焦时使用主粉色 */
-    box-shadow: 0 0 8px rgba(255, 107, 157, 0.4); /* 匹配Admin风格的阴影 */
-    outline: none;
-}
-
-.btn {
-    display: block;
-    width: 100%;
-    padding: 12px;
-    /* 使用Admin风格的渐变按钮背景 */
-    background: linear-gradient(90deg, var(--gradient-start) 0%, var(--gradient-middle) 100%);
-    color: var(--white); /* 按钮文字改为白色 */
-    border: none;
-    border-radius: 8px;
-    font-size: 18px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background 0.3s, transform 0.2s, box-shadow 0.3s;
-    box-shadow: 0 4px 10px rgba(255, 107, 157, 0.3);
-}
-
-.btn:hover {
-    background: linear-gradient(90deg, var(--gradient-middle) 0%, var(--gradient-end) 100%);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(255, 107, 157, 0.4);
-}
-
-.btn:active {
-    transform: translateY(0);
-    box-shadow: 0 4px 10px rgba(255, 107, 157, 0.3);
-}
-
-.form-footer {
-    text-align: center;
-    margin-top: 25px;
-    font-size: 15px;
-}
-
-.form-footer a {
-    color: var(--primary);
-    text-decoration: none;
-    font-weight: bold;
-    transition: color 0.3s;
-}
-
-.form-footer a:hover {
-    color: #ff8fab; /* 浅粉色悬停 */
-    text-decoration: underline;
-}
-
-.error-message {
-    color: var(--error);
-    font-size: 14px;
-    margin-bottom: 15px; /* 调整间距 */
-    padding: 10px;
-    background-color: rgba(231, 76, 60, 0.08); /* 颜色更淡 */
-    border: 1px solid var(--error);
-    border-radius: 6px;
-    display: <?php echo !empty($error_message) ? 'block' : 'none'; ?>;
-}
-
-.success-message {
-    color: var(--success);
-    font-size: 14px;
-    margin-bottom: 15px; /* 调整间距 */
-    padding: 10px;
-    background-color: rgba(46, 204, 113, 0.08); /* 颜色更淡 */
-    border: 1px solid var(--success);
-    border-radius: 6px;
-    display: <?php echo !empty($success_message) ? 'block' : 'none'; ?>;
-}
-
-.row {
-    display: flex;
-    gap: 20px; /* 增加间距 */
-}
-
-.row .form-group {
-    flex: 1;
-}
-
-/* --- Media Queries --- */
-@media (max-width: 768px) {
-    .header {
-        padding: 15px 20px;
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .logo {
-        font-size: 28px;
-    }
-    
-    .header .function-links a {
-        margin: 0 10px;
-    }
-    
-    .container {
-        padding: 10px;
-    }
-    
-    .form-container {
-        margin: 10px;
-        padding: 25px;
-    }
-    
-    .row {
-        flex-direction: column;
-        gap: 0;
-    }
-    
-    .row .form-group {
-        margin-bottom: 15px;
-    }
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
