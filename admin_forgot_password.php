@@ -1,203 +1,128 @@
 <?php
-// forgot_password.php - Forgot Password Page
+// admin_forgot_password.php
+session_start();
+include 'dataconnection.php';
+
+// 引入 PHPMailer 类
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
+require 'PHPMailer/Exception.php';
+require 'PHPMailer/PHPMailer.php';
+require 'PHPMailer/SMTP.php';
+
+$msg = "";
+
+// 处理表单提交
+if (isset($_POST['reset_request'])) {
+    $email = mysqli_real_escape_string($conn, $_POST['email']);
+
+    // 1. 检查邮箱是否存在
+    $check_sql = "SELECT * FROM admin WHERE Admin_Email = '$email'";
+    $result = mysqli_query($conn, $check_sql);
+
+    if (mysqli_num_rows($result) > 0) {
+        // 2. 生成 Token
+        $token = bin2hex(random_bytes(32)); 
+        $expires = date("Y-m-d H:i:s", strtotime('+1 hour'));
+
+        // 3. 存入数据库
+        mysqli_query($conn, "DELETE FROM password_resets WHERE email='$email'");
+        $insert_sql = "INSERT INTO password_resets (email, token, expires_at) VALUES ('$email', '$token', '$expires')";
+        
+        if(mysqli_query($conn, $insert_sql)) {
+            // 4. 发送邮件
+            $mail = new PHPMailer(true);
+            try {
+                $mail->isSMTP();
+                $mail->Host       = 'smtp.gmail.com';
+                $mail->SMTPAuth   = true;
+                $mail->Username   = 'thongyuenzhen@gmail.com'; 
+                $mail->Password   = 'yqha ohwv etrq jaxd'; 
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                $mail->Port       = 465;
+
+                $mail->setFrom('thongyuenzhen@gmail.com', 'Love Bridge Admin');
+                $mail->addAddress($email);
+
+                $base_url = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']);
+                $reset_link = $base_url . "/admin_reset_password.php?token=" . $token . "&email=" . $email;
+
+                $mail->isHTML(true);
+                $mail->Subject = 'Reset Your Password - Love Bridge';
+                $mail->Body    = "
+                    <div style='font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;'>
+                        <div style='background-color: white; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto;'>
+                            <h2 style='color: #D97706;'>Password Reset Request</h2>
+                            <p>Click the button below to reset your password:</p>
+                            <a href='$reset_link' style='display: inline-block; padding: 10px 20px; background-color: #D97706; color: white; text-decoration: none; border-radius: 5px;'>Reset Password</a>
+                            <p style='margin-top: 20px; font-size: 12px; color: #888;'>Expires in 1 hour.</p>
+                        </div>
+                    </div>
+                ";
+
+                $mail->send();
+                $msg = "<div class='alert success'>Reset link has been sent to your email!</div>";
+            } catch (Exception $e) {
+                $msg = "<div class='alert error'>Mailer Error: {$mail->ErrorInfo}</div>";
+            }
+        }
+    } else {
+        $msg = "<div class='alert error'>Email not found in our system.</div>";
+    }
+}
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password - Donation Management System</title>
+    <title>Forgot Password - Love Bridge</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
-            background: linear-gradient(135deg, #fff5e4, #f6b8b8);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .forgot-password-container {
-            max-width: 500px;
-            width: 90%;
-            padding: 40px;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            position: relative;
-            z-index: 10;
-        }
-
-        .logo {
-            font-size: 24px;
-            color: #f28585;
-            margin-bottom: 20px;
-            font-weight: bold;
-        }
-
-        h2 {
-            color: #4a4a4a;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-
-        p {
-            color: #7f8c8d;
-            margin-bottom: 15px;
-            line-height: 1.6;
-        }
-
-        .contact-info {
-            background: #fff5e4;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 25px 0;
-            text-align: left;
-        }
-
-        .contact-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .contact-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .contact-icon {
-            font-size: 20px;
-            color: #f28585;
-            margin-right: 15px;
-            width: 30px;
-        }
-
-        .back-link {
-            display: inline-block;
-            margin-top: 20px;
-            color: #f28585;
-            text-decoration: none;
-            padding: 10px 20px;
-            border: 2px solid #f28585;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-
-        .back-link:hover {
-            background: #f28585;
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(242, 133, 133, 0.4);
-        }
-
-        .background-elements {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        .circle {
-            position: absolute;
-            border-radius: 50%;
-            background: rgba(246, 184, 184, 0.1);
-        }
-
-        .circle:nth-child(1) {
-            width: 200px;
-            height: 200px;
-            top: 10%;
-            left: 10%;
-        }
-
-        .circle:nth-child(2) {
-            width: 150px;
-            height: 150px;
-            bottom: 15%;
-            right: 10%;
-        }
-
-        .support-hours {
-            margin-top: 20px;
-            font-size: 14px;
-            color: #95a5a6;
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 8px;
-        }
-
-        @media (max-width: 768px) {
-            .forgot-password-container {
-                padding: 30px 20px;
-            }
-        }
+        /* 关键修复：box-sizing 防止格子长出来 */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        
+        body { background-color: #FFF6E8; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .container { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); width: 400px; text-align: center; }
+        h2 { color: #5D4037; margin-bottom: 10px; }
+        p { color: #888; font-size: 14px; margin-bottom: 25px; }
+        
+        .input-group { position: relative; margin-bottom: 20px; text-align: left; }
+        .input-group i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #aaa; }
+        
+        /* 这里的 width: 100% 现在因为上面的 box-sizing 而变得安全了 */
+        .input-group input { width: 100%; padding: 12px 15px 12px 45px; border: 1px solid #eee; border-radius: 8px; outline: none; background: #fafafa; }
+        .input-group input:focus { border-color: #D97706; background: #fff; }
+        
+        button { width: 100%; padding: 12px; background: #D97706; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.3s; }
+        button:hover { opacity: 0.9; }
+        
+        .back-link { display: block; margin-top: 20px; color: #666; text-decoration: none; font-size: 13px; }
+        .back-link:hover { color: #D97706; }
+        
+        .alert { padding: 10px; border-radius: 5px; font-size: 13px; margin-bottom: 15px; }
+        .alert.success { background: #dcfce7; color: #166534; }
+        .alert.error { background: #fee2e2; color: #b91c1c; }
     </style>
 </head>
 <body>
-    <!-- Background decorative elements -->
-    <div class="background-elements">
-        <div class="circle"></div>
-        <div class="circle"></div>
-    </div>
-    
-    <div class="forgot-password-container">
-        <div class="logo">Donation Management System</div>
-        <h2>Forgot Password</h2>
-        <p>If you've forgotten your password, please contact the system administrator to reset your account.</p>
+    <div class="container">
+        <i class="fas fa-lock" style="font-size: 40px; color: #D97706; margin-bottom: 20px;"></i>
+        <h2>Forgot Password?</h2>
+        <p>Enter your email and we'll send you a reset link.</p>
         
-        <div class="contact-info">
-            <div class="contact-item">
-                <div class="contact-icon">
-                    <ion-icon name="mail"></ion-icon>
-                </div>
-                <div>
-                    <strong>Email Address</strong><br>
-                    admin@donationsystem.com
-                </div>
-            </div>
-            <div class="contact-item">
-                <div class="contact-icon">
-                    <ion-icon name="call"></ion-icon>
-                </div>
-                <div>
-                    <strong>Phone Number</strong><br>
-                    +60 12-345 6789
-                </div>
-            </div>
-            <div class="contact-item">
-                <div class="contact-icon">
-                    <ion-icon name="location"></ion-icon>
-                </div>
-                <div>
-                    <strong>Office Address</strong><br>
-                    Donation Management Center, Kuala Lumpur, Malaysia
-                </div>
-            </div>
-        </div>
-        
-        <div class="support-hours">
-            <strong>Support Hours:</strong> Monday - Friday 9:00 AM - 6:00 PM
-        </div>
-        
-        <a href="admin_login.php" class="back-link">
-            <ion-icon name="arrow-back"></ion-icon>
-            Back to Login
-        </a>
-    </div>
+        <?php echo $msg; ?>
 
-    <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
-    <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+        <form method="POST">
+            <div class="input-group">
+                <i class="fas fa-envelope"></i>
+                <input type="email" name="email" placeholder="Enter your email address" required>
+            </div>
+            <button type="submit" name="reset_request">Send Reset Link</button>
+        </form>
+
+        <a href="admin_login.php" class="back-link"><i class="fas fa-arrow-left"></i> Back to Login</a>
+    </div>
 </body>
 </html>
