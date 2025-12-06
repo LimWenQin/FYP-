@@ -1,271 +1,212 @@
 <?php
+// 1. 引入数据库连接
 include 'dataconnection.php';
-include 'header_function.php';
-include 'header_UI_2.php';
-//session_start(); // 1. 开启 Session
 
+// 2. 开启 Session
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// 3. 强制登录检查
 //if (!isset($_SESSION['donor_id'])) {
-//    header("Location: donor_login.php");
-//    exit();
-//}
-// -------------------------
-// ✅ 1. 数据库连接 (必须连接才能查询名字)
-// -------------------------
-//$servername = "localhost";
-//$username = "root";
-//$password = "";
-//$database = "donation_system";
-
-//$conn = new mysqli($servername, $username, $password, $database);
-
-//if ($conn->connect_error) {
-//    die("Database Connection Failed: " . $conn->connect_error);
+//   echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
+//   exit();
 //}
 
-// -------------------------
-// ✅ 2. 获取上一个页面传来的数据
-// -------------------------
+// 4. 获取上页传来的数据
 $amount = isset($_POST['amount']) ? $_POST['amount'] : 0;
 $donation_type = isset($_POST['donation_type']) ? $_POST['donation_type'] : "One-time";
 $branch_id = isset($_POST['branch_id']) ? $_POST['branch_id'] : 0;
 
-// -------------------------
-// ✅ 3. [关键步骤] 使用 ID 去数据库查询分行名字
-// -------------------------
-$branch_name = "Unknown Branch"; // 设置默认值
-
+// 5. 查询分行名字 (用于显示)
+$branch_name = "Unknown Branch"; 
 if ($branch_id > 0) {
-    // 准备 SQL 语句查找名字
     $stmt = $conn->prepare("SELECT Branch_Name FROM branch WHERE Branch_ID = ?");
     $stmt->bind_param("i", $branch_id);
     $stmt->execute();
     $result = $stmt->get_result();
-
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
-        $branch_name = $row['Branch_Name']; // ✅ 成功获取名字！
+        $branch_name = $row['Branch_Name']; 
     }
     $stmt->close();
 }
 
-$conn->close();
+// 6. 引入新版头部
+include 'header_UI.php'; 
 ?>
 
-<!DOCTYPE html>
-<html>
-<head>
-<title>Payment Ways</title>
 <style>
-
-    /* 1. 添加颜色变量定义 */
-    :root 
-    {
-        --gradient-start: #ff6b9d;
-        --gradient-middle: #ff8fab;
-        --gradient-end: #ffb3c6;
-        --white: #ffffff;
+    /* --- Hero Banner --- */
+    .hero-wrap {
+        height: 400px;
+        position: relative;
+        background-image: url('images/hero_1.jpg');
+        background-size: cover;
+        background-position: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
     }
-
-    body 
-    {
-        background-color: #FFF5E4;
-        margin: 0;
-        font-family: Arial;
-        color: #4A4A4A;
+    .hero-wrap .overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
     }
+    .hero-content {
+        position: relative;
+        z-index: 2;
+        max-width: 800px;
+    }
+    .hero-content h1 {
+        font-family: "Mansalva", cursive;
+        color: #fff;
+        font-size: 4rem;
+        margin-bottom: 10px;
+    }
+    .hero-content p { font-size: 1.2rem; color: rgba(255, 255, 255, 0.9); }
 
-    .header 
-    {
+    /* --- 摘要卡片 (左侧) --- */
+    .summary-card {
+        background: #f8f9fa;
+        padding: 30px;
+        border-radius: 8px;
+        border-left: 5px solid #00a651;
+    }
+    .summary-item {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        padding: 20px 50px;
-        /*应用渐变色背景 --- */
-        background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%);
-        box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2); /* 新的阴影 */
-        color: #fcfcfcff; /* 为了在渐变色上清晰显示，文字改为白色 */
-    }
-
-    .logo 
-    {
-        display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
-        align-items: center;    /* 垂直居中 */
-        font-weight: bold;      /*粗体*/
-        font-size: 36px;        /*字体大小*/
-        gap: 10px;              /* 图片与文字之间的间距 */
-    }
-
-    .header .function-links a 
-    {
-        margin-left: 15px;
-        text-decoration: none;
-        font-size: 20px;
-        color: #fcfcfcff;
-        font-weight: bold;
-    }
-
-    .search 
-    { 
-        padding: 6px; font-size: 16px; 
-    }
-
-    .container 
-    {
-        display: flex;
-        flex-direction: row;
-        padding: 20px;
-    }
-
-    .sidebar 
-    {
-        width: 60px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 15px;
-        margin-right: 20px;
-        padding-top: 20px;
-    }
-
-    .sidebar button 
-    {
-        background-color: #A8D5BA;
-        border: none;
-        border-radius: 10px;
-        padding: 8px;
-        width: 50px;
-        height: 50px;
-        cursor: pointer;
-        font-weight: bold;
-        color: #4A4A4A;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-    .story-section 
-    {
-        flex: 2;
-        background-color: white;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-
-    .story-section img 
-    {
-        width: 100%;
-        border-radius: 10px;
         margin-bottom: 15px;
+        border-bottom: 1px dashed #ddd;
+        padding-bottom: 15px;
     }
+    .summary-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .summary-label { font-weight: bold; color: #555; }
+    .summary-value { font-weight: bold; color: #00a651; font-size: 1.1rem; }
 
-    .story-section h2 
-    {
-        color: #F28585;
-    }
-
-    .donation-box 
-    {
-        flex: 1;
-        background-color: white;
-        border-radius: 12px;
-        margin-left: 20px;
+    /* --- 付款方式按钮 (右侧) --- */
+    .payment-option {
+        border: 2px solid #eee;
+        border-radius: 10px;
         padding: 20px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-
-    .donation-box h3 
-    {
         text-align: center;
-        color: #F28585;
-    }
-
-    .donation-box .Payment-Ways 
-    {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-        margin: 15px 15px;
-    }
-
-    .donation-box .Payment-Ways .P_btn 
-    {
-        background-color: #A8D5BA;
-        border: none;
-        border-radius: 10px;
-        padding: 10px;
         cursor: pointer;
-        font-weight: bold;
-        color: #4A4A4A;
+        transition: all 0.3s ease;
+        margin-bottom: 20px;
+        background: #fff;
+        display: block; /* 让整个区域可点 */
         width: 100%;
-        height: 50px;
     }
-
-    .donation-box .Payment-Ways .P_btn:hover 
-    {
-        background-color: #91C8A8;
+    .payment-option:hover {
+        border-color: #00a651;
+        box-shadow: 0 5px 15px rgba(0, 166, 81, 0.1);
+        transform: translateY(-3px);
     }
-
-    .donation-box .Payment-Ways img 
-    {
-        width: 100%;
-        border-radius: 10px;
+    .payment-img {
+        height: 60px;
+        object-fit: contain;
         margin-bottom: 15px;
-        margin-top: 20px;
     }
-
+    .payment-title {
+        font-weight: bold;
+        color: #333;
+        font-size: 18px;
+        display: block;
+    }
+    .payment-desc { font-size: 13px; color: #777; margin-bottom: 15px; }
+    
+    .btn-pay {
+        background-color: #00a651;
+        color: white;
+        border: none;
+        padding: 10px 30px;
+        border-radius: 30px;
+        font-weight: bold;
+        transition: 0.3s;
+    }
+    .btn-pay:hover { background-color: #008f45; color: white; }
 </style>
-</head>
-<body>
 
-<div class="container">
-
-    <!-- 左侧社交栏 -->
-    <div class="sidebar">
-        <button><img src="yourimage.jpg" alt="Whatsapp"></button>
-        <button><img src="yourimage.jpg" alt="Facebook"></button>
-        <button><img src="yourimage.jpg" alt="Instagram"></button>
-        <button><img src="yourimage.jpg" alt="General Line"></button>
+<div class="hero-wrap">
+    <div class="overlay"></div>
+    <div class="hero-content">
+        <h1>Secure Payment</h1>
+        <p>Complete your donation securely. Thank you for your generosity.</p>
     </div>
+</div>
 
-    <!-- 中间故事区 -->
-    <div class="story-section">
-        <h2>Choose your payment method</h2>
-        <p>Please select your preferred payment method to complete your donation. We support Credit/Debit cards and e-wallets.</p>
+<div class="site-section" style="padding: 5em 0;">
+    <div class="container">
+        <div class="row">
+            
+            <div class="col-lg-5 mb-5">
+                <div class="mb-4">
+                    <h3 class="text-cursive mb-4" style="color: #00a651;">Donation Summary</h3>
+                    <p class="text-muted">Please review your donation details before proceeding to payment.</p>
+                </div>
 
-        <h3>Current donation details:</h3>
-        <ul>
-            <li><strong>Donation amount:</strong> RM <?php echo htmlspecialchars($amount); ?></li>
-            <li><strong>Donation type  :</strong> <?php echo htmlspecialchars($donation_type); ?></li>
-            <li><strong>Branch name    :</strong> <?php echo htmlspecialchars($branch_name); ?></li>
-        </ul>
-    </div>
+                <div class="summary-card shadow-sm">
+                    <div class="summary-item">
+                        <span class="summary-label">Branch</span>
+                        <span class="summary-value text-dark"><?php echo htmlspecialchars($branch_name); ?></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Type</span>
+                        <span class="summary-value text-uppercase"><?php echo htmlspecialchars($donation_type); ?></span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Total Amount</span>
+                        <span class="summary-value">RM <?php echo number_format((float)$amount, 2); ?></span>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <p><small class="text-muted"><i class="icon-lock"></i> Your transaction is secure and encrypted.</small></p>
+                </div>
+            </div>
 
-    <!-- 右侧付款选项 -->
-    <div class="donation-box">
-        <h3>Payment Ways</h3>
-        <div class="Payment-Ways">
+            <div class="col-lg-7">
+                <h3 class="text-cursive text-black mb-4 text-center">Select Payment Method</h3>
+                
+                <div class="row">
+                    
+                    <div class="col-md-6">
+                        <div class="payment-option">
+                            <img src="bank.jpg" alt="Bank Transfer" class="payment-img">
+                            <span class="payment-title">Credit / Debit Card</span>
+                            <p class="payment-desc">Visa, Mastercard, Online Banking</p>
+                            
+                            <form method="POST" action="Credit_Debit_Page.php">
+                                <input type="hidden" name="amount" value="<?php echo htmlspecialchars($amount); ?>">
+                                <input type="hidden" name="donation_type" value="<?php echo htmlspecialchars($donation_type); ?>">
+                                <input type="hidden" name="branch_id" value="<?php echo htmlspecialchars($branch_id); ?>">
+                                <button type="submit" class="btn-pay">Pay Now</button>
+                            </form>
+                        </div>
+                    </div>
 
-            <img src="bank.jpg" alt="Bank Transfer">
-            <img src="tng.jpg" alt="E-Wallet">
+                    <div class="col-md-6">
+                        <div class="payment-option">
+                            <img src="tng.jpg" alt="Touch n Go" class="payment-img">
+                            <span class="payment-title">Touch 'n Go eWallet</span>
+                            <p class="payment-desc">Scan QR code to pay instantly</p>
+                            
+                            <form method="POST" action="TNG_Page.php">
+                                <input type="hidden" name="amount" value="<?php echo htmlspecialchars($amount); ?>">
+                                <input type="hidden" name="donation_type" value="<?php echo htmlspecialchars($donation_type); ?>">
+                                <input type="hidden" name="branch_id" value="<?php echo htmlspecialchars($branch_id); ?>">
+                                <button type="submit" class="btn-pay">Pay Now</button>
+                            </form>
+                        </div>
+                    </div>
 
-            <!-- ✅ Bank Transfer -->
-            <form method="POST" action="Credit_Debit_Page.php">
-                <input type="hidden" name="amount" value="<?php echo $amount; ?>">
-                <input type="hidden" name="donation_type" value="<?php echo $donation_type; ?>">
-                <input type="hidden" name="branch_id" value="<?php echo $branch_id; ?>">
-                <button type="submit" class="P_btn">Bank Transfer</button>
-            </form>
-
-            <!-- ✅ TNG -->
-            <form method="POST" action="TNG_Page.php">
-                <input type="hidden" name="amount" value="<?php echo $amount; ?>">
-                <input type="hidden" name="donation_type" value="<?php echo $donation_type; ?>">
-                <input type="hidden" name="branch_id" value="<?php echo $branch_id; ?>">
-                <button type="submit" class="P_btn">TNG</button>
-            </form>
+                </div>
+            </div>
 
         </div>
     </div>
 </div>
 
-</body>
-</html>
+<?php include 'footer.php'; ?>
+<?php $conn->close(); ?>

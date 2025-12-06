@@ -113,7 +113,7 @@ $paymentDate = date("d M Y, h:i A", strtotime($row['Payment_Paid_At']));
 $amountFormatted = "RM " . number_format($row['Order_Amount'], 2);
 
 // 6. 引入新版头部
-include 'header_UI.php'; 
+include 'header_UI_template.php'; 
 ?>
 
 <style>
@@ -354,4 +354,4 @@ include 'header_UI.php';
     </div>
 </div>
 
-<?php include 'footer.php'; ?>
+<?php include 'footer_UI_template.php'; ?>

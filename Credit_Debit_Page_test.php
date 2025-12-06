@@ -90,7 +90,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
 // ---------------------------------------------------------
 // 4. 引入新版 Header (逻辑处理完才引入)
 // ---------------------------------------------------------
-include 'header_UI.php'; 
+include 'header_UI_template.php'; 
 ?>
 
 <style>
@@ -258,4 +258,4 @@ include 'header_UI.php';
     </div>
 </div>
 
-<?php include 'footer.php'; ?>
+<?php include 'footer_UI_template.php'; ?>

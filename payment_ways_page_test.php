@@ -13,35 +13,27 @@ if (session_status() === PHP_SESSION_NONE) {
 //   exit();
 //}
 
-// 4. 接收 POST 数据
-$amount = isset($_POST['amount']) ? (float)$_POST['amount'] : 0;
-$donation_type = isset($_POST['donation_type']) ? $_POST['donation_type'] : "one-time";
-$case_id = isset($_POST['case_id']) ? (int)$_POST['case_id'] : 0;
+// 4. 获取上页传来的数据
+$amount = isset($_POST['amount']) ? $_POST['amount'] : 0;
+$donation_type = isset($_POST['donation_type']) ? $_POST['donation_type'] : "One-time";
+$branch_id = isset($_POST['branch_id']) ? $_POST['branch_id'] : 0;
 
-// 5. 数据验证
-if ($amount <= 0 || $case_id <= 0) {
-    echo "<script>alert('Error: Invalid Data. Amount or Case ID is missing.'); window.history.back();</script>";
-    exit();
-}
-
-// 6. 用 ID 查询 Special Case 的名字
-$case_title = "Unknown Case"; 
-
-if ($case_id > 0) {
-    $sql = "SELECT Case_Title FROM special_case WHERE Case_ID = ?";
-    if ($stmt = $conn->prepare($sql)) {
-        $stmt->bind_param("i", $case_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($row = $result->fetch_assoc()) {
-            $case_title = $row['Case_Title']; 
-        }
-        $stmt->close();
+// 5. 查询分行名字 (用于显示)
+$branch_name = "Unknown Branch"; 
+if ($branch_id > 0) {
+    $stmt = $conn->prepare("SELECT Branch_Name FROM branch WHERE Branch_ID = ?");
+    $stmt->bind_param("i", $branch_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $branch_name = $row['Branch_Name']; 
     }
+    $stmt->close();
 }
 
-// 7. 引入新版头部
-include 'header_UI.php'; 
+// 6. 引入新版头部
+include 'header_UI_template.php'; 
 ?>
 
 <style>
@@ -103,7 +95,7 @@ include 'header_UI.php';
         transition: all 0.3s ease;
         margin-bottom: 20px;
         background: #fff;
-        display: block; 
+        display: block; /* 让整个区域可点 */
         width: 100%;
     }
     .payment-option:hover {
@@ -140,7 +132,7 @@ include 'header_UI.php';
     <div class="overlay"></div>
     <div class="hero-content">
         <h1>Secure Payment</h1>
-        <p>Support a special cause. Your contribution matters.</p>
+        <p>Complete your donation securely. Thank you for your generosity.</p>
     </div>
 </div>
 
@@ -151,13 +143,13 @@ include 'header_UI.php';
             <div class="col-lg-5 mb-5">
                 <div class="mb-4">
                     <h3 class="text-cursive mb-4" style="color: #00a651;">Donation Summary</h3>
-                    <p class="text-muted">Please review your special case donation details.</p>
+                    <p class="text-muted">Please review your donation details before proceeding to payment.</p>
                 </div>
 
                 <div class="summary-card shadow-sm">
                     <div class="summary-item">
-                        <span class="summary-label">Special Case</span>
-                        <span class="summary-value text-dark"><?php echo htmlspecialchars($case_title); ?></span>
+                        <span class="summary-label">Branch</span>
+                        <span class="summary-value text-dark"><?php echo htmlspecialchars($branch_name); ?></span>
                     </div>
                     <div class="summary-item">
                         <span class="summary-label">Type</span>
@@ -165,12 +157,12 @@ include 'header_UI.php';
                     </div>
                     <div class="summary-item">
                         <span class="summary-label">Total Amount</span>
-                        <span class="summary-value">RM <?php echo number_format($amount, 2); ?></span>
+                        <span class="summary-value">RM <?php echo number_format((float)$amount, 2); ?></span>
                     </div>
                 </div>
                 
                 <div class="mt-4">
-                    <p><small class="text-muted"><i class="icon-lock"></i> 100% of this donation goes to the selected case.</small></p>
+                    <p><small class="text-muted"><i class="icon-lock"></i> Your transaction is secure and encrypted.</small></p>
                 </div>
             </div>
 
@@ -188,9 +180,7 @@ include 'header_UI.php';
                             <form method="POST" action="Credit_Debit_Page.php">
                                 <input type="hidden" name="amount" value="<?php echo htmlspecialchars($amount); ?>">
                                 <input type="hidden" name="donation_type" value="<?php echo htmlspecialchars($donation_type); ?>">
-                                <input type="hidden" name="case_id" value="<?php echo htmlspecialchars($case_id); ?>">
-                                <input type="hidden" name="branch_id" value="0">
-                                
+                                <input type="hidden" name="branch_id" value="<?php echo htmlspecialchars($branch_id); ?>">
                                 <button type="submit" class="btn-pay">Pay Now</button>
                             </form>
                         </div>
@@ -205,9 +195,7 @@ include 'header_UI.php';
                             <form method="POST" action="TNG_Page.php">
                                 <input type="hidden" name="amount" value="<?php echo htmlspecialchars($amount); ?>">
                                 <input type="hidden" name="donation_type" value="<?php echo htmlspecialchars($donation_type); ?>">
-                                <input type="hidden" name="case_id" value="<?php echo htmlspecialchars($case_id); ?>">
-                                <input type="hidden" name="branch_id" value="0">
-
+                                <input type="hidden" name="branch_id" value="<?php echo htmlspecialchars($branch_id); ?>">
                                 <button type="submit" class="btn-pay">Pay Now</button>
                             </form>
                         </div>
@@ -220,5 +208,5 @@ include 'header_UI.php';
     </div>
 </div>
 
-<?php include 'footer.php'; ?>
+<?php include 'footer_UI_template.php'; ?>
 <?php $conn->close(); ?>

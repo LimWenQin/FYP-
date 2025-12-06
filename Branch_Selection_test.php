@@ -28,7 +28,7 @@ if ($result->num_rows > 0) {
 }
 
 // 6. 引入新版头部 (包含 CSS 和 导航栏)
-include 'header_UI.php'; 
+include 'header_UI_template.php'; 
 ?>
 
 <style>
@@ -176,5 +176,5 @@ include 'header_UI.php';
     </div>
 </div>
 
-<?php include 'footer.php'; ?>
+<?php include 'footer_UI_template.php'; ?>
 <?php $conn->close(); ?>

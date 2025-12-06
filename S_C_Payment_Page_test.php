@@ -40,7 +40,7 @@ if ($stmt = $conn->prepare($sql)) {
 }
 
 // 6. 引入新版头部
-include 'header_UI.php'; 
+include 'header_UI_template.php'; 
 ?>
 
 <style>
@@ -239,5 +239,5 @@ include 'header_UI.php';
     </div>
 </div>
 
-<?php include 'footer.php'; ?>
+<?php include 'footer_UI_template.php'; ?>
 <?php $conn->close(); ?>
