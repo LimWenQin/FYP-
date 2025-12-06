@@ -60,6 +60,26 @@ body {
     font-size: 20px;
 }
 
+/* Hover effect for sidebar */
+.sidebar.collapsed:hover {
+    width: 260px;
+}
+
+.sidebar.collapsed:hover .sidebar-header h2,
+.sidebar.collapsed:hover .sidebar-menu span {
+    display: block;
+}
+
+.sidebar.collapsed:hover .sidebar-menu a {
+    justify-content: flex-start;
+    padding: 12px 20px;
+}
+
+.sidebar.collapsed:hover .sidebar-menu i {
+    margin-right: 10px;
+    font-size: 18px;
+}
+
 .sidebar-header {
     padding: 20px;
     display: flex;
@@ -143,22 +163,6 @@ body {
 .nav-left {
     display: flex;
     align-items: center;
-}
-
-.menu-toggle {
-    background: none;
-    border: none;
-    font-size: 20px;
-    color: var(--dark);
-    cursor: pointer;
-    margin-right: 20px;
-    padding: 5px;
-    border-radius: 5px;
-    transition: background 0.3s;
-}
-
-.menu-toggle:hover {
-    background: var(--gray-light);
 }
 
 .logo {
