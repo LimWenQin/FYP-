@@ -1,11 +1,9 @@
 -- phpMyAdmin SQL Dump
 -- version 5.2.1
--- https://www.phpmyadmin.net/
---
--- 主机： 127.0.0.1
--- 生成日期： 2025-11-28 13:00:00
--- 服务器版本： 10.4.32-MariaDB
--- PHP 版本： 8.0.30
+-- Host: 127.0.0.1
+-- Generation Time: 2025-12-07 10:00:00
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.0.30
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -17,13 +15,13 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- 数据库： `donation_system`
+-- Database: `donation_system`
 --
 
 -- --------------------------------------------------------
 
 --
--- 表的结构 `achievement`
+-- Table structure for table `achievement`
 --
 
 CREATE TABLE `achievement` (
@@ -37,7 +35,7 @@ CREATE TABLE `achievement` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `activity`
+-- Table structure for table `activity`
 --
 
 CREATE TABLE `activity` (
@@ -51,7 +49,6 @@ CREATE TABLE `activity` (
   `Activity_Status` varchar(50) NOT NULL,
   `Activity_GetAmount` decimal(10,2) NOT NULL,
   `Activity_TargetAmount` decimal(10,2) DEFAULT 0.00,
-  -- ✅ 新增：详细地址字段 (Activity)
   `Activity_Address1` varchar(255) NOT NULL,
   `Activity_Address2` varchar(255) DEFAULT NULL,
   `Activity_Address3` varchar(255) DEFAULT NULL,
@@ -59,14 +56,13 @@ CREATE TABLE `activity` (
   `Activity_State` varchar(100) NOT NULL,
   `Activity_PostalCode` varchar(20) NOT NULL,
   `Activity_Country` varchar(100) DEFAULT 'Malaysia',
-  -- ✅ 结束
   `Branch_ID` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
 --
--- 表的结构 `admin`
+-- Table structure for table `admin`
 --
 
 CREATE TABLE `admin` (
@@ -78,7 +74,6 @@ CREATE TABLE `admin` (
   `Admin_Email` varchar(100) NOT NULL,
   `Admin_Password` varchar(255) NOT NULL,
   `Admin_DOB` date NOT NULL,
-  -- ✅ 已修改：详细地址字段 (Admin)
   `Admin_Address1` varchar(255) NOT NULL,
   `Admin_Address2` varchar(255) DEFAULT NULL,
   `Admin_Address3` varchar(255) DEFAULT NULL,
@@ -86,9 +81,8 @@ CREATE TABLE `admin` (
   `Admin_State` varchar(100) NOT NULL,
   `Admin_PostalCode` varchar(20) NOT NULL,
   `Admin_Country` varchar(100) DEFAULT 'Malaysia',
-  -- ✅ 结束
   `Admin_ProfilePicture` varchar(255) DEFAULT NULL,
-  `Admin_Role` enum('Super Admin','Admin','Moderator') NOT NULL DEFAULT 'Admin',
+  `Admin_Role` enum('Super Admin','Admin') NOT NULL DEFAULT 'Admin', -- ✅ 加回 Role 字段
   `Admin_Status` enum('Active','Inactive','Pending') NOT NULL DEFAULT 'Active',
   `Admin_LastLogin` datetime DEFAULT NULL,
   `Admin_CreatedAt` datetime DEFAULT current_timestamp(),
@@ -99,14 +93,13 @@ CREATE TABLE `admin` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `branch`
+-- Table structure for table `branch`
 --
 
 CREATE TABLE `branch` (
   `Branch_ID` int(11) NOT NULL,
   `Branch_Name` varchar(100) NOT NULL,
   `Branch_Type` varchar(50) NOT NULL,
-  -- ✅ 修改：详细地址字段 (Branch)
   `Branch_Address1` varchar(255) NOT NULL,
   `Branch_Address2` varchar(255) DEFAULT NULL,
   `Branch_Address3` varchar(255) DEFAULT NULL,
@@ -114,7 +107,6 @@ CREATE TABLE `branch` (
   `Branch_State` varchar(100) NOT NULL,
   `Branch_PostalCode` varchar(20) NOT NULL,
   `Branch_Country` varchar(100) DEFAULT 'Malaysia',
-  -- ✅ 结束
   `Branch_ContactNumber` varchar(20) NOT NULL,
   `Branch_Description` text NOT NULL,
   `Admin_ID` int(11) NOT NULL
@@ -123,7 +115,7 @@ CREATE TABLE `branch` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `contact_messages`
+-- Table structure for table `contact_messages`
 --
 
 CREATE TABLE `contact_messages` (
@@ -140,7 +132,7 @@ CREATE TABLE `contact_messages` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `donor`
+-- Table structure for table `donor`
 --
 
 CREATE TABLE `donor` (
@@ -151,7 +143,6 @@ CREATE TABLE `donor` (
   `Donor_ICNumber` varchar(20) NOT NULL,
   `Donor_Email` varchar(100) NOT NULL,
   `Donor_Password` varchar(255) NOT NULL,
-  -- ✅ 已修改：详细地址字段 (Donor)
   `Donor_Address1` varchar(255) NOT NULL,
   `Donor_Address2` varchar(255) DEFAULT NULL,
   `Donor_Address3` varchar(255) DEFAULT NULL,
@@ -159,15 +150,16 @@ CREATE TABLE `donor` (
   `Donor_State` varchar(100) NOT NULL,
   `Donor_PostalCode` varchar(20) NOT NULL,
   `Donor_Country` varchar(100) DEFAULT 'Malaysia',
-  -- ✅ 结束
   `Donor_DOB` date NOT NULL,
-  `Donor_Description` text NOT NULL
+  `Donor_Description` text NOT NULL,
+  `Donor_RegisteredAt` datetime DEFAULT current_timestamp(),
+  `Donor_ProfilePicture` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
 --
--- 表的结构 `donor_achievement`
+-- Table structure for table `donor_achievement`
 --
 
 CREATE TABLE `donor_achievement` (
@@ -180,7 +172,7 @@ CREATE TABLE `donor_achievement` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `headquarters`
+-- Table structure for table `headquarters`
 --
 
 CREATE TABLE `headquarters` (
@@ -188,7 +180,7 @@ CREATE TABLE `headquarters` (
   `HQ_Name` varchar(100) NOT NULL DEFAULT 'Love Bridge Foundation',
   `HQ_ContactNumber` varchar(30) NOT NULL,
   `HQ_Email` varchar(100) NOT NULL,
-  `HQ_Address` text NOT NULL, -- HQ地址通常用于AboutUs展示，保持Text较方便，也可拆分
+  `HQ_Address` text NOT NULL,
   `HQ_Description` text NOT NULL,
   `HQ_Story` longtext NOT NULL,
   `HQ_FoundingDate` date DEFAULT NULL,
@@ -199,7 +191,7 @@ CREATE TABLE `headquarters` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `item_donation`
+-- Table structure for table `item_donation`
 --
 
 CREATE TABLE `item_donation` (
@@ -210,7 +202,6 @@ CREATE TABLE `item_donation` (
   `Item_Description` text NOT NULL,
   `Item_PhotoPath` varchar(255) NOT NULL,
   `Item_DropOff_Method` varchar(50) NOT NULL,
-  -- ✅ 修改：详细地址字段 (Item Pickup)
   `Item_Pickup_Address1` varchar(255) DEFAULT NULL,
   `Item_Pickup_Address2` varchar(255) DEFAULT NULL,
   `Item_Pickup_Address3` varchar(255) DEFAULT NULL,
@@ -218,7 +209,6 @@ CREATE TABLE `item_donation` (
   `Item_Pickup_State` varchar(100) DEFAULT NULL,
   `Item_Pickup_PostalCode` varchar(20) DEFAULT NULL,
   `Item_Pickup_Country` varchar(100) DEFAULT 'Malaysia',
-  -- ✅ 结束
   `Item_Status` varchar(50) NOT NULL,
   `Item_ReceivedBy` varchar(100) NOT NULL,
   `Item_Updated_At` datetime NOT NULL,
@@ -229,7 +219,7 @@ CREATE TABLE `item_donation` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `login_attempts`
+-- Table structure for table `login_attempts`
 --
 
 CREATE TABLE `login_attempts` (
@@ -243,7 +233,7 @@ CREATE TABLE `login_attempts` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `orders`
+-- Table structure for table `orders`
 --
 
 CREATE TABLE `orders` (
@@ -262,19 +252,20 @@ CREATE TABLE `orders` (
   `Order_TXN_Ref` varchar(100) NOT NULL,
   `Order_Type` varchar(50) NOT NULL,
   `Order_Status` text NOT NULL,
+  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Visible, 1=In Trash Bin', -- ✅ 新增：软删除
   `Order_Created_At` datetime NOT NULL,
   `Order_Updated_At` datetime NOT NULL,
   `Donor_ID` int(11) NOT NULL,
   `Payment_ID` int(11) DEFAULT NULL,
   `Branch_ID` int(11) DEFAULT NULL,
-  `Activity_ID` int(11) NULL,
+  `Activity_ID` int(11) NULL, -- ✅ 已设为 NULL (可选)
   `Case_ID` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
 --
--- 表的结构 `password_resets`
+-- Table structure for table `password_resets`
 --
 
 CREATE TABLE `password_resets` (
@@ -288,7 +279,7 @@ CREATE TABLE `password_resets` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `payment`
+-- Table structure for table `payment`
 --
 
 CREATE TABLE `payment` (
@@ -306,7 +297,7 @@ CREATE TABLE `payment` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `point`
+-- Table structure for table `point`
 --
 
 CREATE TABLE `point` (
@@ -320,7 +311,7 @@ CREATE TABLE `point` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `receipt`
+-- Table structure for table `receipt`
 --
 
 CREATE TABLE `receipt` (
@@ -335,15 +326,18 @@ CREATE TABLE `receipt` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `recurring_donation`
+-- Table structure for table `recurring_donation`
 --
 
 CREATE TABLE `recurring_donation` (
   `Recurring_ID` int(11) NOT NULL,
   `Recurring_Amount` decimal(10,2) NOT NULL,
   `Recurring_Payment_Method` varchar(50) NOT NULL,
+  `Recurring_StartDate` date NOT NULL DEFAULT current_timestamp(), -- ✅ 新增
+  `Recurring_EndDate` date DEFAULT NULL, -- ✅ 新增
   `Recurring_Deduction_Date` date NOT NULL,
-  `Recurring_Status` varchar(50) NOT NULL,
+  `Last_Payment_Date` datetime DEFAULT NULL, -- ✅ 新增
+  `Recurring_Status` enum('Active','Stopped','Completed','Failed') NOT NULL DEFAULT 'Active', -- ✅ 修改状态
   `Recurring_Created_At` datetime NOT NULL,
   `Recurring_Updated_At` datetime NOT NULL,
   `Donor_ID` int(11) NOT NULL
@@ -352,12 +346,11 @@ CREATE TABLE `recurring_donation` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `redemption_order`
+-- Table structure for table `redemption_order`
 --
 
 CREATE TABLE `redemption_order` (
   `Redemption_ID` int(11) NOT NULL,
-  -- ✅ 修改：详细地址字段 (Redemption)
   `Redemption_Address1` varchar(255) NOT NULL,
   `Redemption_Address2` varchar(255) DEFAULT NULL,
   `Redemption_Address3` varchar(255) DEFAULT NULL,
@@ -365,7 +358,6 @@ CREATE TABLE `redemption_order` (
   `Redemption_State` varchar(100) NOT NULL,
   `Redemption_PostalCode` varchar(20) NOT NULL,
   `Redemption_Country` varchar(100) DEFAULT 'Malaysia',
-  -- ✅ 结束
   `Redemption_ContactNumber` varchar(20) NOT NULL,
   `Redemption_PointsSpent` int(11) NOT NULL,
   `Redemption_Status` varchar(50) NOT NULL,
@@ -377,7 +369,7 @@ CREATE TABLE `redemption_order` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `reward_item`
+-- Table structure for table `reward_item`
 --
 
 CREATE TABLE `reward_item` (
@@ -393,7 +385,7 @@ CREATE TABLE `reward_item` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `special_case`
+-- Table structure for table `special_case`
 --
 
 CREATE TABLE `special_case` (
@@ -409,7 +401,7 @@ CREATE TABLE `special_case` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `staff`
+-- Table structure for table `staff`
 --
 
 CREATE TABLE `staff` (
@@ -421,7 +413,6 @@ CREATE TABLE `staff` (
   `Staff_Email` varchar(100) NOT NULL,
   `Staff_Password` varchar(15) NOT NULL,
   `Staff_DOB` date NOT NULL,
-  -- ✅ 修改：详细地址字段 (Staff)
   `Staff_Address1` varchar(255) NOT NULL,
   `Staff_Address2` varchar(255) DEFAULT NULL,
   `Staff_Address3` varchar(255) DEFAULT NULL,
@@ -429,7 +420,6 @@ CREATE TABLE `staff` (
   `Staff_State` varchar(100) NOT NULL,
   `Staff_PostalCode` varchar(20) NOT NULL,
   `Staff_Country` varchar(100) DEFAULT 'Malaysia',
-  -- ✅ 结束
   `Staff_Comment` text NOT NULL,
   `Staff_Role` varchar(50) NOT NULL DEFAULT 'Staff',
   `Staff_Status` varchar(50) NOT NULL DEFAULT 'Active',
@@ -442,7 +432,7 @@ CREATE TABLE `staff` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `staff_activity`
+-- Table structure for table `staff_activity`
 --
 
 CREATE TABLE `staff_activity` (
@@ -455,7 +445,7 @@ CREATE TABLE `staff_activity` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `story`
+-- Table structure for table `story`
 --
 
 CREATE TABLE `story` (
@@ -466,394 +456,110 @@ CREATE TABLE `story` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- 转储表中的数据 `admin`
+-- Dumping data for table `admin`
 --
 
 INSERT INTO `admin` (`Admin_ID`, `Admin_FName`, `Admin_LName`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address1`, `Admin_Address2`, `Admin_Address3`, `Admin_City`, `Admin_State`, `Admin_PostalCode`, `Admin_Country`, `Admin_ProfilePicture`, `Admin_Role`, `Admin_Status`, `Admin_LastLogin`, `Admin_CreatedAt`, `Admin_UpdatedAt`, `Admin_Comment`) VALUES
 (1, 'Super', 'Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Level 12', 'Menara Love Bridge', 'Jalan Charity', 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', NULL, '2025-11-28 12:00:00', '2025-11-28 12:00:00', 'System Super Administrator');
 
 --
--- 转储表中的数据 `headquarters`
+-- Dumping data for table `headquarters`
 --
 
 INSERT INTO `headquarters` (`HQ_ID`, `HQ_Name`, `HQ_ContactNumber`, `HQ_Email`, `HQ_Address`, `HQ_Description`, `HQ_Story`, `HQ_FoundingDate`, `HQ_Image`, `Updated_At`) VALUES
-(1, 'Love Bridge Headquarters', '+603-1234 5678', 'info@lovebridge.org.my', 'Level 12, Menara Love Bridge, Jalan Charity, 50450 Kuala Lumpur, Malaysia', 'Love Bridge is a non-profit organization dedicated to helping those in need.', 'Founded in 2010, Love Bridge started with a small group of volunteers who wanted to make a difference. Over the years, we have grown into a nationwide organization supporting various causes including elderly care, orphanages, and disaster relief.', '2010-01-01', NULL, '2025-11-26 12:00:00');
+(1, 'Love Bridge Headquarters', '+603-1234 5678', 'info@lovebridge.org.my', 'Level 12, Menara Love Bridge, Jalan Charity, 50450 Kuala Lumpur, Malaysia', 'Love Bridge is a non-profit organization dedicated to helping those in need.', 'Founded in 2010, Love Bridge started with a small group of volunteers...', '2010-01-01', NULL, '2025-11-26 12:00:00');
 
 --
--- 转储表的索引
+-- Indexes for dumped tables
 --
 
---
--- 表的索引 `achievement`
---
-ALTER TABLE `achievement`
-  ADD PRIMARY KEY (`Achievement_ID`);
+-- Indexes for table `achievement`
+ALTER TABLE `achievement` ADD PRIMARY KEY (`Achievement_ID`);
+-- Indexes for table `activity`
+ALTER TABLE `activity` ADD PRIMARY KEY (`Activity_ID`), ADD KEY `Activity_BrANCH_ID_FK` (`Branch_ID`);
+-- Indexes for table `admin`
+ALTER TABLE `admin` ADD PRIMARY KEY (`Admin_ID`);
+-- Indexes for table `branch`
+ALTER TABLE `branch` ADD PRIMARY KEY (`Branch_ID`), ADD KEY `branch_admin_id_fk` (`Admin_ID`);
+-- Indexes for table `contact_messages`
+ALTER TABLE `contact_messages` ADD PRIMARY KEY (`Contact_ID`);
+-- Indexes for table `donor`
+ALTER TABLE `donor` ADD PRIMARY KEY (`Donor_ID`);
+-- Indexes for table `donor_achievement`
+ALTER TABLE `donor_achievement` ADD PRIMARY KEY (`DonorAchievement_ID`), ADD KEY `DonorAchievement_Donor_ID_FK` (`Donor_ID`), ADD KEY `DonorAchievement_Achievement_ID_FK` (`Achievement_ID`);
+-- Indexes for table `headquarters`
+ALTER TABLE `headquarters` ADD PRIMARY KEY (`HQ_ID`);
+-- Indexes for table `item_donation`
+ALTER TABLE `item_donation` ADD PRIMARY KEY (`Item_ID`), ADD KEY `Item_Donor_ID_FK` (`Donor_ID`), ADD KEY `Item_Activity_ID_FK` (`Activity_ID`);
+-- Indexes for table `login_attempts`
+ALTER TABLE `login_attempts` ADD PRIMARY KEY (`id`), ADD KEY `idx_email_time` (`email`,`attempt_time`), ADD KEY `idx_ip_time` (`ip_address`,`attempt_time`);
+-- Indexes for table `orders`
+ALTER TABLE `orders` ADD PRIMARY KEY (`Order_ID`), ADD KEY `Order_Donor_ID_FK` (`Donor_ID`), ADD KEY `Order_Activity_ID_FK` (`Activity_ID`), ADD KEY `Order_Payment_ID_FK` (`Payment_ID`), ADD KEY `Order_Case_ID_FK` (`Case_ID`);
+-- Indexes for table `password_resets`
+ALTER TABLE `password_resets` ADD PRIMARY KEY (`id`), ADD KEY `idx_email` (`email`), ADD KEY `idx_token` (`token`);
+-- Indexes for table `payment`
+ALTER TABLE `payment` ADD PRIMARY KEY (`Payment_ID`);
+-- Indexes for table `point`
+ALTER TABLE `point` ADD PRIMARY KEY (`Points_ID`), ADD KEY `Point_Donor_ID_FK` (`Donor_ID`);
+-- Indexes for table `receipt`
+ALTER TABLE `receipt` ADD PRIMARY KEY (`Receipt_ID`), ADD KEY `Receipt_Donor_ID_FK` (`Donor_ID`), ADD KEY `Receipt_Order_ID_FK` (`Order_ID`);
+-- Indexes for table `recurring_donation`
+ALTER TABLE `recurring_donation` ADD PRIMARY KEY (`Recurring_ID`), ADD KEY `RecurringDonation_Donor_ID_FK` (`Donor_ID`);
+-- Indexes for table `redemption_order`
+ALTER TABLE `redemption_order` ADD PRIMARY KEY (`Redemption_ID`), ADD KEY `RedemptionOrder_Donor_ID_FK` (`Donor_ID`), ADD KEY `RedemptionOrder_Reward_ID_FK` (`Reward_ID`);
+-- Indexes for table `reward_item`
+ALTER TABLE `reward_item` ADD PRIMARY KEY (`Reward_ID`);
+-- Indexes for table `special_case`
+ALTER TABLE `special_case` ADD PRIMARY KEY (`Case_ID`);
+-- Indexes for table `staff`
+ALTER TABLE `staff` ADD PRIMARY KEY (`Staff_ID`), ADD KEY `staff_admin_id_fk` (`Admin_ID`), ADD KEY `staff_branch_id_fk` (`Branch_ID`);
+-- Indexes for table `staff_activity`
+ALTER TABLE `staff_activity` ADD PRIMARY KEY (`StaffActivity_ID`), ADD KEY `StaffActivity_Staff_ID_FK` (`Staff_ID`), ADD KEY `StaffActivity_Activity_ID_FK` (`Activity_ID`);
+-- Indexes for table `story`
+ALTER TABLE `story` ADD PRIMARY KEY (`Story_ID`);
 
 --
--- 表的索引 `activity`
---
-ALTER TABLE `activity`
-  ADD PRIMARY KEY (`Activity_ID`),
-  ADD KEY `Activity_BrANCH_ID_FK` (`Branch_ID`);
-
---
--- 表的索引 `admin`
---
-ALTER TABLE `admin`
-  ADD PRIMARY KEY (`Admin_ID`);
-
---
--- 表的索引 `branch`
---
-ALTER TABLE `branch`
-  ADD PRIMARY KEY (`Branch_ID`),
-  ADD KEY `branch_admin_id_fk` (`Admin_ID`);
-
---
--- 表的索引 `contact_messages`
---
-ALTER TABLE `contact_messages`
-  ADD PRIMARY KEY (`Contact_ID`);
-
---
--- 表的索引 `donor`
---
-ALTER TABLE `donor`
-  ADD PRIMARY KEY (`Donor_ID`);
-
---
--- 表的索引 `donor_achievement`
---
-ALTER TABLE `donor_achievement`
-  ADD PRIMARY KEY (`DonorAchievement_ID`),
-  ADD KEY `DonorAchievement_Donor_ID_FK` (`Donor_ID`),
-  ADD KEY `DonorAchievement_Achievement_ID_FK` (`Achievement_ID`);
-
---
--- 表的索引 `headquarters`
---
-ALTER TABLE `headquarters`
-  ADD PRIMARY KEY (`HQ_ID`);
-
---
--- 表的索引 `item_donation`
---
-ALTER TABLE `item_donation`
-  ADD PRIMARY KEY (`Item_ID`),
-  ADD KEY `Item_Donor_ID_FK` (`Donor_ID`),
-  ADD KEY `Item_Activity_ID_FK` (`Activity_ID`);
-
---
--- 表的索引 `login_attempts`
---
-ALTER TABLE `login_attempts`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_email_time` (`email`,`attempt_time`),
-  ADD KEY `idx_ip_time` (`ip_address`,`attempt_time`);
-
---
--- 表的索引 `orders`
---
-ALTER TABLE `orders`
-  ADD PRIMARY KEY (`Order_ID`),
-  ADD KEY `Order_Donor_ID_FK` (`Donor_ID`),
-  ADD KEY `Order_Activity_ID_FK` (`Activity_ID`),
-  ADD KEY `Order_Payment_ID_FK` (`Payment_ID`),
-  ADD KEY `Order_Case_ID_FK` (`Case_ID`);
-
---
--- 表的索引 `password_resets`
---
-ALTER TABLE `password_resets`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_email` (`email`),
-  ADD KEY `idx_token` (`token`);
-
---
--- 表的索引 `payment`
---
-ALTER TABLE `payment`
-  ADD PRIMARY KEY (`Payment_ID`);
-
---
--- 表的索引 `point`
---
-ALTER TABLE `point`
-  ADD PRIMARY KEY (`Points_ID`),
-  ADD KEY `Point_Donor_ID_FK` (`Donor_ID`);
-
---
--- 表的索引 `receipt`
---
-ALTER TABLE `receipt`
-  ADD PRIMARY KEY (`Receipt_ID`),
-  ADD KEY `Receipt_Donor_ID_FK` (`Donor_ID`),
-  ADD KEY `Receipt_Order_ID_FK` (`Order_ID`);
-
---
--- 表的索引 `recurring_donation`
---
-ALTER TABLE `recurring_donation`
-  ADD PRIMARY KEY (`Recurring_ID`),
-  ADD KEY `RecurringDonation_Donor_ID_FK` (`Donor_ID`);
-
---
--- 表的索引 `redemption_order`
---
-ALTER TABLE `redemption_order`
-  ADD PRIMARY KEY (`Redemption_ID`),
-  ADD KEY `RedemptionOrder_Donor_ID_FK` (`Donor_ID`),
-  ADD KEY `RedemptionOrder_Reward_ID_FK` (`Reward_ID`);
-
---
--- 表的索引 `reward_item`
---
-ALTER TABLE `reward_item`
-  ADD PRIMARY KEY (`Reward_ID`);
-
---
--- 表的索引 `special_case`
---
-ALTER TABLE `special_case`
-  ADD PRIMARY KEY (`Case_ID`);
-
---
--- 表的索引 `staff`
---
-ALTER TABLE `staff`
-  ADD PRIMARY KEY (`Staff_ID`),
-  ADD KEY `staff_admin_id_fk` (`Admin_ID`),
-  ADD KEY `staff_branch_id_fk` (`Branch_ID`);
-
---
--- 表的索引 `staff_activity`
---
-ALTER TABLE `staff_activity`
-  ADD PRIMARY KEY (`StaffActivity_ID`),
-  ADD KEY `StaffActivity_Staff_ID_FK` (`Staff_ID`),
-  ADD KEY `StaffActivity_Activity_ID_FK` (`Activity_ID`);
-
---
--- 表的索引 `story`
---
-ALTER TABLE `story`
-  ADD PRIMARY KEY (`Story_ID`);
-
---
--- 在导出的表使用AUTO_INCREMENT
+-- AUTO_INCREMENT for dumped tables
 --
 
---
--- 使用表AUTO_INCREMENT `achievement`
---
-ALTER TABLE `achievement`
-  MODIFY `Achievement_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `achievement` MODIFY `Achievement_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `activity` MODIFY `Activity_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `admin` MODIFY `Admin_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+ALTER TABLE `branch` MODIFY `Branch_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `contact_messages` MODIFY `Contact_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `donor` MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `donor_achievement` MODIFY `DonorAchievement_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `headquarters` MODIFY `HQ_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+ALTER TABLE `item_donation` MODIFY `Item_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `login_attempts` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `orders` MODIFY `Order_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `password_resets` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `payment` MODIFY `Payment_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `point` MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `receipt` MODIFY `Receipt_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `recurring_donation` MODIFY `Recurring_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `redemption_order` MODIFY `Redemption_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `reward_item` MODIFY `Reward_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `special_case` MODIFY `Case_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `staff` MODIFY `Staff_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `staff_activity` MODIFY `StaffActivity_ID` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `story` MODIFY `Story_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- 使用表AUTO_INCREMENT `activity`
---
-ALTER TABLE `activity`
-  MODIFY `Activity_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `admin`
---
-ALTER TABLE `admin`
-  MODIFY `Admin_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- 使用表AUTO_INCREMENT `branch`
---
-ALTER TABLE `branch`
-  MODIFY `Branch_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `contact_messages`
---
-ALTER TABLE `contact_messages`
-  MODIFY `Contact_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `donor`
---
-ALTER TABLE `donor`
-  MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `donor_achievement`
---
-ALTER TABLE `donor_achievement`
-  MODIFY `DonorAchievement_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `headquarters`
---
-ALTER TABLE `headquarters`
-  MODIFY `HQ_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
--- 使用表AUTO_INCREMENT `item_donation`
---
-ALTER TABLE `item_donation`
-  MODIFY `Item_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `login_attempts`
---
-ALTER TABLE `login_attempts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `orders`
---
-ALTER TABLE `orders`
-  MODIFY `Order_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `password_resets`
---
-ALTER TABLE `password_resets`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `payment`
---
-ALTER TABLE `payment`
-  MODIFY `Payment_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `point`
---
-ALTER TABLE `point`
-  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `receipt`
---
-ALTER TABLE `receipt`
-  MODIFY `Receipt_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `recurring_donation`
---
-ALTER TABLE `recurring_donation`
-  MODIFY `Recurring_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `redemption_order`
---
-ALTER TABLE `redemption_order`
-  MODIFY `Redemption_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `reward_item`
---
-ALTER TABLE `reward_item`
-  MODIFY `Reward_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `special_case`
---
-ALTER TABLE `special_case`
-  MODIFY `Case_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `staff`
---
-ALTER TABLE `staff`
-  MODIFY `Staff_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `staff_activity`
---
-ALTER TABLE `staff_activity`
-  MODIFY `StaffActivity_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `story`
---
-ALTER TABLE `story`
-  MODIFY `Story_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 限制导出的表
+-- Constraints for dumped tables
 --
 
---
--- 限制表 `activity`
---
-ALTER TABLE `activity`
-  ADD CONSTRAINT `Activity_BrANCH_ID_FK` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`);
-
---
--- 限制表 `branch`
---
-ALTER TABLE `branch`
-  ADD CONSTRAINT `branch_admin_id_fk` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`);
-
---
--- 限制表 `donor_achievement`
---
-ALTER TABLE `donor_achievement`
-  ADD CONSTRAINT `DonorAchievement_Achievement_ID_FK` FOREIGN KEY (`Achievement_ID`) REFERENCES `achievement` (`Achievement_ID`),
-  ADD CONSTRAINT `DonorAchievement_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
-
---
--- 限制表 `item_donation`
---
-ALTER TABLE `item_donation`
-  ADD CONSTRAINT `Item_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
-  ADD CONSTRAINT `Item_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
-
---
--- 限制表 `orders`
---
-ALTER TABLE `orders`
-  ADD CONSTRAINT `Order_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
-  ADD CONSTRAINT `Order_Branch_ID_FK` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`),
-  ADD CONSTRAINT `Order_Case_ID_FK` FOREIGN KEY (`Case_ID`) REFERENCES `special_case` (`Case_ID`),
-  ADD CONSTRAINT `Order_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`),
-  ADD CONSTRAINT `Order_Payment_ID_FK` FOREIGN KEY (`Payment_ID`) REFERENCES `payment` (`Payment_ID`);
-
---
--- 限制表 `point`
---
-ALTER TABLE `point`
-  ADD CONSTRAINT `Point_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
-
---
--- 限制表 `receipt`
---
-ALTER TABLE `receipt`
-  ADD CONSTRAINT `Receipt_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`),
-  ADD CONSTRAINT `Receipt_Order_ID_FK` FOREIGN KEY (`Order_ID`) REFERENCES `orders` (`Order_ID`);
-
---
--- 限制表 `recurring_donation`
---
-ALTER TABLE `recurring_donation`
-  ADD CONSTRAINT `RecurringDonation_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
-
---
--- 限制表 `redemption_order`
---
-ALTER TABLE `redemption_order`
-  ADD CONSTRAINT `RedemptionOrder_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`),
-  ADD CONSTRAINT `RedemptionOrder_Reward_ID_FK` FOREIGN KEY (`Reward_ID`) REFERENCES `reward_item` (`Reward_ID`);
-
---
--- 限制表 `staff`
---
-ALTER TABLE `staff`
-  ADD CONSTRAINT `staff_admin_id_fk` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`),
-  ADD CONSTRAINT `staff_branch_id_fk` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`);
-
---
--- 限制表 `staff_activity`
---
-ALTER TABLE `staff_activity`
-  ADD CONSTRAINT `StaffActivity_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
-  ADD CONSTRAINT `StaffActivity_Staff_ID_FK` FOREIGN KEY (`Staff_ID`) REFERENCES `staff` (`Staff_ID`);
+ALTER TABLE `activity` ADD CONSTRAINT `Activity_BrANCH_ID_FK` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`);
+ALTER TABLE `branch` ADD CONSTRAINT `branch_admin_id_fk` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`);
+ALTER TABLE `donor_achievement` ADD CONSTRAINT `DonorAchievement_Achievement_ID_FK` FOREIGN KEY (`Achievement_ID`) REFERENCES `achievement` (`Achievement_ID`), ADD CONSTRAINT `DonorAchievement_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
+ALTER TABLE `item_donation` ADD CONSTRAINT `Item_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`), ADD CONSTRAINT `Item_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
+ALTER TABLE `orders` ADD CONSTRAINT `Order_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`), ADD CONSTRAINT `Order_Branch_ID_FK` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`), ADD CONSTRAINT `Order_Case_ID_FK` FOREIGN KEY (`Case_ID`) REFERENCES `special_case` (`Case_ID`), ADD CONSTRAINT `Order_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`), ADD CONSTRAINT `Order_Payment_ID_FK` FOREIGN KEY (`Payment_ID`) REFERENCES `payment` (`Payment_ID`);
+ALTER TABLE `point` ADD CONSTRAINT `Point_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
+ALTER TABLE `receipt` ADD CONSTRAINT `Receipt_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`), ADD CONSTRAINT `Receipt_Order_ID_FK` FOREIGN KEY (`Order_ID`) REFERENCES `orders` (`Order_ID`);
+ALTER TABLE `recurring_donation` ADD CONSTRAINT `RecurringDonation_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
+ALTER TABLE `redemption_order` ADD CONSTRAINT `RedemptionOrder_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`), ADD CONSTRAINT `RedemptionOrder_Reward_ID_FK` FOREIGN KEY (`Reward_ID`) REFERENCES `reward_item` (`Reward_ID`);
+ALTER TABLE `staff` ADD CONSTRAINT `staff_admin_id_fk` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`), ADD CONSTRAINT `staff_branch_id_fk` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`);
+ALTER TABLE `staff_activity` ADD CONSTRAINT `StaffActivity_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`), ADD CONSTRAINT `StaffActivity_Staff_ID_FK` FOREIGN KEY (`Staff_ID`) REFERENCES `staff` (`Staff_ID`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
