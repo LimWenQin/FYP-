@@ -1,291 +1,243 @@
 <?php
-// 1. 引入必要的设置和头部文件 (这就包含了 Session 和 导航栏)
+// 1. 引入数据库连接
 include 'dataconnection.php';
-include 'header_function.php';
-include 'header_UI_2.php';
 
-// 2. 特殊个案逻辑：获取从 URL 传来的 'case_id'
+// 2. 开启 Session
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// 3. 强制登录检查
+//if (!isset($_SESSION['donor_id'])) {
+//   echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
+//   exit();
+//}
+
+// 4. 获取 Case ID
 $case_id = isset($_GET['case_id']) ? (int)$_GET['case_id'] : 0;
 
 if ($case_id == 0) {
-    die("Error: Invalid Special Case ID. Please return to the previous page.");
+    echo "<script>alert('Invalid Case ID.'); window.history.back();</script>";
+    exit();
 }
+
+// 5. 查询 Case 详情 (为了显示名字)
+$case_title = "Special Case #" . $case_id; // 默认标题
+$case_desc = "Your donation will directly support this specific case."; // 默认描述
+
+// 尝试从数据库获取真实标题
+$sql = "SELECT Case_Title, Case_Description FROM special_case WHERE Case_ID = ?";
+if ($stmt = $conn->prepare($sql)) {
+    $stmt->bind_param("i", $case_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($row = $result->fetch_assoc()) {
+        $case_title = $row['Case_Title'];
+        // 如果有描述也可以获取，或者只用默认的通用描述
+        // $case_desc = $row['Case_Description']; 
+    }
+    $stmt->close();
+}
+
+// 6. 引入新版头部
+include 'header_UI.php'; 
 ?>
 
-<!DOCTYPE html>
-<html>
-<head>
-<title>Special Case Donation</title>
 <style>
-    /* ✅ 1. 使用与 Payment_Page 一样的颜色变量 */
-    :root 
-    {
-        --gradient-start: #ff6b9d;
-        --gradient-middle: #ff8fab;
-        --gradient-end: #ffb3c6;
-        --white: #ffffff;
-    }
-
-    body 
-    {
-        background-color: #FFF5E4;
-        margin: 0;
-        font-family: Arial;
-        color: #4A4A4A;
-    }
-
-    /* 这里的 .header 样式主要用于覆盖 header_UI_2 中的默认样式，使其变成渐变色 */
-    .header 
-    {
-        display: flex; /* 注意：header_UI_2 可能是 grid，这里覆盖为 flex 可能会影响布局，建议保留背景色修改即可 */
-        background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%) !important;
-        box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2);
-    }
-    
-    /* 强制修改 header_UI_2 中的文字颜色为白色以适配渐变背景 */
-    .header .function-links a, 
-    .header .logo {
-        color: var(--white) !important;
-    }
-
-    .container 
-    {
+    /* --- Hero Banner --- */
+    .hero-wrap {
+        height: 400px;
+        position: relative;
+        background-image: url('images/hero_1.jpg'); /* 确保有这张图 */
+        background-size: cover;
+        background-position: center;
         display: flex;
-        flex-direction: row;
-        padding: 20px;
-    }
-
-    .sidebar 
-    {
-        width: 60px;
-        display: flex;
-        flex-direction: column;
         align-items: center;
-        gap: 15px;
-        margin-right: 20px;
-        padding-top: 20px;
+        justify-content: center;
+        text-align: center;
+    }
+    .hero-wrap .overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+    }
+    .hero-content {
+        position: relative;
+        z-index: 2;
+        max-width: 800px;
+    }
+    .hero-content h1 {
+        font-family: "Mansalva", cursive;
+        color: #fff;
+        font-size: 4rem;
+        margin-bottom: 10px;
+    }
+    .hero-content p { font-size: 1.2rem; color: rgba(255, 255, 255, 0.9); }
+
+    /* --- 捐款卡片 --- */
+    .donation-card {
+        background: #fff;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        border: 1px solid #eee;
     }
 
-    .sidebar button 
-    {
-        background-color: #A8D5BA;
-        border: none;
-        border-radius: 10px;
-        padding: 8px;
-        width: 50px;
-        height: 50px;
-        cursor: pointer;
-        font-weight: bold;
-        color: #4A4A4A;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    /* 类型切换按钮 */
+    .type-group {
+        display: flex;
+        margin-bottom: 20px;
+        border: 1px solid #00a651;
+        border-radius: 5px;
+        overflow: hidden;
     }
-
-    .story-section 
-    {
-        flex: 2;
-        background-color: white;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-    .story-section img 
-    {
-        width: 100%;
-        border-radius: 10px;
-        margin-bottom: 15px;
-    }
-    .story-section h2 
-    { 
-        color: #F28585; 
-    }
-
-    .donation-box 
-    {
+    .type-option {
         flex: 1;
-        background-color: white;
-        border-radius: 12px;
-        margin-left: 20px;
-        padding: 20px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-
-    .donation-box h3 
-    {
         text-align: center;
-        color: #F28585;
-    }
-
-    .donation-box .donation-type 
-    {
-        text-align: center;
-        margin-bottom: 15px;
-    }
-
-    .donation-box .donation-type button 
-    {
-        background-color: #A8D5BA;
-        border: none;
-        border-radius: 25px;
-        padding: 10px 20px;
-        margin: 0 15px;
-        font-weight: bold;
-        color: #4A4A4A;
+        padding: 10px;
         cursor: pointer;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        background: #fff;
+        color: #00a651;
+        font-weight: bold;
+    }
+    .type-option.active {
+        background: #00a651;
+        color: #fff;
     }
 
-    .donation-box .donation-type button.active 
-    {
-        background-color: #91C8A8;
-    }
-
-    .donation-box .donation-type button:hover 
-    {
-        background-color: #91C8A8;
-    }
-
-    .donation-box .amounts 
-    {
+    /* 金额按钮网格 */
+    .amount-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 10px;
-        margin: 15px 0;
-    }
-
-    .donation-box .amounts button 
-    {
-        background-color: #A8D5BA;
-        border: none;
-        border-radius: 10px;
-        padding: 10px;
-        cursor: pointer;
-        font-weight: bold;
-        color: #4A4A4A;
-        height: 50px;
-    }
-
-    .donation-box .amounts button:hover 
-    {
-        background-color: #91C8A8;
-    }
-
-    .donation-box input[type="text"] 
-    {
-        width: 95%;
-        padding: 10px;
-        border-radius: 6px;
-        border: 1px solid #ccc;
         margin-bottom: 15px;
     }
+    .btn-amount {
+        padding: 12px;
+        border: 1px solid #ddd;
+        background: #fff;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 14px;
+        transition: 0.2s;
+    }
+    .btn-amount:hover { background: #f0f0f0; }
+    .btn-amount:active { background: #00a651; color: #fff; }
 
-    .donation-box .donate-btn 
-    {
+    /* 输入框 */
+    .input-custom {
         width: 100%;
         padding: 12px;
-        background-color: #F6B8B8;
-        border: none;
-        border-radius: 8px;
-        font-size: 18px;
-        font-weight: bold;
-        cursor: pointer;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        font-size: 16px;
     }
 
-    .donation-box .donate-btn:hover 
-    {
-        background-color: #F28585;
+    /* 提交按钮 */
+    .btn-submit {
+        width: 100%;
+        padding: 15px;
+        background: #00a651;
+        color: #fff;
+        font-size: 18px;
+        font-weight: bold;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        text-transform: uppercase;
+        transition: 0.3s;
     }
+    .btn-submit:hover { background: #008f45; }
 </style>
 
 <script>
-// ✅ 保留原有的 JS 逻辑
-function selectType(type) {
-    document.getElementById("donation_type").value = type;
-
-    document.getElementById("onceBtn").classList.remove("active");
-    document.getElementById("monthlyBtn").classList.remove("active");
-
-    if (type === "one-time") {
-        document.getElementById("onceBtn").classList.add("active");
-    } else {
-        document.getElementById("monthlyBtn").classList.add("active");
+    function selectType(type) {
+        document.getElementById("donation_type").value = type;
+        document.getElementById('btn-once').classList.remove('active');
+        document.getElementById('btn-monthly').classList.remove('active');
+        if(type === 'one-time') {
+            document.getElementById('btn-once').classList.add('active');
+        } else {
+            document.getElementById('btn-monthly').classList.add('active');
+        }
     }
-}
-
-function selectAmount(amount) {
-    document.getElementById("amount").value = amount;
-    document.getElementById("custom_amount").value = ""; // 清空自定义金额
-}
-
-function beforeSubmit() {
-    let selected = document.getElementById("amount").value;
-    let custom = document.getElementById("custom_amount").value;
-
-    let finalAmount = selected;
-
-    if (custom !== "") {
-        finalAmount = custom;
+    function selectAmount(amount) {
+        document.getElementById("amount").value = amount;
+        document.getElementById("custom_amount").value = amount;
     }
+    
+    // 表单验证
+    function beforeSubmit() {
+        let selected = document.getElementById("amount").value;
+        let custom = document.getElementById("custom_amount").value;
+        let finalAmount = custom || selected;
 
-    if (finalAmount === "" || isNaN(finalAmount) || finalAmount <= 0) {
-        alert("Please enter or select a valid donation amount.");
-        return false;
+        if (!finalAmount || finalAmount <= 0) {
+            alert("Please select or enter a valid amount.");
+            return false;
+        }
+        document.getElementById("amount").value = finalAmount;
+        return true;
     }
-
-    document.getElementById("amount").value = finalAmount;
-    return true;
-}
 </script>
 
-</head>
-<body>
-
-<div class="container">
-
-    <div class="sidebar">
-        <button><img src="yourimage.jpg" alt="Whatsapp"></button>
-        <button><img src="yourimage.jpg" alt="Facebook"></button>
-        <button><img src="yourimage.jpg" alt="Instagram"></button>
-        <button><img src="yourimage.jpg" alt="General Line"></button>
+<div class="hero-wrap">
+    <div class="overlay"></div>
+    <div class="hero-content">
+        <h1>Special Case Donation</h1>
+        <p>Your support provides direct help to specific needs.</p>
     </div>
-
-    <div class="story-section">
-        <img src="yourimage.jpg" alt="Case Image">
-        <h2>Donation Story (Case ID: <?php echo $case_id; ?>)</h2>
-        <p>This is a special case donation description text. Your donation will directly support this specific case.</p>
-    </div>
-
-    <div class="donation-box">
-        <h3>Types of donations</h3>
-
-        <form id="donationForm" method="POST" action="S_C_Payment_Ways_Page.php" onsubmit="return beforeSubmit();">
-
-            <div class="donation-type">
-                <button type="button" id="onceBtn" class="active" onclick="selectType('one-time')">One-time</button>
-                <button type="button" id="monthlyBtn" onclick="selectType('monthly')">Monthly</button>
-            </div>
-
-            <input type="hidden" id="donation_type" name="donation_type" value="one-time">
-            <input type="hidden" id="amount" name="amount" value="">
-            <input type="hidden" name="case_id" value="<?php echo $case_id; ?>">
-
-            <div class="amounts">
-                <button type="button" onclick="selectAmount(20)">RM20</button>
-                <button type="button" onclick="selectAmount(50)">RM50</button>
-                <button type="button" onclick="selectAmount(100)">RM100</button>
-                <button type="button" onclick="selectAmount(200)">RM200</button>
-                <button type="button" onclick="selectAmount(300)">RM300</button>
-                <button type="button" onclick="selectAmount(500)">RM500</button>
-            </div>
-
-            <input type="text" id="custom_amount" placeholder="Enter custom amount">
-
-            <button type="submit" class="donate-btn">Donate</button>
-
-        </form>
-    </div>
-
 </div>
 
-</body>
-</html>
+<div class="site-section" style="padding: 5em 0;">
+    <div class="container">
+        <div class="row">
+            
+            <div class="col-md-6 mb-5">
+                <img src="yourimage.jpg" alt="Case Image" class="img-fluid rounded mb-4 shadow-sm">
+                
+                <h3 class="text-cursive mb-4" style="color: #00a651;">Supporting:</h3>
+                <h2 class="text-black mb-4"><?php echo htmlspecialchars($case_title); ?></h2>
+                
+                <p class="lead"><?php echo htmlspecialchars($case_desc); ?></p>
+                <p class="text-muted">This donation is designated for a special case. 100% of your contribution goes directly towards the relief efforts for this specific cause.</p>
+            </div>
+
+            <div class="col-md-6">
+                <div class="donation-card">
+                    <h3 class="text-cursive text-black text-center mb-4">Choose Amount</h3>
+
+                    <form id="donationForm" method="POST" action="S_C_Payment_Ways_Page.php" onsubmit="return beforeSubmit();">
+                        
+                        <div class="type-group">
+                            <div class="type-option active" id="btn-once" onclick="selectType('one-time')">One-time</div>
+                            <div class="type-option" id="btn-monthly" onclick="selectType('monthly')">Monthly</div>
+                        </div>
+
+                        <input type="hidden" id="donation_type" name="donation_type" value="one-time">
+                        <input type="hidden" id="amount" name="amount" value="">
+                        <input type="hidden" name="case_id" value="<?php echo htmlspecialchars($case_id); ?>">
+
+                        <div class="amount-grid">
+                            <button type="button" class="btn-amount" onclick="selectAmount(20)">RM 20</button>
+                            <button type="button" class="btn-amount" onclick="selectAmount(50)">RM 50</button>
+                            <button type="button" class="btn-amount" onclick="selectAmount(100)">RM 100</button>
+                            <button type="button" class="btn-amount" onclick="selectAmount(200)">RM 200</button>
+                            <button type="button" class="btn-amount" onclick="selectAmount(300)">RM 300</button>
+                            <button type="button" class="btn-amount" onclick="selectAmount(500)">RM 500</button>
+                        </div>
+
+                        <input type="number" id="custom_amount" class="input-custom" placeholder="Enter custom amount (RM)">
+
+                        <button type="submit" class="btn-submit">Donate Now</button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<?php include 'footer.php'; ?>
+<?php $conn->close(); ?>

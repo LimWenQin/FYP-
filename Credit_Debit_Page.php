@@ -2,21 +2,21 @@
 // 1. 开启 Session (必须放在第一行)
 session_start();
 
-// 2. 检查登录
-if (!isset($_SESSION['donor_id'])) {
-    echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
-    exit();
-}
+// 2. 检查登录 (如果没有登录，跳转)
+//if (!isset($_SESSION['donor_id'])) {
+//    echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
+//    exit();
+//}
 
-$current_donor_id = $_SESSION['donor_id'];
+$current_donor_id = $_SESSION['donor_id']; // 获取当前登录用户的ID
 
-// 3. 引入数据库 (这个不输出 HTML，可以放前面)
+// 引入数据库连接和头部
 include 'dataconnection.php';
 
 // 设置时区
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
-// 4. 获取用户真实信息 (逻辑处理，不输出 HTML)
+// 3. 获取当前用户的详细资料
 $user_sql = "SELECT Donor_FName, Donor_LName, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
 $u_stmt = $conn->prepare($user_sql);
 $u_stmt->bind_param("i", $current_donor_id);
@@ -26,11 +26,11 @@ $user_data = $u_result->fetch_assoc();
 $u_stmt->close();
 
 // ---------------------------------------------------------
-// 5. ✅ 关键修改：把所有处理逻辑放在 include HTML 之前！
+// PHP 处理逻辑：当点击 Confirm Payment 时执行
 // ---------------------------------------------------------
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
 
-    // 接收数据
+    // 接收基础数据
     $donation_type = $_POST['donation_type']; 
     $amount = $_POST['amount'];
     $bank_name = $_POST['bank'];
@@ -88,240 +88,174 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
 }
 
 // ---------------------------------------------------------
-// 6. ✅ 只有逻辑处理完且没有跳转时，才加载页面 HTML
+// 4. 引入新版 Header (逻辑处理完才引入)
 // ---------------------------------------------------------
-include 'header_function.php'; 
-include 'header_UI_2.php'; // ⚠️ 这行代码会输出 HTML，必须放在最后！
+include 'header_UI.php'; 
 ?>
 
-<!DOCTYPE html>
-<html>
-<head>
-<title>Bank Transfer</title>
 <style>
-
-    /* 1. 添加颜色变量定义 */
-    :root 
-    {
-        --gradient-start: #ff6b9d;
-        --gradient-middle: #ff8fab;
-        --gradient-end: #ffb3c6;
-        --white: #ffffff;
-    }
-
-    /* ✅ 样式区块（保留你的原始美观风格） */
-    body 
-    {
-        background-color: #FFF5E4;
-        font-family: Arial;
-        color: #4A4A4A;
-        margin: 0;
-    }
-
-    .header 
-    {
+    /* --- Hero Banner --- */
+    .hero-wrap {
+        height: 400px;
+        position: relative;
+        background-image: url('images/hero_1.jpg');
+        background-size: cover;
+        background-position: center;
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        padding: 20px 50px;
-        /*应用渐变色背景 --- */
-        background: linear-gradient(180deg, var(--gradient-start) 0%, var(--gradient-middle) 50%, var(--gradient-end) 100%);
-        box-shadow: 0 4px 15px rgba(255, 107, 157, 0.2); /* 新的阴影 */
-        color: #fcfcfcff; /* 为了在渐变色上清晰显示，文字改为白色 */
-    }
-
-    .logo 
-    {
-        display: flex;          /*变成弹性盒子Flexbox，自动变成一行排列*/
-        align-items: center;    /* 垂直居中 */
-        font-weight: bold;      /*粗体*/
-        font-size: 36px;        /*字体大小*/
-        gap: 10px;              /* 图片与文字之间的间距 */
-    }
-
-    .header .function-links a 
-    {
-        margin-left: 15px;
-        text-decoration: none;
-        font-size: 20px;
-        color: #fcfcfcff;
-        font-weight: bold;
-    }
-
-    .search 
-    { 
-        padding: 6px; font-size: 16px; 
-    }
-
-    .container 
-    {
-        display: flex;
-        flex-direction: row;
-        padding: 20px;
-    }
-
-    .sidebar 
-    {
-        width: 60px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 15px;
-        margin-right: 20px;
-        padding-top: 20px;
-    }
-
-    .sidebar button 
-    {
-        background-color: #A8D5BA;
-        border: none;
-        border-radius: 10px;
-        padding: 8px;
-        width: 50px;
-        height: 50px;
-        cursor: pointer;
-        font-weight: bold;
-        color: #4A4A4A;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-
-    .story-section 
-    {
-        flex: 2;
-        background-color: white;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-
-    .story-section img 
-    {
-        width: 100%;
-        border-radius: 10px;
-        margin-bottom: 15px;
-    }
-
-    .story-section h2 
-    {
-        color: #F28585;
-    }
-
-    .donation-box 
-    {
-        flex: 1;
-        background-color: white;
-        border-radius: 12px;
-        margin-left: 20px;
-        padding: 20px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    }
-
-    .donation-box h3 
-    {
+        justify-content: center;
         text-align: center;
-        color: #F28585;
+    }
+    .hero-wrap .overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+    }
+    .hero-content {
+        position: relative;
+        z-index: 2;
+        max-width: 800px;
+    }
+    .hero-content h1 {
+        font-family: "Mansalva", cursive;
+        color: #fff;
+        font-size: 4rem;
+        margin-bottom: 10px;
+    }
+    .hero-content p { font-size: 1.2rem; color: rgba(255, 255, 255, 0.9); }
+
+    /* --- 付款表单样式 --- */
+    .payment-card {
+        background: #fff;
+        padding: 40px;
+        border-radius: 8px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        border: 1px solid #f0f0f0;
     }
 
-    .bank-form label 
-    {
+    .form-group label {
         font-weight: bold;
-        margin-top: 10px;
+        color: #555;
+        margin-bottom: 8px;
+        display: block;
     }
-
-    .bank-form select, .bank-form input 
-    {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        margin-top: 5px;
+    
+    .form-control {
+        height: 50px;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+        padding: 10px 15px;
         font-size: 16px;
     }
-
-    .card-info 
-    {
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        margin-top: 10px;
+    .form-control:focus {
+        border-color: #00a651;
+        box-shadow: none;
     }
 
-    .card-info div 
-    {
+    .btn-confirm {
+        background-color: #00a651;
+        color: #fff;
+        font-weight: bold;
+        font-size: 18px;
+        padding: 15px;
+        border: none;
+        border-radius: 4px;
+        width: 100%;
+        cursor: pointer;
+        transition: 0.3s;
+    }
+    .btn-confirm:hover {
+        background-color: #008f45;
+        color: #fff;
+    }
+
+    /* 分隔两个输入框 */
+    .card-row {
+        display: flex;
+        gap: 20px;
+    }
+    .card-col {
         flex: 1;
     }
-
-    .donate-btn 
-    {
-        margin-top: 20px;
-        width: 100%;
-        padding: 12px;
-        background-color: #F6B8B8;
-        border: none;
-        border-radius: 8px;
-        font-size: 18px;
-        font-weight: bold;
-        cursor: pointer;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-        color: #4A4A4A;
-    }
-
-    .donate-btn:hover 
-    {
-        background-color: #F28585;
-    }
 </style>
-</head>
-<body>
 
-<div class="container">
-    <!-- 左侧故事区 -->
-    <div class="story-section">
-        <img src="yourimage.jpg" alt="Donation Story">
-        <h2>Donation Story</h2>
-        <p>Support our cause with your donation. Your kindness helps improve lives.</p>
-    </div>
-
-    <!-- 右侧付款区 -->
-    <div class="donation-box">
-        <h3>Credit Card / Debit Card</h3>
-        <form class="bank-form" method="POST" action="">
-            <!-- 从上一页传来的隐藏字段 -->
-            <input type="hidden" name="donation_type" value="<?php echo $_POST['donation_type'] ?? 'one-time'; ?>">
-            <input type="hidden" name="amount" value="<?php echo $_POST['amount'] ?? 50; ?>">
-            <input type="hidden" name="branch_id" value="<?php echo $_POST['branch_id'] ?? 1; ?>">
-
-            <label for="bank">Bank Name</label>
-            <select id="bank" name="bank" required>
-                <option value="">-- Select Bank --</option>
-                <option value="Maybank">Maybank</option>
-                <option value="CIMB Bank">CIMB Bank</option>
-                <option value="Public Bank">Public Bank</option>
-                <option value="Hong Leong Bank">Hong Leong Bank</option>
-                <option value="RHB Bank">RHB Bank</option>
-            </select>
-
-            <label for="card">Card Number</label>
-            <input type="text" id="card" name="card" maxlength="16" placeholder="Enter your card number" pattern="\d{16}" required>
-
-            <div class="card-info">
-                <div>
-                    <label for="exp">Expiration Date</label>
-                    <input type="text" id="exp" name="exp" placeholder="MM/YY" maxlength="5" pattern="(0[1-9]|1[0-2])\/\d{2}" required>
-                </div>
-
-                <div>
-                    <label for="cvc">CVC</label>
-                    <input type="text" id="cvc" name="cvc" maxlength="3" pattern="\d{3}" placeholder="***" required>
-                </div>
-            </div>
-
-            <button type="submit" class="donate-btn">Confirm Payment</button>
-        </form>
+<div class="hero-wrap">
+    <div class="overlay"></div>
+    <div class="hero-content">
+        <h1>Secure Payment</h1>
+        <p>Enter your card details to complete the donation securely.</p>
     </div>
 </div>
 
-</body>
-</html>
+<div class="site-section" style="padding: 5em 0;">
+    <div class="container">
+        <div class="row">
+            
+            <div class="col-md-6 mb-5">
+                <img src="yourimage.jpg" alt="Donation Story" class="img-fluid rounded mb-4 shadow-sm">
+                <h3 class="text-cursive mb-4" style="color: #00a651;">Thank You!</h3>
+                <p>Your donation of <strong>RM <?php echo htmlspecialchars($_POST['amount'] ?? 0); ?></strong> will make a huge difference.</p>
+                <p class="text-muted">We use secure encryption to protect your personal and financial information. Your generosity helps us continue our mission.</p>
+                
+                <?php if(isset($_POST['case_id']) && $_POST['case_id'] > 0): ?>
+                    <div class="alert alert-info mt-3">
+                        <strong>Special Project:</strong> You are donating to Case ID #<?php echo htmlspecialchars($_POST['case_id']); ?>
+                    </div>
+                <?php endif; ?>
+            </div>
 
+            <div class="col-md-6">
+                <div class="payment-card">
+                    <h3 class="text-cursive text-black text-center mb-4">Card Details</h3>
+                    
+                    <form class="bank-form" method="POST" action="">
+                        
+                        <input type="hidden" name="donation_type" value="<?php echo $_POST['donation_type'] ?? 'one-time'; ?>">
+                        <input type="hidden" name="amount" value="<?php echo $_POST['amount'] ?? 50; ?>">
+                        <input type="hidden" name="branch_id" value="<?php echo $_POST['branch_id'] ?? 0; ?>">
+                        <input type="hidden" name="case_id" value="<?php echo $_POST['case_id'] ?? 0; ?>">
+                        <input type="hidden" name="activity_id" value="<?php echo $_POST['activity_id'] ?? ''; ?>">
 
+                        <div class="form-group mb-3">
+                            <label for="bank">Bank Name</label>
+                            <select id="bank" name="bank" class="form-control" required>
+                                <option value="">-- Select Bank --</option>
+                                <option value="Maybank">Maybank</option>
+                                <option value="CIMB Bank">CIMB Bank</option>
+                                <option value="Public Bank">Public Bank</option>
+                                <option value="Hong Leong Bank">Hong Leong Bank</option>
+                                <option value="RHB Bank">RHB Bank</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="card">Card Number</label>
+                            <input type="text" id="card" name="card" class="form-control" maxlength="16" placeholder="1234 5678 9012 3456" pattern="\d{16}" required>
+                        </div>
+
+                        <div class="card-row mb-4">
+                            <div class="card-col">
+                                <label for="exp">Expiration Date</label>
+                                <input type="text" id="exp" name="exp" class="form-control" placeholder="MM/YY" maxlength="5" pattern="(0[1-9]|1[0-2])\/\d{2}" required>
+                            </div>
+                            <div class="card-col">
+                                <label for="cvc">CVC / CVV</label>
+                                <input type="text" id="cvc" name="cvc" class="form-control" maxlength="3" pattern="\d{3}" placeholder="123" required>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-confirm">Confirm Payment</button>
+                        
+                        <div class="text-center mt-3">
+                            <small class="text-muted"><i class="icon-lock"></i> Payments are secure and encrypted.</small>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<?php include 'footer.php'; ?>
