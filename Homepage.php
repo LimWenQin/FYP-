@@ -193,7 +193,7 @@ $upcoming_activities = [
             display: flex;
             justify-content: center;
             gap: 30px;
-            margin-bottom: 40px;
+            margin-bottom: 5px;
             font-size: 1rem;
             color: var(--white);
             font-weight: 500;
@@ -227,7 +227,7 @@ $upcoming_activities = [
         }
 
         .fund-title {
-            font-size: 1.8rem;
+            font-size: 1.2rem;
             color: var(--white);
             margin-bottom: 30px;
             font-weight: 600;

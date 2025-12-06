@@ -2,32 +2,48 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-
 $error_message = "";
 $success_message = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Get form data
-    $fname = trim($_POST['fname']);
-    $lname = trim($_POST['lname']);
+    $name = trim($_POST['name']);
     $contact = trim($_POST['contact']);
     $icnumber = trim($_POST['icnumber']);
     $email = trim($_POST['email']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
-    $address = trim($_POST['address']);
+    $address1 = trim($_POST['address1']);
+    $address2 = trim($_POST['address2']);
+    $address3 = trim($_POST['address3']);
+    $city = trim($_POST['city']);
+    $state = trim($_POST['state']);
+    $postalcode = trim($_POST['postalcode']);
+    $country = trim($_POST['country']);
     $dob = $_POST['dob'];
-    $description = trim($_POST['description']);
+    
 
     // Validation
-    if (empty($fname) || empty($lname) || empty($contact) || empty($icnumber) || 
-        empty($email) || empty($password) || empty($confirm_password) || 
-        empty($address) || empty($dob)) {
-        $error_message = "All required fields must be filled.";
+    $required_fields = ['name', 'contact', 'icnumber', 'email', 'password', 'confirm_password', 
+                       'address1', 'city', 'state', 'postalcode', 'dob'];
+    
+    $missing_fields = [];
+    foreach ($required_fields as $field) {
+        if (empty($_POST[$field])) {
+            $missing_fields[] = $field;
+        }
+    }
+    
+    if (!empty($missing_fields)) {
+        $error_message = "Please fill in all required fields: " . implode(', ', $missing_fields);
     } elseif ($password !== $confirm_password) {
         $error_message = "Passwords do not match.";
     } elseif (strlen($password) < 8) {
         $error_message = "Password must be at least 8 characters long.";
+    } elseif (!preg_match('/^\d{12}$/', $icnumber)) {
+        $error_message = "IC Number must be exactly 12 digits.";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error_message = "Please enter a valid email address.";
     } else {
         // Check if email or IC number already exists
         $check_query = "SELECT Donor_ID FROM donor WHERE Donor_Email = ? OR Donor_ICNumber = ?";
@@ -43,16 +59,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
             
             // Insert into database
-            $insert_query = "INSERT INTO donor (Donor_FName, Donor_LName, Donor_ContactNumber, Donor_ICNumber, Donor_Email, Donor_Password, Donor_Address, Donor_DOB, Donor_Description) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $insert_query = "INSERT INTO donor (Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email, 
+                            Donor_Password, Donor_Address1, Donor_Address2, Donor_Address3, 
+                            Donor_City, Donor_State, Donor_PostalCode, Donor_Country, Donor_DOB) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            
             $stmt = $conn->prepare($insert_query);
-            $stmt->bind_param("sssssssss", $fname, $lname, $contact, $icnumber, $email, $hashed_password, $address, $dob, $description);
+            $stmt->bind_param("sssssssssssss", 
+                $name, $contact, $icnumber, $email, $hashed_password,
+                $address1, $address2, $address3, $city, $state, 
+                $postalcode, $country, $dob
+            );
             
             if ($stmt->execute()) {
                 $success_message = "Registration successful! You can now login.";
                 header("Location: donor_login.php");
                 exit();
-
             } else {
                 $error_message = "Error: " . $stmt->error;
             }
@@ -68,18 +90,269 @@ include 'header_UI.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Donor Registration</title>
-    <link rel="stylesheet" href="donor_design.css">
+    <title>Donor Registration - Love Bridge</title>
     <style>
-        
+        :root {
+            --primary-red: #dc2626;
+            --dark-red: #b91c1c;
+            --light-red: #fee2e2;
+            --white: #ffffff;
+            --light-gray: #f5f5f5;
+            --medium-gray: #737373;
+            --dark-gray: #262626;
+            --text-dark: #171717;
+            --border-color: #e5e5e5;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light-gray);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .form-container {
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            border-top: 5px solid var(--primary-red);
+        }
+
+        .form-title {
+            color: var(--primary-red);
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-align: center;
+            border-bottom: 2px solid var(--light-red);
+            padding-bottom: 15px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark-gray);
+            font-size: 0.95rem;
+        }
+
+        .form-group label.required::after {
+            content: " *";
+            color: var(--primary-red);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-red);
+            box-shadow: 0 0 0 3px var(--light-red);
+        }
+
+        .form-control.error {
+            border-color: var(--primary-red);
+        }
+
+        .form-control.success {
+            border-color: #10b981;
+        }
+
+        .form-help {
+            font-size: 0.85rem;
+            color: var(--medium-gray);
+            margin-top: 5px;
+            display: block;
+        }
+
+        .error-message {
+            background-color: var(--light-red);
+            color: var(--dark-red);
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            border-left: 4px solid var(--primary-red);
+            font-weight: 500;
+        }
+
+        .success-message {
+            background-color: #d1fae5;
+            color: #065f46;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            border-left: 4px solid #10b981;
+            font-weight: 500;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary-red), var(--dark-red));
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:hover {
+            background: linear-gradient(135deg, var(--dark-red), var(--primary-red));
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(220, 38, 38, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .form-footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            color: var(--medium-gray);
+        }
+
+        .form-footer a {
+            color: var(--primary-red);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .form-footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Address section styling */
+        .address-section {
+            background: white;
+            
+            border-radius: 8px;
+            margin-bottom: 25px;
+            
+        }
+
+       
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .container {
+                margin: 20px auto;
+                padding: 0 15px;
+            }
+            
+            .form-container {
+                padding: 25px;
+            }
+            
+            .form-title {
+                font-size: 1.8rem;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .form-container {
+                padding: 20px;
+            }
+            
+            .form-title {
+                font-size: 1.5rem;
+            }
+            
+            .btn {
+                padding: 12px 20px;
+                font-size: 1rem;
+            }
+        }
+
+        /* Custom select styling */
+        select.form-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            background-size: 15px;
+            padding-right: 45px;
+        }
+
+        /* Password strength indicator */
+        .password-strength {
+            height: 5px;
+            background: var(--light-gray);
+            border-radius: 3px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        .password-strength-bar {
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 3px;
+        }
+
+        .strength-weak {
+            background-color: var(--primary-red);
+            width: 25%;
+        }
+
+        .strength-medium {
+            background-color: #f59e0b;
+            width: 50%;
+        }
+
+        .strength-strong {
+            background-color: #10b981;
+            width: 75%;
+        }
+
+        .strength-very-strong {
+            background-color: #059669;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
-   
-
     <div class="container">
         <div class="form-container">
-            <h2 class="form-title">Create Donor Account</h2>
+            <h2 class="form-title">Join Love Bridge - Donor Registration</h2>
             
             <?php if (!empty($error_message)): ?>
                 <div class="error-message"><?php echo $error_message; ?></div>
@@ -90,110 +363,381 @@ include 'header_UI.php';
             <?php endif; ?>
             
             <form method="POST" action="donor_register.php" id="registerForm">
-                <div class="row">
+                <!-- Personal Information -->
+                <div class="form-row">
                     <div class="form-group">
-                        <label for="fname">First Name *</label>
-                        <input type="text" class="form-control" id="fname" name="fname" 
-                         pattern="[A-Za-z]+" title="Only alphabets allowed"
-                         value="<?php echo isset($_POST['fname']) ? htmlspecialchars($_POST['fname']) : ''; ?>" 
-                         required>
+                        <label for="name" class="required">Full Name</label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               pattern="[A-Za-z\s]+" title="Only alphabets and spaces allowed"
+                               value="<?php echo isset($_POST['name']) ? htmlspecialchars($_POST['name']) : ''; ?>" 
+                               required>
+                        <span class="form-help">Enter your full name (letters and spaces only)</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="icnumber" class="required">IC Number</label>
+                        <input type="text" class="form-control" id="icnumber" name="icnumber"
+                               pattern="\d{12}" title="IC must be exactly 12 digits" 
+                               placeholder="990101015678"
+                               value="<?php echo isset($_POST['icnumber']) ? htmlspecialchars($_POST['icnumber']) : ''; ?>" 
+                               required>
+                        <span class="form-help">12 digits only (e.g., 990101015678)</span>
+                    </div>
+                </div>
 
-                    </div>
+                <div class="form-row">
                     <div class="form-group">
-                        <label for="lname">Last Name *</label>
-                        <input type="text" class="form-control" id="lname" name="lname" 
-                        pattern="[A-Za-z]+" title="Only alphabets allowed"
-                        value="<?php echo isset($_POST['lname']) ? htmlspecialchars($_POST['lname']) : ''; ?>" 
-                        required>
+                        <label for="dob" class="required">Date of Birth</label>
+                        <input type="date" class="form-control" id="dob" name="dob" 
+                               max="<?php echo date('Y-m-d'); ?>"
+                               value="<?php echo isset($_POST['dob']) ? $_POST['dob'] : ''; ?>" 
+                               required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="contact" class="required">Contact Number</label>
+                        <input type="tel" class="form-control" id="contact" name="contact" 
+                               pattern="01[0-9]-[0-9]{7,8}" title="Format: 01X-XXXXXXX or 01X-XXXXXXXX"
+                               placeholder="012-3456789"
+                               value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>" 
+                               required>
+                        <span class="form-help">Format: 01X-XXXXXXX</span>
                     </div>
                 </div>
-                
-                <div class="form-group">
-                    <label for="icnumber">IC Number *</label>
-                    <input type="text" class="form-control" id="icnumber" name="icnumber"
-                    pattern="\d{12}" title="IC must be exactly 12 digits" placeholder="XXXXXXXXXXXX"
-                    value="<?php echo isset($_POST['icnumber']) ? htmlspecialchars($_POST['icnumber']) : ''; ?>" 
-                    required>
 
-                </div>
-                
-                <div class="form-group">
-                    <label for="dob">Date of Birth *</label>
-                    <input type="date" class="form-control" id="dob" name="dob" 
-                           value="<?php echo isset($_POST['dob']) ? $_POST['dob'] : ''; ?>" 
-                           required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="contact">Contact Number *</label>
-                    <input type="tel" class="form-control" id="contact" name="contact" placeholder="01X-XXXXXXX"
-                           value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>" 
-                           required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="email">Email Address *</label>
-                    <input type="email" class="form-control" id="email" name="email" placeholder="example@example.com"
-                           value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" 
-                           required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="address">Address *</label>
-                    <input type="text" class="form-control" id="address" name="address" placeholder="123 Main St, City, Country"
-                           value="<?php echo isset($_POST['address']) ? htmlspecialchars($_POST['address']) : ''; ?>" 
-                           required>
-                </div>
-                
-                <div class="row">
+                <!-- Contact Information -->
+                <div class="form-row">
                     <div class="form-group">
-                        <label for="password">Password *</label>
-                        <input type="password" class="form-control" id="password" name="password" required placeholder="At least 8 characters">
+                        <label for="email" class="required">Email Address</label>
+                        <input type="email" class="form-control" id="email" name="email" 
+                               placeholder="example@example.com"
+                               value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" 
+                               required>
                     </div>
+                    
                     <div class="form-group">
-                        <label for="confirm_password">Confirm Password *</label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required placeholder="Re-enter your password">
+                        <label for="email" class="required">Confirm Email Address</label>
+                        <input type="email" class="form-control" id="confirm_email" name="confirm_email" 
+                               placeholder="Re-enter your email"
+                               value="<?php echo isset($_POST['confirm_email']) ? htmlspecialchars($_POST['confirm_email']) : ''; ?>"
+                               required>
                     </div>
                 </div>
-                
-                <div class="form-group">
-                    <label for="description">Description (Optional)</label>
-                    <textarea class="form-control" id="description" name="description" rows="3" 
-                              placeholder="Tell us about yourself..."><?php echo isset($_POST['description']) ? htmlspecialchars($_POST['description']) : ''; ?></textarea>
-                </div>
-                
-                <button type="submit" class="btn">Register</button>
 
+                <!-- Password Section -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="password" class="required">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" 
+                               required placeholder="At least 8 characters">
+                        <div class="password-strength">
+                            <div class="password-strength-bar" id="passwordStrengthBar"></div>
+                        </div>
+                        <span class="form-help">Minimum 8 characters with letters and numbers</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="confirm_password" class="required">Confirm Password</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" 
+                               required placeholder="Re-enter your password">
+                    </div>
+                </div>
+
+                <!-- Address Information -->
+                <div class="address-section">
+                   
+                    
+                    <div class="form-group">
+                        <label for="address1" class="required">Address Line 1</label>
+                        <input type="text" class="form-control" id="address1" name="address1" 
+                               placeholder="House/Unit No, Street Name"
+                               value="<?php echo isset($_POST['address1']) ? htmlspecialchars($_POST['address1']) : ''; ?>" 
+                               required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="address2">Address Line 2 (Optional)</label>
+                        <input type="text" class="form-control" id="address2" name="address2" 
+                               placeholder="Apartment/Building/Floor"
+                               value="<?php echo isset($_POST['address2']) ? htmlspecialchars($_POST['address2']) : ''; ?>">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="address3">Address Line 3 (Optional)</label>
+                        <input type="text" class="form-control" id="address3" name="address3" 
+                               placeholder="Landmark/Additional Information"
+                               value="<?php echo isset($_POST['address3']) ? htmlspecialchars($_POST['address3']) : ''; ?>">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="city" class="required">City</label>
+                            <input type="text" class="form-control" id="city" name="city" 
+                                   placeholder="Kuala Lumpur"
+                                   value="<?php echo isset($_POST['city']) ? htmlspecialchars($_POST['city']) : ''; ?>" 
+                                   required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="state" class="required">State</label>
+                            <select class="form-control" id="state" name="state" required>
+                                <option value="">Select State</option>
+                                <option value="Johor" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Johor') ? 'selected' : ''; ?>>Johor</option>
+                                <option value="Kedah" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Kedah') ? 'selected' : ''; ?>>Kedah</option>
+                                <option value="Kelantan" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Kelantan') ? 'selected' : ''; ?>>Kelantan</option>
+                                <option value="Melaka" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Melaka') ? 'selected' : ''; ?>>Melaka</option>
+                                <option value="Negeri Sembilan" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Negeri Sembilan') ? 'selected' : ''; ?>>Negeri Sembilan</option>
+                                <option value="Pahang" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Pahang') ? 'selected' : ''; ?>>Pahang</option>
+                                <option value="Perak" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Perak') ? 'selected' : ''; ?>>Perak</option>
+                                <option value="Perlis" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Perlis') ? 'selected' : ''; ?>>Perlis</option>
+                                <option value="Pulau Pinang" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Pulau Pinang') ? 'selected' : ''; ?>>Pulau Pinang</option>
+                                <option value="Sabah" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Sabah') ? 'selected' : ''; ?>>Sabah</option>
+                                <option value="Sarawak" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Sarawak') ? 'selected' : ''; ?>>Sarawak</option>
+                                <option value="Selangor" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Selangor') ? 'selected' : ''; ?>>Selangor</option>
+                                <option value="Terengganu" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Terengganu') ? 'selected' : ''; ?>>Terengganu</option>
+                                <option value="Kuala Lumpur" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Kuala Lumpur') ? 'selected' : ''; ?>>Kuala Lumpur</option>
+                                <option value="Labuan" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Labuan') ? 'selected' : ''; ?>>Labuan</option>
+                                <option value="Putrajaya" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Putrajaya') ? 'selected' : ''; ?>>Putrajaya</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="postalcode" class="required">Postal Code</label>
+                            <input type="text" class="form-control" id="postalcode" name="postalcode" 
+                                   pattern="\d{5}" title="5-digit postal code"
+                                   placeholder="50000"
+                                   value="<?php echo isset($_POST['postalcode']) ? htmlspecialchars($_POST['postalcode']) : ''; ?>" 
+                                   required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="country" class="required">Country</label>
+                            <select class="form-control" id="country" name="country" required>
+                                <option value="Malaysia" selected>Malaysia</option>
+                                <option value="Singapore" <?php echo (isset($_POST['country']) && $_POST['country'] == 'Singapore') ? 'selected' : ''; ?>>Singapore</option>
+                                <option value="Indonesia" <?php echo (isset($_POST['country']) && $_POST['country'] == 'Indonesia') ? 'selected' : ''; ?>>Indonesia</option>
+                                <option value="Thailand" <?php echo (isset($_POST['country']) && $_POST['country'] == 'Thailand') ? 'selected' : ''; ?>>Thailand</option>
+                                <option value="Other" <?php echo (isset($_POST['country']) && $_POST['country'] == 'Other') ? 'selected' : ''; ?>>Other</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                
+                <!-- Terms and Conditions -->
+                <div class="form-group">
+                    <div style="display: flex; align-items: flex-start; gap: 10px;">
+                        <input type="checkbox" id="terms" name="terms" required style="margin-top: 5px;">
+                        <label for="terms" style="margin: 0; font-size: 0.9rem;">
+                            I agree to the <a href="terms.php" target="_blank" style="color: var(--primary-red);">Terms and Conditions</a> 
+                            and <a href="privacy.php" target="_blank" style="color: var(--primary-red);">Privacy Policy</a> of Love Bridge Donation System.
+                        </label>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn">Create Donor Account</button>
             </form>
             
             <div class="form-footer">
                 <p>Already have an account? <a href="donor_login.php">Login here</a></p>
+                <p style="font-size: 0.9rem; margin-top: 10px;">
+                    By registering, you agree to receive updates about our campaigns and activities.
+                </p>
             </div>
         </div>
     </div>
 
     <script>
-        // Client-side validation
-        document.getElementById('registerForm').addEventListener('submit', function(e) {
-            let isValid = true;
-            const password = document.getElementById('password').value;
-            const confirmPassword = document.getElementById('confirm_password').value;
+        // Client-side validation and enhanced features
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('registerForm');
+            const password = document.getElementById('password');
+            const confirmPassword = document.getElementById('confirm_password');
+            const email = document.getElementById('email');
+            const confirmEmail = document.getElementById('confirm_email');
+            const passwordStrengthBar = document.getElementById('passwordStrengthBar');
+            const icNumber = document.getElementById('icnumber');
+            const dobInput = document.getElementById('dob');
             
-            // Check password length
-            if (password.length < 8) {
-                alert('Password must be at least 8 characters long.');
-                isValid = false;
+            // Set max date for DOB (must be at least 18 years old)
+            const today = new Date();
+            const maxDate = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+            dobInput.max = maxDate.toISOString().split('T')[0];
+            
+            // Password strength checker
+            password.addEventListener('input', function() {
+                const value = password.value;
+                let strength = 0;
+                
+                if (value.length >= 8) strength++;
+                if (/[A-Z]/.test(value)) strength++;
+                if (/[a-z]/.test(value)) strength++;
+                if (/[0-9]/.test(value)) strength++;
+                if (/[^A-Za-z0-9]/.test(value)) strength++;
+                
+                // Reset classes
+                passwordStrengthBar.className = 'password-strength-bar';
+                
+                // Set strength level
+                if (strength <= 1) {
+                    passwordStrengthBar.classList.add('strength-weak');
+                } else if (strength === 2) {
+                    passwordStrengthBar.classList.add('strength-medium');
+                } else if (strength === 3 || strength === 4) {
+                    passwordStrengthBar.classList.add('strength-strong');
+                } else if (strength >= 5) {
+                    passwordStrengthBar.classList.add('strength-very-strong');
+                }
+            });
+            
+            // Real-time validation
+            function validateEmail() {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (email.value && !emailRegex.test(email.value)) {
+                    email.classList.add('error');
+                    return false;
+                } else {
+                    email.classList.remove('error');
+                    return true;
+                }
             }
             
-            // Check if passwords match
-            if (password !== confirmPassword) {
-                alert('Passwords do not match.');
-                isValid = false;
+            function validateConfirmEmail() {
+                if (confirmEmail.value && email.value !== confirmEmail.value) {
+                    confirmEmail.classList.add('error');
+                    return false;
+                } else {
+                    confirmEmail.classList.remove('error');
+                    return true;
+                }
             }
             
-            if (!isValid) {
-                e.preventDefault();
+            function validatePassword() {
+                if (password.value.length < 8) {
+                    password.classList.add('error');
+                    return false;
+                } else {
+                    password.classList.remove('error');
+                    return true;
+                }
             }
+            
+            function validateConfirmPassword() {
+                if (confirmPassword.value && password.value !== confirmPassword.value) {
+                    confirmPassword.classList.add('error');
+                    return false;
+                } else {
+                    confirmPassword.classList.remove('error');
+                    return true;
+                }
+            }
+            
+            function validateICNumber() {
+                const icRegex = /^\d{12}$/;
+                if (icNumber.value && !icRegex.test(icNumber.value)) {
+                    icNumber.classList.add('error');
+                    return false;
+                } else {
+                    icNumber.classList.remove('error');
+                    return true;
+                }
+            }
+            
+            // Event listeners for real-time validation
+            email.addEventListener('blur', validateEmail);
+            confirmEmail.addEventListener('blur', validateConfirmEmail);
+            password.addEventListener('blur', validatePassword);
+            confirmPassword.addEventListener('blur', validateConfirmPassword);
+            icNumber.addEventListener('blur', validateICNumber);
+            
+            // Form submission validation
+            form.addEventListener('submit', function(e) {
+                let isValid = true;
+                
+                // Validate required fields
+                const requiredFields = form.querySelectorAll('[required]');
+                requiredFields.forEach(field => {
+                    if (!field.value.trim()) {
+                        field.classList.add('error');
+                        isValid = false;
+                    }
+                });
+                
+                // Validate email
+                if (!validateEmail()) isValid = false;
+                if (!validateConfirmEmail()) isValid = false;
+                
+                // Validate password
+                if (!validatePassword()) isValid = false;
+                if (!validateConfirmPassword()) isValid = false;
+                
+                // Validate IC number
+                if (!validateICNumber()) isValid = false;
+                
+                // Validate terms agreement
+                const terms = document.getElementById('terms');
+                if (!terms.checked) {
+                    alert('You must agree to the Terms and Conditions.');
+                    isValid = false;
+                }
+                
+                // Check if email and confirm email match
+                if (email.value !== confirmEmail.value) {
+                    alert('Email addresses do not match.');
+                    isValid = false;
+                }
+                
+                // Check if password and confirm password match
+                if (password.value !== confirmPassword.value) {
+                    alert('Passwords do not match.');
+                    isValid = false;
+                }
+                
+                if (!isValid) {
+                    e.preventDefault();
+                    alert('Please correct the errors in the form before submitting.');
+                }
+            });
+            
+            // Auto-format contact number
+            const contactInput = document.getElementById('contact');
+            contactInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                
+                if (value.length > 3) {
+                    value = value.substring(0, 3) + '-' + value.substring(3);
+                }
+                if (value.length > 12) {
+                    value = value.substring(0, 12);
+                }
+                
+                e.target.value = value;
+            });
+            
+            // Auto-format postal code
+            const postalCodeInput = document.getElementById('postalcode');
+            postalCodeInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                
+                if (value.length > 5) {
+                    value = value.substring(0, 5);
+                }
+                
+                e.target.value = value;
+            });
+            
+            // Auto-format IC number
+            icNumber.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                
+                if (value.length > 12) {
+                    value = value.substring(0, 12);
+                }
+                
+                e.target.value = value;
+            });
         });
     </script>
 </body>
