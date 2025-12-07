@@ -87,7 +87,7 @@ include 'header_UI.php';
     .type-group {
         display: flex;
         margin-bottom: 20px;
-        border: 1px solid #00a651;
+        border: 1px solid #dc2626;
         border-radius: 5px;
         overflow: hidden;
     }
@@ -97,11 +97,11 @@ include 'header_UI.php';
         padding: 10px;
         cursor: pointer;
         background: #fff;
-        color: #00a651;
+        color: #dc2626;
         font-weight: bold;
     }
     .type-option.active {
-        background: #00a651;
+        background: #dc2626;
         color: #fff;
     }
 
@@ -122,7 +122,7 @@ include 'header_UI.php';
         transition: 0.2s;
     }
     .btn-amount:hover { background: #f0f0f0; }
-    .btn-amount:active { background: #00a651; color: #fff; }
+    .btn-amount:active { background: #dc2626; color: #fff; }
 
     /* 输入框 */
     .input-custom {
@@ -138,7 +138,7 @@ include 'header_UI.php';
     .btn-submit {
         width: 100%;
         padding: 15px;
-        background: #00a651;
+        background: #dc2626;
         color: #fff;
         font-size: 18px;
         font-weight: bold;
@@ -148,7 +148,7 @@ include 'header_UI.php';
         text-transform: uppercase;
         transition: 0.3s;
     }
-    .btn-submit:hover { background: #008f45; }
+    .btn-submit:hover { background: #b91c1c; }
 </style>
 
 <script>
@@ -197,7 +197,7 @@ include 'header_UI.php';
             <div class="col-md-6 mb-5">
                 <img src="yourimage.jpg" alt="Case Image" class="img-fluid rounded mb-4 shadow-sm">
                 
-                <h3 class="text-cursive mb-4" style="color: #00a651;">Supporting:</h3>
+                <h3 class="text-cursive mb-4" style="color: #dc2626;">Supporting:</h3>
                 <h2 class="text-black mb-4"><?php echo htmlspecialchars($case_title); ?></h2>
                 
                 <p class="lead"><?php echo htmlspecialchars($case_desc); ?></p>

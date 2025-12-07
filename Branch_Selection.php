@@ -79,7 +79,7 @@ include 'header_UI.php';
     .branch-card:hover {
         transform: translateY(-5px);
         box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        border-color: #00a651; /* 悬停时变绿 */
+        border-color: #dc2626; /* 悬停时变绿 */
     }
     .branch-card h4 {
         font-weight: bold;
@@ -94,7 +94,7 @@ include 'header_UI.php';
     
     /* 选择按钮 */
     .btn-select {
-        background-color: #00a651;
+        background-color: #dc2626;
         color: #fff;
         border-radius: 30px;
         padding: 8px 25px;
@@ -104,7 +104,7 @@ include 'header_UI.php';
         width: 100%;
     }
     .btn-select:hover {
-        background-color: #008f45;
+        background-color: #b91c1c;
         color: #fff;
     }
 </style>
@@ -123,7 +123,7 @@ include 'header_UI.php';
             
             <div class="col-lg-7 mb-5">
                 <div class="mb-5">
-                    <h3 class="text-cursive mb-4" style="color: #00a651;">Our Branches</h3>
+                    <h3 class="text-cursive mb-4" style="color: #dc2626;">Our Branches</h3>
                     <p class="text-muted">Each branch provides assistance to different groups. Below are the details of our locations and their specific missions.</p>
                 </div>
 

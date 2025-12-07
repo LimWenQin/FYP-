@@ -148,12 +148,12 @@ include 'header_UI.php';
         font-size: 16px;
     }
     .form-control:focus {
-        border-color: #00a651;
+        border-color: #dc2626;
         box-shadow: none;
     }
 
     .btn-confirm {
-        background-color: #00a651;
+        background-color: #dc2626;
         color: #fff;
         font-weight: bold;
         font-size: 18px;
@@ -165,7 +165,7 @@ include 'header_UI.php';
         transition: 0.3s;
     }
     .btn-confirm:hover {
-        background-color: #008f45;
+        background-color: #b91c1c;
         color: #fff;
     }
 
@@ -193,7 +193,7 @@ include 'header_UI.php';
             
             <div class="col-md-6 mb-5">
                 <img src="yourimage.jpg" alt="Donation Story" class="img-fluid rounded mb-4 shadow-sm">
-                <h3 class="text-cursive mb-4" style="color: #00a651;">Thank You!</h3>
+                <h3 class="text-cursive mb-4" style="color: #dc2626;">Thank You!</h3>
                 <p>Your donation of <strong>RM <?php echo htmlspecialchars($_POST['amount'] ?? 0); ?></strong> will make a huge difference.</p>
                 <p class="text-muted">We use secure encryption to protect your personal and financial information. Your generosity helps us continue our mission.</p>
                 

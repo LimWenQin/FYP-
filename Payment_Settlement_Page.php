@@ -153,7 +153,7 @@ include 'header_UI.php';
     }
     .icon-success {
         font-size: 80px;
-        color: #00a651;
+        color: #dc2626;
         margin-bottom: 20px;
     }
     .thank-you-msg {
@@ -180,7 +180,7 @@ include 'header_UI.php';
         padding: 40px;
         border-radius: 8px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        border-top: 5px solid #00a651;
+        border-top: 5px solid #dc2626;
     }
     .receipt-title {
         text-align: center;
@@ -219,8 +219,8 @@ include 'header_UI.php';
         border-top: 2px dashed #ddd;
         font-size: 1.2rem;
     }
-    .total-label { font-weight: bold; color: #00a651; }
-    .total-value { font-weight: 900; color: #00a651; }
+    .total-label { font-weight: bold; color: #dc2626; }
+    .total-value { font-weight: 900; color: #dc2626; }
 
     /* 按钮 */
     .btn-home {
@@ -234,7 +234,7 @@ include 'header_UI.php';
         display: inline-block;
         margin-top: 30px;
     }
-    .btn-home:hover { background-color: #00a651; color: #fff; }
+    .btn-home:hover { background-color: #dc2626; color: #fff; }
     
     .btn-print {
         background-color: #f8f9fa;
