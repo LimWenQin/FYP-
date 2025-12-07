@@ -7,12 +7,11 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // 登录检查 (根据需要取消注释)
-/*
 if (!isset($_SESSION['donor_id'])) {
    echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
    exit();
 }
-*/
+
 
 // 2. 引入头部模板 (这里会自动加载导航栏、CSS 和 <body>)
 include 'header_UI.php'; 

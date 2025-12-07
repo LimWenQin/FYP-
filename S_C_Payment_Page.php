@@ -8,10 +8,10 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // 3. 强制登录检查
-//if (!isset($_SESSION['donor_id'])) {
-//   echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
-//   exit();
-//}
+if (!isset($_SESSION['donor_id'])) {
+   echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
+   exit();
+}
 
 // 4. 获取 Case ID
 $case_id = isset($_GET['case_id']) ? (int)$_GET['case_id'] : 0;

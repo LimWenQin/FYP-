@@ -3,10 +3,10 @@
 session_start();
 
 // 2. 检查登录 (如果没有登录，跳转)
-//if (!isset($_SESSION['donor_id'])) {
-//    echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
-//    exit();
-//}
+if (!isset($_SESSION['donor_id'])) {
+    echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
+    exit();
+}
 
 $current_donor_id = $_SESSION['donor_id']; // 获取当前登录用户的ID
 

@@ -8,10 +8,10 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // 3. 强制登录检查
-//if (!isset($_SESSION['donor_id'])) {
-//   echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
-//   exit();
-//}
+if (!isset($_SESSION['donor_id'])) {
+   echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
+   exit();
+}
 
 // 4. 接收 POST 数据
 $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : 0;
