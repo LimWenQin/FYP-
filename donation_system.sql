@@ -1,7 +1,7 @@
 -- phpMyAdmin SQL Dump
 -- version 5.2.1
 -- Host: 127.0.0.1
--- Generation Time: 2025-12-07 11:00:00
+-- Generation Time: 2025-12-07 12:00:00
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -93,7 +93,7 @@ CREATE TABLE `activity` (
 
 CREATE TABLE `admin` (
   `Admin_ID` int(11) NOT NULL AUTO_INCREMENT,
-  `Admin_Name` varchar(100) NOT NULL, -- ✅ 已合并名字
+  `Admin_Name` varchar(100) NOT NULL, 
   `Admin_ContactNumber` varchar(20) NOT NULL,
   `Admin_ICNUMBER` varchar(20) NOT NULL,
   `Admin_Email` varchar(100) NOT NULL,
@@ -119,7 +119,7 @@ CREATE TABLE `admin` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `branch`
+-- Table structure for table `branch` (✅ 已更新)
 --
 
 CREATE TABLE `branch` (
@@ -135,6 +135,11 @@ CREATE TABLE `branch` (
   `Branch_Country` varchar(100) DEFAULT 'Malaysia',
   `Branch_ContactNumber` varchar(20) NOT NULL,
   `Branch_Description` text NOT NULL,
+  -- 👇 新增字段 👇
+  `Branch_ProfilePicture` varchar(255) DEFAULT NULL,
+  `Branch_OperationalStatus` enum('Open','Closed') NOT NULL DEFAULT 'Open',
+  `Branch_TargetAmount` decimal(10,2) NOT NULL DEFAULT 10000.00,
+  -- 👆 新增字段 👆
   `Admin_ID` int(11) NOT NULL,
   PRIMARY KEY (`Branch_ID`),
   KEY `branch_admin_id_fk` (`Admin_ID`)
@@ -166,7 +171,7 @@ CREATE TABLE `contact_messages` (
 
 CREATE TABLE `donor` (
   `Donor_ID` int(11) NOT NULL AUTO_INCREMENT,
-  `Donor_Name` varchar(100) NOT NULL, -- ✅ 已合并名字
+  `Donor_Name` varchar(100) NOT NULL, 
   `Donor_ContactNumber` varchar(20) NOT NULL,
   `Donor_ICNumber` varchar(20) NOT NULL,
   `Donor_Email` varchar(100) NOT NULL,
@@ -277,7 +282,7 @@ CREATE TABLE `login_attempts` (
 
 CREATE TABLE `orders` (
   `Order_ID` int(11) NOT NULL AUTO_INCREMENT,
-  `Order_Name` varchar(100) NOT NULL, -- ✅ 已合并名字
+  `Order_Name` varchar(100) NOT NULL, 
   `Order_ContactNumber` varchar(20) NOT NULL,
   `Order_ICNumber` varchar(20) NOT NULL,
   `Order_Email` varchar(100) NOT NULL,
@@ -465,11 +470,11 @@ CREATE TABLE `special_case` (
 
 CREATE TABLE `staff` (
   `Staff_ID` int(11) NOT NULL AUTO_INCREMENT,
-  `Staff_FullName` varchar(100) NOT NULL, -- ✅ 已修改为 FullName (符合您之前要求)
+  `Staff_FullName` varchar(100) NOT NULL, -- ✅ 已确认合并名字
   `Staff_ContactNumber` varchar(20) NOT NULL,
   `Staff_ICNumber` varchar(20) NOT NULL,
   `Staff_Email` varchar(100) NOT NULL,
-  `Staff_Password` varchar(255) NOT NULL,
+  `Staff_Password` varchar(15) NOT NULL,
   `Staff_DOB` date NOT NULL,
   `Staff_Address1` varchar(255) NOT NULL,
   `Staff_Address2` varchar(255) DEFAULT NULL,
