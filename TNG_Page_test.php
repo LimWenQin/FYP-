@@ -1,22 +1,15 @@
 <?php
-// 1. 开启 Session (必须放在第一行)
 session_start();
 
-// 2. 检查登录
-//if (!isset($_SESSION['donor_id'])) {
-//    echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
-//    exit();
-//}
+if (!isset($_SESSION['donor_id'])) {
+    die("Session expired. Please login again.");
+}
 
 $current_donor_id = $_SESSION['donor_id']; 
-
-// 引入数据库连接
 include 'dataconnection.php';
-
-// 设置时区
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
-// 3. 获取当前用户真实资料
+// 获取用户信息
 $user_sql = "SELECT Donor_FName, Donor_LName, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
 $u_stmt = $conn->prepare($user_sql);
 $u_stmt->bind_param("i", $current_donor_id);
@@ -25,12 +18,9 @@ $u_result = $u_stmt->get_result();
 $user_data = $u_result->fetch_assoc();
 $u_stmt->close();
 
-// -------------------------
-// 4. 显示逻辑：查询 Special Case 名字
-// -------------------------
+// 显示 Case 名字
 $display_case_title = ""; 
 $incoming_case_id = isset($_POST['case_id']) ? $_POST['case_id'] : 0;
-
 if ($incoming_case_id > 0) {
     $c_sql = "SELECT Case_Title FROM special_case WHERE Case_ID = ?";
     if ($c_stmt = $conn->prepare($c_sql)) {
@@ -45,18 +35,16 @@ if ($incoming_case_id > 0) {
 }
 
 // -------------------------
-// 5. 处理付款提交
+// 处理付款提交
 // -------------------------
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 
-    // 接收数据
     $donation_type = $_POST['donation_type']; 
     $amount = $_POST['amount'];
     
-    // ✅ 处理 3 个关键 ID (0 或空 -> NULL)
-    $branch_id = isset($_POST['branch_id']) && $_POST['branch_id'] != '' && $_POST['branch_id'] != '0' ? $_POST['branch_id'] : null;
-    $case_id = isset($_POST['case_id']) && $_POST['case_id'] != '' && $_POST['case_id'] != '0' ? $_POST['case_id'] : null;
-    $activity_id = isset($_POST['activity_id']) && $_POST['activity_id'] != '' && $_POST['activity_id'] != '0' ? $_POST['activity_id'] : null;
+    $branch_id = !empty($_POST['branch_id']) ? $_POST['branch_id'] : null;
+    $case_id = !empty($_POST['case_id']) ? $_POST['case_id'] : null;
+    $activity_id = !empty($_POST['activity_id']) ? $_POST['activity_id'] : null;
 
     $payment_method = "TNG eWallet";
     $txn_ref = "TXN-" . date("YmdHis");
@@ -76,20 +64,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     $order_type = ($donation_type == "monthly") ? "Recurring" : "One-time";
     $order_status = "Completed";
 
-    $stmt = $conn->prepare("INSERT INTO `orders` 
-        (Order_FName, Order_LName, Order_ContactNumber, Order_ICNumber, Order_Email, 
+    $stmt = $conn->prepare("INSERT INTO orders 
+        (Order_Name, Order_ContactNumber, Order_ICNumber, Order_Email, 
          Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, Order_TXN_Ref, 
          Order_Type, Order_Status, Order_Created_At, Order_Updated_At, 
          Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID)
-        VALUES (?, ?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        VALUES (?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    $stmt->bind_param("sssssdsssssssiiiii", 
-        $user_data['Donor_FName'], $user_data['Donor_LName'], $user_data['Donor_ContactNumber'], $user_data['Donor_ICNumber'], $user_data['Donor_Email'], 
+    $full_name = $user_data['Donor_FName'] . " " . $user_data['Donor_LName'];
+
+    $stmt->bind_param("ssssdsssssssiiiii", 
+        $full_name, $user_data['Donor_ContactNumber'], $user_data['Donor_ICNumber'], $user_data['Donor_Email'], 
         $amount, $payment_method, $status, $txn_ref, $order_type, $order_status, $now, $now, 
         $current_donor_id, $payment_id, $branch_id, $activity_id, $case_id
     );
     $stmt->execute();
     $stmt->close();
+
+    // =================================================================
+    // ✅ 关键新增：自动更新 Special Case 的进度条
+    // =================================================================
+    if ($case_id > 0) {
+        $update_sql = "UPDATE special_case SET Raised_Amount = Raised_Amount + ? WHERE Case_ID = ?";
+        if ($stmt_upd = $conn->prepare($update_sql)) {
+            $stmt_upd->bind_param("di", $amount, $case_id);
+            $stmt_upd->execute();
+            $stmt_upd->close();
+        }
+    }
+    // =================================================================
 
     // 3️⃣ 插入 recurring
     if ($donation_type == "monthly") {
@@ -105,124 +108,39 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     exit();
 }
 
-// -------------------------
-// 6. 引入新版 Header
-// -------------------------
 include 'header_UI_template.php'; 
 ?>
 
 <style>
-    /* --- Hero Banner --- */
+    /* Hero Banner */
     .hero-wrap {
         height: 400px;
         position: relative;
         background-image: url('images/hero_1.jpg');
         background-size: cover;
         background-position: center;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
+        display: flex; align-items: center; justify-content: center; text-align: center;
     }
-    .hero-wrap .overlay {
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-    }
-    .hero-content {
-        position: relative;
-        z-index: 2;
-        max-width: 800px;
-    }
-    .hero-content h1 {
-        font-family: "Mansalva", cursive;
-        color: #fff;
-        font-size: 4rem;
-        margin-bottom: 10px;
-    }
+    .hero-wrap .overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); }
+    .hero-content { position: relative; z-index: 2; max-width: 800px; }
+    .hero-content h1 { font-family: "Mansalva", cursive; color: #fff; font-size: 4rem; margin-bottom: 10px; }
     .hero-content p { font-size: 1.2rem; color: rgba(255, 255, 255, 0.9); }
 
-    /* --- 左侧：摘要卡片 --- */
-    .summary-card {
-        background: #f8f9fa;
-        padding: 30px;
-        border-radius: 8px;
-        border-left: 5px solid #0057B7; /* TNG Blue */
-    }
-    .summary-item {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 15px;
-        border-bottom: 1px dashed #ddd;
-        padding-bottom: 15px;
-    }
-    .summary-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    /* 摘要卡片 */
+    .summary-card { background: #f8f9fa; padding: 30px; border-radius: 8px; border-left: 5px solid #0057B7; }
+    .summary-item { display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px dashed #ddd; padding-bottom: 15px; }
     .summary-label { font-weight: bold; color: #555; }
     .summary-value { font-weight: bold; color: #0057B7; }
-    
     .instruction-list { padding-left: 20px; color: #666; margin-top: 20px; }
     .instruction-list li { margin-bottom: 10px; }
 
-    /* --- 右侧：TNG 卡片 --- */
-    .tng-card {
-        background: #fff;
-        padding: 40px;
-        border-radius: 12px;
-        box-shadow: 0 5px 25px rgba(0,0,0,0.1);
-        border: 1px solid #e1e1e1;
-        text-align: center;
-    }
-    .tng-header {
-        margin-bottom: 20px;
-    }
-    .tng-header img {
-        height: 50px;
-        object-fit: contain;
-    }
-    
-    .qr-container {
-        background: #f9f9f9;
-        padding: 20px;
-        border-radius: 10px;
-        display: inline-block;
-        border: 2px dashed #ccc;
-        margin-bottom: 20px;
-    }
-    .qr-code-img {
-        width: 180px;
-        height: 180px;
-    }
-    
-    .amount-display {
-        font-size: 24px;
-        color: #0057B7;
-        font-weight: 900;
-        margin-bottom: 5px;
-    }
-    
-    .timer {
-        font-size: 14px;
-        color: #dc3545;
-        font-weight: bold;
-    }
-
-    .btn-tng {
-        background-color: #0057B7; /* TNG Blue */
-        color: #fff;
-        font-weight: bold;
-        font-size: 18px;
-        padding: 15px;
-        border: none;
-        border-radius: 4px;
-        width: 100%;
-        cursor: pointer;
-        transition: 0.3s;
-        margin-top: 20px;
-    }
-    .btn-tng:hover {
-        background-color: #004494;
-        color: #fff;
-    }
+    /* TNG 卡片 */
+    .tng-card { background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.1); border: 1px solid #e1e1e1; text-align: center; }
+    .qr-container { background: #f9f9f9; padding: 20px; border-radius: 10px; display: inline-block; border: 2px dashed #ccc; margin-bottom: 20px; }
+    .qr-code-img { width: 180px; height: 180px; }
+    .amount-display { font-size: 24px; color: #0057B7; font-weight: 900; margin-bottom: 5px; }
+    .btn-tng { background-color: #0057B7; color: #fff; font-weight: bold; font-size: 18px; padding: 15px; border: none; border-radius: 4px; width: 100%; cursor: pointer; transition: 0.3s; margin-top: 20px; }
+    .btn-tng:hover { background-color: #004494; }
 </style>
 
 <div class="hero-wrap">
@@ -255,10 +173,6 @@ include 'header_UI_template.php';
                     </div>
                     <?php endif; ?>
                     <div class="summary-item">
-                        <span class="summary-label">Transaction ID</span>
-                        <span class="summary-value text-muted small"><?php echo "TXN-" . date("YmdHis"); ?></span>
-                    </div>
-                    <div class="summary-item">
                         <span class="summary-label">Total Amount</span>
                         <span class="summary-value" style="font-size: 1.2rem;">RM <?php echo number_format((float)($_POST['amount'] ?? 5), 2); ?></span>
                     </div>
@@ -270,7 +184,6 @@ include 'header_UI_template.php';
                         <li>Open your <strong>Touch 'n Go eWallet</strong> app.</li>
                         <li>Tap on the <strong>Scan</strong> icon.</li>
                         <li>Scan the QR code displayed on the right.</li>
-                        <li>Verify the amount and approve the payment.</li>
                         <li>Click <strong>"Confirm Payment"</strong> once done.</li>
                     </ol>
                 </div>

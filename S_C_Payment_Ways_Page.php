@@ -8,10 +8,10 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // 3. 强制登录检查
-//if (!isset($_SESSION['donor_id'])) {
-//   echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
-//   exit();
-//}
+if (!isset($_SESSION['donor_id'])) {
+   echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
+   exit();
+}
 
 // 4. 接收 POST 数据
 $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : 0;
@@ -80,7 +80,7 @@ include 'header_UI.php';
         background: #f8f9fa;
         padding: 30px;
         border-radius: 8px;
-        border-left: 5px solid #00a651;
+        border-left: 5px solid #dc2626;
     }
     .summary-item {
         display: flex;
@@ -91,7 +91,7 @@ include 'header_UI.php';
     }
     .summary-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
     .summary-label { font-weight: bold; color: #555; }
-    .summary-value { font-weight: bold; color: #00a651; font-size: 1.1rem; }
+    .summary-value { font-weight: bold; color: #dc2626; font-size: 1.1rem; }
 
     /* --- 付款方式按钮 (右侧) --- */
     .payment-option {
@@ -107,7 +107,7 @@ include 'header_UI.php';
         width: 100%;
     }
     .payment-option:hover {
-        border-color: #00a651;
+        border-color: #dc2626;
         box-shadow: 0 5px 15px rgba(0, 166, 81, 0.1);
         transform: translateY(-3px);
     }
@@ -125,7 +125,7 @@ include 'header_UI.php';
     .payment-desc { font-size: 13px; color: #777; margin-bottom: 15px; }
     
     .btn-pay {
-        background-color: #00a651;
+        background-color: #dc2626;
         color: white;
         border: none;
         padding: 10px 30px;
@@ -133,7 +133,7 @@ include 'header_UI.php';
         font-weight: bold;
         transition: 0.3s;
     }
-    .btn-pay:hover { background-color: #008f45; color: white; }
+    .btn-pay:hover { background-color: #b91c1c; color: white; }
 </style>
 
 <div class="hero-wrap">
@@ -150,7 +150,7 @@ include 'header_UI.php';
             
             <div class="col-lg-5 mb-5">
                 <div class="mb-4">
-                    <h3 class="text-cursive mb-4" style="color: #00a651;">Donation Summary</h3>
+                    <h3 class="text-cursive mb-4" style="color: #dc2626;">Donation Summary</h3>
                     <p class="text-muted">Please review your special case donation details.</p>
                 </div>
 
