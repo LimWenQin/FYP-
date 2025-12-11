@@ -15,7 +15,7 @@ include 'dataconnection.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
 // 3. 获取用户信息
-$user_sql = "SELECT Donor_FName, Donor_LName, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
+$user_sql = "SELECT Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
 $u_stmt = $conn->prepare($user_sql);
 $u_stmt->bind_param("i", $current_donor_id);
 $u_stmt->execute();
@@ -96,14 +96,14 @@ include 'header_UI.php';
     .hero-wrap {
         height: 400px;
         position: relative;
-        background-image: url('images/hero_1.jpg');
+        background-image: url('images/hero_4.jpg');
         background-size: cover;
         background-position: center;
         display: flex; align-items: center; justify-content: center; text-align: center;
     }
     .hero-wrap .overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); }
     .hero-content { position: relative; z-index: 2; max-width: 800px; }
-    .hero-content h1 { font-family: "Mansalva", cursive; color: #fff; font-size: 4rem; margin-bottom: 10px; }
+    .hero-content h1 { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; font-size: 4rem; margin-bottom: 10px; }
     .hero-content p { font-size: 1.2rem; color: rgba(255, 255, 255, 0.9); }
 
     /* 表单样式 */

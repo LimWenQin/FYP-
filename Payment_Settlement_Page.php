@@ -140,7 +140,7 @@ include 'header_UI.php';
         max-width: 800px;
     }
     .hero-content h1 {
-        font-family: "Mansalva", cursive;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: #fff;
         font-size: 3.5rem;
         margin-bottom: 10px;
@@ -187,7 +187,7 @@ include 'header_UI.php';
         font-weight: bold;
         color: #333;
         margin-bottom: 30px;
-        font-family: "Mansalva", cursive;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         font-size: 1.8rem;
     }
     

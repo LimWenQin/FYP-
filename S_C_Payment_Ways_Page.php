@@ -49,7 +49,7 @@ include 'header_UI.php';
     .hero-wrap {
         height: 400px;
         position: relative;
-        background-image: url('images/hero_1.jpg');
+        background-image: url('images/hero_6.jpg');
         background-size: cover;
         background-position: center;
         display: flex;
@@ -68,7 +68,7 @@ include 'header_UI.php';
         max-width: 800px;
     }
     .hero-content h1 {
-        font-family: "Mansalva", cursive;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: #fff;
         font-size: 4rem;
         margin-bottom: 10px;

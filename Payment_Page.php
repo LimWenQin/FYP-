@@ -41,7 +41,7 @@ include 'header_UI.php';
         color: #fff;
         z-index: 1;
     }
-    .hero-text h1 { font-size: 48px; color: #fff; margin-bottom: 10px; font-family: "Mansalva", cursive; }
+    .hero-text h1 { font-size: 48px; color: #fff; margin-bottom: 10px;  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     .hero-text p { font-size: 18px; color: #eee; }
 
     /* --- 主要内容布局 --- */
@@ -62,7 +62,7 @@ include 'header_UI.php';
         border-radius: 8px;
         margin-bottom: 20px;
     }
-    .text-cursive { font-family: "Mansalva", cursive; color: #dc2626; }
+    .text-cursive {  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #dc2626; }
 
     /* 右侧表单盒子 */
     .donation-card {

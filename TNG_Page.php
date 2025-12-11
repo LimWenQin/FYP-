@@ -16,7 +16,7 @@ include 'dataconnection.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
 // 3. 获取当前用户真实资料
-$user_sql = "SELECT Donor_FName, Donor_LName, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
+$user_sql = "SELECT Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
 $u_stmt = $conn->prepare($user_sql);
 $u_stmt->bind_param("i", $current_donor_id);
 $u_stmt->execute();
