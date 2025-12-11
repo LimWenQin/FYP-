@@ -165,6 +165,11 @@ include 'header_UI.php';
     </div>
 </div>
 
+<?php 
+    $current_step = 1; 
+    $flow_type = 'standard'; // 普通流程
+    include 'stepper.php'; 
+?>
 <div class="container">
     <div class="content-section">
         

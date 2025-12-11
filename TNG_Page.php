@@ -136,6 +136,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         <div class="call">Call Center: +603-5022 3888</div>
     </div>
 
+    <?php 
+        // 智能判断：根据是否传入 case_id 决定显示 Step 2 (Special) 还是 Step 3 (Standard)
+        $is_special_case = (isset($_POST['case_id']) && !empty($_POST['case_id']));
+
+        if ($is_special_case) {
+            $flow_type = 'special';
+            $current_step = 2; // Step 2 (Payment)
+        } else {
+            $flow_type = 'standard';
+            $current_step = 3; // Step 3 (Payment)
+        }
+        
+        include 'stepper.php'; 
+    ?>
     <div class="container">
         <div class="payment-box">
             <h3>Payment Details</h3>

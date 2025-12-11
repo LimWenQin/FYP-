@@ -117,6 +117,11 @@ include 'header_UI.php';
     </div>
 </div>
 
+<?php 
+    $current_step = 2; 
+    $flow_type = 'standard'; 
+    include 'stepper.php'; 
+?>
 <div class="site-section" style="padding: 5em 0;">
     <div class="container">
         <div class="row">

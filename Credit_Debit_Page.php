@@ -149,6 +149,21 @@ include 'header_UI.php';
     </div>
 </div>
 
+<?php 
+    // 检查是否有 case_id (Special Case)
+    // 这里的 case_id 可能是通过 POST 传过来的
+    $is_special_case = (isset($_POST['case_id']) && !empty($_POST['case_id']));
+
+    if ($is_special_case) {
+        $flow_type = 'special';
+        $current_step = 2; // Special Flow Step 2 (Payment)
+    } else {
+        $flow_type = 'standard';
+        $current_step = 3; // Standard Flow Step 3 (Payment)
+    }
+
+    include 'stepper.php'; 
+?>
 <div class="site-section" style="padding: 5em 0;">
     <div class="container">
         <div class="row">

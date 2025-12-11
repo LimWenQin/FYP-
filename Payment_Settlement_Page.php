@@ -82,6 +82,7 @@ if ($points_to_add > 0 && $is_success && !isset($_SESSION['points_awarded_' . $t
 $project_label = "General Donation"; 
 $project_name = "Love Bridge Fund"; 
 
+// 这里的逻辑非常重要，我们稍后用它来判断进度条类型
 if (!empty($row['Case_ID'])) {
     $c_sql = "SELECT Case_Title FROM special_case WHERE Case_ID = ?";
     if ($c_stmt = $conn->prepare($c_sql)) {
@@ -89,7 +90,7 @@ if (!empty($row['Case_ID'])) {
         $c_stmt->execute();
         $c_res = $c_stmt->get_result();
         if ($c_row = $c_res->fetch_assoc()) {
-            $project_label = "Special Case";
+            $project_label = "Special Case"; // ★ 关键标记
             $project_name = $c_row['Case_Title'];
         }
         $c_stmt->close();
@@ -101,7 +102,7 @@ if (!empty($row['Case_ID'])) {
         $b_stmt->execute();
         $b_res = $b_stmt->get_result();
         if ($b_row = $b_res->fetch_assoc()) {
-            $project_label = "Branch";
+            $project_label = "Branch"; // ★ 关键标记
             $project_name = $b_row['Branch_Name'];
         }
         $b_stmt->close();
@@ -261,6 +262,18 @@ include 'header_UI.php';
     </div>
 </div>
 
+<?php 
+    // 利用上方代码查询出来的 $project_label 来判断流程
+    if (isset($project_label) && $project_label == "Special Case") {
+        $flow_type = 'special';
+        $current_step = 3; // Special 流程完成 (共3步)
+    } else {
+        $flow_type = 'standard';
+        $current_step = 4; // Standard 流程完成 (共4步)
+    }
+    
+    include 'stepper.php'; 
+?>
 <div class="site-section" style="padding: 5em 0;">
     <div class="container">
         <div class="row align-items-center">
