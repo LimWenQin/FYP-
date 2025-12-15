@@ -20,7 +20,7 @@ if ($txn_ref == '') {
 
 // 5. 查询付款详情 (核心逻辑保持不变)
 $sql = "SELECT p.*, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Case_ID, o.Order_Created_At, o.Donor_ID,
-               d.Donor_FName, d.Donor_LName, d.Donor_Email, d.Donor_ContactNumber, d.Donor_Address
+               d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber, d.Donor_Address1, d.Donor_Address2, d.Donor_City, d.Donor_State, d.Donor_PostalCode
         FROM payment p 
         JOIN orders o ON p.Payment_ID = o.Payment_ID 
         JOIN donor d ON o.Donor_ID = d.Donor_ID
@@ -307,7 +307,7 @@ include 'header_UI.php';
                         <div class="group-title">Donor Details</div>
                         <div class="info-row">
                             <span class="label">Name</span>
-                            <span class="value"><?php echo htmlspecialchars($row['Donor_FName'] . ' ' . $row['Donor_LName']); ?></span>
+                            <span class="value"><span class="value"><?php echo htmlspecialchars($row['Donor_Name']); ?></span>
                         </div>
                         <div class="info-row">
                             <span class="label">Email</span>
