@@ -110,13 +110,13 @@ function sendReceiptEmail($donationData, $project_name) {
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com'; 
         $mail->SMTPAuth   = true;
-        $mail->Username   = '你的邮箱@gmail.com'; // ⚠️ 请修改这里
-        $mail->Password   = '你的应用专用密码';    // ⚠️ 请修改这里 (不是登录密码)
+        $mail->Username   = 'lovebridge1201@gmail.com'; // ⚠️ 请修改这里
+        $mail->Password   = 'odaj iwrz gfrt vven';    // ⚠️ 请修改这里 (不是登录密码)
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
 
         // 收发件人
-        $mail->setFrom('你的邮箱@gmail.com', 'Love Bridge Receipt');
+        $mail->setFrom('lovebridge1201@gmail.com', 'Love Bridge Receipt');
         $mail->addAddress($donationData['Donor_Email'], $donationData['Donor_Name']);
 
         // 附件
