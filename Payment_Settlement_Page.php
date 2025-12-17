@@ -1,6 +1,8 @@
 <?php
 // 1. 引入数据库连接
 include 'dataconnection.php';
+// 引入刚才写的邮件脚本
+require_once 'mail_receipt.php'; 
 
 // 2. 开启 Session
 if (session_status() === PHP_SESSION_NONE) {
@@ -18,9 +20,9 @@ if ($txn_ref == '') {
     exit();
 }
 
-// 5. 查询付款详情 (核心逻辑保持不变)
+// 5. 查询付款详情
 $sql = "SELECT p.*, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Case_ID, o.Order_Created_At, o.Donor_ID,
-               d.Donor_FName, d.Donor_LName, d.Donor_Email, d.Donor_ContactNumber, d.Donor_Address
+               d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber, d.Donor_Address1, d.Donor_Address2, d.Donor_City, d.Donor_State, d.Donor_PostalCode
         FROM payment p 
         JOIN orders o ON p.Payment_ID = o.Payment_ID 
         JOIN donor d ON o.Donor_ID = d.Donor_ID
@@ -39,45 +41,7 @@ $row = $result->fetch_assoc();
 $stmt->close();
 
 // ---------------------------------------------------------
-// ⭐ 积分系统逻辑 (保持原逻辑)
-// ---------------------------------------------------------
-$calc_amount = $row['Order_Amount'];
-$calc_donor_id = $row['Donor_ID'];
-$calc_status = $row['Payment_Status']; 
-
-// 每 RM10 = 1 分
-$points_to_add = floor($calc_amount / 10);
-$is_success = (stripos($calc_status, 'Success') !== false); 
-
-if ($points_to_add > 0 && $is_success && !isset($_SESSION['points_awarded_' . $txn_ref])) {
-
-    // 检查是否已有记录
-    $chk_sql = "SELECT Points_ID FROM point WHERE Donor_ID = ?";
-    $stmt_chk = $conn->prepare($chk_sql);
-    $stmt_chk->bind_param("i", $calc_donor_id);
-    $stmt_chk->execute();
-    $res_chk = $stmt_chk->get_result();
-    $stmt_chk->close();
-
-    if ($res_chk->num_rows > 0) {
-        $upd_sql = "UPDATE point SET Points_Total = Points_Total + ?, Points_Earned = Points_Earned + ?, Points_Updated_At = NOW() WHERE Donor_ID = ?";
-        $stmt_upd = $conn->prepare($upd_sql);
-        $stmt_upd->bind_param("iii", $points_to_add, $points_to_add, $calc_donor_id);
-        $stmt_upd->execute();
-        $stmt_upd->close();
-    } else {
-        $ins_sql = "INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES (?, ?, NOW(), ?)";
-        $stmt_ins = $conn->prepare($ins_sql);
-        $stmt_ins->bind_param("iii", $points_to_add, $points_to_add, $calc_donor_id);
-        $stmt_ins->execute();
-        $stmt_ins->close();
-    }
-    // 标记 Session 防止重复加分
-    $_SESSION['points_awarded_' . $txn_ref] = true;
-}
-
-// ---------------------------------------------------------
-// ⭐ 项目名称逻辑 (Branch vs Special Case)
+// 获取项目名称
 // ---------------------------------------------------------
 $project_label = "General Donation"; 
 $project_name = "Love Bridge Fund"; 
@@ -108,149 +72,88 @@ if (!empty($row['Case_ID'])) {
     }
 }
 
-// 格式化数据
-$paymentDate = date("d M Y, h:i A", strtotime($row['Payment_Paid_At']));
-$amountFormatted = "RM " . number_format($row['Order_Amount'], 2);
+// ---------------------------------------------------------
+// ⭐ 自动发送邮件 (并在 Session 中标记，防止刷新重复发)
+// ---------------------------------------------------------
+$email_msg = "Processing receipt...";
 
-// 6. 引入新版头部
+if (!isset($_SESSION['email_sent_' . $txn_ref])) {
+    // 调用函数
+    $isSent = sendReceiptEmail($row, $project_name);
+    
+    if ($isSent) {
+        $_SESSION['email_sent_' . $txn_ref] = true;
+        $email_msg = "An official receipt (PDF) has been sent to your email.";
+    } else {
+        $email_msg = "Receipt generated, but email sending failed. Please check your inbox later.";
+    }
+} else {
+    $email_msg = "An official receipt (PDF) has been sent to your email.";
+}
+
+// ---------------------------------------------------------
+// 积分逻辑 (保持不变)
+// ---------------------------------------------------------
+$calc_amount = $row['Order_Amount'];
+$calc_donor_id = $row['Donor_ID'];
+$calc_status = $row['Payment_Status']; 
+$points_to_add = floor($calc_amount / 10);
+$is_success = (stripos($calc_status, 'Success') !== false); 
+
+if ($points_to_add > 0 && $is_success && !isset($_SESSION['points_awarded_' . $txn_ref])) {
+    $chk_sql = "SELECT Points_ID FROM point WHERE Donor_ID = ?";
+    $stmt_chk = $conn->prepare($chk_sql);
+    $stmt_chk->bind_param("i", $calc_donor_id);
+    $stmt_chk->execute();
+    $res_chk = $stmt_chk->get_result();
+    $stmt_chk->close();
+
+    if ($res_chk->num_rows > 0) {
+        $upd_sql = "UPDATE point SET Points_Total = Points_Total + ?, Points_Earned = Points_Earned + ?, Points_Updated_At = NOW() WHERE Donor_ID = ?";
+        $stmt_upd = $conn->prepare($upd_sql);
+        $stmt_upd->bind_param("iii", $points_to_add, $points_to_add, $calc_donor_id);
+        $stmt_upd->execute();
+        $stmt_upd->close();
+    } else {
+        $ins_sql = "INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES (?, ?, NOW(), ?)";
+        $stmt_ins = $conn->prepare($ins_sql);
+        $stmt_ins->bind_param("iii", $points_to_add, $points_to_add, $calc_donor_id);
+        $stmt_ins->execute();
+        $stmt_ins->close();
+    }
+    $_SESSION['points_awarded_' . $txn_ref] = true;
+}
+
+$amountFormatted = "RM " . number_format($row['Order_Amount'], 2);
 include 'header_UI.php'; 
 ?>
 
 <style>
-    /* --- Hero Banner --- */
-    .hero-wrap {
-        height: 350px;
-        position: relative;
-        background-image: url('images/hero_1.jpg');
-        background-size: cover;
-        background-position: center;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-    }
-    .hero-wrap .overlay {
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-    }
-    .hero-content {
-        position: relative;
-        z-index: 2;
-        max-width: 800px;
-    }
-    .hero-content h1 {
-        font-family: "Mansalva", cursive;
-        color: #fff;
-        font-size: 3.5rem;
-        margin-bottom: 10px;
-    }
+    /* ...原有 CSS 保持不变... */
+    .hero-wrap { height: 350px; background-image: url('images/hero_1.jpg'); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; text-align: center; position: relative; }
+    .hero-wrap .overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); }
+    .hero-content { position: relative; z-index: 2; max-width: 800px; }
+    .hero-content h1 { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; font-size: 3.5rem; margin-bottom: 10px; }
 
-    /* --- 成功信息区 (左侧) --- */
-    .success-box {
-        text-align: center;
-        padding: 40px 20px;
-    }
-    .icon-success {
-        font-size: 80px;
-        color: #dc2626;
-        margin-bottom: 20px;
-    }
-    .thank-you-msg {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #333;
-        margin-bottom: 15px;
-    }
-    .points-badge {
-        background-color: #FFF5E4;
-        color: #F28585;
-        border: 2px solid #F28585;
-        padding: 10px 25px;
-        border-radius: 50px;
-        font-weight: bold;
-        font-size: 1.2rem;
-        display: inline-block;
-        margin-top: 20px;
-    }
+    .success-box { text-align: center; padding: 40px 20px; }
+    .icon-success { font-size: 80px; color: #dc2626; margin-bottom: 20px; }
+    .thank-you-msg { font-size: 2rem; font-weight: bold; color: #333; margin-bottom: 15px; }
+    .points-badge { background-color: #FFF5E4; color: #F28585; border: 2px solid #F28585; padding: 10px 25px; border-radius: 50px; font-weight: bold; font-size: 1.2rem; display: inline-block; margin-top: 20px; }
 
-    /* --- 收据卡片 (右侧) --- */
-    .receipt-card {
-        background: #fff;
-        padding: 40px;
-        border-radius: 8px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        border-top: 5px solid #dc2626;
-    }
-    .receipt-title {
-        text-align: center;
-        font-weight: bold;
-        color: #333;
-        margin-bottom: 30px;
-        font-family: "Mansalva", cursive;
-        font-size: 1.8rem;
-    }
+    .receipt-card { background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-top: 5px solid #dc2626; }
+    .receipt-title { text-align: center; font-weight: bold; color: #333; margin-bottom: 30px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 1.8rem; }
     
     .info-group { margin-bottom: 25px; }
-    .group-title {
-        font-size: 0.9rem;
-        text-transform: uppercase;
-        color: #999;
-        font-weight: bold;
-        margin-bottom: 10px;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 5px;
-    }
-    
-    .info-row {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 8px;
-        font-size: 0.95rem;
-    }
+    .group-title { font-size: 0.9rem; text-transform: uppercase; color: #999; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+    .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
     .label { color: #555; font-weight: 500; }
     .value { color: #000; font-weight: bold; text-align: right; }
-    
-    .total-row {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 20px;
-        padding-top: 15px;
-        border-top: 2px dashed #ddd;
-        font-size: 1.2rem;
-    }
+    .total-row { display: flex; justify-content: space-between; margin-top: 20px; padding-top: 15px; border-top: 2px dashed #ddd; font-size: 1.2rem; }
     .total-label { font-weight: bold; color: #dc2626; }
     .total-value { font-weight: 900; color: #dc2626; }
 
-    /* 按钮 */
-    .btn-home {
-        background-color: #333;
-        color: #fff;
-        padding: 12px 30px;
-        border-radius: 30px;
-        text-decoration: none;
-        font-weight: bold;
-        transition: 0.3s;
-        display: inline-block;
-        margin-top: 30px;
-    }
+    .btn-home { background-color: #333; color: #fff; padding: 12px 30px; border-radius: 30px; text-decoration: none; font-weight: bold; transition: 0.3s; display: inline-block; margin-top: 30px; }
     .btn-home:hover { background-color: #dc2626; color: #fff; }
-    
-    .btn-print {
-        background-color: #f8f9fa;
-        color: #333;
-        border: 1px solid #ddd;
-        padding: 12px 30px;
-        border-radius: 30px;
-        text-decoration: none;
-        font-weight: bold;
-        transition: 0.3s;
-        display: inline-block;
-        margin-top: 30px;
-        margin-right: 10px;
-        cursor: pointer;
-    }
-    .btn-print:hover { background-color: #e2e6ea; }
 </style>
 
 <div class="hero-wrap">
@@ -260,6 +163,18 @@ include 'header_UI.php';
         <p class="text-white">Your generosity helps us build a better world.</p>
     </div>
 </div>
+
+<?php 
+    // 进度条逻辑
+    if (isset($project_label) && $project_label == "Special Case") {
+        $flow_type = 'special';
+        $current_step = 3; 
+    } else {
+        $flow_type = 'standard';
+        $current_step = 4; 
+    }
+    include 'stepper.php'; 
+?>
 
 <div class="site-section" style="padding: 5em 0;">
     <div class="container">
@@ -271,7 +186,11 @@ include 'header_UI.php';
                         <span class="icon-check-circle"></span> ✅
                     </div>
                     <h2 class="thank-you-msg">Thank You!</h2>
-                    <p class="text-muted">Your payment has been successfully processed. An official receipt has been sent to your email.</p>
+                    
+                    <p class="text-muted" style="font-size: 1.1rem;">
+                        Your payment has been successfully processed.<br>
+                        <strong style="color: #dc2626;"><?php echo $email_msg; ?></strong>
+                    </p>
 
                     <?php if($points_to_add > 0): ?>
                         <div class="points-badge">
@@ -280,7 +199,6 @@ include 'header_UI.php';
                     <?php endif; ?>
                     
                     <div class="mt-4">
-                        <a href="#" onclick="window.print(); return false;" class="btn-print">Print Receipt</a>
                         <a href="Homepage.php" class="btn-home">Back to Home</a>
                     </div>
                 </div>
@@ -294,7 +212,7 @@ include 'header_UI.php';
                         <div class="group-title">Donor Details</div>
                         <div class="info-row">
                             <span class="label">Name</span>
-                            <span class="value"><?php echo htmlspecialchars($row['Donor_FName'] . ' ' . $row['Donor_LName']); ?></span>
+                            <span class="value"><?php echo htmlspecialchars($row['Donor_Name']); ?></span>
                         </div>
                         <div class="info-row">
                             <span class="label">Email</span>

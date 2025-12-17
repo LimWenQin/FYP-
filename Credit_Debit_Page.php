@@ -15,7 +15,8 @@ include 'dataconnection.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
 // 3. 获取用户信息
-$user_sql = "SELECT Donor_FName, Donor_LName, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
+// ✅ 修正：根据您的数据库，donor 表只有 Donor_Name，没有 FName/LName
+$user_sql = "SELECT Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
 $u_stmt = $conn->prepare($user_sql);
 $u_stmt->bind_param("i", $current_donor_id);
 $u_stmt->execute();
@@ -23,8 +24,15 @@ $u_result = $u_stmt->get_result();
 $user_data = $u_result->fetch_assoc();
 $u_stmt->close();
 
+// 🛑 安全检查
+if (!$user_data) {
+    session_destroy();
+    echo "<script>alert('User data not found. Please login again.'); window.location.href='donor_login.php';</script>";
+    exit();
+}
+
 // ---------------------------------------------------------
-// PHP 处理逻辑
+// PHP 处理逻辑 (当用户点击 Confirm Payment)
 // ---------------------------------------------------------
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
 
@@ -33,7 +41,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
     $bank_name = $_POST['bank_display']; // 获取自动识别的卡类型
     $card_number = str_replace(' ', '', $_POST['card']); // 去除空格
     
-    // 处理 ID
+    // ✅ 处理 ID (空值转为 NULL)
+    // 这样存入数据库时就是 NULL，而不是 0，避免外键报错
     $branch_id = !empty($_POST['branch_id']) ? $_POST['branch_id'] : null;
     $case_id = !empty($_POST['case_id']) ? $_POST['case_id'] : null;
     $activity_id = !empty($_POST['activity_id']) ? $_POST['activity_id'] : null;
@@ -44,17 +53,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
     $payment_method = "Credit/Debit Card";
     $masked_card = substr($card_number, 0, 4) . " **** **** " . substr($card_number, -4);
 
-    // 1️⃣ 插入 payment
+    // 1️⃣ 插入 payment 表
     $stmt = $conn->prepare("INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("sssissss", $payment_method, $status, $txn_ref, $amount, $now, $bank_name, $masked_card, $now);
     $stmt->execute();
     $payment_id = $stmt->insert_id;
     $stmt->close();
 
-    // 2️⃣ 插入 orders
+    // 2️⃣ 插入 orders 表
     $order_type = ($donation_type == "monthly") ? "Recurring" : "One-time";
     $order_status = "Completed";
     
+    // ✅ 修正：使用 Donor_Name (数据库 donor 表对应字段)
+    $full_name = $user_data['Donor_Name']; 
+
+    // ✅ 修正：orders 表使用的是 Order_Name
     $stmt = $conn->prepare("INSERT INTO orders 
         (Order_Name, Order_ContactNumber, Order_ICNumber, Order_Email, 
          Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, 
@@ -62,24 +75,49 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
          Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID)
         VALUES (?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    // 合并名字
-    $full_name = $user_data['Donor_FName'] . " " . $user_data['Donor_LName'];
-
     $stmt->bind_param("ssssdsssssssiiiii", 
-        $full_name, $user_data['Donor_ContactNumber'], $user_data['Donor_ICNumber'], $user_data['Donor_Email'], 
+        $full_name, 
+        $user_data['Donor_ContactNumber'], 
+        $user_data['Donor_ICNumber'], 
+        $user_data['Donor_Email'], 
         $amount, $payment_method, $status, $txn_ref, $order_type, $order_status, $now, $now, 
         $current_donor_id, $payment_id, $branch_id, $activity_id, $case_id
     );
     $stmt->execute();
     $stmt->close();
 
-    // 3️⃣ 插入 recurring
+    // 3️⃣ 插入 recurring_donation 表 (如果是月捐)
     if ($donation_type == "monthly") {
         $deduction_date = date("Y-m-d", strtotime("+1 month"));
-        $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID) VALUES (?, ?, ?, 'Active', ?, ?, ?)");
-        $stmt->bind_param("dssssi", $amount, $payment_method, $deduction_date, $now, $now, $current_donor_id);
+        
+        // 【关键修复】这里加入了 Branch_ID, Activity_ID, Case_ID
+        $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?)");
+        
+        // 注意参数绑定：dssssiiii (对应上面的占位符)
+        $stmt->bind_param("dssssiiii", $amount, $payment_method, $deduction_date, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
+        
         $stmt->execute();
         $stmt->close();
+    }
+
+    // ==========================================
+    // 4️⃣ [新增] 更新筹款进度 (Raised Amount)
+    // ==========================================
+    
+    // 如果是 Special Case 捐款，增加 Raised_Amount
+    if ($case_id != null) {
+        $update_case = $conn->prepare("UPDATE special_case SET Raised_Amount = Raised_Amount + ? WHERE Case_ID = ?");
+        $update_case->bind_param("di", $amount, $case_id);
+        $update_case->execute();
+        $update_case->close();
+    }
+
+    // 如果是 Activity 捐款，增加 Activity_GetAmount
+    if ($activity_id != null) {
+        $update_act = $conn->prepare("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + ? WHERE Activity_ID = ?");
+        $update_act->bind_param("di", $amount, $activity_id);
+        $update_act->execute();
+        $update_act->close();
     }
 
     // 跳转
@@ -96,14 +134,14 @@ include 'header_UI.php';
     .hero-wrap {
         height: 400px;
         position: relative;
-        background-image: url('images/hero_1.jpg');
+        background-image: url('images/hero_4.jpg');
         background-size: cover;
         background-position: center;
         display: flex; align-items: center; justify-content: center; text-align: center;
     }
     .hero-wrap .overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); }
     .hero-content { position: relative; z-index: 2; max-width: 800px; }
-    .hero-content h1 { font-family: "Mansalva", cursive; color: #fff; font-size: 4rem; margin-bottom: 10px; }
+    .hero-content h1 { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; font-size: 4rem; margin-bottom: 10px; }
     .hero-content p { font-size: 1.2rem; color: rgba(255, 255, 255, 0.9); }
 
     /* 表单样式 */
@@ -149,12 +187,27 @@ include 'header_UI.php';
     </div>
 </div>
 
+<?php 
+    // 检查是否有 case_id (Special Case)
+    // 这里的 case_id 可能是通过 POST 传过来的
+    $is_special_case = (isset($_POST['case_id']) && !empty($_POST['case_id']));
+
+    if ($is_special_case) {
+        $flow_type = 'special';
+        $current_step = 2; // Special Flow Step 2 (Payment)
+    } else {
+        $flow_type = 'standard';
+        $current_step = 3; // Standard Flow Step 3 (Payment)
+    }
+
+    include 'stepper.php'; 
+?>
 <div class="site-section" style="padding: 5em 0;">
     <div class="container">
         <div class="row">
             
             <div class="col-md-6 mb-5">
-                <img src="yourimage.jpg" alt="Donation Story" class="img-fluid rounded mb-4 shadow-sm">
+                <img src="images/about_1.jpg" alt="Donation Story" class="img-fluid rounded mb-4 shadow-sm">
                 <h3 class="text-cursive mb-4" style="color: #00a651;">Thank You!</h3>
                 <p>Your donation of <strong>RM <?php echo htmlspecialchars($_POST['amount'] ?? 0); ?></strong> makes a difference.</p>
                 <div class="alert alert-success">

@@ -48,7 +48,7 @@ include 'header_UI.php';
     .hero-wrap {
         height: 400px;
         position: relative;
-        background-image: url('images/hero_1.jpg'); /* 确保有这张图 */
+        background-image: url('images/hero_5.jpg'); /* 确保有这张图 */
         background-size: cover;
         background-position: center;
         display: flex;
@@ -67,7 +67,7 @@ include 'header_UI.php';
         max-width: 800px;
     }
     .hero-content h1 {
-        font-family: "Mansalva", cursive;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: #fff;
         font-size: 4rem;
         margin-bottom: 10px;
@@ -190,6 +190,11 @@ include 'header_UI.php';
     </div>
 </div>
 
+<?php 
+    $current_step = 1; 
+    $flow_type = 'special'; 
+    include 'stepper.php'; 
+?>
 <div class="site-section" style="padding: 5em 0;">
     <div class="container">
         <div class="row">

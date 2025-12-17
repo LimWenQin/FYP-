@@ -1,7 +1,7 @@
 -- phpMyAdmin SQL Dump
 -- version 5.2.1
 -- Host: 127.0.0.1
--- Generation Time: 2025-12-07 12:00:00
+-- Generation Time: 2025-12-08 14:30:00
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -17,29 +17,6 @@ SET time_zone = "+00:00";
 --
 -- Database: `donation_system`
 --
-
--- ⚠️ 先删除旧表，防止报错 ⚠️
-DROP TABLE IF EXISTS `staff_activity`;
-DROP TABLE IF EXISTS `staff`;
-DROP TABLE IF EXISTS `redemption_order`;
-DROP TABLE IF EXISTS `recurring_donation`;
-DROP TABLE IF EXISTS `receipt`;
-DROP TABLE IF EXISTS `point`;
-DROP TABLE IF EXISTS `payment`;
-DROP TABLE IF EXISTS `password_resets`;
-DROP TABLE IF EXISTS `orders`;
-DROP TABLE IF EXISTS `login_attempts`;
-DROP TABLE IF EXISTS `item_donation`;
-DROP TABLE IF EXISTS `headquarters`;
-DROP TABLE IF EXISTS `donor_achievement`;
-DROP TABLE IF EXISTS `donor`;
-DROP TABLE IF EXISTS `contact_messages`;
-DROP TABLE IF EXISTS `branch`;
-DROP TABLE IF EXISTS `admin`;
-DROP TABLE IF EXISTS `activity`;
-DROP TABLE IF EXISTS `achievement`;
-DROP TABLE IF EXISTS `special_case`;
-DROP TABLE IF EXISTS `reward_item`;
 
 -- --------------------------------------------------------
 
@@ -119,7 +96,7 @@ CREATE TABLE `admin` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `branch` (✅ 已更新)
+-- Table structure for table `branch`
 --
 
 CREATE TABLE `branch` (
@@ -135,11 +112,9 @@ CREATE TABLE `branch` (
   `Branch_Country` varchar(100) DEFAULT 'Malaysia',
   `Branch_ContactNumber` varchar(20) NOT NULL,
   `Branch_Description` text NOT NULL,
-  -- 👇 新增字段 👇
   `Branch_ProfilePicture` varchar(255) DEFAULT NULL,
   `Branch_OperationalStatus` enum('Open','Closed') NOT NULL DEFAULT 'Open',
   `Branch_TargetAmount` decimal(10,2) NOT NULL DEFAULT 10000.00,
-  -- 👆 新增字段 👆
   `Admin_ID` int(11) NOT NULL,
   PRIMARY KEY (`Branch_ID`),
   KEY `branch_admin_id_fk` (`Admin_ID`)
@@ -277,6 +252,22 @@ CREATE TABLE `login_attempts` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `notifications` (✅ 新增)
+--
+
+CREATE TABLE `notifications` (
+  `Notification_ID` int(11) NOT NULL AUTO_INCREMENT,
+  `Donor_ID` int(11) NOT NULL,
+  `Message` text NOT NULL,
+  `Is_Read` tinyint(1) DEFAULT 0, -- 0 = 未读, 1 = 已读
+  `Created_At` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`Notification_ID`),
+  KEY `Notification_Donor_ID_FK` (`Donor_ID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `orders`
 --
 
@@ -383,7 +374,7 @@ CREATE TABLE `receipt` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `recurring_donation`
+-- Table structure for table `recurring_donation` (✅ 已修改)
 --
 
 CREATE TABLE `recurring_donation` (
@@ -394,7 +385,7 @@ CREATE TABLE `recurring_donation` (
   `Recurring_EndDate` date DEFAULT NULL,
   `Recurring_Deduction_Date` date NOT NULL,
   `Last_Payment_Date` datetime DEFAULT NULL,
-  `Recurring_Status` enum('Active','Stopped','Completed','Failed') NOT NULL DEFAULT 'Active',
+  `Recurring_Status` enum('Active','Paused','Cancelled','Stopped','Completed','Failed') NOT NULL DEFAULT 'Active',
   `Recurring_Created_At` datetime NOT NULL,
   `Recurring_Updated_At` datetime NOT NULL,
   `Donor_ID` int(11) NOT NULL,
@@ -470,7 +461,7 @@ CREATE TABLE `special_case` (
 
 CREATE TABLE `staff` (
   `Staff_ID` int(11) NOT NULL AUTO_INCREMENT,
-  `Staff_FullName` varchar(100) NOT NULL, -- ✅ 已确认合并名字
+  `Staff_FullName` varchar(100) NOT NULL,
   `Staff_ContactNumber` varchar(20) NOT NULL,
   `Staff_ICNumber` varchar(20) NOT NULL,
   `Staff_Email` varchar(100) NOT NULL,
@@ -536,8 +527,8 @@ INSERT INTO `admin` (`Admin_ID`, `Admin_Name`, `Admin_ContactNumber`, `Admin_ICN
 -- Dumping data for table `donor`
 --
 
-INSERT INTO `donor` (`Donor_Name`, `Donor_Email`, `Donor_ContactNumber`, `Donor_ICNumber`, `Donor_Password`, `Donor_Address1`, `Donor_Address2`, `Donor_Address3`, `Donor_City`, `Donor_State`, `Donor_PostalCode`, `Donor_Country`, `Donor_DOB`, `Donor_Description`, `Donor_RegisteredAt`, `Donor_ProfilePicture`) VALUES
-('Ronald Tan Bin Hong', 'ronaldtan0404@gmail.com', '0123456789', '050404011183', 'Rd2535@T', 'No19, Jalan Melawati', 'Taman Melawati', NULL, 'Kuala Lumpur', 'Wilayah Persekutuan', '53100', 'Malaysia', '2005-04-04', 'Newly registered donor', NOW(), NULL);
+INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_Email`, `Donor_ContactNumber`, `Donor_ICNumber`, `Donor_Password`, `Donor_Address1`, `Donor_Address2`, `Donor_Address3`, `Donor_City`, `Donor_State`, `Donor_PostalCode`, `Donor_Country`, `Donor_DOB`, `Donor_Description`, `Donor_RegisteredAt`, `Donor_ProfilePicture`) VALUES
+(1, 'Ronald Tan Bin Hong', 'ronaldtan0404@gmail.com', '0123456789', '050404011183', 'Rd2535@T', 'No19, Jalan Melawati', 'Taman Melawati', NULL, 'Kuala Lumpur', 'Wilayah Persekutuan', '53100', 'Malaysia', '2005-04-04', 'Newly registered donor', NOW(), NULL);
 
 --
 -- Dumping data for table `headquarters`
@@ -545,6 +536,14 @@ INSERT INTO `donor` (`Donor_Name`, `Donor_Email`, `Donor_ContactNumber`, `Donor_
 
 INSERT INTO `headquarters` (`HQ_ID`, `HQ_Name`, `HQ_ContactNumber`, `HQ_Email`, `HQ_Address`, `HQ_Description`, `HQ_Story`, `HQ_FoundingDate`, `HQ_Image`, `Updated_At`) VALUES
 (1, 'Love Bridge Headquarters', '+603-1234 5678', 'info@lovebridge.org.my', 'Level 12, Menara Love Bridge, Jalan Charity, 50450 Kuala Lumpur, Malaysia', 'Love Bridge is a non-profit organization dedicated to helping those in need.', 'Founded in 2010, Love Bridge started with a small group of volunteers who wanted to make a difference. Over the years, we have grown into a nationwide organization supporting various causes including elderly care, orphanages, and disaster relief.', '2010-01-01', NULL, '2025-11-26 12:00:00');
+
+--
+-- Dumping data for table `recurring_donation` (✅ 新增测试数据)
+-- 此处插入了一条3天后到期的数据，用于测试Reminder功能
+--
+
+INSERT INTO `recurring_donation` (`Recurring_Amount`, `Recurring_Payment_Method`, `Recurring_Deduction_Date`, `Recurring_Status`, `Donor_ID`, `Recurring_Created_At`, `Recurring_Updated_At`) 
+VALUES (50.00, 'Credit Card', DATE_ADD(CURDATE(), INTERVAL 3 DAY), 'Active', 1, NOW(), NOW());
 
 --
 -- Constraints for dumped tables
@@ -563,6 +562,9 @@ ALTER TABLE `donor_achievement`
 ALTER TABLE `item_donation`
   ADD CONSTRAINT `Item_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
   ADD CONSTRAINT `Item_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
+
+ALTER TABLE `notifications`
+  ADD CONSTRAINT `Notification_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 ALTER TABLE `orders`
   ADD CONSTRAINT `Order_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),

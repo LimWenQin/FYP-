@@ -16,7 +16,7 @@ include 'dataconnection.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
 // 3. 获取当前用户真实资料
-$user_sql = "SELECT Donor_FName, Donor_LName, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
+$user_sql = "SELECT Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
 $u_stmt = $conn->prepare($user_sql);
 $u_stmt->bind_param("i", $current_donor_id);
 $u_stmt->execute();
@@ -24,8 +24,15 @@ $u_result = $u_stmt->get_result();
 $user_data = $u_result->fetch_assoc();
 $u_stmt->close();
 
+// 🛑 安全检查
+if (!$user_data) {
+    session_destroy();
+    echo "<script>alert('User data not found. Please login again.'); window.location.href='donor_login.php';</script>";
+    exit();
+}
+
 // -------------------------
-// 4. 显示逻辑：查询 Special Case 名字
+// 4. 显示逻辑：查询 Special Case 名字 (用于右侧 Summary 显示)
 // -------------------------
 $display_case_title = ""; 
 $incoming_case_id = isset($_POST['case_id']) ? $_POST['case_id'] : 0;
@@ -53,9 +60,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     $amount = $_POST['amount'];
     
     // ✅ 处理 3 个关键 ID (0 或空 -> NULL)
-    $branch_id = isset($_POST['branch_id']) && $_POST['branch_id'] != '' && $_POST['branch_id'] != '0' ? $_POST['branch_id'] : null;
-    $case_id = isset($_POST['case_id']) && $_POST['case_id'] != '' && $_POST['case_id'] != '0' ? $_POST['case_id'] : null;
-    $activity_id = isset($_POST['activity_id']) && $_POST['activity_id'] != '' && $_POST['activity_id'] != '0' ? $_POST['activity_id'] : null;
+    // 这样存入数据库时就是 NULL，而不是 0，避免外键报错
+    $branch_id = !empty($_POST['branch_id']) ? $_POST['branch_id'] : null;
+    $case_id = !empty($_POST['case_id']) ? $_POST['case_id'] : null;
+    $activity_id = !empty($_POST['activity_id']) ? $_POST['activity_id'] : null;
 
     $payment_method = "TNG eWallet";
     $txn_ref = "TXN-" . date("YmdHis");
@@ -64,42 +72,71 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     $bank_name = "TNG eWallet";
     $masked = "QR Payment";
 
-    // 1️⃣ 插入 payment
+    // 1️⃣ 插入 payment 表
     $stmt = $conn->prepare("INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("sssissss", $payment_method, $status, $txn_ref, $amount, $now, $bank_name, $masked, $now);
     $stmt->execute();
     $payment_id = $stmt->insert_id;
     $stmt->close();
 
-    // 2️⃣ 插入 orders
+    // 2️⃣ 插入 orders 表
     $order_type = ($donation_type == "monthly") ? "Recurring" : "One-time";
     $order_status = "Completed";
 
+    // 修正：使用 Donor_Name 而不是拆分 FName/LName
     $stmt = $conn->prepare("INSERT INTO `orders` 
-        (Order_FName, Order_LName, Order_ContactNumber, Order_ICNumber, Order_Email, 
+        (Order_Name, Order_ContactNumber, Order_ICNumber, Order_Email, 
          Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, Order_TXN_Ref, 
          Order_Type, Order_Status, Order_Created_At, Order_Updated_At, 
          Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID)
-        VALUES (?, ?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        VALUES (?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    $stmt->bind_param("sssssdsssssssiiiii", 
-        $user_data['Donor_FName'], $user_data['Donor_LName'], $user_data['Donor_ContactNumber'], $user_data['Donor_ICNumber'], $user_data['Donor_Email'], 
+    $stmt->bind_param("ssssdsssssssiiiii", 
+        $user_data['Donor_Name'], 
+        $user_data['Donor_ContactNumber'], 
+        $user_data['Donor_ICNumber'], 
+        $user_data['Donor_Email'], 
         $amount, $payment_method, $status, $txn_ref, $order_type, $order_status, $now, $now, 
         $current_donor_id, $payment_id, $branch_id, $activity_id, $case_id
     );
     $stmt->execute();
     $stmt->close();
 
-    // 3️⃣ 插入 recurring
+    // 3️⃣ 插入 recurring_donation 表 (如果是月捐)
     if ($donation_type == "monthly") {
         $deduction_date = date("Y-m-d", strtotime("+1 month"));
-        $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID) VALUES (?, ?, ?, 'Active', ?, ?, ?)");
-        $stmt->bind_param("dssssi", $amount, $payment_method, $deduction_date, $now, $now, $current_donor_id);
+        
+        // 【关键修复】这里加入了 Branch_ID, Activity_ID, Case_ID
+        $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?)");
+        
+        // 注意参数绑定：dssssiiii (对应上面的占位符)
+        $stmt->bind_param("dssssiiii", $amount, $payment_method, $deduction_date, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
+        
         $stmt->execute();
         $stmt->close();
     }
 
-    // 跳转
+    // ==========================================
+    // 4️⃣ [新增] 更新筹款进度 (Raised Amount)
+    // ==========================================
+    
+    // 如果是 Special Case 捐款，增加 Raised_Amount
+    if ($case_id != null) {
+        $update_case = $conn->prepare("UPDATE special_case SET Raised_Amount = Raised_Amount + ? WHERE Case_ID = ?");
+        $update_case->bind_param("di", $amount, $case_id);
+        $update_case->execute();
+        $update_case->close();
+    }
+
+    // 如果是 Activity 捐款，增加 Activity_GetAmount
+    if ($activity_id != null) {
+        $update_act = $conn->prepare("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + ? WHERE Activity_ID = ?");
+        $update_act->bind_param("di", $amount, $activity_id);
+        $update_act->execute();
+        $update_act->close();
+    }
+
+    // 跳转到收据页
     header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
     exit();
 }
@@ -110,7 +147,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 <head>
 <title>Touch 'n Go eWallet Payment</title>
 <style>
-    /* ... 样式保持不变 ... */
     body { margin: 0; font-family: Arial, sans-serif; background-color: #FFF5E4; color: #4A4A4A; }
     .header { background-color: #0057B7; color: white; display: flex; justify-content: space-between; align-items: center; padding: 15px 40px; }
     .header .title { font-size: 22px; font-weight: bold; }
@@ -136,6 +172,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         <div class="call">Call Center: +603-5022 3888</div>
     </div>
 
+    <?php 
+        // 智能判断：根据是否传入 case_id 决定显示 Step 2 (Special) 还是 Step 3 (Standard)
+        $is_special_case = (isset($_POST['case_id']) && !empty($_POST['case_id']));
+
+        if ($is_special_case) {
+            $flow_type = 'special';
+            $current_step = 2; // Step 2 (Payment)
+        } else {
+            $flow_type = 'standard';
+            $current_step = 3; // Step 3 (Payment)
+        }
+        
+        include 'stepper.php'; 
+    ?>
     <div class="container">
         <div class="payment-box">
             <h3>Payment Details</h3>
@@ -147,7 +197,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
                 <input type="hidden" name="activity_id" value="<?php echo htmlspecialchars($_POST['activity_id'] ?? ''); ?>">
 
                 <div class="qr-box">
-                    <img src="your_qr_image_here.png" alt="QR Code">
+                    <img src="images/tng_qr.jpg" alt="QR Code" onerror="this.src='https://via.placeholder.com/180?text=QR+Code'">
                     <div class="amount">RM <?php echo number_format($_POST['amount'] ?? 5, 2); ?></div>
                     <p>QR Code will expire in <b>60s</b></p>
                 </div>
@@ -169,12 +219,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 
         <div class="order-summary">
             <h3>Order Summary</h3>
-            <p><b>Payment To:</b> CARE FOR MALAYSIA SOCIETY</p>
+            <p><b>Payment To:</b> LOVE BRIDGE</p>
             <p><b>Transaction No:</b> <?php echo "TXN-" . date("YmdHis"); ?></p>
             <p><b>Payment Details:</b> Donation</p>
             
             <?php if(!empty($display_case_title)): ?>
-                <p><b>Special Project:</b><br><?php echo htmlspecialchars($display_case_title); ?></p>
+                <p><b>Project:</b><br><?php echo htmlspecialchars($display_case_title); ?></p>
             <?php endif; ?>
 
             <p class="total">Total: RM <?php echo number_format($_POST['amount'] ?? 5, 2); ?></p>
