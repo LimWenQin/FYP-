@@ -13,19 +13,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = trim($_POST['email']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
-    $address1 = trim($_POST['address1']);
-    $address2 = trim($_POST['address2']);
-    $address3 = trim($_POST['address3']);
-    $city = trim($_POST['city']);
-    $state = trim($_POST['state']);
-    $postalcode = trim($_POST['postalcode']);
-    $country = trim($_POST['country']);
     $dob = $_POST['dob'];
     
 
     // Validation
-    $required_fields = ['name', 'contact', 'icnumber', 'email', 'password', 'confirm_password', 
-                       'address1', 'city', 'state', 'postalcode', 'dob'];
+    $required_fields = ['name', 'contact', 'icnumber', 'email', 'password', 'confirm_password', 'dob'];
     
     $missing_fields = [];
     foreach ($required_fields as $field) {
@@ -60,15 +52,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             // Insert into database
             $insert_query = "INSERT INTO donor (Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email, 
-                            Donor_Password, Donor_Address1, Donor_Address2, Donor_Address3, 
-                            Donor_City, Donor_State, Donor_PostalCode, Donor_Country, Donor_DOB) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                            Donor_Password, Donor_DOB) 
+                            VALUES (?, ?, ?, ?, ?, ?)";
             
             $stmt = $conn->prepare($insert_query);
-            $stmt->bind_param("sssssssssssss", 
-                $name, $contact, $icnumber, $email, $hashed_password,
-                $address1, $address2, $address3, $city, $state, 
-                $postalcode, $country, $dob
+            $stmt->bind_param("ssssss", 
+                $name, $contact, $icnumber, $email, $hashed_password, $dob
             );
             
             if ($stmt->execute()) {
@@ -138,92 +127,6 @@ include 'header_UI.php';
             text-align: center;
             border-bottom: 2px solid var(--light-red);
             padding-bottom: 15px;
-        }
-
-        /* Progress Bar */
-        .progress-bar {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 40px;
-            position: relative;
-        }
-
-        .progress-bar::before {
-            content: '';
-            position: absolute;
-            top: 15px;
-            left: 50px;
-            right: 50px;
-            height: 4px;
-            background-color: var(--border-color);
-            z-index: 1;
-        }
-
-        .progress-step {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: relative;
-            z-index: 2;
-            flex: 1;
-            max-width: 200px;
-        }
-
-        .step-circle {
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            background-color: var(--white);
-            border: 3px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            color: var(--medium-gray);
-            margin-bottom: 8px;
-            transition: all 0.3s ease;
-        }
-
-        .progress-step.active .step-circle {
-            border-color: var(--primary-red);
-            background-color: var(--primary-red);
-            color: var(--white);
-        }
-
-        .progress-step.completed .step-circle {
-            border-color: var(--success-green);
-            background-color: var(--success-green);
-            color: var(--white);
-        }
-
-        .step-label {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--medium-gray);
-            text-align: center;
-        }
-
-        .progress-step.active .step-label {
-            color: var(--primary-red);
-        }
-
-        .progress-step.completed .step-label {
-            color: var(--success-green);
-        }
-
-        /* Form Steps */
-        .form-step {
-            display: none;
-            animation: fadeIn 0.5s ease;
-        }
-
-        .form-step.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         .form-row {
@@ -346,7 +249,7 @@ include 'header_UI.php';
         /* Button Container */
         .button-container {
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             margin-top: 40px;
             padding-top: 25px;
             border-top: 1px solid var(--border-color);
@@ -375,15 +278,6 @@ include 'header_UI.php';
 
         .btn:active {
             transform: translateY(0);
-        }
-
-        .btn-secondary {
-            background: linear-gradient(135deg, var(--medium-gray), var(--dark-gray));
-        }
-
-        .btn-secondary:hover {
-            background: linear-gradient(135deg, var(--dark-gray), var(--medium-gray));
-            box-shadow: 0 5px 15px rgba(115, 115, 115, 0.3);
         }
 
         .btn:disabled {
@@ -440,11 +334,6 @@ include 'header_UI.php';
             .btn {
                 width: 100%;
             }
-            
-            .progress-bar::before {
-                left: 30px;
-                right: 30px;
-            }
         }
 
         @media (max-width: 480px) {
@@ -459,11 +348,6 @@ include 'header_UI.php';
             .btn {
                 padding: 12px 20px;
                 font-size: 1rem;
-            }
-            
-            .progress-bar::before {
-                left: 20px;
-                right: 20px;
             }
         }
 
@@ -527,198 +411,97 @@ include 'header_UI.php';
                 <div class="success-message"><?php echo $success_message; ?></div>
             <?php endif; ?>
             
-            <!-- Progress Bar -->
-            <div class="progress-bar">
-                <div class="progress-step active" id="step1-indicator">
-                    <div class="step-circle">1</div>
-                    <div class="step-label">Personal Information</div>
-                </div>
-                <div class="progress-step" id="step2-indicator">
-                    <div class="step-circle">2</div>
-                    <div class="step-label">Address Information</div>
-                </div>
-            </div>
-            
             <form method="POST" action="donor_register.php" id="registerForm">
-                <!-- Step 1: Personal Information -->
-                <div class="form-step active" id="step1">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="name" class="required">Full Name</label>
-                            <input type="text" class="form-control" id="name" name="name" 
-                                   pattern="[A-Za-z\s]+" title="Only alphabets and spaces allowed"
-                                   value="<?php echo isset($_POST['name']) ? htmlspecialchars($_POST['name']) : ''; ?>" 
-                                   required>
-                            <span class="form-help">Enter your full name (letters and spaces only)</span>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="icnumber" class="required">IC Number</label>
-                            <input type="text" class="form-control" id="icnumber" name="icnumber"
-                                   pattern="\d{12}" title="IC must be exactly 12 digits" 
-                                   placeholder="990101015678"
-                                   value="<?php echo isset($_POST['icnumber']) ? htmlspecialchars($_POST['icnumber']) : ''; ?>" 
-                                   required>
-                            <span class="form-help">12 digits only (e.g., 990101015678)</span>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="dob" class="required">Date of Birth</label>
-                            <input type="date" class="form-control" id="dob" name="dob" 
-                                   max="<?php echo date('Y-m-d'); ?>"
-                                   value="<?php echo isset($_POST['dob']) ? $_POST['dob'] : ''; ?>" 
-                                   required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="contact" class="required">Contact Number</label>
-                            <input type="tel" class="form-control" id="contact" name="contact" 
-                                   pattern="01[0-9]-[0-9]{7,8}" title="Format: 01X-XXXXXXX or 01X-XXXXXXXX"
-                                   placeholder="012-3456789"
-                                   value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>" 
-                                   required>
-                            <span class="form-help">Format: 01X-XXXXXXX</span>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="email" class="required">Email Address</label>
-                            <input type="email" class="form-control" id="email" name="email" 
-                                   placeholder="example@example.com"
-                                   value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" 
-                                   required>
-                        </div>
-                    </div>
-
-                    <!-- Password Section -->
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="password" class="required">Password</label>
-                            <input type="password" class="form-control" id="password" name="password" 
-                                   required placeholder="At least 8 characters">
-                            <div class="password-strength">
-                                <div class="password-strength-bar" id="passwordStrengthBar"></div>
-                            </div>
-                            <!-- Password Requirements -->
-                            <div class="password-requirements">
-                                <div class="requirement-item invalid" id="lengthReq"><i class="fas fa-times"></i> Must be 8-15 characters long</div>
-                                <div class="requirement-item invalid" id="uppercaseReq"><i class="fas fa-times"></i> Must contain at least one Uppercase letter</div>
-                                <div class="requirement-item invalid" id="lowercaseReq"><i class="fas fa-times"></i> Must contain at least one Lowercase letter</div>
-                                <div class="requirement-item invalid" id="numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div>
-                                <div class="requirement-item invalid" id="specialReq"><i class="fas fa-times"></i> Must contain at least one Special character (e.g. !@#)</div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="confirm_password" class="required">Confirm Password</label>
-                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" 
-                                   required placeholder="Re-enter your password">
-                        </div>
-                    </div>
-
-                    <!-- Terms and Conditions -->
+                <div class="form-row">
                     <div class="form-group">
-                        <div style="display: flex; align-items: flex-start; gap: 10px;">
-                            <input type="checkbox" id="terms" name="terms" required style="margin-top: 5px;">
-                            <label for="terms" style="margin: 0; font-size: 0.9rem;">
-                                I agree to the <a href="terms.php" target="_blank" style="color: var(--primary-red);">Terms and Conditions</a> 
-                                and <a href="privacy.php" target="_blank" style="color: var(--primary-red);">Privacy Policy</a> of Love Bridge Donation System.
-                            </label>
-                        </div>
+                        <label for="name" class="required">Full Name</label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               pattern="[A-Za-z\s]+" title="Only alphabets and spaces allowed"
+                               value="<?php echo isset($_POST['name']) ? htmlspecialchars($_POST['name']) : ''; ?>" 
+                               required>
+                        <span class="form-help">Enter your full name (letters and spaces only)</span>
                     </div>
                     
-                    <div class="button-container">
-                        <div></div> <!-- Empty div for spacing -->
-                        <button type="button" class="btn" id="nextBtn">Next Step <i class="fas fa-arrow-right"></i></button>
+                    <div class="form-group">
+                        <label for="icnumber" class="required">IC Number</label>
+                        <input type="text" class="form-control" id="icnumber" name="icnumber"
+                               pattern="\d{12}" title="IC must be exactly 12 digits" 
+                               placeholder="990101015678"
+                               value="<?php echo isset($_POST['icnumber']) ? htmlspecialchars($_POST['icnumber']) : ''; ?>" 
+                               required>
+                        <span class="form-help">12 digits only (e.g., 990101015678)</span>
                     </div>
                 </div>
-                
-                <!-- Step 2: Address Information -->
-                <div class="form-step" id="step2">
+
+                <div class="form-row">
                     <div class="form-group">
-                        <label for="address1" class="required">Address Line 1</label>
-                        <input type="text" class="form-control" id="address1" name="address1" 
-                               placeholder="House/Unit No, Street Name"
-                               value="<?php echo isset($_POST['address1']) ? htmlspecialchars($_POST['address1']) : ''; ?>" 
+                        <label for="dob" class="required">Date of Birth</label>
+                        <input type="date" class="form-control" id="dob" name="dob" 
+                               max="<?php echo date('Y-m-d'); ?>"
+                               value="<?php echo isset($_POST['dob']) ? $_POST['dob'] : ''; ?>" 
                                required>
                     </div>
                     
                     <div class="form-group">
-                        <label for="address2">Address Line 2 (Optional)</label>
-                        <input type="text" class="form-control" id="address2" name="address2" 
-                               placeholder="Apartment/Building/Floor"
-                               value="<?php echo isset($_POST['address2']) ? htmlspecialchars($_POST['address2']) : ''; ?>">
+                        <label for="contact" class="required">Contact Number</label>
+                        <input type="tel" class="form-control" id="contact" name="contact" 
+                               pattern="01[0-9]-[0-9]{7,8}" title="Format: 01X-XXXXXXX or 01X-XXXXXXXX"
+                               placeholder="012-3456789"
+                               value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>" 
+                               required>
+                        <span class="form-help">Format: 01X-XXXXXXX</span>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="email" class="required">Email Address</label>
+                        <input type="email" class="form-control" id="email" name="email" 
+                               placeholder="example@example.com"
+                               value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" 
+                               required>
+                    </div>
+                </div>
+
+                <!-- Password Section -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="password" class="required">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" 
+                               required placeholder="At least 8 characters">
+                        <div class="password-strength">
+                            <div class="password-strength-bar" id="passwordStrengthBar"></div>
+                        </div>
+                        <!-- Password Requirements -->
+                        <div class="password-requirements">
+                            <div class="requirement-item invalid" id="lengthReq"><i class="fas fa-times"></i> Must be 8-15 characters long</div>
+                            <div class="requirement-item invalid" id="uppercaseReq"><i class="fas fa-times"></i> Must contain at least one Uppercase letter</div>
+                            <div class="requirement-item invalid" id="lowercaseReq"><i class="fas fa-times"></i> Must contain at least one Lowercase letter</div>
+                            <div class="requirement-item invalid" id="numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div>
+                            <div class="requirement-item invalid" id="specialReq"><i class="fas fa-times"></i> Must contain at least one Special character (e.g. !@#)</div>
+                        </div>
                     </div>
                     
                     <div class="form-group">
-                        <label for="address3">Address Line 3 (Optional)</label>
-                        <input type="text" class="form-control" id="address3" name="address3" 
-                               placeholder="Landmark/Additional Information"
-                               value="<?php echo isset($_POST['address3']) ? htmlspecialchars($_POST['address3']) : ''; ?>">
+                        <label for="confirm_password" class="required">Confirm Password</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" 
+                               required placeholder="Re-enter your password">
                     </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="city" class="required">City</label>
-                            <input type="text" class="form-control" id="city" name="city" 
-                                   placeholder="Kuala Lumpur"
-                                   value="<?php echo isset($_POST['city']) ? htmlspecialchars($_POST['city']) : ''; ?>" 
-                                   required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="state" class="required">State</label>
-                            <select class="form-control" id="state" name="state" required>
-                                <option value="">Select State</option>
-                                <option value="Johor" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Johor') ? 'selected' : ''; ?>>Johor</option>
-                                <option value="Kedah" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Kedah') ? 'selected' : ''; ?>>Kedah</option>
-                                <option value="Kelantan" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Kelantan') ? 'selected' : ''; ?>>Kelantan</option>
-                                <option value="Melaka" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Melaka') ? 'selected' : ''; ?>>Melaka</option>
-                                <option value="Negeri Sembilan" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Negeri Sembilan') ? 'selected' : ''; ?>>Negeri Sembilan</option>
-                                <option value="Pahang" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Pahang') ? 'selected' : ''; ?>>Pahang</option>
-                                <option value="Perak" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Perak') ? 'selected' : ''; ?>>Perak</option>
-                                <option value="Perlis" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Perlis') ? 'selected' : ''; ?>>Perlis</option>
-                                <option value="Pulau Pinang" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Pulau Pinang') ? 'selected' : ''; ?>>Pulau Pinang</option>
-                                <option value="Sabah" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Sabah') ? 'selected' : ''; ?>>Sabah</option>
-                                <option value="Sarawak" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Sarawak') ? 'selected' : ''; ?>>Sarawak</option>
-                                <option value="Selangor" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Selangor') ? 'selected' : ''; ?>>Selangor</option>
-                                <option value="Terengganu" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Terengganu') ? 'selected' : ''; ?>>Terengganu</option>
-                                <option value="Kuala Lumpur" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Kuala Lumpur') ? 'selected' : ''; ?>>Kuala Lumpur</option>
-                                <option value="Labuan" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Labuan') ? 'selected' : ''; ?>>Labuan</option>
-                                <option value="Putrajaya" <?php echo (isset($_POST['state']) && $_POST['state'] == 'Putrajaya') ? 'selected' : ''; ?>>Putrajaya</option>
-                            </select>
-                        </div>
+                </div>
+
+                <!-- Terms and Conditions -->
+                <div class="form-group">
+                    <div style="display: flex; align-items: flex-start; gap: 10px;">
+                        <input type="checkbox" id="terms" name="terms" required style="margin-top: 5px;">
+                        <label for="terms" style="margin: 0; font-size: 0.9rem;">
+                            I agree to the <a href="terms.php" target="_blank" style="color: var(--primary-red);">Terms and Conditions</a> 
+                            and <a href="privacy.php" target="_blank" style="color: var(--primary-red);">Privacy Policy</a> of Love Bridge Donation System.
+                        </label>
                     </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="postalcode" class="required">Postal Code</label>
-                            <input type="text" class="form-control" id="postalcode" name="postalcode" 
-                                   pattern="\d{5}" title="5-digit postal code"
-                                   placeholder="50000"
-                                   value="<?php echo isset($_POST['postalcode']) ? htmlspecialchars($_POST['postalcode']) : ''; ?>" 
-                                   required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="country" class="required">Country</label>
-                            <select class="form-control" id="country" name="country" required>
-                                <option value="Malaysia" selected>Malaysia</option>
-                                <option value="Singapore" <?php echo (isset($_POST['country']) && $_POST['country'] == 'Singapore') ? 'selected' : ''; ?>>Singapore</option>
-                                <option value="Indonesia" <?php echo (isset($_POST['country']) && $_POST['country'] == 'Indonesia') ? 'selected' : ''; ?>>Indonesia</option>
-                                <option value="Thailand" <?php echo (isset($_POST['country']) && $_POST['country'] == 'Thailand') ? 'selected' : ''; ?>>Thailand</option>
-                                <option value="Other" <?php echo (isset($_POST['country']) && $_POST['country'] == 'Other') ? 'selected' : ''; ?>>Other</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="button-container">
-                        <button type="button" class="btn btn-secondary" id="prevBtn"><i class="fas fa-arrow-left"></i> Previous</button>
-                        <button type="submit" class="btn" id="submitBtn">Create Donor Account</button>
-                    </div>
+                </div>
+                
+                <div class="button-container">
+                    <button type="submit" class="btn" id="submitBtn">Create Donor Account</button>
                 </div>
             </form>
             
@@ -741,13 +524,7 @@ include 'header_UI.php';
             const passwordStrengthBar = document.getElementById('passwordStrengthBar');
             const icNumber = document.getElementById('icnumber');
             const dobInput = document.getElementById('dob');
-            const nextBtn = document.getElementById('nextBtn');
-            const prevBtn = document.getElementById('prevBtn');
             const submitBtn = document.getElementById('submitBtn');
-            const step1 = document.getElementById('step1');
-            const step2 = document.getElementById('step2');
-            const step1Indicator = document.getElementById('step1-indicator');
-            const step2Indicator = document.getElementById('step2-indicator');
             
             // Password requirement elements
             const lengthReq = document.getElementById('lengthReq');
@@ -858,13 +635,13 @@ include 'header_UI.php';
                 }
             }
             
-            // Validate step 1 fields
-            function validateStep1() {
+            // Validate all fields
+            function validateForm() {
                 let isValid = true;
                 
-                // Check all required fields in step 1
-                const step1Required = step1.querySelectorAll('[required]');
-                step1Required.forEach(field => {
+                // Check all required fields
+                const requiredFields = form.querySelectorAll('[required]');
+                requiredFields.forEach(field => {
                     if (!field.value.trim()) {
                         field.classList.add('error');
                         isValid = false;
@@ -895,39 +672,12 @@ include 'header_UI.php';
             confirmPassword.addEventListener('blur', validateConfirmPassword);
             icNumber.addEventListener('blur', validateICNumber);
             
-            // Navigation between steps
-            nextBtn.addEventListener('click', function() {
-                if (validateStep1()) {
-                    step1.classList.remove('active');
-                    step2.classList.add('active');
-                    step1Indicator.classList.remove('active');
-                    step1Indicator.classList.add('completed');
-                    step2Indicator.classList.add('active');
-                } else {
-                    alert('Please correct the errors in Step 1 before proceeding.');
-                }
-            });
-            
-            prevBtn.addEventListener('click', function() {
-                step2.classList.remove('active');
-                step1.classList.add('active');
-                step2Indicator.classList.remove('active');
-                step1Indicator.classList.add('active');
-                step1Indicator.classList.remove('completed');
-            });
-            
             // Form submission validation
             form.addEventListener('submit', function(e) {
-                // Validate all steps before submission
-                if (!validateStep1()) {
+                // Validate all fields before submission
+                if (!validateForm()) {
                     e.preventDefault();
-                    // Go back to step 1 if validation fails
-                    step2.classList.remove('active');
-                    step1.classList.add('active');
-                    step2Indicator.classList.remove('active');
-                    step1Indicator.classList.add('active');
-                    step1Indicator.classList.remove('completed');
-                    alert('Please complete Step 1 correctly before submitting.');
+                    alert('Please correct the errors before submitting.');
                     return;
                 }
                 
@@ -957,18 +707,6 @@ include 'header_UI.php';
                 }
                 if (value.length > 12) {
                     value = value.substring(0, 12);
-                }
-                
-                e.target.value = value;
-            });
-            
-            // Auto-format postal code
-            const postalCodeInput = document.getElementById('postalcode');
-            postalCodeInput.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, '');
-                
-                if (value.length > 5) {
-                    value = value.substring(0, 5);
                 }
                 
                 e.target.value = value;

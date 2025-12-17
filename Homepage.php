@@ -162,14 +162,129 @@ $upcoming_activities = [
             z-index: 1;
         }
 
-        .campaign-image {
+        .campaign-image-container {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
+            overflow: hidden;
+        }
+
+        .campaign-image {
+            width: 100%;
+            height: 100%;
             object-fit: cover;
             filter: brightness(0.4);
+        }
+
+        /* Progress Bar Overlay on Image */
+        .image-progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            padding: 0 40px;
+            z-index: 2;
+        }
+
+        .progress-stats {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            color: white;
+        }
+
+        .progress-left {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .progress-right {
+            text-align: right;
+        }
+
+        .progress-label {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 5px;
+        }
+
+        .progress-amount {
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .progress-bar-track {
+            flex: 1;
+            margin: 0 20px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #FF9800, #FF5722);
+            border-radius: 5px;
+            position: relative;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .progress-percentage {
+            position: absolute;
+            top: -25px;
+            right: 0;
+            background: var(--primary-red);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: bold;
+            transform: translateX(50%);
+        }
+
+        /* Navigation Arrows */
+        .nav-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        .nav-arrow:hover {
+            background: var(--primary-red);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .nav-arrow.prev {
+            left: 30px;
+        }
+
+        .nav-arrow.next {
+            right: 30px;
         }
 
         .campaign-content {
@@ -271,7 +386,7 @@ $upcoming_activities = [
         /* Slider Controls */
         .slider-controls {
             position: absolute;
-            bottom: 8px;
+            bottom: 70px;
             left: 0;
             width: 100%;
             display: flex;
@@ -310,7 +425,7 @@ $upcoming_activities = [
         /* Progress Bar */
         .progress-bar-container {
             position: absolute;
-            bottom: 0;
+            bottom: 60px;
             left: 0;
             width: 100%;
             height: 4px;
@@ -710,12 +825,35 @@ $upcoming_activities = [
             }
             
             .slider-controls {
-                bottom: 15px;
+                bottom: 75px;
             }
             
             .stats-overview {
                 grid-template-columns: repeat(2, 1fr);
                 padding: 0 20px;
+            }
+            
+            .nav-arrow {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+            
+            .nav-arrow.prev {
+                left: 15px;
+            }
+            
+            .nav-arrow.next {
+                right: 15px;
+            }
+            
+            .image-progress-bar {
+                padding: 0 20px;
+                height: 50px;
+            }
+            
+            .progress-amount {
+                font-size: 16px;
             }
         }
 
@@ -771,6 +909,34 @@ $upcoming_activities = [
             .stats-overview {
                 grid-template-columns: 1fr;
             }
+            
+            .nav-arrow {
+                width: 40px;
+                height: 40px;
+                font-size: 18px;
+            }
+            
+            .image-progress-bar {
+                flex-direction: column;
+                height: auto;
+                padding: 10px;
+                gap: 10px;
+            }
+            
+            .progress-bar-track {
+                width: 100%;
+                margin: 5px 0;
+            }
+            
+            .progress-left, .progress-right {
+                text-align: center;
+                width: 100%;
+            }
+            
+            .progress-percentage {
+                top: -20px;
+                font-size: 10px;
+            }
         }
     </style>
 </head>
@@ -779,9 +945,37 @@ $upcoming_activities = [
         <!-- Hero Campaign Slider -->
         <section class="campaign-hero">
             <div class="campaign-slides">
-                <?php foreach ($campaigns as $index => $campaign): ?>
+                <?php foreach ($campaigns as $index => $campaign): 
+                    // 计算进度百分比
+                    $percentage = round(($campaign['raised'] / $campaign['goal']) * 100);
+                    $remaining = $campaign['goal'] - $campaign['raised'];
+                ?>
                 <div class="campaign-slide <?php echo $index === 0 ? 'active' : ''; ?>" data-index="<?php echo $index; ?>">
-                    <img src="<?php echo $campaign['image']; ?>" alt="<?php echo $campaign['title']; ?>" class="campaign-image">
+                    <div class="campaign-image-container">
+                        <img src="<?php echo $campaign['image']; ?>" alt="<?php echo $campaign['title']; ?>" class="campaign-image">
+                        
+                        <!-- Progress Bar on Image -->
+                        <div class="image-progress-bar">
+                            <div class="progress-stats">
+                                <div class="progress-left">
+                                    <div class="progress-label">RAISED</div>
+                                    <div class="progress-amount">RM <?php echo number_format($campaign['raised'], 2); ?></div>
+                                </div>
+                                
+                                <div class="progress-bar-track">
+                                    <div class="progress-bar-fill" style="width: <?php echo $percentage; ?>%">
+                                        <div class="progress-percentage"><?php echo $percentage; ?>%</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="progress-right">
+                                    <div class="progress-label">GOAL</div>
+                                    <div class="progress-amount">RM <?php echo number_format($campaign['goal'], 2); ?></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="campaign-content">
                         <div class="days-counter">
                             <?php echo $campaign['days_active']; ?> Days
@@ -806,15 +1000,15 @@ $upcoming_activities = [
                         
                         <div class="campaign-stats">
                             <div class="stat-item">
-                                <div class="stat-value">RM <?php echo number_format($campaign['goal']); ?></div>
-                                <div class="stat-label">Target Goal</div>
+                                <div class="stat-value">RM <?php echo number_format($remaining, 2); ?></div>
+                                <div class="stat-label">Still Needed</div>
                             </div>
                             <div class="stat-item">
                                 <div class="stat-value"><?php echo number_format($campaign['donors']); ?></div>
                                 <div class="stat-label">Total Donors</div>
                             </div>
                             <div class="stat-item">
-                                <div class="stat-value"><?php echo round(($campaign['raised'] / $campaign['goal']) * 100); ?>%</div>
+                                <div class="stat-value"><?php echo $percentage; ?>%</div>
                                 <div class="stat-label">Progress</div>
                             </div>
                         </div>
@@ -822,6 +1016,14 @@ $upcoming_activities = [
                 </div>
                 <?php endforeach; ?>
             </div>
+            
+            <!-- Navigation Arrows -->
+            <button class="nav-arrow prev" onclick="prevSlide()">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="nav-arrow next" onclick="nextSlide()">
+                <i class="fas fa-chevron-right"></i>
+            </button>
             
             <!-- Progress Bar -->
             <div class="progress-bar-container">
@@ -933,11 +1135,15 @@ $upcoming_activities = [
     
     <?php include 'footer.php'; ?>
     
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const slides = document.querySelectorAll('.campaign-slide');
             const dots = document.querySelectorAll('.slider-dot');
             const progressBar = document.querySelector('.progress-bar');
+            const progressFill = document.querySelectorAll('.progress-bar-fill');
             
             let currentSlide = 0;
             let slideInterval;
@@ -965,6 +1171,11 @@ $upcoming_activities = [
             
             function nextSlide() {
                 currentSlide = (currentSlide + 1) % slides.length;
+                showSlide(currentSlide);
+            }
+            
+            function prevSlide() {
+                currentSlide = (currentSlide - 1 + slides.length) % slides.length;
                 showSlide(currentSlide);
             }
             
@@ -997,7 +1208,83 @@ $upcoming_activities = [
             
             // Progress bar animation
             progressBar.style.transition = `width ${slideDuration}ms linear`;
+            
+            // 键盘导航支持
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'ArrowLeft') {
+                    stopSlider();
+                    prevSlide();
+                    startSlider();
+                } else if (e.key === 'ArrowRight') {
+                    stopSlider();
+                    nextSlide();
+                    startSlider();
+                }
+            });
         });
+        
+        // 添加全局函数供箭头按钮使用
+        function nextSlide() {
+            const slides = document.querySelectorAll('.campaign-slide');
+            const dots = document.querySelectorAll('.slider-dot');
+            const progressBar = document.querySelector('.progress-bar');
+            
+            let currentSlide = 0;
+            slides.forEach((slide, index) => {
+                if (slide.classList.contains('active')) {
+                    currentSlide = index;
+                }
+            });
+            
+            currentSlide = (currentSlide + 1) % slides.length;
+            
+            // 手动更新轮播
+            slides.forEach(slide => {
+                slide.classList.remove('active');
+            });
+            dots.forEach(dot => {
+                dot.classList.remove('active');
+            });
+            
+            slides[currentSlide].classList.add('active');
+            dots[currentSlide].classList.add('active');
+            
+            // 重置进度条
+            progressBar.classList.remove('active');
+            void progressBar.offsetWidth;
+            progressBar.classList.add('active');
+        }
+        
+        function prevSlide() {
+            const slides = document.querySelectorAll('.campaign-slide');
+            const dots = document.querySelectorAll('.slider-dot');
+            const progressBar = document.querySelector('.progress-bar');
+            
+            let currentSlide = 0;
+            slides.forEach((slide, index) => {
+                if (slide.classList.contains('active')) {
+                    currentSlide = index;
+                }
+            });
+            
+            currentSlide = (currentSlide - 1 + slides.length) % slides.length;
+            
+            // 手动更新轮播
+            slides.forEach(slide => {
+                slide.classList.remove('active');
+            });
+            dots.forEach(dot => {
+                dot.classList.remove('active');
+            });
+            
+            slides[currentSlide].classList.add('active');
+            dots[currentSlide].classList.add('active');
+            
+            // 重置进度条
+            progressBar.classList.remove('active');
+            void progressBar.offsetWidth;
+            progressBar.classList.add('active');
+        }
         
         // Update time units every second
         function updateTime() {

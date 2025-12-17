@@ -1,24 +1,45 @@
 <?php
 include 'dataconnection.php';
 include 'header_function.php';
-include 'header_UI.php';
 
+// 添加筛选功能
+$category_filter = isset($_GET['category']) ? $_GET['category'] : 'all';
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 
+// 构建查询条件
+$where_conditions = ["Case_Status = 'Active'"];
+if ($category_filter !== 'all') {
+    $where_conditions[] = "Case_Category = '$category_filter'";
+}
+$where_clause = implode(' AND ', $where_conditions);
 
 // 分页逻辑
 $cases_per_page = 4; // 每页显示4个案例(2行)
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $offset = ($page - 1) * $cases_per_page;
 
 // 获取总案例数
-$count_query = "SELECT COUNT(*) as total FROM special_case WHERE Case_Status = 'active'";
+$count_query = "SELECT COUNT(*) as total FROM special_case WHERE $where_clause";
 $count_result = $conn->query($count_query);
 $total_cases = $count_result->fetch_assoc()['total'];
 $total_pages = ceil($total_cases / $cases_per_page);
 
 // 获取当前页的案例
-$query = "SELECT * FROM special_case WHERE Case_Status = 'active' ORDER BY created_at DESC LIMIT $cases_per_page OFFSET $offset";
+$query = "SELECT * FROM special_case WHERE $where_clause ORDER BY created_at DESC LIMIT $cases_per_page OFFSET $offset";
 $result = $conn->query($query);
+
+// 定义案例类别
+$categories = [
+    'medical' => ['name' => 'Medical Treatment', 'icon' => 'fas fa-heartbeat', 'color' => '#4CAF50'],
+    'disability' => ['name' => 'Disability Support', 'icon' => 'fas fa-wheelchair', 'color' => '#2196F3'],
+    'education' => ['name' => 'Education', 'icon' => 'fas fa-graduation-cap', 'color' => '#9C27B0'],
+    'emergency' => ['name' => 'Emergency Relief', 'icon' => 'fas fa-first-aid', 'color' => '#FF5722'],
+    'elderly' => ['name' => 'Elderly Care', 'icon' => 'fas fa-user-friends', 'color' => '#795548'],
+    'children' => ['name' => 'Children Support', 'icon' => 'fas fa-child', 'color' => '#FF9800'],
+    'livelihood' => ['name' => 'Livelihood', 'icon' => 'fas fa-briefcase', 'color' => '#607D8B'],
+    'other' => ['name' => 'Other Cases', 'icon' => 'fas fa-hands-helping', 'color' => '#00BCD4']
+];
+
+include 'header_UI.php';
 ?>
 
 <!DOCTYPE html>
@@ -26,241 +47,344 @@ $result = $conn->query($query);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Special Cases - Donation Platform</title>
+    <title>Special Cases - Love Bridge Foundation</title>
     <style>
         :root {
-            --primary: #F6B8B8;
-            --secondary: #FFF5E4;
-            --text: #4A4A4A;
-            --light-text: #777777;
+            --primary-red: #e53935;
+            --dark-red: #c62828;
+            --light-red: #ff5252;
+            --lighter-red: #ffcdd2;
             --white: #FFFFFF;
-            --shadow: rgba(0, 0, 0, 0.1);
+            --light-bg: #fef7f7;
+            --text: #212121;
+           
+            --shadow: rgba(229, 57, 53, 0.1);
+            --shadow-dark: rgba(0, 0, 0, 0.1);
             --progress-bg: #e0e0e0;
-            --progress-fill: #F6B8B8;
         }
         
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Arial', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
         body {
-            background-color: var(--secondary);
+            background-color: var(--light-bg);
             color: var(--text);
             line-height: 1.6;
         }
         
-        .header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: #434141;
-            padding: 6px 50px;
-            box-shadow: 0 2px 4px var(--shadow);
-        }
-        
-        .welcome-text {
-            font-size: 16px;
-            font-weight: bold;
-            color: white;
-        }
-        
-        .auth-buttons {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .auth-btn {
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        
-        .login-btn {
-            background-color: white;
-            color: black;
-            border: none;
-        }
-        
-        .login-btn:hover {
-            background-color: #938e8eff;
-        }
-        
-        .register-btn {
-            background-color: var(--text);
-            color: var(--white);
-            border: none;
-        }
-        
-        .register-btn:hover {
-            background-color: #333333;
-        }
-        
-        .header {
-            display: grid;
-            grid-template-columns: 1fr 2fr 1fr; 
-            align-items: center;
-            background-color: var(--primary);
-            padding: 20px 50px;
-            box-shadow: 0 2px 6px var(--shadow);
-            gap: 20px;
-        }
-        
-        .logo {
-            font-weight: bold;
-            font-size: 36px;
-            color: var(--text);
-            text-align: left; 
-            grid-column: 1;
-        }
-        
-        .header-right { 
-            grid-column: 2;
-            display: flex;
-            align-items: center;
-            justify-content: center; 
-            gap: 15px;
-        }
-
-        .function-links {
-            display: flex;
-            gap: 15px;
-        }
-        
-        .function-links a {
-            text-decoration: none;
-            font-size: 18px;
-            color: var(--text);
-            font-weight: bold;
-            transition: opacity 0.3s;
-            white-space: nowrap;
-        }
-        
-        .function-links a:hover {
-            opacity: 0.8;
-        }
-
-        .header-center { 
-            grid-column: 3;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end; 
-            gap: 15px;
-        }
-        
-        .search-box {
-            display: flex;
-            align-items: center;
-            background-color: var(--white);
-            border-radius: 4px;
-            padding: 4px 8px;
-            width: auto; 
-            max-width: 250px;
-        }
-        
-        .search-box input {
-            border: none;
-            background: transparent;
-            padding: 6px;
-            width: 100%;
-            outline: none;
-        }
-        
-        .donate-btn {
-            background-color: #e74c3c;
-            color: white;
-            border: none;
-            padding: 6px 18px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s;
-            white-space: nowrap;
-            text-decoration: none;
-            text-align: center;
-            display: inline-block;
-        }
-
-        .donate-btn:hover {
-            background-color: #c0392b;
-        }
-        
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .user-name {
-            font-weight: bold;
-        }
-        
+        /* Main Container */
         .case-container {
-            padding: 30px;
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        /* Page Header */
+        .page-header {
+            text-align: center;
+            margin-bottom: 50px;
+            position: relative;
         }
         
         .page-title {
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 36px;
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--dark-red);
+            position: relative;
+            display: inline-block;
+        }
+        
+        .page-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-red) 0%, var(--light-red) 100%);
+            border-radius: 2px;
         }
         
         .page-description {
-            text-align: center;
-            margin-bottom: 40px;
-            font-size: 18px;
+            font-size: 20px;
             max-width: 800px;
-            margin-left: auto;
-            margin-right: auto;
+            margin: 0 auto 30px;
+            color: #8a8686;
         }
         
+        /* Stats */
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-box {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 20px var(--shadow);
+            border: 1px solid var(--lighter-red);
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-box:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-number {
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--primary-red);
+            display: block;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            font-size: 16px;
+            color: #8a8686;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        /* Categories Grid */
+        .categories-container {
+            margin-bottom: 40px;
+        }
+        
+        .categories-title {
+            font-size: 24px;
+            color: var(--primary-red);
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .categories-title i {
+            font-size: 28px;
+        }
+        
+        .categories-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+        }
+        
+        .category-item {
+            background: var(--white);
+            border: 2px solid var(--lighter-red);
+            border-radius: 10px;
+            padding: 20px 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: var(--text);
+            display: block;
+        }
+        
+        .category-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px var(--shadow);
+            border-color: var(--primary-red);
+        }
+        
+        .category-item.active {
+            background: var(--primary-red);
+            color: white;
+            border-color: var(--primary-red);
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(229, 57, 53, 0.3);
+        }
+        
+        .category-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        .category-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        /* Filters */
+        .filters-container {
+            background: var(--white);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 5px 20px var(--shadow);
+            border: 1px solid var(--lighter-red);
+        }
+        
+        .filters-title {
+            font-size: 24px;
+            color: var(--primary-red);
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .filters-title i {
+            font-size: 28px;
+        }
+        
+        .filters {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-btn {
+            background: var(--white);
+            border: 2px solid var(--primary-red);
+            color: var(--primary-red);
+            padding: 12px 28px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .filter-btn i {
+            font-size: 18px;
+        }
+        
+        .filter-btn.active {
+            background: var(--primary-red);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(229, 57, 53, 0.3);
+        }
+        
+        .filter-btn:hover:not(.active) {
+            background: var(--lighter-red);
+            transform: translateY(-2px);
+        }
+        
+        /* Cases Grid */
         .cases-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 30px;
-            margin-bottom: 40px;
+            margin-bottom: 50px;
         }
         
+        /* Case Card */
         .case-card {
-            background-color: var(--white);
-            border-radius: 10px;
-            box-shadow: 0 4px 12px var(--shadow);
+            background: var(--white);
+            border-radius: 15px;
             overflow: hidden;
-            transition: transform 0.3s;
+            box-shadow: 0 8px 25px var(--shadow);
+            transition: all 0.3s ease;
+            border: 1px solid var(--lighter-red);
             position: relative;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
         }
         
         .case-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-10px);
+            box-shadow: 0 15px 35px rgba(229, 57, 53, 0.15);
+        }
+        
+        .case-image-container {
+            position: relative;
+            height: 250px;
+            overflow: hidden;
         }
         
         .case-image {
             width: 100%;
-            height: 200px;
+            height: 100%;
             object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+        
+        .case-card:hover .case-image {
+            transform: scale(1.05);
+        }
+        
+        .case-badges {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .case-badge {
+            padding: 6px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            color: white;
+        }
+        
+        .badge-urgent {
+            background: #ff5252;
         }
         
         .case-content {
-            padding: 20px;
+            padding: 25px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .case-header {
+            margin-bottom: 15px;
         }
         
         .case-title {
-            font-size: 20px;
-            margin-bottom: 10px;
+            font-size: 24px;
+            font-weight: 700;
             color: var(--text);
+            margin-bottom: 10px;
+            line-height: 1.3;
+        }
+        
+        .case-meta {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: #8a8686;
+            font-size: 14px;
+        }
+        
+        .case-meta i {
+            color: var(--primary-red);
+        }
+        
+        .case-description-container {
+            margin-bottom: 20px;
+            flex: 1;
         }
         
         .case-description {
-            margin-bottom: 15px;
-            color: var(--light-text);
+            color: #8a8686;
+            font-size: 16px;
+            line-height: 1.6;
             display: -webkit-box;
             -webkit-line-clamp: 3;
             -webkit-box-orient: vertical;
@@ -277,25 +401,34 @@ $result = $conn->query($query);
         .show-more-btn {
             background: none;
             border: none;
-            color: var(--primary);
+            color: var(--primary-red);
             cursor: pointer;
-            font-weight: bold;
-            margin-top: 5px;
+            font-weight: 600;
+            margin-top: 10px;
             padding: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 15px;
         }
         
         .show-more-btn:hover {
             text-decoration: underline;
         }
         
-        .progress-container {
-            margin-bottom: 15px;
+        .show-more-btn i {
+            font-size: 12px;
+        }
+        
+        /* Progress Bar */
+        .progress-section {
+            margin-bottom: 25px;
         }
         
         .progress-info {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 5px;
+            margin-bottom: 10px;
             font-size: 14px;
         }
         
@@ -305,140 +438,377 @@ $result = $conn->query($query);
             border-radius: 5px;
             overflow: hidden;
             margin-bottom: 5px;
+            position: relative;
         }
         
         .progress-fill {
             height: 100%;
-            background-color: var(--progress-fill);
+            background: linear-gradient(90deg, var(--light-red) 0%, var(--primary-red) 100%);
             border-radius: 5px;
-            transition: width 0.5s ease-in-out;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(255, 255, 255, 0.3) 50%, 
+                transparent 100%);
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
         }
         
         .progress-percentage {
             text-align: right;
-            font-size: 12px;
-            color: var(--light-text);
+            font-size: 14px;
+            color: var(--primary-red);
+            font-weight: 600;
         }
         
         .case-details {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 15px;
-            font-size: 14px;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--lighter-red);
         }
         
-        .case-amount {
-            font-weight: bold;
-            color: var(--primary);
-        }
-        
-        .case-deadline {
-            color: var(--light-text);
-        }
-        
-        .btn {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: var(--primary);
-            color: var(--text);
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.3s, transform 0.2s;
-            text-decoration: none;
+        .detail-item {
             text-align: center;
         }
         
-        .btn:hover {
-            background-color: #f0a8a8;
-            transform: translateY(-2px);
+        .detail-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary-red);
+            display: block;
         }
         
-        .btn:active {
+        .detail-label {
+            font-size: 13px;
+            color: #8a8686;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        /* Donate Button */
+        .case-actions {
+            margin-top: auto;
+        }
+        
+        .btn-donate {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background: var(--primary-red);
+            color: var(--white);
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .btn-donate:hover {
+            background: var(--dark-red);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(229, 57, 53, 0.3);
+        }
+        
+        .btn-donate:active {
             transform: translateY(0);
         }
         
-        .btn-full {
-            display: block;
-            width: 100%;
+        .btn-donate i {
+            font-size: 20px;
         }
         
+        /* No Cases */
         .no-cases {
-            text-align: center;
-            padding: 40px;
             grid-column: 1 / -1;
+            text-align: center;
+            padding: 80px 20px;
+            background: var(--white);
+            border-radius: 15px;
+            box-shadow: 0 5px 20px var(--shadow);
         }
         
-        .urgent-tag {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background-color: #ff5252;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            z-index: 1;
+        .no-cases i {
+            font-size: 60px;
+            color: var(--lighter-red);
+            margin-bottom: 20px;
         }
         
+        .no-cases h3 {
+            font-size: 28px;
+            color: var(--text);
+            margin-bottom: 10px;
+        }
+        
+        .no-cases p {
+            color: #8a8686;
+            font-size: 18px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        /* Pagination */
         .pagination {
             display: flex;
             justify-content: center;
             align-items: center;
-            margin-top: 30px;
             gap: 10px;
+            margin-top: 40px;
         }
         
         .pagination a, .pagination span {
-            padding: 8px 16px;
+            padding: 10px 18px;
             text-decoration: none;
-            border: 1px solid #ddd;
-            color: var(--text);
-            border-radius: 4px;
-            transition: background-color 0.3s;
+            border: 2px solid var(--primary-red);
+            color: var(--primary-red);
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
         }
         
         .pagination a:hover {
-            background-color: var(--primary);
+            background: var(--primary-red);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(229, 57, 53, 0.3);
         }
         
         .pagination .current {
-            background-color: var(--primary);
+            background: var(--primary-red);
             color: white;
-            border: 1px solid var(--primary);
+            border-color: var(--primary-red);
+        }
+        
+        .pagination .disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .case-container {
+                padding: 30px 20px;
+            }
+            
+            .page-title {
+                font-size: 42px;
+            }
+        }
+        
+        @media (max-width: 992px) {
+            .cases-grid {
+                grid-template-columns: 1fr;
+                gap: 25px;
+            }
+            
+            .case-image-container {
+                height: 220px;
+            }
+            
+            .page-title {
+                font-size: 36px;
+            }
+            
+            .page-description {
+                font-size: 18px;
+                padding: 0 20px;
+            }
+            
+            .categories-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
         }
         
         @media (max-width: 768px) {
-            .header {
-                padding: 15px 20px;
-                flex-direction: column;
+            .stats-container {
+                grid-template-columns: repeat(2, 1fr);
                 gap: 15px;
             }
             
-            .logo {
+            .stat-box {
+                padding: 20px 15px;
+            }
+            
+            .stat-number {
                 font-size: 28px;
             }
             
-            .case-container {
-                padding: 15px;
+            .filters {
+                justify-content: center;
             }
             
-            .cases-grid {
+            .filter-btn {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            
+            .case-title {
+                font-size: 22px;
+            }
+            
+            .case-content {
+                padding: 20px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .page-header {
+                margin-bottom: 30px;
+            }
+            
+            .page-title {
+                font-size: 32px;
+            }
+            
+            .stats-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-box {
+                padding: 25px;
+            }
+            
+            .case-image-container {
+                height: 200px;
+            }
+            
+            .case-badges {
+                top: 10px;
+                right: 10px;
+            }
+            
+            .case-badge {
+                padding: 5px 12px;
+                font-size: 11px;
+            }
+            
+            .pagination a, .pagination span {
+                padding: 8px 14px;
+                font-size: 14px;
+            }
+            
+            .categories-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .page-title {
+                font-size: 28px;
+            }
+            
+            .page-description {
+                font-size: 16px;
+            }
+            
+            .filters-container {
+                padding: 20px;
+            }
+            
+            .case-details {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .categories-grid {
                 grid-template-columns: 1fr;
             }
         }
     </style>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <!-- Your header content here -->
 
     <div class="case-container">
-        <h1 class="page-title">Special Cases</h1>
-        <p class="page-description">These are urgent cases that need immediate support. Your donation can make a significant difference in someone's life today.</p>
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1 class="page-title">Special Cases</h1>
+            <p class="page-description">These are urgent cases that need immediate support. Your donation can make a significant difference in someone's life today.</p>
+        </div>
         
+        <!-- Stats Section -->
+        <div class="stats-container">
+            <?php 
+            // 获取统计数据
+            $total_query = "SELECT COUNT(*) as total, SUM(Raised_Amount) as total_raised FROM special_case WHERE Case_Status = 'Active'";
+            $total_result = $conn->query($total_query);
+            $stats = $total_result->fetch_assoc();
+            
+            $urgent_count_query = "SELECT COUNT(*) as count FROM special_case WHERE Case_Status = 'Active' AND Urgency = 'high'";
+            $urgent_result = $conn->query($urgent_count_query);
+            $urgent_count = $urgent_result->fetch_assoc()['count'];
+            
+            $total_donors_query = "SELECT SUM(Donor_Count) as total_donors FROM special_case WHERE Case_Status = 'Active'";
+            $donors_result = $conn->query($total_donors_query);
+            $total_donors = $donors_result->fetch_assoc()['total_donors'] ?? 0;
+            ?>
+            
+            <div class="stat-box">
+                <span class="stat-number"><?php echo $total_cases; ?></span>
+                <span class="stat-label">Active Cases</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-number">RM <?php echo number_format($stats['total_raised'] ?? 0, 0); ?></span>
+                <span class="stat-label">Total Raised</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-number"><?php echo $urgent_count; ?></span>
+                <span class="stat-label">Urgent Cases</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-number"><?php echo $total_donors; ?></span>
+                <span class="stat-label">Total Donors</span>
+            </div>
+        </div>
+        
+        <!-- Categories Grid -->
+        <div class="categories-container">
+            <h2 class="categories-title">
+                <i class="fas fa-list-alt"></i> Case Categories
+            </h2>
+            <div class="categories-grid">
+                <a href="?category=all&page=1" class="category-item <?php echo $category_filter == 'all' ? 'active' : ''; ?>">
+                    <i class="fas fa-layer-group category-icon"></i>
+                    <span class="category-name">All Cases</span>
+                </a>
+                <?php foreach($categories as $key => $category): ?>
+                    <a href="?category=<?php echo $key; ?>&page=1" class="category-item <?php echo $category_filter == $key ? 'active' : ''; ?>" style="border-color: <?php echo $category['color']; ?>">
+                        <i class="<?php echo $category['icon']; ?> category-icon" style="color: <?php echo $category['color']; ?>"></i>
+                        <span class="category-name"><?php echo $category['name']; ?></span>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        
+        <!-- Cases Grid -->
         <div class="cases-grid">
             <?php if ($result->num_rows > 0): ?>
                 <?php while($case = $result->fetch_assoc()): 
@@ -449,31 +819,71 @@ $result = $conn->query($query);
                     $progress = ($raised / $target) * 100;
                     $progress = min($progress, 100); // 确保不超过100%
                     
+                    // 确定案例类型和紧急状态
+                    $category = isset($case['Case_Category']) ? $case['Case_Category'] : 'medical';
                     $is_urgent = isset($case['Urgency']) && $case['Urgency'] === 'high';
+                    
+                    // 获取类别信息
+                    $category_info = isset($categories[$category]) ? $categories[$category] : $categories['other'];
+                    $category_name = $category_info['name'];
+                    $category_color = $category_info['color'];
+                    $category_icon = $category_info['icon'];
+                    
+                    // 获取捐助者数量
                     $donor_count = isset($case['Donor_Count']) ? $case['Donor_Count'] : 0;
+                    
+                    // 设置默认图片
+                    $default_image = 'images/case-default.jpg';
+                    if (isset($case['Case_Image']) && !empty($case['Case_Image'])) {
+                        $image_path = $case['Case_Image'];
+                    } else {
+                        $image_path = $default_image;
+                    }
                 ?>
                     <div class="case-card">
-                        <?php if ($is_urgent): ?>
-                            <div class="urgent-tag">URGENT</div>
-                        <?php endif; ?>
+                        <!-- Case Image -->
+                        <div class="case-image-container">
+                            <!--<img src="<?php echo htmlspecialchars($image_path); ?>" 
+                                 alt="<?php echo htmlspecialchars($case['Case_Title']); ?>" 
+                                 class="case-image"
+                                 onerror="this.src='<?php echo $default_image; ?>'">-->
+                            
+                            <!-- Badges -->
+                            <div class="case-badges">
+                                <span class="case-badge" style="background: <?php echo $category_color; ?>">
+                                    <?php echo $category_name; ?>
+                                </span>
+                                <?php if ($is_urgent): ?>
+                                    <span class="case-badge badge-urgent">URGENT</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                         
-                        <img src="<?php echo !empty($case['image']) ? htmlspecialchars($case['image']) : 'picture/orphan.jpg'; ?>" 
-                             alt="<?php echo htmlspecialchars($case['Case_Title']); ?>" 
-                             class="case-image">
-                             
+                        <!-- Case Content -->
                         <div class="case-content">
-                            <h3 class="case-title"><?php echo htmlspecialchars($case['Case_Title']); ?></h3>
+                            <!-- Header -->
+                            <div class="case-header">
+                                <h3 class="case-title"><?php echo htmlspecialchars($case['Case_Title']); ?></h3>
+                                <div class="case-meta">
+                                    <span><i class="far fa-calendar"></i> Posted: <?php echo date('M d, Y', strtotime($case['Created_At'])); ?></span>
+                                    <span><i class="<?php echo $category_icon; ?>"></i> <?php echo $category_name; ?></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Description -->
                             <div class="case-description-container">
                                 <p class="case-description" id="desc-<?php echo $case['Case_ID']; ?>">
                                     <?php echo htmlspecialchars($case['Case_Description']); ?>
                                 </p>
                                 <?php if (strlen($case['Case_Description']) > 150): ?>
-                                    <button class="show-more-btn" onclick="toggleDescription(<?php echo $case['Case_ID']; ?>)">Show more</button>
+                                    <button class="show-more-btn" onclick="toggleDescription(<?php echo $case['Case_ID']; ?>)">
+                                        <i class="fas fa-chevron-down"></i> Show more
+                                    </button>
                                 <?php endif; ?>
                             </div>
                             
-                            <!-- 进度条部分 -->
-                            <div class="progress-container">
+                            <!-- Progress Section -->
+                            <div class="progress-section">
                                 <div class="progress-info">
                                     <span>Raised: RM <?php echo number_format($raised, 2); ?></span>
                                     <span>Goal: RM <?php echo number_format($target, 2); ?></span>
@@ -484,61 +894,113 @@ $result = $conn->query($query);
                                 <div class="progress-percentage">
                                     <?php echo number_format($progress, 1); ?>% funded
                                 </div>
-                                <div class="progress-info">
-                                    <span><?php echo $donor_count; ?> donors</span>
-                                    <span class="case-deadline">
-                                        Deadline: <?php echo date('M j, Y', strtotime($case['Case_Deadline'])); ?>
-                                    </span>
+                            </div>
+                            
+                            <!-- Details -->
+                            <div class="case-details">
+                                <div class="detail-item">
+                                    <span class="detail-value"><?php echo $donor_count; ?></span>
+                                    <span class="detail-label">Donors</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-value"><?php echo isset($case['Case_Deadline']) ? date('M j', strtotime($case['Case_Deadline'])) : 'Ongoing'; ?></span>
+                                    <span class="detail-label">Deadline</span>
                                 </div>
                             </div>
                             
-                            <a href="S_C_Payment_Page.php?case_id=<?php echo $case['Case_ID']; ?>" class="btn btn-full">Donate Now</a>
+                            <!-- Donate Button -->
+                            <div class="case-actions">
+                                <a href="S_C_Payment_Page.php?case_id=<?php echo $case['Case_ID']; ?>" class="btn-donate">
+                                    <i class="fas fa-heart"></i> Donate Now
+                                </a>
+                            </div>
                         </div>
                     </div>
                 <?php endwhile; ?>
             <?php else: ?>
                 <div class="no-cases">
-                    <h3>No special cases at the moment</h3>
-                    <p>All urgent cases have been resolved. Check back later for new cases.</p>
+                    <i class="fas fa-search"></i>
+                    <h3>No cases found</h3>
+                    <p><?php echo $category_filter !== 'all' ? "No cases in this category at the moment." : "No special cases at the moment." ?></p>
+                    <?php if ($category_filter !== 'all'): ?>
+                        <p style="margin-top: 10px;">Try viewing <a href="?category=all&page=1" style="color: var(--primary-red);">all cases</a> instead.</p>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
         </div>
         
-        <!-- 分页 -->
+        <!-- Pagination -->
         <?php if ($total_pages > 1): ?>
             <div class="pagination">
                 <?php if ($page > 1): ?>
-                    <a href="?page=<?php echo $page - 1; ?>">&laquo; Previous</a>
+                    <a href="?category=<?php echo $category_filter; ?>&page=<?php echo $page - 1; ?>">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </a>
+                <?php else: ?>
+                    <span class="disabled"><i class="fas fa-chevron-left"></i> Previous</span>
                 <?php endif; ?>
                 
-                <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                <?php 
+                // 显示分页链接
+                $start_page = max(1, $page - 2);
+                $end_page = min($total_pages, $start_page + 4);
+                $start_page = max(1, $end_page - 4);
+                
+                for ($i = $start_page; $i <= $end_page; $i++):
+                ?>
                     <?php if ($i == $page): ?>
                         <span class="current"><?php echo $i; ?></span>
                     <?php else: ?>
-                        <a href="?page=<?php echo $i; ?>"><?php echo $i; ?></a>
+                        <a href="?category=<?php echo $category_filter; ?>&page=<?php echo $i; ?>"><?php echo $i; ?></a>
                     <?php endif; ?>
                 <?php endfor; ?>
                 
                 <?php if ($page < $total_pages): ?>
-                    <a href="?page=<?php echo $page + 1; ?>">Next &raquo;</a>
+                    <a href="?category=<?php echo $category_filter; ?>&page=<?php echo $page + 1; ?>">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </a>
+                <?php else: ?>
+                    <span class="disabled">Next <i class="fas fa-chevron-right"></i></span>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
     </div>
+    
+    <?php include 'footer.php'; ?>
 
     <script>
+        // Toggle description expand/collapse
         function toggleDescription(caseId) {
             const description = document.getElementById(`desc-${caseId}`);
             const button = description.nextElementSibling;
             
             if (description.classList.contains('expanded')) {
                 description.classList.remove('expanded');
-                button.textContent = 'Show more';
+                button.innerHTML = '<i class="fas fa-chevron-down"></i> Show more';
             } else {
                 description.classList.add('expanded');
-                button.textContent = 'Show less';
+                button.innerHTML = '<i class="fas fa-chevron-up"></i> Show less';
             }
         }
+        
+        // Animate progress bars on scroll
+        function animateProgressBars() {
+            const progressBars = document.querySelectorAll('.progress-fill');
+            
+            progressBars.forEach(bar => {
+                const rect = bar.getBoundingClientRect();
+                if (rect.top < window.innerHeight - 100) {
+                    // Add animation class when in viewport
+                    bar.style.transition = 'width 1s cubic-bezier(0.4, 0, 0.2, 1)';
+                }
+            });
+        }
+        
+        // Initial animation
+        document.addEventListener('DOMContentLoaded', animateProgressBars);
+        
+        // Animate on scroll
+        window.addEventListener('scroll', animateProgressBars);
     </script>
 </body>
 </html>

@@ -1,20 +1,15 @@
 <?php
 include 'dataconnection.php';
 include 'header_function.php';
-include 'header_UI.php';
 
-$logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
-
-
-$stories = [];
-$query = "SELECT * FROM story ORDER BY Story_Date DESC LIMIT 10";
+// 获取所有故事，按日期倒序排列（最新的在前）
+$query = "SELECT * FROM story ORDER BY Story_Date DESC";
 $result = $conn->query($query);
 
-if ($result && $result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        $stories[] = $row;
-    }
-}
+// 获取故事总数
+$totalStories = $result->num_rows;
+
+include 'header_UI.php';
 ?>
 
 <!DOCTYPE html>
@@ -22,334 +17,517 @@ if ($result && $result->num_rows > 0) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>News & Stories - Donor Platform</title>
-    <link rel="stylesheet" href="donor_design.css">
+    <title>News & Stories - Love Bridge Foundation</title>
     <style>
-  :root {
-            --primary: #F6B8B8;
-            --secondary: #FFF5E4;
-            --text: #4A4A4A;
-            --light-text: #777777;
-            --white: #FFFFFF;
-            --shadow: rgba(0, 0, 0, 0.1);
+        :root {
+            --primary-red: #e53935;
+            --dark-red: #c62828;
+            --light-red: #ff5252;
+            --lighter-red: #ffcdd2;
+            --white: #ffffff;
+            --light-bg: #fef7f7;
+            --text: #212121;
+            
+            --shadow: rgba(229, 57, 53, 0.1);
         }
         
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Arial', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
         body {
-            background-color: var(--secondary);
+            background-color: var(--light-bg);
             color: var(--text);
             line-height: 1.6;
         }
         
-        .header-top {
+        /* Full Page Layout */
+        .stories-fullpage {
+            min-height: 100vh;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: #434141;
-            padding: 6px 50px;
-            box-shadow: 0 2px 4px var(--shadow);
+            flex-direction: column;
         }
         
-        .welcome-text {
-            font-size: 16px;
-            font-weight: bold;
+        /* Header Styles */
+        .stories-header {
+            background: linear-gradient(135deg, var(--primary-red) 0%, var(--dark-red) 100%);
             color: white;
-        }
-        
-        .auth-buttons {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .auth-btn {
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        
-        .login-btn {
-            background-color: white;
-            color: black;
-            border: none;
-        }
-        
-        .login-btn:hover {
-            background-color: #938e8eff;
-        }
-        
-        .register-btn {
-            background-color: var(--text);
-            color: var(--white);
-            border: none;
-        }
-        
-        .register-btn:hover {
-            background-color: #333333;
-        }
-        
-        .header {
-            display: grid;
-            grid-template-columns: 1fr 2fr 1fr; 
-            align-items: center;
-            background-color: var(--primary);
-            padding: 20px 50px;
-            box-shadow: 0 2px 6px var(--shadow);
-            gap: 20px;
-        }
-        
-        .logo {
-            font-weight: bold;
-            font-size: 36px;
-            color: var(--text);
-            text-align: left; 
-            grid-column: 1;
-        }
-        
-        .header-right { 
-            grid-column: 2;
-            display: flex;
-            align-items: center;
-            justify-content: center; 
-            gap: 15px;
-        }
-
-        .function-links {
-            display: flex;
-            gap: 15px;
-        }
-        
-        .function-links a {
-            text-decoration: none;
-            font-size: 18px;
-            color: var(--text);
-            font-weight: bold;
-            transition: opacity 0.3s;
-            white-space: nowrap;
-        }
-        
-        .function-links a:hover {
-            opacity: 0.8;
-        }
-
-        .header-center { 
-            grid-column: 3;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end; 
-            gap: 15px;
-        }
-        
-        .search-box {
-            display: flex;
-            align-items: center;
-            background-color: var(--white);
-            border-radius: 4px;
-            padding: 4px 8px;
-            width: auto; 
-            max-width: 250px;
-        }
-        
-        .search-box input {
-            border: none;
-            background: transparent;
-            padding: 6px;
-            width: 100%;
-            outline: none;
-        }
-        
-        .donate-btn {
-            background-color: #e74c3c;
-            color: white;
-            border: none;
-            padding: 6px 18px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s;
-            white-space: nowrap;
-            text-decoration: none;
+            padding: 80px 0 60px;
             text-align: center;
-            display: inline-block;
+            position: relative;
+            overflow: hidden;
+            flex-shrink: 0;
         }
-
-        .donate-btn:hover {
-            background-color: #c0392b;
-        }
-        .page-container {
-            padding: 30px;
-            max-width: 1200px;
-            margin: 0 auto;
+        
+        .stories-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><path d="M50,0 C77.6,0 100,22.4 100,50 C100,77.6 77.6,100 50,100 C22.4,100 0,77.6 0,50 C0,22.4 22.4,0 50,0 Z" fill="white" fill-opacity="0.05"/></svg>');
+            background-size: 120px;
+            opacity: 0.1;
         }
         
         .page-title {
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 32px;
-            color: var(--text);
+            font-size: 56px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            position: relative;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
         }
         
+        .page-description {
+            font-size: 22px;
+            max-width: 800px;
+            margin: 0 auto;
+            opacity: 0.9;
+            position: relative;
+            line-height: 1.6;
+        }
+        
+        /* Main Container */
+        .stories-container {
+            flex: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 60px 40px;
+            width: 100%;
+        }
+        
+        /* Story Grid */
         .stories-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 25px;
-            margin-bottom: 40px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
         }
         
+        /* Story Card */
         .story-card {
-            background-color: var(--white);
-            border-radius: 10px;
-            box-shadow: 0 4px 12px var(--shadow);
+            background: var(--white);
+            border-radius: 20px;
             overflow: hidden;
-            transition: transform 0.3s;
+            box-shadow: 0 10px 30px var(--shadow);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid var(--lighter-red);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
         
         .story-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(229, 57, 53, 0.2);
+        }
+        
+        .story-image-container {
+            position: relative;
+            height: 300px;
+            overflow: hidden;
         }
         
         .story-image {
             width: 100%;
-            height: 200px;
+            height: 100%;
             object-fit: cover;
+            transition: transform 0.6s ease;
+        }
+        
+        .story-card:hover .story-image {
+            transform: scale(1.05);
+        }
+        
+        .story-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: var(--primary-red);
+            color: white;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
         }
         
         .story-content {
-            padding: 20px;
+            padding: 30px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .story-header {
+            margin-bottom: 20px;
+        }
+        
+        .story-meta {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 12px;
+            color: #3b3b3b;
+            font-size: 14px;
+        }
+        
+        .story-meta i {
+            color: var(--primary-red);
         }
         
         .story-title {
-            font-size: 20px;
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text);
             margin-bottom: 10px;
-            color: var(--text);
+            line-height: 1.3;
         }
         
-        .story-date {
-            color: var(--light-text);
+        .story-author {
+            color: var(--primary-red);
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .story-author i {
+            font-size: 16px;
+        }
+        
+        .story-description-container {
+            margin-bottom: 20px;
+            flex: 1;
+        }
+        
+        .story-description {
+            color: #3b3b3b;
+            font-size: 17px;
+            line-height: 1.8;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .story-description.expanded {
+            -webkit-line-clamp: unset;
+            overflow: visible;
+            display: block;
+        }
+        
+        .show-more-btn {
+            background: none;
+            border: none;
+            color: var(--primary-red);
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 15px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .show-more-btn:hover {
+            transform: translateX(5px);
+        }
+        
+        .show-more-btn i {
             font-size: 14px;
-            margin-bottom: 15px;
+            transition: transform 0.3s ease;
         }
         
-        .story-excerpt {
-            margin-bottom: 15px;
-            color: var(--text);
+        .story-footer {
+            margin-top: auto;
+            padding-top: 20px;
+            border-top: 1px solid var(--lighter-red);
         }
         
-        .read-more {
-            color: var(--primary);
-            text-decoration: none;
-            font-weight: bold;
+        .story-category {
             display: inline-block;
+            padding: 6px 15px;
+            background: var(--lighter-red);
+            color: var(--primary-red);
+            border-radius: 15px;
+            font-size: 13px;
+            font-weight: 600;
         }
         
-        .read-more:hover {
-            text-decoration: underline;
-        }
-        
+        /* Empty State */
         .no-stories {
             text-align: center;
-            padding: 40px;
-            background-color: var(--white);
-            border-radius: 10px;
-            box-shadow: 0 4px 12px var(--shadow);
+            padding: 100px 20px;
+            background: var(--white);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px var(--shadow);
+            grid-column: 1 / -1;
         }
         
-        @media (max-width: 1024px) {
-            .header {
-                grid-template-columns: 1fr 1fr; 
-                grid-template-rows: auto auto; 
-                gap: 15px;
+        .no-stories i {
+            font-size: 80px;
+            color: var(--lighter-red);
+            margin-bottom: 30px;
+        }
+        
+        .no-stories h3 {
+            font-size: 32px;
+            color: var(--text);
+            margin-bottom: 15px;
+        }
+        
+        .no-stories p {
+            color: #3b3b3b;
+            font-size: 18px;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .stories-container {
+                padding: 50px 30px;
             }
             
-            .logo { 
-                grid-column: 1;
-                grid-row: 1;
-                text-align: left;
+            .page-title {
+                font-size: 48px;
             }
             
-            .header-right { 
-                grid-column: 2;
-                grid-row: 1;
-                justify-content: flex-end; 
+            .story-title {
+                font-size: 24px;
             }
-
-            .header-center { 
-                grid-column: 1 / span 2;
-                grid-row: 2;
-                justify-content: center; 
+        }
+        
+        @media (max-width: 992px) {
+            .stories-grid {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+            
+            .page-title {
+                font-size: 42px;
+            }
+            
+            .page-description {
+                font-size: 20px;
+                padding: 0 20px;
+            }
+            
+            .story-image-container {
+                height: 250px;
             }
         }
         
         @media (max-width: 768px) {
-            .header {
-                grid-template-columns: 1fr;
-                grid-template-rows: auto auto auto;
+            .stories-header {
+                padding: 60px 0 40px;
             }
             
-            .header-top, .header {
-                padding: 15px 20px;
+            .stories-container {
+                padding: 40px 20px;
             }
             
-            .logo { 
-                grid-row: 1; 
-                text-align: center;
+            .page-title {
+                font-size: 36px;
             }
             
-            .header-right { 
-                grid-row: 2; 
-                justify-content: center;
+            .story-content {
+                padding: 25px;
             }
-
-            .header-center { 
-                grid-row: 3; 
+            
+            .story-title {
+                font-size: 22px;
+            }
+            
+            .story-description {
+                font-size: 16px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .page-title {
+                font-size: 32px;
+            }
+            
+            .page-description {
+                font-size: 18px;
+            }
+            
+            .story-image-container {
+                height: 200px;
+            }
+            
+            .story-meta {
                 flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .stories-header {
+                padding: 50px 0 30px;
             }
             
-            .page-container {
-                padding: 15px;
+            .page-title {
+                font-size: 28px;
             }
             
-            .stories-grid {
-                grid-template-columns: 1fr;
+            .stories-container {
+                padding: 30px 15px;
+            }
+            
+            .story-content {
+                padding: 20px;
+            }
+            
+            .story-description {
+                font-size: 15px;
             }
         }
     </style>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-   
-    <div class="page-container">
-        <h1 class="page-title">News & Stories</h1>
-        
-        <?php if (!empty($stories)): ?>
-            <div class="stories-grid">
-                <?php foreach ($stories as $story): ?>
-                    <div class="story-card">
+    <div class="stories-fullpage">
+        <!-- Stories Header -->
+        <div class="stories-header">
+            <h1 class="page-title">News & Stories</h1>
+            <p class="page-description">Discover inspiring stories of hope, resilience, and transformation from our community. Each story represents a life touched by generosity.</p>
+        </div>
 
-                        <img src="<?php echo htmlspecialchars($story['Image_URL']); ?>" alt="<?php echo htmlspecialchars($story['Story_Title']); ?>" class="story-image">
+        <!-- Main Content -->
+        <div class="stories-container">
+            <div class="stories-grid">
+                <?php if ($totalStories > 0): 
+                    while($story = $result->fetch_assoc()): 
+                        $storyDate = date('F d, Y', strtotime($story['Story_Date']));
+                        $imagePath = !empty($story['Story_Image']) ? $story['Story_Image'] : 'images/story-default.jpg';
+                        $title = !empty($story['Story_Title']) ? $story['Story_Title'] : "Story #" . $story['Story_ID'];
+                        $author = !empty($story['Story_Author']) ? $story['Story_Author'] : "Anonymous";
+                        $category = !empty($story['Story_Category']) ? $story['Story_Category'] : "General";
+                        
+                        // 检查描述长度
+                        $description = $story['Donor_Description'];
+                        $descriptionLength = strlen($description);
+                        $hasLongDescription = $descriptionLength > 200;
+                ?>
+                    <div class="story-card">
+                        <!-- Story Image -->
+                        <div class="story-image-container">
+                            <img src="<?php echo $imagePath; ?>" 
+                                 alt="<?php echo htmlspecialchars($title); ?>" 
+                                 class="story-image"
+                                 onerror="this.src='images/story-default.jpg'">
+                            <span class="story-badge"><?php echo htmlspecialchars($category); ?></span>
+                        </div>
+                        
+                        <!-- Story Content -->
                         <div class="story-content">
-                            <h2 class="story-title"><?php echo htmlspecialchars($story['Story_Title']); ?></h2>
-                            <div class="story-date"><?php echo date('F j, Y', strtotime($story['Story_Date'])); ?></div>
-                            <p class="story-excerpt"><?php echo htmlspecialchars(substr($story['Donor_Description'], 0, 150)); ?>...</p>
-                            <a href="story_detail.php?id=<?php echo $story['Story_ID']; ?>" class="read-more">Read More</a>
+                            <!-- Story Header -->
+                            <div class="story-header">
+                                <div class="story-meta">
+                                    <span><i class="far fa-calendar"></i> <?php echo $storyDate; ?></span>
+                                    <span><i class="far fa-clock"></i> <?php echo ceil($descriptionLength / 1000); ?> min read</span>
+                                </div>
+                                <h3 class="story-title"><?php echo htmlspecialchars($title); ?></h3>
+                                <div class="story-author">
+                                    <i class="fas fa-user-edit"></i> By <?php echo htmlspecialchars($author); ?>
+                                </div>
+                            </div>
+                            
+                            <!-- Story Description -->
+                            <div class="story-description-container">
+                                <p class="story-description" id="story-desc-<?php echo $story['Story_ID']; ?>">
+                                    <?php echo nl2br(htmlspecialchars($description)); ?>
+                                </p>
+                                <?php if ($hasLongDescription): ?>
+                                    <button class="show-more-btn" onclick="toggleStoryDescription(<?php echo $story['Story_ID']; ?>)">
+                                        <i class="fas fa-chevron-down"></i> Show more
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <!-- Story Footer -->
+                            <div class="story-footer">
+                                <span class="story-category"><?php echo htmlspecialchars($category); ?></span>
+                            </div>
                         </div>
                     </div>
-                <?php endforeach; ?>
+                <?php endwhile; ?>
+                <?php else: ?>
+                    <div class="no-stories">
+                        <i class="fas fa-book-open"></i>
+                        <h3>No Stories Available</h3>
+                        <p>We're currently gathering inspiring stories from our community. Check back soon to read about the impact of your generosity and the lives we've touched together.</p>
+                    </div>
+                <?php endif; ?>
             </div>
-        <?php else: ?>
-            <div class="no-stories">
-                <h2>No stories available</h2>
-                <p>Check back later for inspiring stories from our community.</p>
-            </div>
-        <?php endif; ?>
+        </div>
+        
+        <?php include 'footer.php'; ?>
     </div>
+
+    <script>
+        // Toggle story description expand/collapse
+        function toggleStoryDescription(storyId) {
+            const description = document.getElementById(`story-desc-${storyId}`);
+            const button = description.nextElementSibling;
+            
+            if (description.classList.contains('expanded')) {
+                description.classList.remove('expanded');
+                button.innerHTML = '<i class="fas fa-chevron-down"></i> Show more';
+                button.style.transform = 'translateX(0)';
+            } else {
+                description.classList.add('expanded');
+                button.innerHTML = '<i class="fas fa-chevron-up"></i> Show less';
+                button.style.transform = 'translateX(5px)';
+            }
+        }
+        
+        // Add animation to story cards on scroll
+        function animateStoryCards() {
+            const storyCards = document.querySelectorAll('.story-card');
+            
+            storyCards.forEach((card, index) => {
+                const rect = card.getBoundingClientRect();
+                if (rect.top < window.innerHeight - 100) {
+                    // Add delay for staggered animation
+                    setTimeout(() => {
+                        card.style.opacity = '1';
+                        card.style.transform = 'translateY(0)';
+                    }, index * 100);
+                }
+            });
+        }
+        
+        // Initialize story cards with hidden state
+        document.addEventListener('DOMContentLoaded', function() {
+            const storyCards = document.querySelectorAll('.story-card');
+            storyCards.forEach(card => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            });
+            
+            // Trigger initial animation
+            setTimeout(animateStoryCards, 100);
+            
+            // Animate on scroll
+            window.addEventListener('scroll', animateStoryCards);
+        });
+    </script>
 </body>
 </html>

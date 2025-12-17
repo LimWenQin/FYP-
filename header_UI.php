@@ -208,9 +208,8 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             <nav>
                 <ul class="header-menu">
                     <li><a href="Homepage.php">Home</a></li>
-                    <li><a href="Activity Page.php">Activity</a></li>
-                    <li><a href="History.php">History</a></li>
-                    <li><a href="New&Story.php">News</a></li>
+                    <li><a href="Campaign_Page.php">Campaign</a></li>
+                    <li><a href="New&Story.php">News & Story</a></li>
                     <li><a href="Special_case Page.php">Special Case</a></li>
                     <li><a href="Profile.php">Profile</a></li>
                 </ul>
