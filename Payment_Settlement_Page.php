@@ -1,7 +1,7 @@
 <?php
 // 1. 引入数据库连接
 include 'dataconnection.php';
-// 引入刚才写的邮件脚本
+// 引入邮件发送脚本
 require_once 'mail_receipt.php'; 
 
 // 2. 开启 Session
@@ -92,7 +92,7 @@ if (!isset($_SESSION['email_sent_' . $txn_ref])) {
 }
 
 // ---------------------------------------------------------
-// 积分逻辑 (保持不变)
+// 积分逻辑
 // ---------------------------------------------------------
 $calc_amount = $row['Order_Amount'];
 $calc_donor_id = $row['Donor_ID'];
@@ -124,7 +124,10 @@ if ($points_to_add > 0 && $is_success && !isset($_SESSION['points_awarded_' . $t
     $_SESSION['points_awarded_' . $txn_ref] = true;
 }
 
+// ✅ 补回缺失的变量定义
+$paymentDate = date("d M Y, h:i A", strtotime($row['Payment_Paid_At']));
 $amountFormatted = "RM " . number_format($row['Order_Amount'], 2);
+
 include 'header_UI.php'; 
 ?>
 

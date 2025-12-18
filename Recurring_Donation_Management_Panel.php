@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // 2. 读取数据 (核心修改部分)
 // ==========================================
 
-// 【修改点】使用 LEFT JOIN 查询具体的 Case / Branch / Activity 名字
+// 使用 LEFT JOIN 查询具体的 Case / Branch / Activity 名字
 $query = "SELECT r.*, 
                  sc.Case_Title, 
                  b.Branch_Name, 
@@ -103,19 +103,20 @@ while ($row = $notif_result->fetch_assoc()) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recurring Donation Management - Love Bridge</title>
-<style>
+    <style>
         /* --- 核心变量 --- */
         :root {
-            --brand-red: #dc2626;     /* 品牌红 (用于表头) */
-            --text-dark: #1f2937;     /* 深色文字 */
-            --text-gray: #6b7280;     /* 灰色文字 */
-            --bg-page: #f9fafb;       /* 页面背景 */
-            --border-color: #e5e7eb;  /* 边框颜色 */
+            --brand-red: #dc2626;     /* 品牌红 */
+            --dark-red: #b91c1c;      /* 深红 (Hover用) */
+            --light-red: #fef2f2;     /* 浅红背景 */
+            --text-dark: #1f2937;     
+            --text-gray: #6b7280;     
+            --bg-page: #f9fafb;       
+            --border-color: #e5e7eb;  
             
-            /* 柔和的功能色 (莫兰迪色系) */
+            /* 功能色 */
             --green-bg: #ecfdf5; --green-text: #047857;
             --orange-bg: #fffbeb; --orange-text: #b45309;
-            --red-bg: #fef2f2;    --red-text: #b91c1c;
             --gray-bg: #f3f4f6;   --gray-text: #374151;
         }
 
@@ -155,7 +156,7 @@ while ($row = $notif_result->fetch_assoc()) {
             background: white;
             border-radius: 12px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            overflow: hidden; /* 确保表头圆角不被遮挡 */
+            overflow: hidden;
             border: 1px solid var(--border-color);
         }
 
@@ -163,7 +164,7 @@ while ($row = $notif_result->fetch_assoc()) {
         .table-responsive { overflow-x: auto; }
         .styled-table { width: 100%; border-collapse: collapse; }
 
-        /* ★★★ 关键修改：保留红色表头 ★★★ */
+        /* 红色表头 */
         .styled-table thead tr {
             background-color: var(--brand-red);
             color: white;
@@ -176,7 +177,7 @@ while ($row = $notif_result->fetch_assoc()) {
             font-size: 0.85rem;
             letter-spacing: 0.5px;
             text-align: left;
-            border-bottom: none; /* 红色背景不需要底部边框 */
+            border-bottom: none;
         }
 
         .styled-table td {
@@ -189,7 +190,7 @@ while ($row = $notif_result->fetch_assoc()) {
         .styled-table tbody tr:last-child td { border-bottom: none; }
         .styled-table tbody tr:hover { background-color: #fafafa; }
 
-        /* --- ★★★ 状态标签 (柔和版) ★★★ --- */
+        /* --- 状态标签 --- */
         .status-badge {
             padding: 5px 12px;
             border-radius: 20px;
@@ -199,14 +200,8 @@ while ($row = $notif_result->fetch_assoc()) {
             display: inline-block;
             letter-spacing: 0.5px;
         }
-
-        /* Active: 浅绿底深绿字 */
         .status-active { background-color: var(--green-bg); color: var(--green-text); }
-        
-        /* Paused: 浅黄底深橘字 */
         .status-paused { background-color: var(--orange-bg); color: var(--orange-text); }
-        
-        /* Cancelled: 浅灰底深灰字 */
         .status-cancelled { background-color: var(--gray-bg); color: var(--gray-text); }
 
         /* --- 表单控件 --- */
@@ -219,9 +214,9 @@ while ($row = $notif_result->fetch_assoc()) {
             font-size: 0.9rem;
         }
 
-        .action-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        .action-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
-        /* --- ★★★ 按钮样式 (舒服的配色) ★★★ --- */
+        /* --- 按钮样式 --- */
         .btn-sm {
             padding: 6px 14px;
             border-radius: 6px;
@@ -233,42 +228,44 @@ while ($row = $notif_result->fetch_assoc()) {
             display: inline-flex; align-items: center; justify-content: center;
         }
 
-        /* Update: 黑色实心 (稳重) */
+        /* Update: 红色实心 */
         .btn-edit {
-            background-color: #1f2937;
+            background-color: var(--brand-red);
             color: white;
         }
-        .btn-edit:hover { background-color: black; }
+        .btn-edit:hover { background-color: var(--dark-red); }
 
-        /* Pause: 白色背景 + 橙色边框 (清爽) */
+        /* Pause: 红色边框 + 红色字 */
         .btn-pause {
             background-color: white;
-            color: #d97706;
-            border-color: #d97706;
+            color: var(--brand-red);
+            border: 1px solid var(--brand-red);
         }
         .btn-pause:hover {
-            background-color: #fffbeb;
+            background-color: var(--light-red); /* 浅红色背景 */
         }
 
-        /* Resume: 白色背景 + 绿色边框 (清爽) */
+        /* Resume: 绿色实心 (保持不变，以示区分) */
         .btn-resume {
             background-color: white;
-            color: #059669;
-            border-color: #059669;
+            color: var(--green-text);
+            border: 1px solid var(--green-text);
         }
         .btn-resume:hover {
-            background-color: #ecfdf5;
+            background-color: var(--green-bg);
         }
 
-        /* Cancel: 纯文字链接 (降低视觉干扰) */
+        /* 【修改】Cancel: 红色实心 (与 Update 一致) */
         .btn-cancel {
-            background-color: transparent;
-            color: #9ca3af;
-            text-decoration: underline;
-            padding: 6px 8px;
+            background-color: var(--brand-red);
+            color: white;
+            border: 1px solid var(--brand-red); /* 确保有框 */
+            text-decoration: none;
         }
         .btn-cancel:hover {
-            color: var(--brand-red);
+            background-color: var(--dark-red);
+            border-color: var(--dark-red);
+            color: white;
         }
 
         /* --- 下载区域 --- */
@@ -352,12 +349,17 @@ while ($row = $notif_result->fetch_assoc()) {
                             
                             <td data-label="Project / Case">
                                 <?php 
+                                    // 图标逻辑：使用 SVG 直接嵌入，不依赖 FontAwesome
+                                    $icon_heart = '<svg style="width:16px;height:16px;color:#dc2626;vertical-align:text-bottom;margin-right:5px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+                                    $icon_build = '<svg style="width:16px;height:16px;color:#dc2626;vertical-align:text-bottom;margin-right:5px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg>';
+                                    $icon_run   = '<svg style="width:16px;height:16px;color:#dc2626;vertical-align:text-bottom;margin-right:5px;" fill="currentColor" viewBox="0 0 24 24"><path d="M13.49 9L11 6.5C10.6 6.1 9.97 6.1 9.57 6.5L6 10.07V16h2v-4.5l2-2V14l-4 4 1.41 1.41 4.77-4.77c.31-.31.42-.74.31-1.15l-.65-2.6 1.16 1.16V16h2v-4.5l-2.09-2.09zM12 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>';
+
                                     if (!empty($row['Case_Title'])) {
-                                        echo "<strong><i class='fas fa-heart' style='color:#dc2626;'></i> " . htmlspecialchars($row['Case_Title']) . "</strong>";
+                                        echo "<strong>" . $icon_heart . htmlspecialchars($row['Case_Title']) . "</strong>";
                                     } elseif (!empty($row['Branch_Name'])) {
-                                        echo "<strong><i class='fas fa-building' style='color:#dc2626;'></i> " . htmlspecialchars($row['Branch_Name']) . "</strong>";
+                                        echo "<strong>" . $icon_build . htmlspecialchars($row['Branch_Name']) . "</strong>";
                                     } elseif (!empty($row['Activity_Name'])) {
-                                        echo "<strong><i class='fas fa-running' style='color:#dc2626;'></i> " . htmlspecialchars($row['Activity_Name']) . "</strong>";
+                                        echo "<strong>" . $icon_run . htmlspecialchars($row['Activity_Name']) . "</strong>";
                                     } else {
                                         echo "<span style='color:#999; font-style:italic;'>General Donation</span>";
                                     }
@@ -396,7 +398,7 @@ while ($row = $notif_result->fetch_assoc()) {
                         </tr>
                     <?php endwhile; ?>
                 <?php else: ?>
-                    <tr><td colspan="6" style="text-align:center; padding: 40px; color: var(--medium-gray);">No active recurring plans found.</td></tr>
+                    <tr><td colspan="6" style="text-align:center; padding: 40px; color: var(--text-gray);">No active recurring plans found.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -454,8 +456,6 @@ while ($row = $notif_result->fetch_assoc()) {
         xhr.send("mark_read_all=1");
     }
 </script>
-
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 </body>
 </html>
