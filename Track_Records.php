@@ -230,12 +230,13 @@ usort($records, function($a, $b) {
         .styled-table thead tr {
             background-color: var(--primary-red);
             color: var(--white);
-            text-align: left;
+            text-align: center;
         }
 
         .styled-table th, .styled-table td {
             padding: 18px 25px;
             border-bottom: 1px solid #eee;
+            text-align: center;
         }
 
         .styled-table th {

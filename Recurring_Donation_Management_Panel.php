@@ -103,216 +103,213 @@ while ($row = $notif_result->fetch_assoc()) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recurring Donation Management - Love Bridge</title>
-    <style>
-        /* 引入 Homepage 的核心变量 */
+<style>
+        /* --- 核心变量 --- */
         :root {
-            --primary-red: #dc2626;
-            --dark-red: #b91c1c;
-            --light-red: #fee2e2;
-            --white: #ffffff;
-            --light-gray: #f5f5f5;
-            --medium-gray: #737373;
-            --dark-gray: #262626;
-            --text-dark: #171717;
-            --success-green: #10b981;
-            --warning-orange: #f59e0b;
+            --brand-red: #dc2626;     /* 品牌红 (用于表头) */
+            --text-dark: #1f2937;     /* 深色文字 */
+            --text-gray: #6b7280;     /* 灰色文字 */
+            --bg-page: #f9fafb;       /* 页面背景 */
+            --border-color: #e5e7eb;  /* 边框颜色 */
+            
+            /* 柔和的功能色 (莫兰迪色系) */
+            --green-bg: #ecfdf5; --green-text: #047857;
+            --orange-bg: #fffbeb; --orange-text: #b45309;
+            --red-bg: #fef2f2;    --red-text: #b91c1c;
+            --gray-bg: #f3f4f6;   --gray-text: #374151;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: var(--light-gray);
+            font-family: 'Segoe UI', 'Inter', sans-serif;
+            background-color: var(--bg-page);
             color: var(--text-dark);
+            margin: 0; padding: 0;
         }
 
         .main-container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
-            padding: 40px 20px;
+            padding: 50px 20px;
             min-height: 80vh;
         }
 
-        /* 标题部分 */
-        .page-header {
-            text-align: center;
-            margin-bottom: 50px;
-        }
+        /* --- 标题 --- */
+        .page-header { text-align: center; margin-bottom: 40px; }
+        .page-title { font-size: 2.2rem; color: var(--brand-red); font-weight: 800; margin-bottom: 10px; }
+        .page-subtitle { color: var(--text-gray); font-size: 1rem; }
 
-        .page-title {
-            font-size: 2.5rem;
-            color: var(--primary-red);
-            font-weight: 800;
-            margin-bottom: 15px;
-            position: relative;
-            display: inline-block;
-        }
-
-        .page-title::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80px;
-            height: 4px;
-            background: var(--primary-red);
-            border-radius: 2px;
-        }
-
-        .page-subtitle {
-            font-size: 1.1rem;
-            color: var(--medium-gray);
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        /* 卡片容器风格 */
-        .content-card {
-            background: var(--white);
-            border-radius: 10px;
-            padding: 40px;
-            border-top: 5px solid var(--primary-red);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-            margin-bottom: 40px;
-        }
-
-        /* 信息提示框 */
+        /* --- 提示框 --- */
         .info-alert {
-            background-color: var(--light-red);
-            color: var(--dark-red);
+            background-color: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #dbeafe;
             padding: 15px 20px;
             border-radius: 8px;
-            border-left: 4px solid var(--primary-red);
+            display: flex; align-items: center; gap: 10px;
             margin-bottom: 30px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        }
+        .info-alert svg { stroke: #2563eb; }
+
+        /* --- 卡片容器 --- */
+        .content-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            overflow: hidden; /* 确保表头圆角不被遮挡 */
+            border: 1px solid var(--border-color);
         }
 
-        /* 表格样式美化 */
-        .table-responsive {
-            overflow-x: auto;
-        }
+        /* --- 表格样式 --- */
+        .table-responsive { overflow-x: auto; }
+        .styled-table { width: 100%; border-collapse: collapse; }
 
-        .styled-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 0;
-            font-size: 1rem;
-            background-color: var(--white);
-        }
-
+        /* ★★★ 关键修改：保留红色表头 ★★★ */
         .styled-table thead tr {
-            background-color: var(--primary-red);
-            color: var(--white);
-            text-align: left;
-        }
-
-        .styled-table th, 
-        .styled-table td {
-            padding: 15px 20px;
-            border-bottom: 1px solid #eee;
-            vertical-align: middle; /* 垂直居中 */
+            background-color: var(--brand-red);
+            color: white;
         }
 
         .styled-table th {
+            padding: 18px 20px;
             font-weight: 600;
-            letter-spacing: 0.5px;
             text-transform: uppercase;
-            font-size: 0.9rem;
-        }
-
-        .styled-table tbody tr {
-            transition: all 0.2s ease;
-        }
-
-        .styled-table tbody tr:hover {
-            background-color: var(--light-gray);
-        }
-
-        /* 状态标签 */
-        .status-badge {
-            padding: 6px 12px;
-            border-radius: 20px;
             font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            text-align: left;
+            border-bottom: none; /* 红色背景不需要底部边框 */
+        }
+
+        .styled-table td {
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+            color: var(--text-dark);
+        }
+
+        .styled-table tbody tr:last-child td { border-bottom: none; }
+        .styled-table tbody tr:hover { background-color: #fafafa; }
+
+        /* --- ★★★ 状态标签 (柔和版) ★★★ --- */
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
             font-weight: 700;
             text-transform: uppercase;
             display: inline-block;
-        }
-
-        .status-active { background-color: #d1fae5; color: #065f46; }
-        .status-paused { background-color: #fef3c7; color: #92400e; }
-
-        /* 表单控件 */
-        .date-input {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-family: inherit;
-            color: var(--text-dark);
-            margin-right: 5px;
-        }
-
-        .action-group {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        /* 按钮风格 */
-        .btn-sm {
-            padding: 8px 16px;
-            border-radius: 5px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
-        .btn-edit { background-color: var(--text-dark); color: white; }
-        .btn-edit:hover { background-color: black; transform: translateY(-2px); }
+        /* Active: 浅绿底深绿字 */
+        .status-active { background-color: var(--green-bg); color: var(--green-text); }
+        
+        /* Paused: 浅黄底深橘字 */
+        .status-paused { background-color: var(--orange-bg); color: var(--orange-text); }
+        
+        /* Cancelled: 浅灰底深灰字 */
+        .status-cancelled { background-color: var(--gray-bg); color: var(--gray-text); }
 
-        .btn-pause { background-color: var(--warning-orange); color: white; }
-        .btn-pause:hover { background-color: #d97706; transform: translateY(-2px); }
-
-        .btn-resume { background-color: var(--success-green); color: white; }
-        .btn-resume:hover { background-color: #059669; transform: translateY(-2px); }
-
-        .btn-cancel { background-color: var(--white); color: var(--primary-red); border: 1px solid var(--primary-red); }
-        .btn-cancel:hover { background-color: var(--light-red); }
-
-        .btn-download {
-            background-color: var(--primary-red); color: white; padding: 15px 30px; font-size: 1rem; border: none; border-radius: 5px; font-weight: 700; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 10px;
+        /* --- 表单控件 --- */
+        .date-input {
+            padding: 6px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            color: var(--text-dark);
+            margin-right: 8px;
+            font-size: 0.9rem;
         }
-        .btn-download:hover { background-color: var(--dark-red); transform: translateY(-3px); box-shadow: 0 5px 15px rgba(220, 38, 38, 0.3); }
 
-        .download-section { text-align: center; margin-top: 20px; padding: 40px; background: var(--white); border-radius: 10px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05); }
-        .download-title { font-size: 1.5rem; color: var(--text-dark); margin-bottom: 10px; font-weight: 700; }
-        .download-desc { color: var(--medium-gray); margin-bottom: 25px; }
+        .action-group { display: flex; gap: 8px; flex-wrap: wrap; }
 
-        /* Modal Styles */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
-        .modal-box { background: white; padding: 40px; border-radius: 10px; width: 500px; text-align: center; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.2); border-top: 6px solid var(--primary-red); animation: popIn 0.3s ease-out; }
-        .modal-title { font-size: 1.8rem; color: var(--primary-red); font-weight: 800; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .modal-content { font-size: 1.1rem; margin-bottom: 30px; line-height: 1.6; text-align: left; color: var(--text-dark); }
-        .modal-content ul { list-style: none; padding: 0; }
-        .modal-content li { background: var(--light-gray); margin-bottom: 10px; padding: 15px; border-radius: 5px; border-left: 3px solid var(--primary-red); }
-        .modal-close-btn { background: var(--primary-red); color: white; padding: 12px 30px; border: none; border-radius: 5px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.3s ease; }
-        .modal-close-btn:hover { background: var(--dark-red); transform: translateY(-2px); }
-        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        /* --- ★★★ 按钮样式 (舒服的配色) ★★★ --- */
+        .btn-sm {
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
 
-        /* 响应式调整 */
+        /* Update: 黑色实心 (稳重) */
+        .btn-edit {
+            background-color: #1f2937;
+            color: white;
+        }
+        .btn-edit:hover { background-color: black; }
+
+        /* Pause: 白色背景 + 橙色边框 (清爽) */
+        .btn-pause {
+            background-color: white;
+            color: #d97706;
+            border-color: #d97706;
+        }
+        .btn-pause:hover {
+            background-color: #fffbeb;
+        }
+
+        /* Resume: 白色背景 + 绿色边框 (清爽) */
+        .btn-resume {
+            background-color: white;
+            color: #059669;
+            border-color: #059669;
+        }
+        .btn-resume:hover {
+            background-color: #ecfdf5;
+        }
+
+        /* Cancel: 纯文字链接 (降低视觉干扰) */
+        .btn-cancel {
+            background-color: transparent;
+            color: #9ca3af;
+            text-decoration: underline;
+            padding: 6px 8px;
+        }
+        .btn-cancel:hover {
+            color: var(--brand-red);
+        }
+
+        /* --- 下载区域 --- */
+        .download-section {
+            text-align: center;
+            margin-top: 30px;
+            padding: 30px;
+            background: white;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+        .btn-download {
+            background-color: white;
+            color: var(--brand-red);
+            border: 1px solid var(--brand-red);
+            padding: 10px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex; align-items: center; gap: 8px;
+            transition: 0.2s;
+        }
+        .btn-download:hover {
+            background-color: var(--brand-red);
+            color: white;
+        }
+
+        /* --- 弹窗样式 --- */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-box { background: white; padding: 30px; border-radius: 12px; width: 400px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .modal-title { font-size: 1.4rem; color: var(--brand-red); font-weight: 700; margin-bottom: 15px; }
+        .modal-content { text-align: left; margin-bottom: 20px; line-height: 1.6; }
+        .modal-close-btn { background: var(--brand-red); color: white; padding: 10px 24px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        
+        /* 响应式 */
         @media (max-width: 768px) {
             .styled-table thead { display: none; }
-            .styled-table, .styled-table tbody, .styled-table tr, .styled-table td { display: block; width: 100%; }
-            .styled-table tr { margin-bottom: 20px; border: 1px solid #eee; border-radius: 8px; overflow: hidden; }
-            .styled-table td { text-align: right; padding-left: 50%; position: relative; border-bottom: 1px solid #f5f5f5; }
-            .styled-table td::before { content: attr(data-label); position: absolute; left: 15px; width: 45%; font-weight: 700; text-align: left; color: var(--primary-red); }
-            .date-input { width: 100%; margin-bottom: 10px; }
+            .styled-table, tbody, tr, td { display: block; width: 100%; }
+            .styled-table tr { margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: white; }
+            .styled-table td { text-align: right; padding-left: 50%; position: relative; border-bottom: 1px solid #f3f4f6; }
+            .styled-table td::before { content: attr(data-label); position: absolute; left: 20px; width: 45%; font-weight: 600; text-align: left; color: var(--text-gray); }
             .action-group { justify-content: flex-end; }
         }
     </style>
