@@ -2,7 +2,7 @@
 // 1. 开启 Session
 session_start();
 
-// 引入数据库和统一的头部 (注意：这里改为 header_UI.php 以保持和 Homepage 一致)
+// 引入数据库和头部
 include 'dataconnection.php';
 
 // 2. 检查登录状态
@@ -15,28 +15,182 @@ if (!isset($_SESSION['donor_id'])) {
 }
 
 $donor_id = $_SESSION['donor_id'];
-$current_points = 0;
-$total_earned = 0;
 
-// 3. 从数据库获取积分
-$sql = "SELECT Points_Total, Points_Earned FROM point WHERE Donor_ID = ?";
-if ($stmt = $conn->prepare($sql)) {
+// ==========================================
+// 3. 获取基础数据 (积分)
+// ==========================================
+$current_points = 0;
+$total_points_earned = 0;
+
+$sql_pts = "SELECT Points_Total, Points_Earned FROM point WHERE Donor_ID = ?";
+if ($stmt = $conn->prepare($sql_pts)) {
     $stmt->bind_param("i", $donor_id);
     $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($row = $result->fetch_assoc()) {
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
         $current_points = $row['Points_Total'];
-        $total_earned = $row['Points_Earned'];
+        $total_points_earned = $row['Points_Earned'];
     }
     $stmt->close();
 }
 
-// 4. 定义徽章逻辑
+// ==========================================
+// 4. 获取高级统计数据 (用于计算成就)
+// ==========================================
+
+// A. 总捐款次数 & 终身累计捐款总额 (Lifetime Amount)
+$total_donations_count = 0;
+$lifetime_amount = 0.00;
+
+$sql_stats = "SELECT COUNT(*) as cnt, SUM(Order_Amount) as total_amt 
+              FROM orders 
+              WHERE Donor_ID = ? AND Order_Status IN ('Success', 'Completed')";
+if ($stmt = $conn->prepare($sql_stats)) {
+    $stmt->bind_param("i", $donor_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
+        $total_donations_count = $row['cnt'];
+        $lifetime_amount = $row['total_amt'] ?? 0;
+    }
+    $stmt->close();
+}
+
+// B. 单月最高捐款额 (Max Monthly Donation)
+$max_monthly_amount = 0;
+$sql_max_month = "SELECT SUM(Order_Amount) as month_total 
+                  FROM orders 
+                  WHERE Donor_ID = ? AND Order_Status IN ('Success', 'Completed')
+                  GROUP BY DATE_FORMAT(Order_Created_At, '%Y-%m') 
+                  ORDER BY month_total DESC LIMIT 1";
+if ($stmt = $conn->prepare($sql_max_month)) {
+    $stmt->bind_param("i", $donor_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) $max_monthly_amount = $row['month_total'];
+    $stmt->close();
+}
+
+// C. 过去一年累计捐款 (Annual Accumulation)
+$annual_total = 0;
+$sql_annual = "SELECT SUM(Order_Amount) as year_total 
+               FROM orders 
+               WHERE Donor_ID = ? AND Order_Status IN ('Success', 'Completed')
+               AND Order_Created_At >= DATE_SUB(NOW(), INTERVAL 1 YEAR)";
+if ($stmt = $conn->prepare($sql_annual)) {
+    $stmt->bind_param("i", $donor_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) $annual_total = $row['year_total'];
+    $stmt->close();
+}
+
+// D. 连续捐款时长 (月捐计划持续时间)
+$recurring_months = 0;
+$sql_rec = "SELECT Recurring_StartDate FROM recurring_donation 
+            WHERE Donor_ID = ? AND Recurring_Status = 'Active' 
+            ORDER BY Recurring_StartDate ASC LIMIT 1";
+if ($stmt = $conn->prepare($sql_rec)) {
+    $stmt->bind_param("i", $donor_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
+        $start_date = new DateTime($row['Recurring_StartDate']);
+        $now = new DateTime();
+        $interval = $start_date->diff($now);
+        $recurring_months = ($interval->y * 12) + $interval->m;
+    }
+    $stmt->close();
+}
+
+// ==========================================
+// 5. 定义所有徽章逻辑 (统一列表)
+// ==========================================
 $badges = [
-    'first_donation' => ($total_earned > 0),      
-    'rm500_donor'    => ($total_earned >= 50),    
-    'monthly_hero'   => ($total_earned >= 100)    
+    // --- 频次类 ---
+    'first_donation' => [
+        'unlocked' => ($total_donations_count >= 1),
+        'title' => 'First Step',
+        'desc' => 'Make your first donation.',
+        'icon' => 'fa-hand-holding-heart',
+        'class' => ''
+    ],
+    '3_donations' => [
+        'unlocked' => ($total_donations_count >= 3),
+        'title' => 'Rising Star',
+        'desc' => 'Donate 3 times to unlock.',
+        'icon' => 'fa-star',
+        'class' => ''
+    ],
+    '10_donations' => [
+        'unlocked' => ($total_donations_count >= 10),
+        'title' => 'Philanthropist',
+        'desc' => 'Donate 10 times to unlock.',
+        'icon' => 'fa-users-rays',
+        'class' => ''
+    ],
+
+    // --- 月捐类 ---
+    'rec_3months' => [
+        'unlocked' => ($recurring_months >= 3),
+        'title' => 'Quarterly Guardian',
+        'desc' => 'Active recurring donor for 3 months.',
+        'icon' => 'fa-shield-heart',
+        'class' => ''
+    ],
+    'rec_1year' => [
+        'unlocked' => ($recurring_months >= 12),
+        'title' => 'Loyalty Legend',
+        'desc' => 'Active recurring donor for 1 year.',
+        'icon' => 'fa-calendar-check',
+        'class' => ''
+    ],
+
+    // --- 累计金额类 (Lifetime) ---
+    'life_2k' => [
+        'unlocked' => ($lifetime_amount >= 2000),
+        'title' => 'Big Heart',
+        'desc' => 'Total lifetime donation reaches RM 2,000.',
+        'icon' => 'fa-heart-circle-plus',
+        'class' => ''
+    ],
+    'life_20k' => [
+        'unlocked' => ($lifetime_amount >= 20000),
+        'title' => 'Community Hero',
+        'desc' => 'Total lifetime donation reaches RM 20,000.',
+        'icon' => 'fa-building-ngo',
+        'class' => ''
+    ],
+
+    // --- 单月/年度大额类 (Special) ---
+    'monthly_1k' => [
+        'unlocked' => ($max_monthly_amount >= 1000),
+        'title' => 'Bronze Patron',
+        'desc' => 'Donate RM 1,000+ in a single month.',
+        'icon' => 'fa-medal',
+        'class' => 'bronze'
+    ],
+    'monthly_5k' => [
+        'unlocked' => ($max_monthly_amount >= 5000),
+        'title' => 'Silver Patron',
+        'desc' => 'Donate RM 5,000+ in a single month.',
+        'icon' => 'fa-award',
+        'class' => 'silver'
+    ],
+    'monthly_10k' => [
+        'unlocked' => ($max_monthly_amount >= 10000),
+        'title' => 'Gold Patron',
+        'desc' => 'Donate RM 10,000+ in a single month.',
+        'icon' => 'fa-crown',
+        'class' => 'gold'
+    ],
+    'annual_50k' => [
+        'unlocked' => ($annual_total >= 50000),
+        'title' => 'Diamond Partner',
+        'desc' => 'Accumulate RM 50,000 in 1 year.',
+        'icon' => 'fa-trophy',
+        'class' => 'diamond'
+    ]
 ];
 ?>
 
@@ -46,22 +200,23 @@ $badges = [
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Achievements - Love Bridge</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        /* --- 引入 Homepage 核心变量 --- */
+        /* --- 核心变量 --- */
         :root {
             --primary-red: #dc2626;
             --dark-red: #b91c1c;
-            --light-red: #fee2e2;
-            --white: #ffffff;
             --light-gray: #f5f5f5;
+            --white: #ffffff;
             --medium-gray: #737373;
-            --dark-gray: #262626;
             --text-dark: #171717;
-            --gold: #fbbf24;
-            --silver: #9ca3af;
-            --bronze: #78350f;
+            
+            /* 勋章颜色 */
+            --bronze-color: #cd7f32;
+            --silver-color: #94a3b8;
+            --gold-color: #fbbf24;
+            --diamond-color: #3b82f6;
         }
 
         body {
@@ -80,43 +235,22 @@ $badges = [
         }
 
         /* 标题部分 */
-        .page-header {
-            text-align: center;
-            margin-bottom: 50px;
-        }
-
+        .page-header { text-align: center; margin-bottom: 50px; }
         .page-title {
-            font-size: 2.5rem;
-            color: var(--primary-red);
-            font-weight: 800;
-            margin-bottom: 15px;
-            position: relative;
-            display: inline-block;
+            font-size: 2.5rem; color: var(--primary-red); font-weight: 800;
+            margin-bottom: 15px; position: relative; display: inline-block;
         }
-
         .page-title::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80px;
-            height: 4px;
-            background: var(--primary-red);
-            border-radius: 2px;
+            content: ''; position: absolute; bottom: -10px; left: 50%;
+            transform: translateX(-50%); width: 80px; height: 4px;
+            background: var(--primary-red); border-radius: 2px;
         }
-
-        .page-subtitle {
-            font-size: 1.1rem;
-            color: var(--medium-gray);
-            max-width: 600px;
-            margin: 0 auto;
-        }
+        .page-subtitle { font-size: 1.1rem; color: var(--medium-gray); }
 
         /* --- 积分卡片 (Hero Stats) --- */
         .points-hero {
             background: linear-gradient(135deg, var(--primary-red), var(--dark-red));
-            border-radius: 15px;
+            border-radius: 16px;
             padding: 40px;
             color: white;
             text-align: center;
@@ -125,197 +259,84 @@ $badges = [
             position: relative;
             overflow: hidden;
         }
-
         .points-hero::before {
-            content: '\f005'; /* Star icon */
-            font-family: 'Font Awesome 6 Free';
-            font-weight: 900;
-            position: absolute;
-            top: -20px;
-            right: -20px;
-            font-size: 15rem;
-            opacity: 0.1;
-            color: white;
+            content: '\f005'; font-family: 'Font Awesome 6 Free'; font-weight: 900;
+            position: absolute; top: -20px; right: -20px; font-size: 15rem;
+            opacity: 0.1; color: white;
         }
-
-        .points-value {
-            font-size: 5rem;
-            font-weight: 800;
-            margin: 10px 0;
-            line-height: 1;
-        }
-
-        .points-label {
-            font-size: 1.2rem;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            opacity: 0.9;
-        }
-
+        .points-value { font-size: 4.5rem; font-weight: 800; margin: 10px 0; line-height: 1; }
+        .points-label { font-size: 1.2rem; text-transform: uppercase; letter-spacing: 2px; opacity: 0.9; }
         .points-sub {
-            background: rgba(255, 255, 255, 0.2);
-            display: inline-block;
-            padding: 5px 15px;
-            border-radius: 20px;
-            margin-top: 15px;
-            font-size: 0.9rem;
+            background: rgba(255, 255, 255, 0.2); display: inline-block;
+            padding: 5px 15px; border-radius: 20px; margin-top: 15px; font-size: 0.9rem;
         }
 
         /* --- Section Styling --- */
         .section-title {
-            font-size: 1.8rem;
-            color: var(--text-dark);
-            margin-bottom: 25px;
-            border-left: 5px solid var(--primary-red);
-            padding-left: 15px;
-            font-weight: 700;
+            font-size: 1.8rem; color: var(--text-dark); margin-bottom: 25px;
+            border-left: 5px solid var(--primary-red); padding-left: 15px; font-weight: 700;
         }
 
         /* --- Badges Grid --- */
         .badge-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); /* 自适应网格 */
             gap: 25px;
             margin-bottom: 60px;
         }
 
         .badge-card {
             background: var(--white);
-            border-radius: 12px;
-            padding: 30px;
+            border-radius: 16px;
+            padding: 30px 20px;
             text-align: center;
             box-shadow: 0 5px 15px rgba(0,0,0,0.05);
             transition: all 0.3s ease;
             border: 1px solid #eee;
             position: relative;
+            height: 100%; /* 等高 */
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
+        .badge-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.1); }
 
-        .badge-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-
-        /* 图标容器 */
+        /* 图标圆圈 */
         .badge-icon-wrapper {
-            width: 100px;
-            height: 100px;
+            width: 80px; height: 80px;
             margin: 0 auto 20px;
             background: var(--light-gray);
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3rem;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2.2rem;
             transition: all 0.3s;
+            color: #9ca3af;
         }
 
-        .badge-card h4 {
-            margin: 0 0 10px;
-            font-size: 1.2rem;
-            color: var(--text-dark);
-        }
+        .badge-card h4 { margin: 0 0 8px; font-size: 1.1rem; color: var(--text-dark); font-weight: 700; }
+        .badge-card p { color: var(--medium-gray); font-size: 0.85rem; margin: 0; line-height: 1.4; }
 
-        .badge-card p {
-            color: var(--medium-gray);
-            font-size: 0.9rem;
-            margin: 0;
-        }
-
-        /* 状态逻辑 */
+        /* --- 解锁状态 --- */
         .badge-card.earned .badge-icon-wrapper {
-            background: #fee2e2; /* Light Red */
+            background: #fee2e2;
             color: var(--primary-red);
-            box-shadow: 0 0 0 5px rgba(220, 38, 38, 0.1);
+            box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.05);
         }
+        .badge-card.earned h4 { color: var(--primary-red); }
 
-        .badge-card.locked {
-            opacity: 0.7;
-        }
-        
-        .badge-card.locked .badge-icon-wrapper {
-            background: #f3f4f6;
-            color: #d1d5db;
-        }
+        /* 特殊颜色勋章 */
+        .badge-card.bronze.earned .badge-icon-wrapper { color: var(--bronze-color); background: #fff7ed; }
+        .badge-card.silver.earned .badge-icon-wrapper { color: var(--silver-color); background: #f1f5f9; }
+        .badge-card.gold.earned .badge-icon-wrapper { color: var(--gold-color); background: #fefce8; }
+        .badge-card.diamond.earned .badge-icon-wrapper { color: var(--diamond-color); background: #eff6ff; }
 
-        .badge-card.locked h4 { color: var(--medium-gray); }
-        
+        /* 锁定状态 */
+        .badge-card.locked { opacity: 0.6; filter: grayscale(1); }
         .lock-icon {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            color: var(--medium-gray);
-            font-size: 1.2rem;
+            position: absolute; top: 15px; right: 15px;
+            color: #cbd5e1; font-size: 1.2rem;
         }
 
-        /* --- Achievement Wall --- */
-        .wall-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-        }
-
-        .achievement-item {
-            background: var(--white);
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            transition: all 0.3s ease;
-        }
-
-        .achievement-item:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
-        }
-
-        .achievement-img {
-            width: 100%;
-            height: 200px;
-            object-fit: cover;
-        }
-
-        .achievement-content {
-            padding: 20px;
-        }
-
-        .achievement-text {
-            font-weight: 600;
-            color: var(--text-dark);
-            margin-bottom: 15px;
-            font-size: 1.1rem;
-        }
-
-        .share-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .btn-share {
-            flex: 1;
-            padding: 8px;
-            border: 1px solid #ddd;
-            background: white;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            color: var(--medium-gray);
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-        }
-
-        .btn-share:hover {
-            background: var(--light-gray);
-            color: var(--primary-red);
-            border-color: var(--primary-red);
-        }
-
-        /* Responsive */
         @media (max-width: 768px) {
             .points-value { font-size: 3.5rem; }
-            .badge-grid, .wall-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -327,8 +348,8 @@ $badges = [
 <div class="main-container">
 
     <div class="page-header">
-        <h1 class="page-title">My Gamification Panel</h1>
-        <p class="page-subtitle">Track your impact, earn badges, and share your journey.</p>
+        <h1 class="page-title">My Achievements</h1>
+        <p class="page-subtitle">Track your impact, earn badges, and celebrate your generosity.</p>
     </div>
 
     <div class="points-hero">
@@ -336,77 +357,27 @@ $badges = [
         <div class="points-value"><?php echo number_format($current_points); ?></div>
         <div class="points-label">Points</div>
         <div class="points-sub">
-            Lifetime Earned: <strong><?php echo number_format($total_earned); ?> PTS</strong>
+            Lifetime Earned: <strong><?php echo number_format($total_points_earned); ?> PTS</strong>
         </div>
     </div>
 
-    <h3 class="section-title">Your Badges</h3>
+    <h3 class="section-title">Badge Collection</h3>
     <div class="badge-grid">
         
-        <div class="badge-card <?php echo $badges['first_donation'] ? 'earned' : 'locked'; ?>">
-            <?php if(!$badges['first_donation']): ?><i class="fas fa-lock lock-icon"></i><?php endif; ?>
-            <div class="badge-icon-wrapper">
-                <i class="fas fa-heart"></i>
-            </div>
-            <h4>First Donation</h4>
-            <p><?php echo $badges['first_donation'] ? 'Unlocked!' : 'Donate once to unlock'; ?></p>
-        </div>
-
-        <div class="badge-card <?php echo $badges['rm500_donor'] ? 'earned' : 'locked'; ?>">
-            <?php if(!$badges['rm500_donor']): ?><i class="fas fa-lock lock-icon"></i><?php endif; ?>
-            <div class="badge-icon-wrapper">
-                <i class="fas fa-crown"></i>
-            </div>
-            <h4>RM 500 Donor</h4>
-            <p><?php echo $badges['rm500_donor'] ? 'Unlocked!' : 'Earn 50 points to unlock'; ?></p>
-        </div>
-
-        <div class="badge-card <?php echo $badges['monthly_hero'] ? 'earned' : 'locked'; ?>">
-            <?php if(!$badges['monthly_hero']): ?><i class="fas fa-lock lock-icon"></i><?php endif; ?>
-            <div class="badge-icon-wrapper">
-                <i class="fas fa-calendar-check"></i>
-            </div>
-            <h4>Monthly Hero</h4>
-            <p><?php echo $badges['monthly_hero'] ? 'Unlocked!' : 'Earn 100 points to unlock'; ?></p>
-        </div>
-
-    </div>
-
-    <h3 class="section-title">Achievements Wall</h3>
-    <div class="wall-grid">
-
-        <div class="achievement-item">
-            <img src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" alt="Orphanage Support" class="achievement-img">
-            <div class="achievement-content">
-                <div class="achievement-text">Supported Education for Orphanage</div>
-                <div class="share-buttons">
-                    <button class="btn-share"><i class="fab fa-whatsapp"></i> Share</button>
-                    <button class="btn-share"><i class="fab fa-facebook"></i> Share</button>
+        <?php foreach ($badges as $key => $badge): ?>
+            <div class="badge-card <?php echo $badge['class']; ?> <?php echo $badge['unlocked'] ? 'earned' : 'locked'; ?>">
+                <?php if(!$badge['unlocked']): ?>
+                    <i class="fas fa-lock lock-icon"></i>
+                <?php endif; ?>
+                
+                <div class="badge-icon-wrapper">
+                    <i class="fas <?php echo $badge['icon']; ?>"></i>
                 </div>
+                
+                <h4><?php echo $badge['title']; ?></h4>
+                <p><?php echo $badge['unlocked'] ? 'Unlocked!' : $badge['desc']; ?></p>
             </div>
-        </div>
-
-        <div class="achievement-item">
-            <img src="https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" alt="Medical Support" class="achievement-img">
-            <div class="achievement-content">
-                <div class="achievement-text">Elderly Medical Care Sponsor</div>
-                <div class="share-buttons">
-                    <button class="btn-share"><i class="fab fa-whatsapp"></i> Share</button>
-                    <button class="btn-share"><i class="fab fa-facebook"></i> Share</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="achievement-item">
-            <img src="https://images.unsplash.com/photo-1552664730-d307ca884978?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80" alt="Charity Run" class="achievement-img">
-            <div class="achievement-content">
-                <div class="achievement-text">Annual Charity Run Participant</div>
-                <div class="share-buttons">
-                    <button class="btn-share"><i class="fab fa-whatsapp"></i> Share</button>
-                    <button class="btn-share"><i class="fab fa-facebook"></i> Share</button>
-                </div>
-            </div>
-        </div>
+        <?php endforeach; ?>
 
     </div>
 
