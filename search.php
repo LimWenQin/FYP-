@@ -2,7 +2,7 @@
 // 1. 引入数据库连接和头部
 include 'dataconnection.php';
 include 'header_function.php'; // 包含 session_start
-include 'header_UI_2.php';     // 包含导航栏
+include 'header_UI.php';     // 包含导航栏
 
 $search_query = "";
 $activity_results = [];

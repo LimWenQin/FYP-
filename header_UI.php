@@ -216,7 +216,7 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             </nav>
 
             <div style="display:flex; align-items:center;">
-                <form action="search_results.php" method="GET" class="header-search">
+                <form action="search.php" method="GET" class="header-search">
                     <input type="text" name="query" placeholder="Search...">
                     <button type="submit">🔍</button>
                 </form>
