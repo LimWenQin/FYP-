@@ -108,6 +108,7 @@
                     <li><a href="Homepage.php">Home</a></li>
                     <li><a href="About Us.php">About Us</a></li>
                     <li><a href="Contact_us.php">Contact Us</a></li>
+                    <li><a href="FAQs.php">FAQ</a></li>
                     </ul>
             </div>
 
