@@ -402,7 +402,7 @@ include 'header_UI.php';
         </div>
     </div>
 </div>
-
+ <?php include 'footer.php'; ?>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const form = document.getElementById('loginForm');

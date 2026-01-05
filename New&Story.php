@@ -420,7 +420,7 @@ include 'header_UI.php';
                         $category = !empty($story['Story_Category']) ? $story['Story_Category'] : "General";
                         
                         // 检查描述长度
-                        $description = $story['Donor_Description'];
+                        $description = $story['Story_Description'];
                         $descriptionLength = strlen($description);
                         $hasLongDescription = $descriptionLength > 200;
                 ?>

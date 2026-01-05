@@ -322,7 +322,7 @@ $upcoming_activities = [
             max-width: 900px;
             margin-left: auto;
             margin-right: auto;
-            border-left: 5px solid var(--primary-red);
+           
         }
 
         .fund-tagline {
@@ -422,27 +422,6 @@ $upcoming_activities = [
             border-color: white;
         }
 
-        /* Progress Bar */
-        .progress-bar-container {
-            position: absolute;
-            bottom: 60px;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.1);
-            z-index: 3;
-        }
-
-        .progress-bar {
-            height: 100%;
-            background: var(--primary-red);
-            width: 0%;
-            transition: width 5s linear;
-        }
-
-        .progress-bar.active {
-            width: 100%;
-        }
 
         /* Campaign Stats */
         .campaign-stats {
@@ -1122,9 +1101,7 @@ $upcoming_activities = [
                     <a href="donate.php" class="btn btn-primary">
                         Make a Donation
                     </a>
-                    <a href="volunteer.php" class="btn btn-secondary">
-                        Join as Volunteer
-                    </a>
+                    
                     <a href="campaigns.php" class="btn btn-secondary">
                         View All Campaigns
                     </a>

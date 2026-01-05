@@ -106,8 +106,10 @@
                 <h3 class="footer-heading">Quick Links</h3>
                 <ul class="footer-links">
                     <li><a href="Homepage.php">Home</a></li>
-                    <li><a href="About Us.php">About Us</a></li>
+                    <li><a href="About_us.php">About Us</a></li>
                     <li><a href="Contact_us.php">Contact Us</a></li>
+                    <li><a href="terms&condition.php">Terms & Conditions</a></li>
+                    <li><a href="privacy.php">Privacy Policy</a></li>
                     <li><a href="FAQs.php">FAQ</a></li>
                     </ul>
             </div>

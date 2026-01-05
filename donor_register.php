@@ -494,7 +494,7 @@ include 'header_UI.php';
                     <div style="display: flex; align-items: flex-start; gap: 10px;">
                         <input type="checkbox" id="terms" name="terms" required style="margin-top: 5px;">
                         <label for="terms" style="margin: 0; font-size: 0.9rem;">
-                            I agree to the <a href="terms.php" target="_blank" style="color: var(--primary-red);">Terms and Conditions</a> 
+                            I agree to the <a href="term&conditon.php" target="_blank" style="color: var(--primary-red);">Terms and Conditions</a> 
                             and <a href="privacy.php" target="_blank" style="color: var(--primary-red);">Privacy Policy</a> of Love Bridge Donation System.
                         </label>
                     </div>
@@ -513,7 +513,7 @@ include 'header_UI.php';
             </div>
         </div>
     </div>
-
+ <?php include 'footer.php'; ?>
     <script>
         // Client-side validation and enhanced features
         document.addEventListener('DOMContentLoaded', function() {
