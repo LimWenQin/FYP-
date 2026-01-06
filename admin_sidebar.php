@@ -32,11 +32,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <i class="fas fa-home"></i> <span>Dashboard</span>
                 </a>
             </li>
+            
             <li>
                 <a href="admin_donor_page.php" class="<?php echo $current_page == 'admin_donor_page.php' ? 'active' : ''; ?>">
                     <i class="fas fa-users"></i> <span>Donor Management</span>
                 </a>
             </li>
+
             <li>
                 <a href="staff_management_page.php" class="<?php echo $current_page == 'staff_management_page.php' ? 'active' : ''; ?>">
                     <i class="fas fa-user-tie"></i> <span>Staff Management</span>
@@ -109,6 +111,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         </a>
                     </li>
                 </ul>
+            </li>
+
+            <li>
+                <a href="admin_blocked_donors.php" class="<?php echo $current_page == 'admin_blocked_donors.php' ? 'active' : ''; ?>" style="font-size: 0.9em; padding-left: 20px; color: #8B0000;">
+                    <i class="fas fa-user-slash"></i> <span>Blocked Donors</span>
+                </a>
             </li>
 
         </ul>
