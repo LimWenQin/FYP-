@@ -430,7 +430,7 @@ $chartData = getDynamicDonationTrends($conn);
         <script>setTimeout(() => { document.getElementById('floatingAlert').style.display='none'; }, 5000);</script>
     <?php endif; ?>
 
-    <?php include 'admin_sidebar.php'; ?>
+    <?php include 'admin_sidebar.css'; ?>
 
     <div class="main-content" id="mainContent">
         <?php include 'admin_header.php'; ?>
