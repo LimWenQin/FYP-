@@ -11,6 +11,76 @@ if (!isset($_SESSION['admin_id'])) {
 // Include database connection
 include 'dataconnection.php';
 
+// --- 0. FETCH CURRENT ADMIN INFO (FIX FOR HEADER WARNING) ---
+// This must be done BEFORE including admin_header.php
+$currentAdminId = $_SESSION['admin_id'];
+$headerSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $currentAdminId";
+$headerResult = $conn->query($headerSql);
+
+if ($headerResult && $headerResult->num_rows > 0) {
+    $headerRow = $headerResult->fetch_assoc();
+    $adminName = $headerRow['Admin_Name'];         // Fixes the $adminName warning
+    $adminProfilePicture = $headerRow['Admin_ProfilePicture'];
+    $adminPosition = $headerRow['Admin_Role'];
+} else {
+    // Fallback if something goes wrong
+    $adminName = "Admin";
+    $adminProfilePicture = null;
+    $adminPosition = "System Admin";
+}
+
+// --- 1. EXPORT TO EXCEL LOGIC (Modified) ---
+if (isset($_POST['export_excel'])) {
+    $filename = "admin_list_" . date('Ymd') . ".xls";
+    header("Content-Type: application/vnd.ms-excel");
+    header("Content-Disposition: attachment; filename=\"$filename\"");
+    header("Pragma: no-cache");
+    header("Expires: 0");
+
+    // 【修改点 1】 导出时过滤掉已删除的 Admin
+    $exportSql = "SELECT * FROM admin WHERE Is_Deleted = 0 ORDER BY Admin_ID ASC";
+    $exportResult = $conn->query($exportSql);
+
+    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+    $host = $_SERVER['HTTP_HOST']; 
+    $path = dirname($_SERVER['PHP_SELF']); 
+    $baseUrl = rtrim($protocol . "://" . $host . $path, '/\\') . '/';
+
+    echo '<table border="1">';
+    echo '<tr>
+            <th style="width: 80px;">Profile Picture</th> <th>ID</th>
+            <th>Name</th><th>Email</th><th>Contact</th><th>IC Number</th>
+            <th>Role</th><th>Status</th><th>Address</th><th>Comment</th>
+          </tr>';
+
+    if ($exportResult->num_rows > 0) {
+        while($row = $exportResult->fetch_assoc()) {
+            $fullAddr = $row['Admin_Address1'] . " " . $row['Admin_Address2'] . " " . $row['Admin_Address3'] . " " . $row['Admin_City'] . " " . $row['Admin_State'];
+            echo '<tr>';
+            echo '<td style="text-align:center; vertical-align:middle; height:80px;">';
+            if (!empty($row['Admin_ProfilePicture']) && file_exists($row['Admin_ProfilePicture'])) {
+                $fullImageUrl = $baseUrl . $row['Admin_ProfilePicture'];
+                echo '<img src="' . $fullImageUrl . '" width="60" height="60" style="object-fit:cover; border-radius:50%;">';
+            } else {
+                echo 'No Image';
+            }
+            echo '</td>';
+            echo '<td style="vertical-align:middle;">' . $row['Admin_ID'] . '</td>';
+            echo '<td style="vertical-align:middle;">' . htmlspecialchars($row['Admin_Name']) . '</td>';
+            echo '<td style="vertical-align:middle;">' . htmlspecialchars($row['Admin_Email']) . '</td>';
+            echo '<td style="vertical-align:middle; mso-number-format:\'\@\'">' . htmlspecialchars($row['Admin_ContactNumber']) . '</td>';
+            echo '<td style="vertical-align:middle; mso-number-format:\'\@\'">' . htmlspecialchars($row['Admin_ICNUMBER']) . '</td>';
+            echo '<td style="vertical-align:middle;">' . htmlspecialchars($row['Admin_Role']) . '</td>';
+            echo '<td style="vertical-align:middle;">' . htmlspecialchars($row['Admin_Status']) . '</td>';
+            echo '<td style="vertical-align:middle;">' . htmlspecialchars($fullAddr) . '</td>';
+            echo '<td style="vertical-align:middle;">' . htmlspecialchars($row['Admin_Comment']) . '</td>';
+            echo '</tr>';
+        }
+    }
+    echo '</table>';
+    exit();
+}
+
 // --- FILE UPLOAD HELPER FUNCTION ---
 function handleProfileUpload($file) {
     if (isset($file) && $file['error'] == 0) {
@@ -23,7 +93,6 @@ function handleProfileUpload($file) {
             $fileExtension = pathinfo($file['name'], PATHINFO_EXTENSION);
             $fileName = 'admin_' . time() . '_' . uniqid() . '.' . $fileExtension;
             $uploadPath = $uploadDir . $fileName;
-            
             if (move_uploaded_file($file['tmp_name'], $uploadPath)) {
                 return $uploadPath;
             }
@@ -34,27 +103,30 @@ function handleProfileUpload($file) {
 
 // --- HANDLE ADD ADMIN ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
-    $name = mysqli_real_escape_string($conn, $_POST['name']);
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
+    $name = mysqli_real_escape_string($conn, trim($_POST['name']));
+    $email = mysqli_real_escape_string($conn, trim($_POST['email']));
     
-    $contactRaw = $_POST['contact'];
-    $contact = "+601" . $contactRaw;
+    $contactRaw = trim($_POST['contact']);
+    $contact = "+60" . $contactRaw;
     
-    $icNumber = mysqli_real_escape_string($conn, $_POST['ic_number']);
+    $icNumber = mysqli_real_escape_string($conn, trim($_POST['ic_number']));
     $dob = mysqli_real_escape_string($conn, $_POST['dob']);
     
-    $address1 = mysqli_real_escape_string($conn, $_POST['address1']);
-    $address2 = mysqli_real_escape_string($conn, $_POST['address2']);
-    $address3 = mysqli_real_escape_string($conn, $_POST['address3']);
-    $city = mysqli_real_escape_string($conn, $_POST['city']);
+    $address1 = mysqli_real_escape_string($conn, trim($_POST['address1']));
+    $address2 = mysqli_real_escape_string($conn, trim($_POST['address2']));
+    $address3 = mysqli_real_escape_string($conn, trim($_POST['address3']));
+    $city = mysqli_real_escape_string($conn, trim($_POST['city']));
     $state = mysqli_real_escape_string($conn, $_POST['state']);
-    $postalCode = mysqli_real_escape_string($conn, $_POST['postal_code']);
-    $country = mysqli_real_escape_string($conn, $_POST['country']);
+    $postalCode = mysqli_real_escape_string($conn, trim($_POST['postal_code']));
+    $country = mysqli_real_escape_string($conn, "Malaysia");
     
     $role = mysqli_real_escape_string($conn, $_POST['role']);
-    $password = $_POST['password'];
+    $status = mysqli_real_escape_string($conn, $_POST['status']);
+    // Added Comment
+    $comment = mysqli_real_escape_string($conn, $_POST['comment']); 
     
-    // Handle Profile Picture
+    $password = trim($_POST['password']);
+    
     $profilePicture = null;
     if (isset($_FILES['profile_picture'])) {
         $uploadedPath = handleProfileUpload($_FILES['profile_picture']);
@@ -65,15 +137,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
     
     // Validation
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !preg_match('/\.(com|net|org|edu|gov|my)$/i', $email)) {
-        $errorMessage = "Invalid email format.";
+        $errorMessage = "Invalid email format. Must contain @ and a valid domain.";
     } elseif (!preg_match('/^[a-zA-Z\s]+$/', $name)) {
-        $errorMessage = "Name can only contain letters and spaces.";
-    } elseif (!preg_match('/^\+601[0-9]-[0-9]{7,10}$/', $contact)) { 
+        $errorMessage = "Name can only contain letters.";
+    } elseif (!preg_match('/^\+60[0-9]{1,2}-[0-9]{7,10}$/', $contact)) { 
         $errorMessage = "Invalid phone format.";
     } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>])[A-Za-z\d!@#$%^&*()\-_=+{};:,<.>]{8,15}$/', $password)) {
-        $errorMessage = "Password is weak. Follow requirements.";
+        $errorMessage = "Password does not meet security requirements.";
     } else {
-        // Validate Age (Must be 18+)
         if (!empty($dob)) {
             $birthDate = new DateTime($dob);
             $today = new DateTime();
@@ -84,6 +155,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
         }
 
         if (!isset($errorMessage)) {
+            // Note: We check if email exists in the system. 
+            // Usually unique constraint is on the email column, so even deleted users retain the email.
+            // If you want to allow re-using email of deleted users, this query needs Is_Deleted = 0.
+            // For now, I'll keep it strict (email must be unique globally).
             $checkEmailSql = "SELECT Admin_ID FROM admin WHERE Admin_Email = '$email'";
             $res = $conn->query($checkEmailSql);
             
@@ -92,13 +167,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
             } else {
                 $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
                 
+                // Added Admin_Comment to query
                 $cols = "Admin_Name, Admin_ContactNumber, Admin_ICNUMBER, Admin_Email, Admin_Password, 
                         Admin_Address1, Admin_Address2, Admin_Address3, Admin_City, Admin_State, Admin_PostalCode, Admin_Country, 
-                        Admin_DOB, Admin_Role, Admin_Status, Admin_Comment";
+                        Admin_DOB, Admin_Role, Admin_Status, Admin_Comment, Is_Deleted";
                 
                 $vals = "'$name', '$contact', '$icNumber', '$email', '$hashedPassword', 
                         '$address1', '$address2', '$address3', '$city', '$state', '$postalCode', '$country',
-                        '$dob', '$role', 'Active', 'Added via admin management system'";
+                        '$dob', '$role', '$status', '$comment', 0";
 
                 if ($profilePicture) {
                     $cols .= ", Admin_ProfilePicture";
@@ -120,39 +196,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
     elseif (!empty($errorMessage)) { header("Location: admin_management_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
 
-// --- HANDLE UPDATE ADMIN ---
+// --- HANDLE UPDATE ADMIN INFO ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
     $editId = mysqli_real_escape_string($conn, $_POST['admin_id']);
-    $name = mysqli_real_escape_string($conn, $_POST['name']);
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
+    $name = mysqli_real_escape_string($conn, trim($_POST['name']));
+    $email = mysqli_real_escape_string($conn, trim($_POST['email']));
     
-    $contactRaw = $_POST['contact'];
-    $contact = "+601" . $contactRaw;
+    $contactRaw = trim($_POST['contact']);
+    $contact = "+60" . $contactRaw;
     
-    $icNumber = mysqli_real_escape_string($conn, $_POST['ic_number']);
+    $icNumber = mysqli_real_escape_string($conn, trim($_POST['ic_number']));
     $dob = mysqli_real_escape_string($conn, $_POST['dob']);
     
-    $address1 = mysqli_real_escape_string($conn, $_POST['address1']);
-    $address2 = mysqli_real_escape_string($conn, $_POST['address2']);
-    $address3 = mysqli_real_escape_string($conn, $_POST['address3']);
-    $city = mysqli_real_escape_string($conn, $_POST['city']);
+    $address1 = mysqli_real_escape_string($conn, trim($_POST['address1']));
+    $address2 = mysqli_real_escape_string($conn, trim($_POST['address2']));
+    $address3 = mysqli_real_escape_string($conn, trim($_POST['address3']));
+    $city = mysqli_real_escape_string($conn, trim($_POST['city']));
     $state = mysqli_real_escape_string($conn, $_POST['state']);
-    $postalCode = mysqli_real_escape_string($conn, $_POST['postal_code']);
-    $country = mysqli_real_escape_string($conn, $_POST['country']);
+    $postalCode = mysqli_real_escape_string($conn, trim($_POST['postal_code']));
+    $country = mysqli_real_escape_string($conn, "Malaysia");
     
     $role = mysqli_real_escape_string($conn, $_POST['role']);
+    $status = mysqli_real_escape_string($conn, $_POST['status']);
+    // Added Comment Update
+    $comment = mysqli_real_escape_string($conn, $_POST['comment']);
     
-    $passwordSql = "";
-    if (!empty($_POST['password'])) {
-        $password = $_POST['password'];
-        if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>])[A-Za-z\d!@#$%^&*()\-_=+{};:,<.>]{8,15}$/', $password)) {
-            $errorMessage = "New password does not meet requirements.";
-        } else {
-            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-            $passwordSql = ", Admin_Password = '$hashedPassword'";
-        }
-    }
-
     $picSql = "";
     if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] == 0) {
         $uploadedPath = handleProfileUpload($_FILES['profile_picture']);
@@ -167,33 +235,35 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
         }
     }
 
-    if (empty($errorMessage)) {
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-             $errorMessage = "Invalid email format.";
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+         $errorMessage = "Invalid email format.";
+    } elseif (!preg_match('/^[a-zA-Z\s]+$/', $name)) {
+        $errorMessage = "Name can only contain letters and spaces.";
+    } else {
+        // Added Admin_Comment to update query
+        $sql = "UPDATE admin SET 
+                Admin_Name = '$name', 
+                Admin_ContactNumber = '$contact', 
+                Admin_ICNUMBER = '$icNumber', 
+                Admin_Email = '$email',
+                Admin_Address1 = '$address1', 
+                Admin_Address2 = '$address2', 
+                Admin_Address3 = '$address3',
+                Admin_City = '$city', 
+                Admin_State = '$state', 
+                Admin_PostalCode = '$postalCode',
+                Admin_Country = '$country', 
+                Admin_DOB = '$dob',
+                Admin_Role = '$role',
+                Admin_Status = '$status',
+                Admin_Comment = '$comment'
+                $picSql
+                WHERE Admin_ID = $editId";
+        
+        if ($conn->query($sql)) {
+            $successMessage = "Admin info updated successfully!";
         } else {
-            $sql = "UPDATE admin SET 
-                    Admin_Name = '$name', 
-                    Admin_ContactNumber = '$contact', 
-                    Admin_ICNUMBER = '$icNumber', 
-                    Admin_Email = '$email',
-                    Admin_Address1 = '$address1', 
-                    Admin_Address2 = '$address2', 
-                    Admin_Address3 = '$address3',
-                    Admin_City = '$city', 
-                    Admin_State = '$state', 
-                    Admin_PostalCode = '$postalCode',
-                    Admin_Country = '$country', 
-                    Admin_DOB = '$dob',
-                    Admin_Role = '$role'
-                    $passwordSql
-                    $picSql
-                    WHERE Admin_ID = $editId";
-            
-            if ($conn->query($sql)) {
-                $successMessage = "Admin updated successfully!";
-            } else {
-                $errorMessage = "Error updating admin: " . $conn->error;
-            }
+            $errorMessage = "Error updating admin: " . $conn->error;
         }
     }
 
@@ -201,16 +271,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
     elseif (!empty($errorMessage)) { header("Location: admin_management_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
 
-// --- DELETE ADMIN ---
+// --- HANDLE CHANGE PASSWORD (unchanged) ---
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
+    $targetAdminId = mysqli_real_escape_string($conn, $_POST['target_admin_id']);
+    $authPassword = $_POST['auth_password']; 
+    $newPassword = $_POST['new_password'];
+    $confirmPassword = $_POST['confirm_new_password'];
+    
+    $loggedInAdminId = $_SESSION['admin_id'];
+    
+    $authSql = "SELECT Admin_Password FROM admin WHERE Admin_ID = $loggedInAdminId";
+    $authResult = $conn->query($authSql);
+    $currentUser = $authResult->fetch_assoc();
+    
+    if (!$currentUser || !password_verify($authPassword, $currentUser['Admin_Password'])) {
+        $errorMessage = "Authorization failed: Your current password is incorrect.";
+    } elseif ($newPassword !== $confirmPassword) {
+        $errorMessage = "New passwords do not match.";
+    } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>])[A-Za-z\d!@#$%^&*()\-_=+{};:,<.>]{8,15}$/', $newPassword)) {
+        $errorMessage = "New password does not meet security requirements.";
+    } else {
+        $newHashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+        $updatePassSql = "UPDATE admin SET Admin_Password = '$newHashedPassword' WHERE Admin_ID = $targetAdminId";
+        if ($conn->query($updatePassSql)) {
+            $successMessage = "Password changed successfully!";
+        } else {
+            $errorMessage = "Error changing password: " . $conn->error;
+        }
+    }
+    
+    if (!empty($successMessage)) { header("Location: admin_management_page.php?success=" . urlencode($successMessage)); exit(); }
+    elseif (!empty($errorMessage)) { header("Location: admin_management_page.php?error=" . urlencode($errorMessage)); exit(); }
+}
+
+// --- DELETE ADMIN (Modified for Soft Delete) ---
 if (isset($_GET['delete_id'])) {
     $deleteId = $_GET['delete_id'];
-    
     if ($deleteId == $_SESSION['admin_id']) {
         $errorMessage = "You cannot delete your own account!";
         header("Location: admin_management_page.php?error=" . urlencode($errorMessage));
         exit();
     } else {
-        $deleteSql = "DELETE FROM admin WHERE Admin_ID = $deleteId";
+        // 【修改点 2】 Soft Delete Logic
+        $deleteSql = "UPDATE admin SET Is_Deleted = 1 WHERE Admin_ID = $deleteId";
         if ($conn->query($deleteSql)) {
             $successMessage = "Admin deleted successfully!";
             header("Location: admin_management_page.php?success=" . urlencode($successMessage));
@@ -223,19 +326,19 @@ if (isset($_GET['delete_id'])) {
     }
 }
 
-// --- PAGINATION & SEARCH & FILTER (NEW LOGIC) ---
-$results_per_page = 10;
+// --- PAGINATION & SEARCH & FILTER (Modified) ---
+$results_per_page = 6;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $page = max(1, $page);
 $start_from = ($page - 1) * $results_per_page;
 
-// Get Search and Filter inputs (Updated to match Donor Logic)
 $searchTerm = isset($_GET['search']) ? mysqli_real_escape_string($conn, $_GET['search']) : "";
 $filterType = isset($_GET['filter_type']) ? $_GET['filter_type'] : "";
 $filterValue = "";
 
-// Build WHERE Clause dynamically
+// 【修改点 3】 默认只显示未删除的 Admin
 $conditions = [];
+$conditions[] = "Is_Deleted = 0";
 
 if (!empty($searchTerm)) {
     $conditions[] = "(Admin_Name LIKE '%$searchTerm%' 
@@ -243,7 +346,6 @@ if (!empty($searchTerm)) {
                      OR Admin_ID LIKE '%$searchTerm%')";
 }
 
-// Handle Dynamic Filters
 if (!empty($filterType)) {
     if ($filterType == 'role' && !empty($_GET['filter_val_role'])) {
         $filterValue = mysqli_real_escape_string($conn, $_GET['filter_val_role']);
@@ -260,7 +362,6 @@ if (count($conditions) > 0) {
     $whereClause = "WHERE " . implode(' AND ', $conditions);
 }
 
-// Get Count
 $count_sql = "SELECT COUNT(*) as total FROM admin $whereClause";
 $count_result = $conn->query($count_sql);
 $total_admins = 0;
@@ -271,7 +372,6 @@ if ($count_result && $count_result->num_rows > 0) {
 
 $total_pages = ceil($total_admins / $results_per_page);
 
-// Get Data
 $sql = "SELECT * FROM admin $whereClause ORDER BY Admin_Name LIMIT $start_from, $results_per_page";
 $result = $conn->query($sql);
 $admins = [];
@@ -284,50 +384,9 @@ if ($result && $result->num_rows > 0) {
 $start_record = ($total_admins > 0) ? $start_from + 1 : 0;
 $end_record = min($page * $results_per_page, $total_admins);
 
-// --- STATS ---
-function getTotalAdmins($conn) {
-    $sql = "SELECT COUNT(*) as total FROM admin";
-    $result = $conn->query($sql);
-    return ($result && $result->num_rows > 0) ? $result->fetch_assoc()['total'] : 0;
-}
-
-function getActiveAdmins($conn) {
-    $sql = "SELECT COUNT(*) as total FROM admin WHERE Admin_Status = 'Active'";
-    $result = $conn->query($sql);
-    return ($result && $result->num_rows > 0) ? $result->fetch_assoc()['total'] : 0;
-}
-
-$totalAdminsCount = getTotalAdmins($conn);
-$activeAdminsCount = getActiveAdmins($conn);
-
-// --- CURRENT USER INFO ---
-$adminId = $_SESSION['admin_id'];
-$adminName = isset($_SESSION['admin_name']) ? $_SESSION['admin_name'] : 'Admin'; 
-$adminProfilePicture = null;
-
-$stmt = $conn->prepare("SELECT Admin_ProfilePicture FROM admin WHERE Admin_ID = ?");
-$stmt->bind_param("i", $adminId);
-$stmt->execute();
-$res = $stmt->get_result();
-if ($res && $res->num_rows > 0) {
-    $row = $res->fetch_assoc();
-    $adminProfilePicture = $row['Admin_ProfilePicture'];
-}
-$stmt->close();
-
-function formatAddress($admin) {
-    $addressParts = [];
-    if (!empty($admin['Admin_Address1'])) $addressParts[] = htmlspecialchars($admin['Admin_Address1']) . ',';
-    $line2Parts = [];
-    if (!empty($admin['Admin_Address2'])) $line2Parts[] = htmlspecialchars($admin['Admin_Address2']);
-    if (!empty($admin['Admin_Address3'])) $line2Parts[] = htmlspecialchars($admin['Admin_Address3']);
-    if (!empty($line2Parts)) $addressParts[] = implode(', ', $line2Parts) . ',';
-    $postal = htmlspecialchars($admin['Admin_PostalCode']);
-    $city = htmlspecialchars($admin['Admin_City']);
-    $state = htmlspecialchars($admin['Admin_State']);
-    $addressParts[] = $postal . ' ' . $city . ',' . $state;
-    return implode("<br>", $addressParts);
-}
+// 【修改点 4】 统计数据过滤掉已删除的 Admin
+$totalAdminsCount = $conn->query("SELECT COUNT(*) as total FROM admin WHERE Is_Deleted = 0")->fetch_assoc()['total'];
+$activeAdminsCount = $conn->query("SELECT COUNT(*) as total FROM admin WHERE Admin_Status = 'Active' AND Is_Deleted = 0")->fetch_assoc()['total'];
 
 $malaysiaStates = [
     'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 
@@ -345,7 +404,7 @@ $conn->close();
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin_common.css">
     <style>
-        /* 复用样式 - 与 Donor Page 一致 */
+        /* Specific Styles for Admin Management Page */
         .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-5px); }
@@ -362,71 +421,48 @@ $conn->close();
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .section-header h2 { font-size: 18px; font-weight: 600; }
         .action-buttons { display: flex; gap: 10px; }
-        .btn { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: 500; transition: all 0.3s; display: flex; align-items: center; gap: 5px; }
+        .btn { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: 500; transition: all 0.3s; display: flex; align-items: center; gap: 5px; text-decoration: none; font-size: 14px;}
         .btn-primary { background: var(--primary); color: white; }
         .btn-success { background: var(--success); color: white; }
         .btn-danger { background: var(--danger); color: white; }
         
-        /* Updated Search Bar Styling (To Match Donor Page) */
-        .admin-search { 
-            margin-bottom: 20px; 
-            display: flex; 
-            gap: 10px; 
-            align-items: center; 
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #eee;
-            flex-wrap: wrap;
-        }
+        .admin-search { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee; flex-wrap: wrap; }
         .search-input { flex: 1; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; background: white; min-width: 200px; }
         .search-input:focus { border-color: var(--primary); }
-        
-        /* Filter Styles */
         .filter-group { display: flex; align-items: center; gap: 8px; }
-        .filter-select {
-            padding: 10px 15px;
-            border: 1px solid var(--gray-light);
-            border-radius: 5px;
-            outline: none;
-            background-color: white;
-            min-width: 140px;
-            cursor: pointer;
-        }
+        .filter-select { padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; background-color: white; min-width: 140px; cursor: pointer; }
         .filter-select:focus { border-color: var(--primary); }
-        
-        /* Secondary Filters (Hidden by Default) */
         .secondary-filter { display: none; animation: fadeIn 0.3s; }
         .secondary-filter.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
-        .admin-table { width: 100%; border-collapse: collapse; }
-        .admin-table th, .admin-table td { padding: 15px; text-align: left; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
-        .admin-table th { font-weight: 600; color: var(--gray); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
-        
-        .admin-info { display: flex; align-items: center; }
-        .admin-avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 15px; background: var(--primary-light); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; overflow: hidden; }
-        .admin-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .admin-details h4 { font-size: 14px; margin-bottom: 4px; color: var(--dark); }
-        .admin-details p { font-size: 12px; color: #888; margin: 0; }
-        
-        .role-status-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
-        .role-text { font-weight: 600; color: #333; font-size: 13px; }
-        .status-badge { padding: 4px 8px; border-radius: 20px; font-size: 12px; font-weight: 500; }
-        .status-active { background: rgba(40, 167, 69, 0.1); color: var(--success); }
-        .status-inactive { background: rgba(220, 53, 69, 0.1); color: var(--danger); }
+        /* GRID / CARD VIEW STYLES */
+        .staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; }
+        .staff-card { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; transition: transform 0.3s, box-shadow 0.3s; position: relative; display: flex; flex-direction: column; border: 1px solid #eee; }
+        .staff-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-color: #F28585; }
+        .card-header-actions { position: absolute; top: 15px; right: 15px; z-index: 10; }
+        .card-body { padding: 25px 20px 20px; text-align: center; flex: 1; }
+        .card-avatar { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 15px; background: #ffe5e5; color: #F28585; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 28px; object-fit: cover; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); overflow: hidden; }
+        .card-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .card-name { font-size: 18px; font-weight: 700; color: #333; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-role { font-size: 14px; color: #666; margin-bottom: 12px; display: inline-block; background: #f8f9fa; padding: 4px 12px; border-radius: 20px; font-weight: 500; }
+        .card-status { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.3px; margin-bottom: 15px; }
+        .status-active { background-color: #e6f4ea; color: #1e7e34; }
+        .status-inactive { background-color: #fce8e6; color: #c5221f; }
+        .card-footer { background: #fcfcfc; border-top: 1px solid #f0f0f0; padding: 15px 20px; font-size: 13px; color: #555; text-align: left; }
+        .contact-item { display: flex; align-items: center; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .contact-item i { width: 20px; color: #aaa; text-align: center; margin-right: 8px; }
 
-        .action-cell { display: flex; justify-content: center; align-items: center; height: 100%; }
+        /* Action Menu */
         .action-menu { position: relative; display: inline-block; }
-        .menu-btn { background-color: #f8f9fa; border: 1px solid #e9ecef; cursor: pointer; width: 35px; height: 35px; border-radius: 50%; color: #6c757d; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
-        .menu-btn:hover { background-color: #e2e6ea; color: var(--primary); transform: translateY(-1px); }
-        .dropdown-content { display: none; position: absolute; right: 0; top: 40px; background-color: white; min-width: 180px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); z-index: 100; border-radius: 8px; border: 1px solid #eee; animation: fadeIn 0.2s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        .dropdown-content div, .dropdown-content a { color: #333; padding: 12px 16px; text-decoration: none; display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; transition: background 0.2s; }
+        .menu-btn { width: 32px; height: 32px; border-radius: 50%; background: white; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: #777; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 14px; }
+        .menu-btn:hover { background: #f8f9fa; color: var(--primary); border-color: #ddd; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .dropdown-content { display: none; position: absolute; right: 0; top: 40px; background-color: white; min-width: 180px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); z-index: 100; border-radius: 8px; overflow: hidden; border: 1px solid #eee; text-align: left; }
+        .dropdown-content div, .dropdown-content a { color: #333; padding: 12px 16px; text-decoration: none; display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; }
         .dropdown-content div:hover, .dropdown-content a:hover { background-color: #f8f9fa; color: var(--primary); }
         .text-delete { color: var(--danger) !important; border-top: 1px solid #eee; }
-        .text-delete:hover { background-color: #fff5f5 !important; }
 
+        /* Modals & Forms */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background-color: white; border-radius: 10px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--gray-light); }
@@ -438,9 +474,11 @@ $conn->close();
         .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
         .form-row .form-group { flex: 1; margin-bottom: 0; }
         .form-group { margin-bottom: 15px; }
-        .form-label { display: block; margin-bottom: 5px; font-weight: 500; color: var(--dark); }
-        .form-input, .form-select { width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; }
-        .form-input:read-only { background-color: #f8f9fa; color: #555; cursor: default; }
+        .form-label { display: block; margin-bottom: 5px; font-weight: 500; color: var(--dark); font-size: 14px; }
+        
+        .form-input, .form-select, .form-textarea { width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; transition: 0.3s; }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
+        .form-input:read-only, .form-textarea:read-only { background-color: #f8f9fa; color: #555; cursor: default; }
 
         .file-upload { text-align: center; margin-bottom: 20px; }
         .profile-picture-preview { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #f8f9fa; margin: 0 auto 15px; background: #eee; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
@@ -451,24 +489,22 @@ $conn->close();
         .file-upload input[type="file"] { display: none; }
         .file-info { display: none; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; background: #f1f1f1; padding: 5px 10px; border-radius: 5px; }
         .file-info.active { display: inline-flex; }
-        .file-name { font-size: 12px; color: #555; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .file-remove { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 14px; padding: 0 5px; }
 
-        /* Error Messages & Guides */
         .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
-        .form-guide { font-size: 11px; color: #6c757d; margin-top: 3px; display: block; font-style: italic; }
+        
+        /* Updated Form Guide Style to match Staff/Donor Page */
+        .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
         .required { color: red; margin-left: 3px; font-weight: bold; }
 
-        /* Password Styling */
+        /* Password Specific */
         .password-input-group { display: flex; width: 100%; }
         .password-input-container { position: relative; flex: 1; display: flex; }
         .password-input-container input { border-radius: 5px 0 0 5px; border-right: none; width: 100%; }
-        .password-input-container button.toggle-password { 
-            position: static; border: 1px solid var(--gray-light); border-left: none; 
-            border-radius: 0; background: white; padding: 0 10px; cursor: pointer; color: #888;
-        }
+        .password-input-container button.toggle-password { position: static; border: 1px solid var(--gray-light); border-left: none; border-radius: 0; background: white; padding: 0 10px; cursor: pointer; color: #888; width: 40px; display: flex; align-items: center; justify-content: center; }
         .btn-small { padding: 0 12px; border-radius: 0 5px 5px 0; border: 1px solid var(--gray-light); border-left: none; background: #f8f9fa; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--primary); transition: 0.2s; }
-        .btn-small:hover { background: #e9ecef; }
+        
+        .confirm-check { position: absolute; right: 50px; top: 50%; transform: translateY(-50%); color: var(--success); font-size: 14px; display: none; z-index: 2; }
 
         .password-requirements { margin-top: 8px; font-size: 12px; }
         .requirement-item { display: flex; align-items: center; margin-bottom: 3px; color: #888; }
@@ -476,9 +512,8 @@ $conn->close();
         .requirement-item.invalid { color: var(--gray); }
         .requirement-item i { width: 15px; text-align: center; margin-right: 5px; }
 
-        /* Phone Input */
         .phone-format { display: flex; align-items: center; }
-        .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid var(--gray-light); border-right: none; border-radius: 5px 0 0 5px; color: var(--gray); }
+        .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid var(--gray-light); border-right: none; border-radius: 5px 0 0 5px; color: var(--gray); font-weight: bold; }
         .phone-input { border-radius: 0 5px 5px 0 !important; }
 
         .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; }
@@ -486,10 +521,7 @@ $conn->close();
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
 
         .pagination-container { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding: 15px 0; border-top: 1px solid var(--gray-light); }
-        .pagination-info { font-size: 14px; color: var(--gray); }
-        .pagination-controls { display: flex; gap: 5px; align-items: center; }
         .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; transition: all 0.3s; }
-        .pagination-btn:hover:not(.disabled):not(.active) { background-color: #e2e6ea; border-color: #dae0e5; }
         .pagination-btn.active { background-color: #F28585; color: white; border-color: #F28585; cursor: default; }
         .pagination-btn.disabled { color: #ccc; cursor: not-allowed; background-color: #f8f9fa; }
     </style>
@@ -509,36 +541,28 @@ $conn->close();
         </div>
     <?php endif; ?>
 
-    <div class="sidebar collapsed" id="sidebar">
-        <div class="sidebar-menu">
-            <ul>
-                <li><a href="admin_dashboard.php"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
-                <li><a href="admin_donor_page.php"><i class="fas fa-users"></i> <span>Donor Management</span></a></li>
-                <li><a href="staff_management_page.php"><i class="fas fa-user-tie"></i> <span>Staff Management</span></a></li>
-                <li><a href="admin_management_page.php" class="active"><i class="fas fa-user-shield"></i> <span>Admin Management</span></a></li>
-                <li><a href="branch_management_page.php"><i class="fas fa-map-marker-alt"></i> <span>Branch Management</span></a></li>
-                <li><a href="activity_management.php"><i class="fas fa-calendar-alt"></i> <span>Activity Management</span></a></li>
-                <li><a href="payment_management.php"><i class="fas fa-credit-card"></i> <span>Payment Management</span></a></li>
-                <li><a href="reward_item_management.php"><i class="fas fa-gift"></i> <span>Reward Items</span></a></li>
-            </ul>
-        </div>
-    </div>
+    <?php include 'admin_sidebar.php'; ?>
 
     <div class="main-content" id="mainContent">
-        <div class="top-nav">
-            <div class="nav-left"><div class="logo"><a href="admin_dashboard.php"><img src="logo.jpg" alt="Logo"><h1>DonationMS</h1></a></div><div class="search-bar"><i class="fas fa-search"></i><input type="text" placeholder="Search..."></div></div>
-            <div class="nav-right"><div class="user-profile" id="userProfileDropdown"><div class="user-profile-with-avatar"><div class="user-avatar"><?php if (!empty($adminProfilePicture)): ?><img src="<?php echo htmlspecialchars($adminProfilePicture); ?>" alt="Profile"><?php else: ?><?php echo substr($adminName, 0, 1); ?><?php endif; ?></div><div class="user-details"><div class="user-name"><?php echo htmlspecialchars($adminName); ?></div><div class="user-role">Administrator</div></div></div></div></div>
-        </div>
+        <?php include 'admin_header.php'; ?>
 
         <div class="dashboard-content">
             <div class="welcome-section"><h1>Admin Management</h1><p>Manage all administrators in the system.</p></div>
             <div class="stats-cards">
-                <div class="stat-card"><div class="stat-info"><h3>TOTAL ADMINS</h3><h2><?php echo $totalAdminsCount; ?></h2><p class="stat-desc text-muted"><i class="fas fa-users"></i> Total registered administrators</p></div><div class="stat-icon"><i class="fas fa-user-shield"></i></div></div>
+                <div class="stat-card"><div class="stat-info"><h3>TOTAL ADMINS</h3><h2><?php echo $totalAdminsCount; ?></h2><p class="stat-desc text-success"><i class="fas fa-users"></i> Total registered administrators</p></div><div class="stat-icon"><i class="fas fa-user-shield"></i></div></div>
                 <div class="stat-card"><div class="stat-info"><h3>ACTIVE ADMINS</h3><h2><?php echo $activeAdminsCount; ?></h2><p class="stat-desc text-success"><i class="fas fa-check-circle"></i> Currently active</p></div><div class="stat-icon"><i class="fas fa-user-check"></i></div></div>
             </div>
 
             <div class="admin-management">
-                <div class="section-header"><h2>Admin List</h2><div class="action-buttons"><button class="btn btn-primary" onclick="openAddAdminModal()"><i class="fas fa-plus"></i> Add New Admin</button><button class="btn btn-success"><i class="fas fa-download"></i> Export Data</button></div></div>
+                <div class="section-header">
+                    <h2>Admin List</h2>
+                    <div class="action-buttons">
+                        <button class="btn btn-primary" onclick="openAddAdminModal()"><i class="fas fa-plus"></i> Add New Admin</button>
+                        <form method="POST" action="admin_management_page.php" style="display:inline;">
+                            <button type="submit" name="export_excel" class="btn btn-success"><i class="fas fa-download"></i> Export Data</button>
+                        </form>
+                    </div>
+                </div>
                 
                 <form method="GET" action="admin_management_page.php" class="admin-search">
                     <div class="filter-group">
@@ -555,8 +579,7 @@ $conn->close();
                             <option value="">Select Role...</option>
                             <option value="Admin" <?php if($filterType == 'role' && $filterValue == 'Admin') echo 'selected'; ?>>Admin</option>
                             <option value="Super Admin" <?php if($filterType == 'role' && $filterValue == 'Super Admin') echo 'selected'; ?>>Super Admin</option>
-                            <option value="Moderator" <?php if($filterType == 'role' && $filterValue == 'Moderator') echo 'selected'; ?>>Moderator</option>
-                        </select>
+                            </select>
                     </div>
 
                     <div id="filter_status_container" class="secondary-filter">
@@ -568,39 +591,74 @@ $conn->close();
                     </div>
 
                     <input type="text" name="search" class="search-input" placeholder="Search by Name, ID or Email..." value="<?php echo htmlspecialchars($searchTerm); ?>">
-                    
                     <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
-                    
                     <?php if (!empty($searchTerm) || !empty($filterType)): ?>
                         <a href="admin_management_page.php" class="btn btn-danger" style="background-color: #dc3545; padding: 10px 15px;" title="Clear Filters"><i class="fas fa-times"></i></a>
                     <?php endif; ?>
                 </form>
-                <table class="admin-table">
-                    <thead><tr><th>ADMIN NAME</th><th>CONTACT INFO</th><th>IC / DOB</th><th style="width: 25%;">ADDRESS</th><th>ROLE & STATUS</th><th style="text-align: center;">ACTIONS</th></tr></thead>
-                    <tbody>
-                        <?php if (count($admins) > 0): foreach($admins as $admin): ?>
-                            <tr>
-                                <td><div class="admin-info"><div class="admin-avatar"><?php if (!empty($admin['Admin_ProfilePicture'])): ?><img src="<?php echo htmlspecialchars($admin['Admin_ProfilePicture']); ?>" alt="Profile"><?php else: ?><?php echo substr($admin['Admin_Name'], 0, 1); ?><?php endif; ?></div><div class="admin-details"><h4><?php echo htmlspecialchars($admin['Admin_Name']); ?></h4><p>ID: <?php echo htmlspecialchars($admin['Admin_ID']); ?></p></div></div></td>
-                                <td><div class="admin-details"><p><i class="fas fa-envelope" style="width:15px;color:#999;"></i> <?php echo htmlspecialchars($admin['Admin_Email']); ?></p><p><i class="fas fa-phone" style="width:15px;color:#999;"></i> <?php echo htmlspecialchars($admin['Admin_ContactNumber']); ?></p></div></td>
-                                <td><div style="font-size:13px; color:#555;"><div style="margin-bottom:3px;">IC: <?php echo htmlspecialchars($admin['Admin_ICNUMBER']); ?></div><div>DOB: <?php echo date('Y-m-d', strtotime($admin['Admin_DOB'])); ?></div></div></td>
-                                <td><div class="address-display" style="font-size:12px; color:#666;"><?php echo formatAddress($admin); ?></div></td>
-                                <td><div class="role-status-cell"><span class="role-text"><?php echo htmlspecialchars($admin['Admin_Role']); ?></span><span class="status-badge <?php echo ($admin['Admin_Status'] ?? 'Active') === 'Active' ? 'status-active' : 'status-inactive'; ?>"><?php echo $admin['Admin_Status'] ?? 'Active'; ?></span></div></td>
-                                <td><div class="action-cell"><div class="action-menu"><button class="menu-btn" onclick="toggleMenu(event, <?php echo $admin['Admin_ID']; ?>)"><i class="fas fa-ellipsis-v"></i></button><div id="menu-<?php echo $admin['Admin_ID']; ?>" class="dropdown-content"><div onclick="openViewAdminModal(<?php echo htmlspecialchars(json_encode($admin)); ?>)"><i class="fas fa-eye"></i> View Details</div><div onclick='openEditAdminModal(<?php echo json_encode($admin); ?>)'><i class="fas fa-edit"></i> Edit Details</div><a href="javascript:confirmDelete(<?php echo $admin['Admin_ID']; ?>, '<?php echo htmlspecialchars($admin['Admin_Name']); ?>')" class="text-delete"><i class="fas fa-trash"></i> Delete</a></div></div></div></td>
-                            </tr>
-                        <?php endforeach; else: ?><tr><td colspan="6" style="text-align: center; padding: 20px;">No admins found.</td></tr><?php endif; ?>
-                    </tbody>
-                </table>
                 
+                <div class="staff-grid">
+                    <?php if (count($admins) > 0): foreach($admins as $admin): ?>
+                    <div class="staff-card">
+                        <div class="card-header-actions">
+                            <div class="action-menu">
+                                <button class="menu-btn" onclick="toggleMenu(event, <?php echo $admin['Admin_ID']; ?>)">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <div id="menu-<?php echo $admin['Admin_ID']; ?>" class="dropdown-content">
+                                    <div onclick="openViewAdminModal(<?php echo htmlspecialchars(json_encode($admin)); ?>)"><i class="fas fa-eye"></i> View Details</div>
+                                    <div onclick='openEditAdminModal(<?php echo json_encode($admin); ?>)'><i class="fas fa-edit"></i> Edit Details</div>
+                                    <div onclick="openChangePasswordModal(<?php echo $admin['Admin_ID']; ?>)"><i class="fas fa-key"></i> Change Password</div>
+                                    <a href="javascript:confirmDelete(<?php echo $admin['Admin_ID']; ?>, '<?php echo htmlspecialchars($admin['Admin_Name']); ?>')" class="text-delete"><i class="fas fa-trash"></i> Delete</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <div class="card-avatar">
+                                <?php if (!empty($admin['Admin_ProfilePicture'])): ?>
+                                    <img src="<?php echo htmlspecialchars($admin['Admin_ProfilePicture']); ?>" alt="Profile">
+                                <?php else: ?>
+                                    <?php echo substr($admin['Admin_Name'], 0, 1); ?>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <div class="card-name"><?php echo htmlspecialchars($admin['Admin_Name']); ?></div>
+                            <div class="card-role"><?php echo htmlspecialchars($admin['Admin_Role']); ?></div>
+                            
+                            <div>
+                                <span class="card-status <?php echo ($admin['Admin_Status'] == 'Active') ? 'status-active' : 'status-inactive'; ?>">
+                                    <?php echo htmlspecialchars($admin['Admin_Status'] ?? 'Active'); ?>
+                                </span>
+                            </div>
+                            
+                            <div style="font-size: 12px; color: #999; margin-top: 5px;">ID: #<?php echo str_pad($admin['Admin_ID'], 4, '0', STR_PAD_LEFT); ?></div>
+                        </div>
+                        
+                        <div class="card-footer">
+                            <div class="contact-item">
+                                <i class="fas fa-envelope"></i> <?php echo htmlspecialchars($admin['Admin_Email']); ?>
+                            </div>
+                            <div class="contact-item">
+                                <i class="fas fa-phone"></i> <?php echo htmlspecialchars($admin['Admin_ContactNumber']); ?>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; else: ?>
+                    <div style="grid-column: 1 / -1; text-align:center; padding:40px; color:#888; background:#f9f9f9; border-radius:10px;">
+                        <i class="fas fa-search" style="font-size:40px; color:#ddd; margin-bottom:10px;"></i>
+                        <p>No active admins found matching your criteria.</p>
+                    </div>
+                    <?php endif; ?>
+                </div>
                 <div class="pagination-container">
                     <div class="pagination-info">Showing <?php echo $start_record; ?> to <?php echo $end_record; ?> of <?php echo $total_admins; ?> results</div>
                     <div class="pagination-controls">
                         <?php 
-                        // Build query params for pagination
                         $queryParams = [];
                         if (!empty($searchTerm)) $queryParams['search'] = $searchTerm;
                         if (!empty($filterType)) {
                             $queryParams['filter_type'] = $filterType;
-                            // Add value depending on type
                             if ($filterType == 'role' && !empty($filterValue)) $queryParams['filter_val_role'] = $filterValue;
                             if ($filterType == 'status' && !empty($filterValue)) $queryParams['filter_val_status'] = $filterValue;
                         }
@@ -636,18 +694,132 @@ $conn->close();
         <div class="modal-content">
             <div class="modal-header"><h2>Add New Administrator</h2><button class="close-btn" onclick="closeAddAdminModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="addAdminForm" action="admin_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm()">
+                <form id="addAdminForm" action="admin_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')">
                     <input type="hidden" name="add_admin" value="1">
                     <div class="form-group"><label>Profile Picture</label><div class="profile-picture-preview" id="add-preview-container"><div class="default-avatar-icon"><i class="fas fa-user"></i></div></div><div class="file-upload"><label for="add_profile_picture" class="file-upload-label"><i class="fas fa-upload"></i> Choose File</label><input type="file" id="add_profile_picture" name="profile_picture" accept="image/*" onchange="previewImage(this, 'add-preview-container', 'add-file-info', 'add-file-name')"><div id="add-file-info" class="file-info"><span id="add-file-name" class="file-name"></span><button type="button" class="file-remove" onclick="removeImage('add_profile_picture', 'add-preview-container', 'add-file-info')"><i class="fas fa-times"></i></button></div></div></div>
-                    <div class="form-group"><label class="form-label">Full Name <span class="required">*</span></label><input type="text" name="name" class="form-input" required placeholder="Full Name" oninput="validateName(this)"><span class="form-guide">Only English letters and spaces are allowed.</span></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Email <span class="required">*</span></label><input type="email" id="email" name="email" class="form-input" required onblur="validateEmail()" placeholder="e.g. admin@lovebridge.org.my"><span class="form-guide">Must include '@' and end with .com, .net, .org, etc.</span><div id="emailError" class="error-message">Invalid email format</div></div><div class="form-group"><label class="form-label">Contact Number <span class="required">*</span></label><div class="phone-format"><span class="phone-prefix">+601</span><input type="text" id="contact" name="contact" class="form-input phone-input" required maxlength="11" placeholder="X-XXXXXXX"></div><span class="form-guide">(e.g., +6012-3456789)</span></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">IC Number <span class="required">*</span></label><input type="text" id="ic_number" name="ic_number" class="form-input" required maxlength="14" oninput="formatICNumber('ic_number')" placeholder="XXXXXX-XX-XXXX"></div><div class="form-group"><label class="form-label">Date of Birth <span class="required">*</span></label><input type="date" id="dob" name="dob" class="form-input" required onchange="validateAge()"><div id="ageError" class="error-message">Must be 18+</div></div></div>
-                    <div class="form-group"><label class="form-label">Address Line 1 <span class="required">*</span></label><input type="text" name="address1" class="form-input" required placeholder="House No, Street"></div><div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" name="address2" class="form-input" required placeholder="Area / Taman"></div><div class="form-group"><label class="form-label">Address Line 3</label><input type="text" name="address3" class="form-input" placeholder="Building (Optional)"></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" name="city" class="form-input" required></div><div class="form-group"><label class="form-label">State <span class="required">*</span></label><select name="state" class="form-select" required><option value="">Select State</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Postal Code <span class="required">*</span></label><input type="text" name="postal_code" class="form-input" required></div><div class="form-group"><label class="form-label">Country</label><input type="text" name="country" class="form-input" value="Malaysia" readonly></div></div>
-                    <div class="form-group"><label class="form-label">Role <span class="required">*</span></label><select name="role" class="form-select" required><option value="Admin">Admin</option><option value="Super Admin">Super Admin</option><option value="Moderator">Moderator</option></select></div>
-                    <div class="form-group"><label class="form-label">Password <span class="required">*</span></label><div class="password-input-group"><div class="password-input-container"><input type="password" id="password" name="password" class="form-input" required oninput="validatePasswordRequirements()"><button type="button" class="toggle-password" onclick="togglePasswordVisibility('password')"><i class="fas fa-eye"></i></button></div><button type="button" class="btn-small" onclick="generateStrongPassword('password', 'confirm_password')">Auto Generate</button></div><div class="password-requirements"><div class="requirement-item invalid" id="lengthReq"><i class="fas fa-times"></i> Must be 8-15 characters long</div><div class="requirement-item invalid" id="uppercaseReq"><i class="fas fa-times"></i> Must contain at least one Uppercase letter</div><div class="requirement-item invalid" id="lowercaseReq"><i class="fas fa-times"></i> Must contain at least one Lowercase letter</div><div class="requirement-item invalid" id="numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div><div class="requirement-item invalid" id="specialReq"><i class="fas fa-times"></i> Must contain at least one Special character (e.g. !@#)</div></div></div>
-                    <div class="form-group"><label class="form-label">Confirm Password <span class="required">*</span></label><div class="password-input-container"><input type="password" id="confirm_password" name="confirm_password" class="form-input" required oninput="validatePasswordMatch()"><i id="password-match-icon" class="fas fa-check-circle confirm-check" style="display:none; position:absolute; right:40px; top:50%; transform:translateY(-50%); color:green;"></i><button type="button" class="toggle-password" onclick="togglePasswordVisibility('confirm_password')"><i class="fas fa-eye"></i></button></div><div id="confirmPasswordError" class="error-message">Passwords do not match</div></div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Full Name <span class="required">*</span></label>
+                        <input type="text" name="name" class="form-input" required placeholder="Full Name" oninput="validateName(this)">
+                        <span class="form-guide">Enter full name as per IC. English letters only.</span>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Email <span class="required">*</span></label>
+                            <input type="email" id="email" name="email" class="form-input" required onblur="validateEmail('email', 'emailError')" placeholder="e.g. admin@lovebridge.org.my">
+                            <span class="form-guide">Valid email address (e.g. name@domain.com, must contain @ and domain).</span>
+                            <div id="emailError" class="error-message">Invalid email format.</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contact Number <span class="required">*</span></label>
+                            <div class="phone-format">
+                                <span class="phone-prefix">+60</span>
+                                <input type="text" id="contact" name="contact" class="form-input phone-input" required maxlength="11" placeholder="1X-XXXXXXX">
+                            </div>
+                            <span class="form-guide">Format: 12-3456789 or 11-12345678 (No need for +60).</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">IC Number <span class="required">*</span></label>
+                            <input type="text" id="ic_number" name="ic_number" class="form-input" required maxlength="14" placeholder="XXXXXX-XX-XXXX">
+                            <span class="form-guide">Format: YYMMDD-PB-#### (e.g. 990101-07-1234).</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Date of Birth <span class="required">*</span></label>
+                            <input type="date" id="dob" name="dob" class="form-input" required onchange="validateAge('dob', 'ageError')">
+                            <div id="ageError" class="error-message">Must be 18+</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Address Line 1 <span class="required">*</span></label>
+                        <input type="text" name="address1" class="form-input" required placeholder="House No, Street">
+                        <span class="form-guide">House unit no., floor, building, street name.</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Address Line 2 <span class="required">*</span></label>
+                        <input type="text" name="address2" class="form-input" required placeholder="Area / Taman">
+                        <span class="form-guide">Residential area, village, or section.</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Address Line 3</label>
+                        <input type="text" name="address3" class="form-input" placeholder="(Optional)">
+                        <span class="form-guide">Address Line 3 (Optional)</span>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Postal Code <span class="required">*</span></label>
+                            <input type="text" id="postal_code" name="postal_code" class="form-input" required oninput="autoSelectState('postal_code', 'state')">
+                            <span class="form-guide">Enter postal code first to auto-detect State.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">City <span class="required">*</span></label>
+                            <input type="text" name="city" class="form-input" required>
+                            <span class="form-guide">City or Municipality.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">State <span class="required">*</span></label>
+                            <select id="state" name="state" class="form-select" required>
+                                <option value="">Select State</option>
+                                <?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?>
+                            </select>
+                            <span class="form-guide">Select state (Auto-selected if valid postal code).</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Country</label>
+                            <input type="text" name="country" class="form-input" value="Malaysia" readonly>
+                            <span class="form-guide">Default country is Malaysia.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Description / Comment</label>
+                        <textarea name="comment" class="form-textarea" rows="2" placeholder="Optional notes..."></textarea>
+                        <span class="form-guide">Optional: Enter remarks, preferences, or important notes about this admin.</span>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Role <span class="required">*</span></label><select name="role" class="form-select" required><option value="Admin">Admin</option><option value="Super Admin">Super Admin</option></select></div>
+                        <div class="form-group"><label class="form-label">Status <span class="required">*</span></label><select name="status" class="form-select" required><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Password <span class="required">*</span></label>
+                        <div class="password-input-group">
+                            <div class="password-input-container">
+                                <input type="password" id="password" name="password" class="form-input" required oninput="validatePasswordRequirements('password')">
+                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('password', this)"><i class="fas fa-eye"></i></button>
+                            </div>
+                            <button type="button" class="btn-small" onclick="generateStrongPassword('password', 'confirm_password')">Auto Generate</button>
+                        </div>
+                        <div class="password-requirements" id="passReqList">
+                            <div class="requirement-item invalid" id="lengthReq"><i class="fas fa-times"></i> Must be 8-15 characters long</div>
+                            <div class="requirement-item invalid" id="uppercaseReq"><i class="fas fa-times"></i> Must contain at least one Uppercase letter</div>
+                            <div class="requirement-item invalid" id="lowercaseReq"><i class="fas fa-times"></i> Must contain at least one Lowercase letter</div>
+                            <div class="requirement-item invalid" id="numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div>
+                            <div class="requirement-item invalid" id="specialReq"><i class="fas fa-times"></i> Must contain at least one Special character (e.g. !@#)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Confirm Password <span class="required">*</span></label>
+                        <div class="password-input-container">
+                            <input type="password" id="confirm_password" name="confirm_password" class="form-input" required oninput="validatePasswordMatch('password', 'confirm_password', 'confirmPasswordError')">
+                            <i id="password-match-icon" class="fas fa-check-circle confirm-check"></i>
+                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('confirm_password', this)"><i class="fas fa-eye"></i></button>
+                        </div>
+                        <div id="confirmPasswordError" class="error-message">Passwords do not match</div>
+                    </div>
+                    
                     <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Admin</button></div>
                 </form>
             </div>
@@ -656,21 +828,159 @@ $conn->close();
 
     <div class="modal" id="editAdminModal">
         <div class="modal-content">
-            <div class="modal-header"><h2>Edit Administrator</h2><button class="close-btn" onclick="closeEditAdminModal()">&times;</button></div>
+            <div class="modal-header"><h2>Edit Administrator Info</h2><button class="close-btn" onclick="closeEditAdminModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="editAdminForm" action="admin_management_page.php" method="POST" enctype="multipart/form-data">
+                <form id="editAdminForm" action="admin_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('edit')">
                     <input type="hidden" name="update_admin" value="1">
                     <input type="hidden" name="admin_id" id="edit_admin_id">
+                    
                     <div class="form-group"><label>Profile Picture</label><div class="profile-picture-preview" id="edit-preview-container"><div class="default-avatar-icon"><i class="fas fa-user"></i></div></div><div class="file-upload"><label for="edit_profile_picture" class="file-upload-label"><i class="fas fa-upload"></i> Change File</label><input type="file" id="edit_profile_picture" name="profile_picture" accept="image/*" onchange="previewImage(this, 'edit-preview-container', 'edit-file-info', 'edit-file-name')"><div id="edit-file-info" class="file-info"><span id="edit-file-name" class="file-name"></span><button type="button" class="file-remove" onclick="removeImage('edit_profile_picture', 'edit-preview-container', 'edit-file-info')"><i class="fas fa-times"></i></button></div></div></div>
-                    <div class="form-group"><label class="form-label">Full Name <span class="required">*</span></label><input type="text" id="edit_name" name="name" class="form-input" required oninput="validateName(this)"></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Email <span class="required">*</span></label><input type="email" id="edit_email" name="email" class="form-input" required></div><div class="form-group"><label class="form-label">Contact Number <span class="required">*</span></label><div class="phone-format"><span class="phone-prefix">+601</span><input type="text" id="edit_contact" name="contact" class="form-input phone-input" required maxlength="11"></div></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">IC Number <span class="required">*</span></label><input type="text" id="edit_ic_number" name="ic_number" class="form-input" required oninput="formatICNumber('edit_ic_number')"></div><div class="form-group"><label class="form-label">Date of Birth <span class="required">*</span></label><input type="date" id="edit_dob" name="dob" class="form-input" required></div></div>
-                    <div class="form-group"><label class="form-label">Address Line 1 <span class="required">*</span></label><input type="text" id="edit_address1" name="address1" class="form-input" required></div><div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" id="edit_address2" name="address2" class="form-input" required></div><div class="form-group"><label class="form-label">Address Line 3</label><input type="text" id="edit_address3" name="address3" class="form-input"></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" id="edit_city" name="city" class="form-input" required></div><div class="form-group"><label class="form-label">State <span class="required">*</span></label><select id="edit_state" name="state" class="form-select" required><option value="">Select State</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Postal Code <span class="required">*</span></label><input type="text" id="edit_postal_code" name="postal_code" class="form-input" required></div><div class="form-group"><label class="form-label">Country</label><input type="text" name="country" class="form-input" value="Malaysia" readonly></div></div>
-                    <div class="form-group"><label class="form-label">Role <span class="required">*</span></label><select id="edit_role" name="role" class="form-select" required><option value="Admin">Admin</option><option value="Super Admin">Super Admin</option><option value="Moderator">Moderator</option></select></div>
-                    <div class="form-group"><label class="form-label">New Password (Leave blank to keep current)</label><div class="password-input-group"><div class="password-input-container"><input type="password" id="edit_password" name="password" class="form-input"><button type="button" class="toggle-password" onclick="togglePasswordVisibility('edit_password')"><i class="fas fa-eye"></i></button></div></div><span class="form-guide">If you type here, the password will be changed.</span></div>
-                    <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Update Admin</button></div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Full Name <span class="required">*</span></label>
+                        <input type="text" id="edit_name" name="name" class="form-input" required oninput="validateName(this)">
+                        <span class="form-guide">Enter full name as per IC. English letters only.</span>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Email <span class="required">*</span></label>
+                            <input type="email" id="edit_email" name="email" class="form-input" required onblur="validateEmail('edit_email', 'editEmailError')">
+                            <span class="form-guide">Valid email address (e.g. name@domain.com, must contain @ and domain).</span>
+                            <div id="editEmailError" class="error-message">Invalid email format.</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contact Number <span class="required">*</span></label>
+                            <div class="phone-format">
+                                <span class="phone-prefix">+60</span>
+                                <input type="text" id="edit_contact" name="contact" class="form-input phone-input" required maxlength="11">
+                            </div>
+                            <span class="form-guide">Format: 12-3456789 or 11-12345678 (No need for +60).</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">IC Number <span class="required">*</span></label>
+                            <input type="text" id="edit_ic_number" name="ic_number" class="form-input" required>
+                            <span class="form-guide">Format: YYMMDD-PB-#### (e.g. 990101-07-1234).</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Date of Birth <span class="required">*</span></label>
+                            <input type="date" id="edit_dob" name="dob" class="form-input" required onchange="validateAge('edit_dob', 'editAgeError')">
+                            <div id="editAgeError" class="error-message">Must be 18+</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Address Line 1 <span class="required">*</span></label>
+                        <input type="text" id="edit_address1" name="address1" class="form-input" required>
+                        <span class="form-guide">House unit no., floor, building, street name.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Address Line 2 <span class="required">*</span></label>
+                        <input type="text" id="edit_address2" name="address2" class="form-input" required>
+                        <span class="form-guide">Residential area, village, or section.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Address Line 3</label>
+                        <input type="text" id="edit_address3" name="address3" class="form-input" placeholder="(Optional)">
+                        <span class="form-guide">Address Line 3 (Optional)</span>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Postal Code <span class="required">*</span></label>
+                            <input type="text" id="edit_postal_code" name="postal_code" class="form-input" required oninput="autoSelectState('edit_postal_code', 'edit_state')">
+                            <span class="form-guide">Enter postal code first to auto-detect State.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">City <span class="required">*</span></label>
+                            <input type="text" id="edit_city" name="city" class="form-input" required>
+                            <span class="form-guide">City or Municipality.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">State <span class="required">*</span></label>
+                            <select id="edit_state" name="state" class="form-select" required>
+                                <option value="">Select State</option>
+                                <?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?>
+                            </select>
+                            <span class="form-guide">Select state (Auto-selected if valid postal code).</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Country</label>
+                            <input type="text" name="country" class="form-input" value="Malaysia" readonly>
+                            <span class="form-guide">Default country is Malaysia.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Description / Comment</label>
+                        <textarea id="edit_comment" name="comment" class="form-textarea" rows="2"></textarea>
+                        <span class="form-guide">Optional: Update remarks or notes about this admin.</span>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Role <span class="required">*</span></label><select id="edit_role" name="role" class="form-select" required><option value="Admin">Admin</option><option value="Super Admin">Super Admin</option></select></div>
+                        <div class="form-group"><label class="form-label">Status <span class="required">*</span></label><select id="edit_status" name="status" class="form-select" required><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+                    </div>
+                    
+                    <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Update Info</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="changePasswordModal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>Change Password</h2><button class="close-btn" onclick="closeChangePasswordModal()">&times;</button></div>
+            <div class="modal-body">
+                <form id="changePasswordForm" action="admin_management_page.php" method="POST" onsubmit="return validateChangePassword()">
+                    <input type="hidden" name="change_password" value="1">
+                    <input type="hidden" name="target_admin_id" id="cp_target_id">
+                    
+                    <div class="form-group">
+                        <label class="form-label">Your Current Password (Authorization) <span class="required">*</span></label>
+                        <div class="password-input-container">
+                            <input type="password" name="auth_password" class="form-input" required placeholder="Enter logged-in admin password">
+                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility(this.previousElementSibling, this)"><i class="fas fa-eye"></i></button>
+                        </div>
+                        <span class="form-guide">To ensure security, please enter your own password to proceed.</span>
+                    </div>
+                    
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+                    <div class="form-group">
+                        <label class="form-label">New Password <span class="required">*</span></label>
+                        <div class="password-input-group">
+                            <div class="password-input-container">
+                                <input type="password" id="cp_new_password" name="new_password" class="form-input" required oninput="validatePasswordRequirements('cp_new_password', 'cp_req_list', 'cp_')">
+                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('cp_new_password', this)"><i class="fas fa-eye"></i></button>
+                            </div>
+                            <button type="button" class="btn-small" onclick="generateStrongPassword('cp_new_password', 'cp_confirm_password')">Auto Generate</button>
+                        </div>
+                        <div class="password-requirements" id="cp_req_list">
+                            <div class="requirement-item invalid" id="cp_lengthReq"><i class="fas fa-times"></i> Must be 8-15 characters long</div>
+                            <div class="requirement-item invalid" id="cp_uppercaseReq"><i class="fas fa-times"></i> Must contain at least one Uppercase letter</div>
+                            <div class="requirement-item invalid" id="cp_lowercaseReq"><i class="fas fa-times"></i> Must contain at least one Lowercase letter</div>
+                            <div class="requirement-item invalid" id="cp_numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div>
+                            <div class="requirement-item invalid" id="cp_specialReq"><i class="fas fa-times"></i> Must contain at least one Special character (e.g. !@#)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Confirm New Password <span class="required">*</span></label>
+                        <div class="password-input-container">
+                            <input type="password" id="cp_confirm_password" name="confirm_new_password" class="form-input" required oninput="validatePasswordMatch('cp_new_password', 'cp_confirm_password', 'cp_match_error')">
+                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('cp_confirm_password', this)"><i class="fas fa-eye"></i></button>
+                        </div>
+                        <div id="cp_match_error" class="error-message">Passwords do not match</div>
+                    </div>
+
+                    <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-key"></i> Update Password</button></div>
                 </form>
             </div>
         </div>
@@ -691,24 +1001,20 @@ $conn->close();
                     <div><strong>IC Number:</strong> <span id="view_ic"></span></div>
                     <div><strong>DOB:</strong> <span id="view_dob"></span></div>
                     <div style="grid-column: span 2;"><strong>Address:</strong><br><span id="view_address" style="color:#555;"></span></div>
+                    <div style="grid-column: span 2;"><strong>Comment:</strong><br><span id="view_comment" style="color:#555; background:#f9f9f9; padding:10px; display:block; border-radius:5px; margin-top:5px;"></span></div>
                 </div>
             </div>
         </div>
     </div>
     
     <script>
-        // --- NEW DYNAMIC FILTER SCRIPT ---
+        // Filters Logic
         function toggleFilterInputs() {
             const type = document.getElementById('filterType').value;
-            
-            // Hide all secondary filters first
             document.querySelectorAll('.secondary-filter').forEach(el => {
                 el.classList.remove('active');
-                // Disable inputs to prevent them from sending empty values to URL if not selected
                 if(el.querySelector('select')) el.querySelector('select').disabled = true;
             });
-
-            // Show specific one based on selection
             if (type === 'role') {
                 const el = document.getElementById('filter_role_container');
                 el.classList.add('active');
@@ -720,27 +1026,37 @@ $conn->close();
             }
         }
 
-        // Initialize functionality on load
         document.addEventListener('DOMContentLoaded', function() {
             toggleFilterInputs();
+            setupPhoneInput('contact'); 
+            setupPhoneInput('edit_contact');
+            setupICInput('ic_number', 'dob'); 
+            setupICInput('edit_ic_number', 'edit_dob'); 
             
-            // Existing setup functions
-            setupPhoneInput('contact'); setupPhoneInput('edit_contact');
+            // Floating alerts
             const s = document.getElementById('floatingSuccess');
             const e = document.getElementById('floatingError');
-            if(s) { s.style.opacity='0'; setTimeout(()=>s.style.display='none',300); }
-            if(e) { e.style.opacity='0'; setTimeout(()=>e.style.display='none',300); }
+            if(s) { s.style.opacity='0'; setTimeout(()=>s.style.display='none',3000); }
+            if(e) { e.style.opacity='0'; setTimeout(()=>e.style.display='none',3000); }
         });
 
-        // --- EXISTING JAVASCRIPT ---
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('mainContent');
-        sidebar.addEventListener('mouseenter', () => { sidebar.classList.remove('collapsed'); mainContent.classList.add('expanded'); });
-        sidebar.addEventListener('mouseleave', () => { sidebar.classList.add('collapsed'); mainContent.classList.remove('expanded'); });
+        // Dropdown Logic for Table Actions
+        function toggleMenu(e, id) { 
+            e.stopPropagation(); 
+            // Close all other dropdowns
+            document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); 
+            // Toggle current one
+            document.getElementById('menu-' + id).style.display = 'block'; 
+        }
+        
+        window.onclick = function(e) { 
+            if (!e.target.matches('.menu-btn') && !e.target.matches('.menu-btn *')) { 
+                document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); 
+            } 
+            if (e.target.classList.contains('modal')) e.target.style.display = "none"; 
+        }
 
-        function toggleMenu(e, id) { e.stopPropagation(); document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); document.getElementById('menu-' + id).style.display = 'block'; }
-        window.onclick = function(e) { if (!e.target.matches('.menu-btn') && !e.target.matches('.menu-btn *')) { document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); } if (e.target.classList.contains('modal')) e.target.style.display = "none"; }
-
+        // --- Image Preview Logic ---
         function previewImage(input, containerId, infoId, nameId) {
             const container = document.getElementById(containerId);
             const info = document.getElementById(infoId);
@@ -753,13 +1069,13 @@ $conn->close();
         }
         function removeImage(inputId, containerId, infoId, originalSrc = null) { document.getElementById(inputId).value = ''; if(infoId) document.getElementById(infoId).style.display = 'none'; const container = document.getElementById(containerId); if (originalSrc) { container.innerHTML = `<img src="${originalSrc}" alt="Preview">`; } else { container.innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; } }
 
+        // --- Modal Control Functions ---
         function openAddAdminModal() { document.getElementById('addAdminModal').style.display = 'flex'; }
         function closeAddAdminModal() { 
             document.getElementById('addAdminModal').style.display = 'none'; 
             document.getElementById('addAdminForm').reset();
             document.getElementById('add-preview-container').innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>';
             document.getElementById('add-file-info').style.display = 'none';
-            document.querySelectorAll('.requirement-item').forEach(el => { el.className = 'requirement-item invalid'; el.querySelector('i').className = 'fas fa-times'; });
         }
         
         function openEditAdminModal(admin) {
@@ -767,8 +1083,19 @@ $conn->close();
             document.getElementById('edit_admin_id').value = admin.Admin_ID;
             document.getElementById('edit_name').value = admin.Admin_Name;
             document.getElementById('edit_email').value = admin.Admin_Email;
-            document.getElementById('edit_contact').value = admin.Admin_ContactNumber.replace('+601', '');
-            document.getElementById('edit_ic_number').value = admin.Admin_ICNUMBER;
+            
+            // Edit: Remove +60 for display in input
+            let cleanContact = admin.Admin_ContactNumber;
+            if(cleanContact.startsWith('+60')) cleanContact = cleanContact.substring(3);
+            document.getElementById('edit_contact').value = cleanContact;
+            
+            let icInput = document.getElementById('edit_ic_number');
+            icInput.value = admin.Admin_ICNUMBER;
+            // Trigger IC formatting to add dashes if stored without them
+            if (typeof icInput.dispatchEvent === "function") {
+                 icInput.dispatchEvent(new Event('input'));
+            }
+            
             const dobDate = new Date(admin.Admin_DOB);
             document.getElementById('edit_dob').value = dobDate.toISOString().split('T')[0];
             document.getElementById('edit_address1').value = admin.Admin_Address1;
@@ -778,6 +1105,9 @@ $conn->close();
             document.getElementById('edit_state').value = admin.Admin_State;
             document.getElementById('edit_postal_code').value = admin.Admin_PostalCode;
             document.getElementById('edit_role').value = admin.Admin_Role;
+            document.getElementById('edit_status').value = admin.Admin_Status || 'Active';
+            // Set Comment
+            document.getElementById('edit_comment').value = admin.Admin_Comment ? admin.Admin_Comment : '';
             
             const container = document.getElementById('edit-preview-container');
             if (admin.Admin_ProfilePicture) {
@@ -788,6 +1118,23 @@ $conn->close();
         }
         function closeEditAdminModal() { document.getElementById('editAdminModal').style.display = 'none'; document.getElementById('editAdminForm').reset(); }
 
+        function openChangePasswordModal(id) {
+            if (!id) return;
+            document.getElementById('changePasswordModal').style.display = 'flex';
+            document.getElementById('cp_target_id').value = id;
+            document.getElementById('changePasswordForm').reset();
+            resetReqList('cp_req_list', 'cp_');
+        }
+        function closeChangePasswordModal() { document.getElementById('changePasswordModal').style.display = 'none'; }
+        
+        function resetReqList(listId, prefix) {
+            const list = document.getElementById(listId);
+            list.querySelectorAll('.requirement-item').forEach(el => {
+                el.className = 'requirement-item invalid';
+                el.querySelector('i').className = 'fas fa-times';
+            });
+        }
+
         function openViewAdminModal(admin) {
             document.getElementById('viewAdminModal').style.display = 'flex';
             document.getElementById('view_name_display').textContent = admin.Admin_Name;
@@ -795,6 +1142,7 @@ $conn->close();
             document.getElementById('view_contact').textContent = admin.Admin_ContactNumber;
             document.getElementById('view_ic').textContent = admin.Admin_ICNUMBER;
             document.getElementById('view_dob').textContent = new Date(admin.Admin_DOB).toDateString();
+            document.getElementById('view_comment').textContent = admin.Admin_Comment ? admin.Admin_Comment : 'No comments available.';
             
             const roleBadge = document.getElementById('view_role_badge');
             roleBadge.textContent = admin.Admin_Role;
@@ -821,49 +1169,196 @@ $conn->close();
             }
         }
 
-        // --- Validation & Helper Scripts ---
-        function setupPhoneInput(id) { const el = document.getElementById(id); if(!el)return; el.addEventListener('input', function() { let v = this.value.replace(/\D/g, ''); if(v.length > 0) this.value = v.substring(0,1) + (v.length>1?'-':'') + (v.length>1?v.substring(1,9):''); }); }
+        // --- Helper Functions (Formatting & Validation) ---
+        function setupPhoneInput(id) { 
+            const el = document.getElementById(id); 
+            if(!el) return; 
+            el.addEventListener('input', function() { 
+                let v = this.value.replace(/\D/g, '');
+                if (v.length > 11) v = v.substring(0, 11);
+                let newVal = v;
+                if (v.length > 2) {
+                    newVal = v.substring(0, 2) + '-' + v.substring(2);
+                } 
+                this.value = newVal;
+            }); 
+        }
         
-        function formatICNumber(id) { const el = document.getElementById(id); let v = el.value.replace(/\D/g, ''); let n = ''; if(v.length > 0) n += v.substring(0,6); if(v.length >= 6) n += '-'; if(v.length > 6) n += v.substring(6,8); if(v.length >= 8) n += '-'; if(v.length > 8) n += v.substring(8,12); el.value = n; }
-
-        function togglePasswordVisibility(id) { const f = document.getElementById(id); const icon = f.nextElementSibling.querySelector('i'); if(f.type==='password') { f.type='text'; icon.className='fas fa-eye-slash'; } else { f.type='password'; icon.className='fas fa-eye'; } }
-
-        function validateName(input) { input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); }
-        function validateEmail() { const v = /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(document.getElementById('email').value); document.getElementById('emailError').style.display = v ? 'none' : 'block'; return v; }
-        function validateAge() { const d = document.getElementById('dob').value; if(!d) return false; const diff = new Date().getFullYear() - new Date(d).getFullYear(); const valid = diff >= 18; document.getElementById('ageError').style.display = valid ? 'none' : 'block'; return valid; }
-
-        function generateStrongPassword(passId, confirmId) {
-            const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-            let p = ""; for(let i=0;i<12;i++) p += chars.charAt(Math.floor(Math.random()*chars.length));
-            if(!/[A-Z]/.test(p)) p+='A'; if(!/[0-9]/.test(p)) p+='1'; if(!/[!@#$%^&*]/.test(p)) p+='!';
-            document.getElementById(passId).value = p; 
-            document.getElementById(confirmId).value = p;
-            validatePasswordRequirements(); validatePasswordMatch();
-            document.getElementById(passId).type='text'; document.getElementById(confirmId).type='text';
+        function setupICInput(inputId, dobInputId) {
+            const input = document.getElementById(inputId); 
+            const dobInput = document.getElementById(dobInputId); 
+            if(!input) return;
+            input.addEventListener('input', function(e) {
+                let val = this.value.replace(/\D/g, ''); 
+                if (val.length > 12) val = val.substring(0, 12);
+                let newVal = ''; 
+                newVal += val.substring(0, 6); 
+                if (val.length > 6) newVal += '-' + val.substring(6, 8); 
+                if (val.length > 8) newVal += '-' + val.substring(8, 12);
+                this.value = newVal;
+                
+                if (val.length >= 6 && dobInput) {
+                    const yy = parseInt(val.substring(0, 2)); 
+                    const mm = val.substring(2, 4); 
+                    const dd = val.substring(4, 6);
+                    const prefix = (yy > (new Date().getFullYear() % 100)) ? '19' : '20';
+                    const fullDate = `${prefix}${val.substring(0, 2)}-${mm}-${dd}`;
+                    const dateObj = new Date(fullDate);
+                    if (!isNaN(dateObj.getTime())) { 
+                        dobInput.value = fullDate; 
+                        // Trigger validation if function exists
+                        if (inputId === 'ic_number') validateAge('dob', 'ageError');
+                        if (inputId === 'edit_ic_number') validateAge('edit_dob', 'editAgeError');
+                    }
+                }
+            });
         }
 
-        function validatePasswordRequirements() {
-            const p = document.getElementById('password').value;
-            const reqs = { lengthReq: p.length>=8 && p.length<=15, uppercaseReq: /[A-Z]/.test(p), lowercaseReq: /[a-z]/.test(p), numberReq: /\d/.test(p), specialReq: /[!@#$%^&*]/.test(p) };
-            let allValid = true;
-            for (const [id, valid] of Object.entries(reqs)) {
-                const el = document.getElementById(id);
-                const icon = el.querySelector('i');
-                if(valid) { el.className='requirement-item valid'; icon.className='fas fa-check'; }
-                else { el.className='requirement-item invalid'; icon.className='fas fa-times'; allValid=false; }
+        function autoSelectState(postalInputId, stateSelectId) {
+            const postal = document.getElementById(postalInputId).value;
+            const stateSelect = document.getElementById(stateSelectId);
+            
+            if (postal.length >= 2) {
+                const prefix = parseInt(postal.substring(0, 2));
+                let foundState = "";
+                // Malaysia Postal Code Mapping
+                if ((prefix >= 50 && prefix <= 60)) foundState = "Kuala Lumpur";
+                else if (prefix >= 62 && prefix <= 62) foundState = "Putrajaya";
+                else if (prefix >= 40 && prefix <= 48) foundState = "Selangor";
+                else if (prefix >= 63 && prefix <= 68) foundState = "Selangor";
+                else if (prefix >= 79 && prefix <= 86) foundState = "Johor";
+                else if (prefix >= 75 && prefix <= 78) foundState = "Melaka";
+                else if (prefix >= 70 && prefix <= 73) foundState = "Negeri Sembilan";
+                else if (prefix >= 30 && prefix <= 39) foundState = "Perak";
+                else if (prefix >= 10 && prefix <= 14) foundState = "Penang";
+                else if (prefix >= 1 && prefix <= 2) foundState = "Perlis"; 
+                else if (prefix >= 5 && prefix <= 9) foundState = "Kedah"; 
+                else if (prefix >= 15 && prefix <= 18) foundState = "Kelantan";
+                else if (prefix >= 20 && prefix <= 24) foundState = "Terengganu";
+                else if (prefix >= 25 && prefix <= 28) foundState = "Pahang";
+                else if (prefix >= 88 && prefix <= 91) foundState = "Sabah";
+                else if (prefix >= 93 && prefix <= 98) foundState = "Sarawak";
+                else if (prefix >= 87 && prefix <= 87) foundState = "Labuan";
+
+                if (foundState !== "") {
+                    stateSelect.value = foundState;
+                }
             }
-            if(document.getElementById('confirm_password').value) validatePasswordMatch();
+        }
+
+        function togglePasswordVisibility(idOrEl, btnElement) { 
+            let input;
+            if (typeof idOrEl === 'string') { input = document.getElementById(idOrEl); }
+            else { input = idOrEl; } 
+            
+            const icon = btnElement.querySelector('i'); 
+            if(input.type==='password') { input.type='text'; icon.className='fas fa-eye-slash'; } 
+            else { input.type='password'; icon.className='fas fa-eye'; } 
+        }
+
+        function validateName(input) { input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); }
+        
+        function validateEmail(id, errorId) { 
+            const val = document.getElementById(id).value;
+            const v = /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val); 
+            document.getElementById(errorId).style.display = v ? 'none' : 'block'; 
+            return v; 
+        }
+        
+        function validateAge(id, errorId) { 
+            const d = document.getElementById(id).value; 
+            if(!d) return false; 
+            const diff = new Date().getFullYear() - new Date(d).getFullYear(); 
+            const valid = diff >= 18; 
+            document.getElementById(errorId).style.display = valid ? 'none' : 'block'; 
+            return valid; 
+        }
+
+        function generateStrongPassword(passId, confirmId) {
+            const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; 
+            const lower = "abcdefghijklmnopqrstuvwxyz"; 
+            const numbers = "0123456789"; 
+            const specials = "!@#$%^&*"; 
+            const all = upper + lower + numbers + specials;
+            let password = ""; 
+            password += upper[Math.floor(Math.random() * upper.length)]; 
+            password += lower[Math.floor(Math.random() * lower.length)]; 
+            password += numbers[Math.floor(Math.random() * numbers.length)]; 
+            password += specials[Math.floor(Math.random() * specials.length)];
+            for (let i = 4; i < 12; i++) { password += all[Math.floor(Math.random() * all.length)]; }
+            password = password.split('').sort(() => 0.5 - Math.random()).join('');
+            
+            document.getElementById(passId).value = password; 
+            document.getElementById(confirmId).value = password;
+            document.getElementById(passId).dispatchEvent(new Event('input'));
+            document.getElementById(confirmId).dispatchEvent(new Event('input'));
+            
+            // Show password
+            const passInput = document.getElementById(passId);
+            passInput.type = "text";
+            if(passInput.nextElementSibling) passInput.nextElementSibling.querySelector('i').className = 'fas fa-eye-slash';
+             
+             const confInput = document.getElementById(confirmId);
+             confInput.type = "text";
+             if(confInput.nextElementSibling) confInput.nextElementSibling.querySelector('i').className = 'fas fa-eye-slash';
+        }
+
+        function validatePasswordRequirements(passId = 'password', listContainerId = 'passReqList', prefix = '') {
+            if(prefix === '' && passId !== 'password') prefix = 'cp_';
+            const p = document.getElementById(passId).value;
+            const reqs = { 
+                lengthReq: p.length>=8 && p.length<=15, 
+                uppercaseReq: /[A-Z]/.test(p), 
+                lowercaseReq: /[a-z]/.test(p), 
+                numberReq: /\d/.test(p), 
+                specialReq: /[!@#$%^&*]/.test(p) 
+            };
+            let allValid = true;
+            for (const [key, valid] of Object.entries(reqs)) {
+                const el = document.getElementById(prefix + key);
+                if(el) {
+                    const icon = el.querySelector('i');
+                    if(valid) { el.className='requirement-item valid'; icon.className='fas fa-check'; }
+                    else { el.className='requirement-item invalid'; icon.className='fas fa-times'; allValid=false; }
+                }
+            }
             return allValid;
         }
 
-        function validatePasswordMatch() {
-            const m = document.getElementById('password').value === document.getElementById('confirm_password').value;
-            document.getElementById('confirmPasswordError').style.display = m ? 'none' : 'block';
-            document.getElementById('password-match-icon').style.display = m ? 'block' : 'none';
+        function validatePasswordMatch(passId, confirmId, errorId) {
+            const m = document.getElementById(passId).value === document.getElementById(confirmId).value;
+            document.getElementById(errorId).style.display = m ? 'none' : 'block';
+            
+            // Show check icon if matching
+            const container = document.getElementById(confirmId).parentElement;
+            const checkIcon = container.querySelector('.confirm-check');
+            if(checkIcon) checkIcon.style.display = (m && document.getElementById(passId).value.length > 0) ? 'block' : 'none';
+            
             return m;
         }
 
-        function validateForm() { return validateEmail() && validateAge() && validatePasswordRequirements() && validatePasswordMatch(); }
+        function validateForm(type) { 
+            let vEmail, vAge, vPass = true, vMatch = true;
+            if (type === 'add') {
+                vEmail = validateEmail('email', 'emailError');
+                vAge = validateAge('dob', 'ageError');
+                vPass = validatePasswordRequirements('password');
+                vMatch = validatePasswordMatch('password', 'confirm_password', 'confirmPasswordError');
+                return vEmail && vAge && vPass && vMatch;
+            } 
+            else if (type === 'edit') {
+                vEmail = validateEmail('edit_email', 'editEmailError');
+                vAge = validateAge('edit_dob', 'editAgeError');
+                return vEmail && vAge;
+            }
+            return false;
+        }
+        
+        function validateChangePassword() {
+            const vPass = validatePasswordRequirements('cp_new_password', 'cp_req_list', 'cp_');
+            const vMatch = validatePasswordMatch('cp_new_password', 'cp_confirm_password', 'cp_match_error');
+            return vPass && vMatch;
+        }
     </script>
 </body>
 </html>
