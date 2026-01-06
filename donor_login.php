@@ -386,7 +386,7 @@ include 'header_UI.php';
                     <label for="remember">Remember me</label>
                 </div>
                 <div class="forgot-password">
-                    <a href="forgot_password.php">Forgot password?</a> 
+                    <a href="donor_forgot_password.php">Forgot password?</a> 
                 </div>
             </div>
             
@@ -398,7 +398,7 @@ include 'header_UI.php';
         </div>
         
         <div class="form-footer">
-            <p>By logging in, you agree to our <a href="terms.php" style="color: var(--primary-red);">Terms</a> and <a href="privacy.php" style="color: var(--primary-red);">Privacy Policy</a></p>
+            <p>By logging in, you agree to our <a href="terms&condition.php" style="color: var(--primary-red);">Terms</a> and <a href="privacy.php" style="color: var(--primary-red);">Privacy Policy</a></p>
         </div>
     </div>
 </div>
