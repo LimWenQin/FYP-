@@ -1098,11 +1098,11 @@ $upcoming_activities = [
                 <h2>Be the Bridge of Hope</h2>
                 <p>Your generosity has the power to transform lives. Whether through donations, volunteering, or spreading awareness, you can be part of creating positive change in our community. Join us in building bridges of compassion.</p>
                 <div class="cta-buttons">
-                    <a href="donate.php" class="btn btn-primary">
+                    <a href="Payment_page.php" class="btn btn-primary">
                         Make a Donation
                     </a>
                     
-                    <a href="campaigns.php" class="btn btn-secondary">
+                    <a href="Campaign_Page.php" class="btn btn-secondary">
                         View All Campaigns
                     </a>
                 </div>

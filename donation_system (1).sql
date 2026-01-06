@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jan 05, 2026 at 06:14 PM
+-- Generation Time: Jan 06, 2026 at 07:54 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -242,16 +242,20 @@ CREATE TABLE `donor` (
   `Donor_RegisteredAt` datetime DEFAULT current_timestamp(),
   `Donor_LastLogin` datetime DEFAULT NULL,
   `Donor_ProfilePicture` varchar(255) DEFAULT NULL,
-  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted'
+  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted',
+  `donor_last_reset_request` datetime DEFAULT NULL,
+  `donor_reset_count` int(11) DEFAULT 0,
+  `donor_last_password_change` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `donor`
 --
 
-INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_ContactNumber`, `Donor_ICNumber`, `Donor_Email`, `Donor_Password`, `Donor_Address1`, `Donor_Address2`, `Donor_Address3`, `Donor_City`, `Donor_State`, `Donor_PostalCode`, `Donor_Country`, `Donor_DOB`, `Donor_Description`, `Donor_RegisteredAt`, `Donor_LastLogin`, `Donor_ProfilePicture`, `Is_Deleted`) VALUES
-(2, 'RONALD TAN BIN HONG', '012-7212535', '030404011183', 'abc@gmail.com', '$2y$10$3hsuDLLcdM4mr9bqhvJekOZqH80/6aF.7GR2vLxXHbcgWT.RjOe.O', 'No19.jalan melawati 19, taman melawati', '', '', 'Johor Bahru', 'Johor', '81300', 'Malaysia', '2003-04-04', '', '2025-12-15 22:27:40', NULL, NULL, 0),
-(3, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$PNOaF1e8KP0y9i404VCz9OWhn3XVyLHx8roawWiJjvPR0hyRunfeW', 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '2003-05-17', '', '2026-01-03 21:43:26', NULL, 'uploads/donors/donor_1767447806_69591cfe10e76.jpg', 0);
+INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_ContactNumber`, `Donor_ICNumber`, `Donor_Email`, `Donor_Password`, `Donor_Address1`, `Donor_Address2`, `Donor_Address3`, `Donor_City`, `Donor_State`, `Donor_PostalCode`, `Donor_Country`, `Donor_DOB`, `Donor_Description`, `Donor_RegisteredAt`, `Donor_LastLogin`, `Donor_ProfilePicture`, `Is_Deleted`, `donor_last_reset_request`, `donor_reset_count`, `donor_last_password_change`) VALUES
+(2, 'RONALD TAN BIN HONG', '012-7212535', '030404011183', 'abc@gmail.com', '$2y$10$3hsuDLLcdM4mr9bqhvJekOZqH80/6aF.7GR2vLxXHbcgWT.RjOe.O', 'No19.jalan melawati 19, taman melawati', '', '', 'Johor Bahru', 'Johor', '81300', 'Malaysia', '2003-04-04', '', '2025-12-15 22:27:40', NULL, NULL, 0, NULL, 0, NULL),
+(3, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$PNOaF1e8KP0y9i404VCz9OWhn3XVyLHx8roawWiJjvPR0hyRunfeW', 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '2003-05-17', '', '2026-01-03 21:43:26', NULL, 'uploads/donors/donor_1767447806_69591cfe10e76.jpg', 0, NULL, 0, NULL),
+(4, 'LIM WEN QIN', '011-12345678', '543252336857', 'lll8694798586@gmail.com', '$2y$10$8GkDtCyIx0NsWl0y6zP2Fev19Q3/9BPeOh/G7UvtF7mk1/3R4eGHG', '', NULL, NULL, '', '', '', 'Malaysia', '2008-01-01', '', '2026-01-06 13:33:25', NULL, NULL, 0, NULL, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -264,6 +268,57 @@ CREATE TABLE `donor_achievement` (
   `DonorAchievement_AchievedAt` datetime NOT NULL,
   `Donor_ID` int(11) NOT NULL,
   `Achievement_ID` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `donor_password_history`
+--
+
+CREATE TABLE `donor_password_history` (
+  `history_id` int(11) NOT NULL,
+  `donor_id` int(11) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `change_timestamp` datetime DEFAULT current_timestamp(),
+  `changed_by` varchar(50) DEFAULT 'system'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `donor_password_reset`
+--
+
+CREATE TABLE `donor_password_reset` (
+  `reset_id` int(11) NOT NULL,
+  `donor_id` int(11) NOT NULL,
+  `reset_token` varchar(64) NOT NULL,
+  `reset_email` varchar(100) NOT NULL,
+  `reset_expires` datetime NOT NULL,
+  `reset_used` tinyint(1) DEFAULT 0,
+  `reset_created` datetime DEFAULT current_timestamp(),
+  `reset_updated` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
+  `reset_status` enum('pending','used','expired','invalidated') DEFAULT 'pending'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `donor_security_logs`
+--
+
+CREATE TABLE `donor_security_logs` (
+  `log_id` int(11) NOT NULL,
+  `donor_id` int(11) DEFAULT NULL,
+  `log_type` varchar(50) NOT NULL,
+  `log_action` varchar(100) NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
+  `log_details` text DEFAULT NULL,
+  `log_timestamp` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -439,7 +494,9 @@ CREATE TABLE `orders` (
 
 INSERT INTO `orders` (`Order_ID`, `Order_Name`, `Order_ContactNumber`, `Order_ICNumber`, `Order_Email`, `Order_Amount`, `Order_Points_Earned`, `Order_Currency`, `Order_PaymentMethod`, `Order_PaymentStatus`, `Order_Admin_Status`, `Order_TXN_Ref`, `Order_Type`, `Order_Status`, `Tax_Receipt_Status`, `Is_Deleted`, `Order_Created_At`, `Order_Updated_At`, `Donor_ID`, `Payment_ID`, `Branch_ID`, `Activity_ID`, `Case_ID`) VALUES
 (1, 'RONALD TAN BIN HONG', '012-7212535', '030404011183', 'abc@gmail.com', 100.00, 0, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-20251215222806', 'Recurring', 'Completed', 'Not_Requested', 0, '2025-12-15 22:28:06', '2025-12-15 22:28:06', 2, 1, NULL, NULL, 3),
-(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', 1000.00, 100, 'MYR', 'Cash', 'Success', 'Completed', 'MAN-IN-20260104001033-858', 'One-Time', 'Completed', 'Not_Requested', 0, '2026-01-04 00:10:33', '2026-01-04 00:10:33', 3, 3, NULL, NULL, NULL);
+(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', 1000.00, 100, 'MYR', 'Cash', 'Success', 'Completed', 'MAN-IN-20260104001033-858', 'One-Time', 'Completed', 'Not_Requested', 0, '2026-01-04 00:10:33', '2026-01-04 00:10:33', 3, 3, NULL, NULL, NULL),
+(3, 'LIM WEN QIN', '011-12345678', '543252336857', 'lll8694798586@gmail.com', 20.00, 0, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-20260106133546', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-06 13:35:46', '2026-01-06 13:35:46', 4, 4, 3, NULL, NULL),
+(4, 'LIM WEN QIN', '011-12345678', '543252336857', 'lll8694798586@gmail.com', 20.00, 0, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-20260106133604', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-06 13:36:04', '2026-01-06 13:36:04', 4, 5, 3, NULL, NULL);
 
 --
 -- Triggers `orders`
@@ -502,7 +559,9 @@ CREATE TABLE `payment` (
 
 INSERT INTO `payment` (`Payment_ID`, `Payment_Method`, `Payment_Status`, `Payment_TXN_Ref`, `Payment_Amount`, `Payment_Paid_At`, `Payment_Bank_Name`, `Payment_Bank_Masked`, `Payment_Proof`, `Payment_Created_At`) VALUES
 (1, 'TNG eWallet', 'Success', 'TXN-20251215222806', 100.00, '2025-12-15 22:28:06', 'TNG eWallet', 'QR Payment', NULL, '2025-12-15 22:28:06'),
-(3, 'Cash', 'Success', 'MAN-IN-20260104001033-858', 1000.00, '2026-01-04 00:10:33', 'Manual Entry', 'N/A', NULL, '2026-01-04 00:10:33');
+(3, 'Cash', 'Success', 'MAN-IN-20260104001033-858', 1000.00, '2026-01-04 00:10:33', 'Manual Entry', 'N/A', NULL, '2026-01-04 00:10:33'),
+(4, 'TNG eWallet', 'Success', 'TXN-20260106133546', 20.00, '2026-01-06 13:35:46', 'TNG eWallet', 'QR Payment', NULL, '2026-01-06 13:35:46'),
+(5, 'TNG eWallet', 'Success', 'TXN-20260106133604', 20.00, '2026-01-06 13:36:04', 'TNG eWallet', 'QR Payment', NULL, '2026-01-06 13:36:04');
 
 -- --------------------------------------------------------
 
@@ -524,7 +583,8 @@ CREATE TABLE `point` (
 
 INSERT INTO `point` (`Points_ID`, `Points_Earned`, `Points_Total`, `Points_Updated_At`, `Donor_ID`) VALUES
 (1, 10, 10, '2025-12-15 22:28:06', 2),
-(2, 100, 65, '2026-01-04 23:11:46', 3);
+(2, 100, 65, '2026-01-04 23:11:46', 3),
+(3, 4, 4, '2026-01-06 13:36:09', 4);
 
 -- --------------------------------------------------------
 
@@ -925,6 +985,35 @@ ALTER TABLE `donor_achievement`
   ADD KEY `DonorAchievement_Achievement_ID_FK` (`Achievement_ID`);
 
 --
+-- Indexes for table `donor_password_history`
+--
+ALTER TABLE `donor_password_history`
+  ADD PRIMARY KEY (`history_id`),
+  ADD KEY `idx_donor_history` (`donor_id`,`change_timestamp`);
+
+--
+-- Indexes for table `donor_password_reset`
+--
+ALTER TABLE `donor_password_reset`
+  ADD PRIMARY KEY (`reset_id`),
+  ADD UNIQUE KEY `unique_active_token` (`donor_id`,`reset_used`,`reset_status`),
+  ADD KEY `idx_reset_token` (`reset_token`),
+  ADD KEY `idx_donor_id` (`donor_id`),
+  ADD KEY `idx_reset_email` (`reset_email`),
+  ADD KEY `idx_reset_expires` (`reset_expires`),
+  ADD KEY `idx_reset_status` (`reset_status`),
+  ADD KEY `idx_reset_used` (`reset_used`);
+
+--
+-- Indexes for table `donor_security_logs`
+--
+ALTER TABLE `donor_security_logs`
+  ADD PRIMARY KEY (`log_id`),
+  ADD KEY `idx_donor_logs` (`donor_id`,`log_type`),
+  ADD KEY `idx_log_timestamp` (`log_timestamp`),
+  ADD KEY `idx_log_action` (`log_action`);
+
+--
 -- Indexes for table `email_logs`
 --
 ALTER TABLE `email_logs`
@@ -1150,13 +1239,31 @@ ALTER TABLE `donations`
 -- AUTO_INCREMENT for table `donor`
 --
 ALTER TABLE `donor`
-  MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `donor_achievement`
 --
 ALTER TABLE `donor_achievement`
   MODIFY `DonorAchievement_ID` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `donor_password_history`
+--
+ALTER TABLE `donor_password_history`
+  MODIFY `history_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `donor_password_reset`
+--
+ALTER TABLE `donor_password_reset`
+  MODIFY `reset_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `donor_security_logs`
+--
+ALTER TABLE `donor_security_logs`
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `email_logs`
@@ -1198,7 +1305,7 @@ ALTER TABLE `notifications`
 -- AUTO_INCREMENT for table `orders`
 --
 ALTER TABLE `orders`
-  MODIFY `Order_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `Order_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `password_resets`
@@ -1210,13 +1317,13 @@ ALTER TABLE `password_resets`
 -- AUTO_INCREMENT for table `payment`
 --
 ALTER TABLE `payment`
-  MODIFY `Payment_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `Payment_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `point`
 --
 ALTER TABLE `point`
-  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `policy_acceptances`
@@ -1330,6 +1437,24 @@ ALTER TABLE `donations`
 ALTER TABLE `donor_achievement`
   ADD CONSTRAINT `DonorAchievement_Achievement_ID_FK` FOREIGN KEY (`Achievement_ID`) REFERENCES `achievement` (`Achievement_ID`),
   ADD CONSTRAINT `DonorAchievement_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
+
+--
+-- Constraints for table `donor_password_history`
+--
+ALTER TABLE `donor_password_history`
+  ADD CONSTRAINT `donor_password_history_ibfk_1` FOREIGN KEY (`donor_id`) REFERENCES `donor` (`Donor_ID`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `donor_password_reset`
+--
+ALTER TABLE `donor_password_reset`
+  ADD CONSTRAINT `donor_password_reset_ibfk_1` FOREIGN KEY (`donor_id`) REFERENCES `donor` (`Donor_ID`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `donor_security_logs`
+--
+ALTER TABLE `donor_security_logs`
+  ADD CONSTRAINT `donor_security_logs_ibfk_1` FOREIGN KEY (`donor_id`) REFERENCES `donor` (`Donor_ID`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `item_donation`

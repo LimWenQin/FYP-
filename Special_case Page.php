@@ -31,13 +31,13 @@ $result = $conn->query($query);
 $categories = [
     'medical' => ['name' => 'Medical Treatment', 'icon' => 'fas fa-heartbeat', 'color' => '#4CAF50'],
     'disability' => ['name' => 'Disability Support', 'icon' => 'fas fa-wheelchair', 'color' => '#2196F3'],
-    'education' => ['name' => 'Education', 'icon' => 'fas fa-graduation-cap', 'color' => '#9C27B0'],
+    'animal' => ['name' => 'Stray Animal', 'icon' => 'fas fa-solid fa-cat', 'color' => '#9C27B0'],
     'emergency' => ['name' => 'Emergency Relief', 'icon' => 'fas fa-first-aid', 'color' => '#FF5722'],
     'elderly' => ['name' => 'Elderly Care', 'icon' => 'fas fa-user-friends', 'color' => '#795548'],
     'children' => ['name' => 'Children Support', 'icon' => 'fas fa-child', 'color' => '#FF9800'],
-    'livelihood' => ['name' => 'Livelihood', 'icon' => 'fas fa-briefcase', 'color' => '#607D8B'],
-    'other' => ['name' => 'Other Cases', 'icon' => 'fas fa-hands-helping', 'color' => '#00BCD4']
+    
 ];
+
 
 include 'header_UI.php';
 ?>
