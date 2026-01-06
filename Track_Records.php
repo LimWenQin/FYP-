@@ -14,20 +14,35 @@ $current_donor_id = $_SESSION['donor_id'];
 // 2. 处理 POST 请求 (更新资料 & 申请收据)
 // ==========================================
 
-// A. 处理：更新个人资料
+// A. 处理：更新个人资料 (包含详细地址和 IC)
 if (isset($_POST['update_profile'])) {
     $ic = trim($_POST['ic_number']);
-    $address = trim($_POST['address']);
+    $addr1 = trim($_POST['addr1']);
+    $addr2 = trim($_POST['addr2']);
+    $addr3 = trim($_POST['addr3']);
+    $city = trim($_POST['city']);
+    $state = trim($_POST['state']);
+    $zip = trim($_POST['zip']);
+    $country = trim($_POST['country']);
     
-    if(!empty($ic) && !empty($address)){
-        $stmt = $conn->prepare("UPDATE donor SET Donor_ICNumber = ?, Donor_Address1 = ? WHERE Donor_ID = ?");
-        $stmt->bind_param("ssi", $ic, $address, $current_donor_id);
+    // 验证必填项
+    if(!empty($ic) && !empty($addr1) && !empty($city) && !empty($state) && !empty($zip)){
+        $sql = "UPDATE donor SET 
+                Donor_ICNumber=?, 
+                Donor_Address1=?, Donor_Address2=?, Donor_Address3=?, 
+                Donor_City=?, Donor_State=?, Donor_PostalCode=?, Donor_Country=? 
+                WHERE Donor_ID=?";
+        
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ssssssssi", $ic, $addr1, $addr2, $addr3, $city, $state, $zip, $country, $current_donor_id);
         
         if ($stmt->execute()) {
             echo "<script>alert('Profile updated successfully! You can now request your receipt.'); window.location.href='Track_Records.php';</script>";
         } else {
             echo "<script>alert('Update failed. Please try again.');</script>";
         }
+    } else {
+        echo "<script>alert('Please fill in all required fields.');</script>";
     }
 }
 
@@ -35,7 +50,8 @@ if (isset($_POST['update_profile'])) {
 if (isset($_POST['request_receipt'])) {
     $order_id = $_POST['order_id'];
     
-    // 安全验证
+    // 安全验证：确保是本人的订单，且金额达标
+    // 同时检查地址是否完整 (Address1 不能为空)
     $check_sql = "SELECT d.Donor_ICNumber, d.Donor_Address1, o.Order_Amount 
                   FROM orders o JOIN donor d ON o.Donor_ID = d.Donor_ID 
                   WHERE o.Order_ID = ? AND o.Donor_ID = ?";
@@ -60,13 +76,22 @@ if (isset($_POST['request_receipt'])) {
 // 3. 获取数据
 // ==========================================
 
-// --- 获取用户资料状态 ---
-$user_sql = "SELECT Donor_ICNumber, Donor_Address1 FROM donor WHERE Donor_ID = ?";
+// --- 获取用户资料状态 (用于预填表单和检查完整性) ---
+$user_sql = "SELECT * FROM donor WHERE Donor_ID = ?";
 $stmt_user = $conn->prepare($user_sql);
 $stmt_user->bind_param("i", $current_donor_id);
 $stmt_user->execute();
 $user_data = $stmt_user->get_result()->fetch_assoc();
-$is_profile_complete = (!empty($user_data['Donor_ICNumber']) && !empty($user_data['Donor_Address1'])) ? 'true' : 'false';
+
+// 检查关键字段是否完整
+$is_profile_complete = (
+    !empty($user_data['Donor_ICNumber']) && 
+    !empty($user_data['Donor_Address1']) && 
+    !empty($user_data['Donor_City']) && 
+    !empty($user_data['Donor_State']) && 
+    !empty($user_data['Donor_PostalCode'])
+) ? 'true' : 'false';
+
 
 // --- 获取筛选参数 ---
 $filter_type = isset($_GET['type']) ? $_GET['type'] : 'All';
@@ -74,18 +99,17 @@ $filter_status = isset($_GET['status']) ? $_GET['status'] : 'All';
 
 $records = [];
 
-// --- A. 获取现金捐款记录 ---
-$is_cash_related = ($filter_type == 'All' || $filter_type == 'TNG eWallet' || $filter_type == 'Credit/Debit Card');
+// --- A. 获取现金捐款记录 (Orders) ---
+$is_cash_related = ($filter_type == 'All' || $filter_type == 'TNG eWallet' || $filter_type == 'Credit/Debit Card' || $filter_type == 'Cash'); // 添加 Cash 支持
 
 if ($is_cash_related) {
     $sql_orders = "SELECT Order_ID, Order_TXN_Ref, Order_Amount, Order_Status, Order_Created_At, Order_PaymentMethod, Tax_Receipt_Status, 'Cash' as Record_Type 
                    FROM orders 
                    WHERE Donor_ID = ? AND Order_Status != 'Failed'";
     
-    if ($filter_type == 'TNG eWallet') {
-        $sql_orders .= " AND Order_PaymentMethod LIKE '%TNG%'";
-    } elseif ($filter_type == 'Credit/Debit Card') {
-        $sql_orders .= " AND (Order_PaymentMethod LIKE '%Credit%' OR Order_PaymentMethod LIKE '%Card%' OR Order_PaymentMethod LIKE '%Debit%')";
+    if ($filter_type != 'All') {
+        // 简单模糊匹配
+        $sql_orders .= " AND Order_PaymentMethod LIKE '%$filter_type%'";
     }
 
     if ($filter_status != 'All') {
@@ -112,7 +136,7 @@ if ($is_cash_related) {
     $stmt->close();
 }
 
-// --- B. 获取物品捐赠记录 ---
+// --- B. 获取物品捐赠记录 (Item Donation) ---
 if ($filter_type == 'All' || $filter_type == 'Item') {
     $sql_items = "SELECT Item_ID, Item_Name, Item_Quantity, Item_Status, Item_Updated_At, Item_DropOff_Method, 'Item' as Record_Type 
                   FROM item_donation 
@@ -162,7 +186,6 @@ usort($records, function($a, $b) {
     <title>Track Records - Love Bridge</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* 保持原有样式不变 */
         :root {
             --primary-red: #dc2626;
             --dark-red: #b91c1c;
@@ -197,7 +220,7 @@ usort($records, function($a, $b) {
         }
         .page-subtitle { font-size: 1.1rem; color: var(--medium-gray); }
 
-        /* Filter */
+        /* Filter Section */
         .filter-card {
             background: var(--white); padding: 25px; border-radius: 10px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05); margin-bottom: 30px;
@@ -228,14 +251,14 @@ usort($records, function($a, $b) {
         .styled-table th { font-weight: 600; font-size: 0.9rem; text-transform: uppercase; }
         .styled-table tbody tr:hover { background-color: var(--light-gray); }
 
-        /* Badges & Buttons */
+        /* Badges */
         .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; display: inline-block; }
-        
         .status-completed, .status-success, .status-generated { background-color: #dcfce7; color: #166534; }
         .status-pending, .status-requested { background-color: #fef3c7; color: #92400e; }
         .status-failed, .status-rejected { background-color: #fee2e2; color: #991b1b; }
         .status-not_requested { background-color: #f3f4f6; color: #6b7280; }
 
+        /* Action Buttons */
         .btn-action {
             padding: 6px 12px; border-radius: 5px; font-size: 0.85rem; font-weight: 600;
             cursor: pointer; border: none; transition: 0.2s;
@@ -245,22 +268,27 @@ usort($records, function($a, $b) {
         .btn-tax { background: var(--primary-red); color: white; border: 1px solid var(--primary-red); }
         .btn-tax:hover { background: var(--dark-red); }
         .btn-processing { background: #fbbf24; color: white; cursor: default; }
-        
-        /* Modal */
+
+        /* Modal Styles */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
-        .modal-box { background: white; padding: 30px; border-radius: 10px; width: 90%; max-width: 500px; border-top: 6px solid var(--primary-red); }
-        .modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .modal-title { font-size: 1.5rem; font-weight: 800; }
-        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
-        .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        .modal-box { background: white; padding: 30px; border-radius: 10px; width: 90%; max-width: 500px; border-top: 6px solid var(--primary-red); position: relative; }
+        
+        .modal-title { font-size: 1.5rem; font-weight: 800; color: var(--primary-red); margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        
+        .close-btn { position: absolute; right: 20px; top: 15px; border: none; background: none; font-size: 1.8rem; cursor: pointer; color: #999; }
+        .close-btn:hover { color: #333; }
+
+        /* Form Inputs in Modal */
+        .form-group { margin-bottom: 15px; text-align: left; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; color: #333; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        .form-control:focus { border-color: var(--primary-red); outline: none; }
 
         @media (max-width: 768px) {
             .styled-table thead { display: none; }
-            .styled-table tr { display: block; margin-bottom: 20px; border: 1px solid #eee; }
-            .styled-table td { display: flex; justify-content: space-between; text-align: right; padding: 10px; border-bottom: 1px solid #f5f5f5; }
-            .styled-table td::before { content: attr(data-label); font-weight: 700; color: #777; }
+            .styled-table tr { display: block; margin-bottom: 20px; border: 1px solid #eee; background: white; border-radius: 8px; }
+            .styled-table td { display: flex; justify-content: space-between; text-align: right; padding: 12px; border-bottom: 1px solid #f5f5f5; }
+            .styled-table td::before { content: attr(data-label); font-weight: 700; color: #777; margin-right: auto;}
         }
     </style>
 </head>
@@ -283,6 +311,7 @@ usort($records, function($a, $b) {
                     <option value="All" <?php echo $filter_type=='All'?'selected':''; ?>>All Methods</option>
                     <option value="TNG eWallet" <?php echo $filter_type=='TNG eWallet'?'selected':''; ?>>TNG eWallet</option>
                     <option value="Credit/Debit Card" <?php echo $filter_type=='Credit/Debit Card'?'selected':''; ?>>Credit/Debit Card</option>
+                    <option value="Cash" <?php echo $filter_type=='Cash'?'selected':''; ?>>Cash / Manual</option>
                     <option value="Item" <?php echo $filter_type=='Item'?'selected':''; ?>>Item Donation</option>
                 </select>
             </div>
@@ -378,31 +407,81 @@ usort($records, function($a, $b) {
 
 <div id="recordModal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-header">
-            <div class="modal-title">Details</div>
-            <button class="close-btn" onclick="closeDetailModal()">&times;</button>
-        </div>
+        <div class="modal-title">Details</div>
+        <button class="close-btn" onclick="closeDetailModal()">&times;</button>
         <div id="modalContent"></div>
     </div>
 </div>
 
 <div id="profileModal" class="modal-overlay">
-    <div class="modal-box" style="border-top-color: #f59e0b;">
-        <div class="modal-header">
-            <div class="modal-title">Update Profile</div>
-            <button class="close-btn" onclick="closeProfileModal()">&times;</button>
-        </div>
-        <p style="color:#666; margin-bottom:20px;">LHDN requires your IC and Address for tax receipts.</p>
+    <div class="modal-box">
+        <div class="modal-title">Complete Your Profile</div>
+        <button class="close-btn" onclick="closeProfileModal()">&times;</button>
+        
+        <p style="margin-bottom: 20px; color: #666; font-size: 0.9rem;">
+            To issue a valid Tax Exemption Receipt (LHDN requirement), we need your IC Number and Full Address.
+        </p>
+        
         <form method="POST" action="Track_Records.php">
+            <input type="hidden" name="update_profile" value="1">
+
             <div class="form-group">
-                <label>IC Number</label>
-                <input type="text" name="ic_number" required value="<?php echo htmlspecialchars($user_data['Donor_ICNumber'] ?? ''); ?>">
+                <label>IC Number (MyKad) <span style="color:red">*</span></label>
+                <input type="text" name="ic_number" class="form-control" required 
+                       placeholder="e.g. 990101-01-1234"
+                       value="<?php echo htmlspecialchars($user_data['Donor_ICNumber'] ?? ''); ?>">
             </div>
+
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+
             <div class="form-group">
-                <label>Address</label>
-                <textarea name="address" rows="3" required><?php echo htmlspecialchars($user_data['Donor_Address1'] ?? ''); ?></textarea>
+                <label>Address Line 1 <span style="color:red">*</span></label>
+                <input type="text" name="addr1" class="form-control" required 
+                       placeholder="House No, Street Name"
+                       value="<?php echo htmlspecialchars($user_data['Donor_Address1'] ?? ''); ?>">
             </div>
-            <button type="submit" name="update_profile" class="btn-filter" style="width:100%">Save & Continue</button>
+
+            <div class="form-group">
+                <label>Address Line 2 (Optional)</label>
+                <input type="text" name="addr2" class="form-control" 
+                       placeholder="Apartment, Suite, Unit, etc."
+                       value="<?php echo htmlspecialchars($user_data['Donor_Address2'] ?? ''); ?>">
+            </div>
+
+            <div class="form-group">
+                <label>Address Line 3 (Optional)</label>
+                <input type="text" name="addr3" class="form-control" 
+                       placeholder="Landmark / Additional Info"
+                       value="<?php echo htmlspecialchars($user_data['Donor_Address3'] ?? ''); ?>">
+            </div>
+
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex:1">
+                    <label>City <span style="color:red">*</span></label>
+                    <input type="text" name="city" class="form-control" required 
+                           value="<?php echo htmlspecialchars($user_data['Donor_City'] ?? ''); ?>">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label>State <span style="color:red">*</span></label>
+                    <input type="text" name="state" class="form-control" required 
+                           value="<?php echo htmlspecialchars($user_data['Donor_State'] ?? ''); ?>">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex:1">
+                    <label>Postal Code <span style="color:red">*</span></label>
+                    <input type="text" name="zip" class="form-control" required 
+                           value="<?php echo htmlspecialchars($user_data['Donor_PostalCode'] ?? ''); ?>">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label>Country <span style="color:red">*</span></label>
+                    <input type="text" name="country" class="form-control" required 
+                           value="<?php echo htmlspecialchars($user_data['Donor_Country'] ?? 'Malaysia'); ?>">
+                </div>
+            </div>
+
+            <button type="submit" class="btn-filter" style="width:100%; margin-top: 10px;">Save & Continue</button>
         </form>
     </div>
 </div>
@@ -415,12 +494,21 @@ usort($records, function($a, $b) {
 <?php include 'footer.php'; ?>
 
 <script>
+    // JS Logic
     function openDetailModal(data) {
         var html = `
-            <div style="margin-bottom:10px;"><strong>Ref:</strong> ${data.ref}</div>
-            <div style="margin-bottom:10px;"><strong>Amount:</strong> ${data.details}</div>
-            <div style="margin-bottom:10px;"><strong>Date:</strong> ${data.date}</div>
-            <div style="margin-bottom:10px;"><strong>Status:</strong> ${data.status}</div>
+            <div style="margin-bottom:10px; display:flex; justify-content:space-between;">
+                <span style="color:#777;">Ref ID:</span> <strong>${data.ref}</strong>
+            </div>
+            <div style="margin-bottom:10px; display:flex; justify-content:space-between;">
+                <span style="color:#777;">Amount:</span> <strong style="color:var(--primary-red);">${data.details}</strong>
+            </div>
+            <div style="margin-bottom:10px; display:flex; justify-content:space-between;">
+                <span style="color:#777;">Date:</span> <strong>${data.date}</strong>
+            </div>
+            <div style="margin-bottom:10px; display:flex; justify-content:space-between;">
+                <span style="color:#777;">Status:</span> <strong class="status-badge status-${data.status.toLowerCase().includes('success')?'success':'pending'}">${data.status}</strong>
+            </div>
         `;
         document.getElementById('modalContent').innerHTML = html;
         document.getElementById('recordModal').style.display = 'flex';
@@ -428,18 +516,23 @@ usort($records, function($a, $b) {
     function closeDetailModal() { document.getElementById('recordModal').style.display = 'none'; }
 
     const isProfileComplete = <?php echo $is_profile_complete; ?>;
+    
     function handleRequest(orderId) {
         if (isProfileComplete) {
-            if(confirm("Request Tax Receipt?")) {
+            // 如果资料完整，直接确认提交
+            if(confirm("Request Tax Receipt for this donation?")) {
                 document.getElementById('hidden_order_id').value = orderId;
                 document.getElementById('directRequestForm').submit();
             }
         } else {
+            // 资料不全，弹出填表窗口
             document.getElementById('profileModal').style.display = 'flex';
         }
     }
+    
     function closeProfileModal() { document.getElementById('profileModal').style.display = 'none'; }
     
+    // 点击窗口外部关闭
     window.onclick = function(e) {
         if(e.target == document.getElementById('recordModal')) closeDetailModal();
         if(e.target == document.getElementById('profileModal')) closeProfileModal();

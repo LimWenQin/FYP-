@@ -12,6 +12,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'approve') {
         // --- APPROVE 逻辑 ---
+        
+        // 1. 获取该订单的详细信息 (用于生成 PDF)
+        // 我们需要 JOIN payment 表来获取 TXN Ref，JOIN donor 表获取个人信息
         $sql = "SELECT p.*, o.Order_ID, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Case_ID, o.Order_Created_At, o.Donor_ID,
                        d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber, d.Donor_Address1, d.Donor_Address2, d.Donor_City, d.Donor_State, d.Donor_PostalCode
                 FROM orders o 
@@ -26,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
 
         if ($row) {
-            // 确定项目名称
+            // 2. 确定项目名称 (Project Name)
             $project_name = "Love Bridge Fund"; 
             if (!empty($row['Case_ID'])) {
                 $c_stmt = $conn->prepare("SELECT Case_Title FROM special_case WHERE Case_ID = ?");
@@ -42,44 +45,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $b_stmt->close();
             }
 
-            // 发送邮件
+            // 3. 调用函数：生成 PDF 并发邮件
             if (sendReceiptEmail($row, $project_name)) {
+                
                 $receipt_no = "REC-" . date("Y") . "-" . str_pad($order_id, 6, "0", STR_PAD_LEFT);
                 $file_name = "receipt_" . $order_id . ".pdf";
 
-                $conn->query("UPDATE orders SET Tax_Receipt_Status = 'Generated' WHERE Order_ID = $order_id");
-                
-                $stmt_ins = $conn->prepare("INSERT INTO receipt (Receipt_Receipt_Number, Receipt_Generated_At, Receipt_Receipt_File, Donor_ID, Order_ID) VALUES (?, NOW(), ?, ?, ?)");
-                $stmt_ins->bind_param("ssii", $receipt_no, $file_name, $row['Donor_ID'], $order_id);
-                $stmt_ins->execute();
+                // ======================================================
+                // 【修复核心】检查收据是否已经存在，防止 Duplicate Entry 错误
+                // ======================================================
+                $check_sql = "SELECT Receipt_ID FROM receipt WHERE Order_ID = ?";
+                $check_stmt = $conn->prepare($check_sql);
+                $check_stmt->bind_param("i", $order_id);
+                $check_stmt->execute();
+                $check_res = $check_stmt->get_result();
 
-                echo "<script>alert('Receipt Approved & Sent!');</script>";
+                // 只有当收据不存在时，才执行插入
+                if ($check_res->num_rows == 0) {
+                    $stmt_ins = $conn->prepare("INSERT INTO receipt (Receipt_Receipt_Number, Receipt_Generated_At, Receipt_Receipt_File, Donor_ID, Order_ID) VALUES (?, NOW(), ?, ?, ?)");
+                    $stmt_ins->bind_param("ssii", $receipt_no, $file_name, $row['Donor_ID'], $order_id);
+                    $stmt_ins->execute();
+                    $stmt_ins->close();
+                }
+                $check_stmt->close();
+
+                // 无论是否插入新记录，都确保更新 Order 状态
+                $conn->query("UPDATE orders SET Tax_Receipt_Status = 'Generated' WHERE Order_ID = $order_id");
+
+                // 使用 JS 跳转防止表单重复提交
+                echo "<script>alert('Receipt Approved & Sent Successfully!'); window.location.href='admin_receipts.php';</script>";
             } else {
-                echo "<script>alert('Error: Email sending failed.');</script>";
+                echo "<script>alert('Error: Email sending failed. Please check server logs.'); window.history.back();</script>";
             }
         }
 
     } elseif ($action === 'reject') {
         // --- REJECT 逻辑 ---
+        
+        // 1. 更新状态
         $conn->query("UPDATE orders SET Tax_Receipt_Status = 'Rejected' WHERE Order_ID = $order_id");
         
-        // 获取邮箱发通知
+        // 2. 发送简单通知邮件
         $stmt = $conn->prepare("SELECT d.Donor_Email, d.Donor_Name FROM orders o JOIN donor d ON o.Donor_ID = d.Donor_ID WHERE o.Order_ID = ?");
         $stmt->bind_param("i", $order_id);
         $stmt->execute();
         $userData = $stmt->get_result()->fetch_assoc();
         
-        mail($userData['Donor_Email'], "Tax Receipt Request Update", "Dear " . $userData['Donor_Name'] . ", your request has been declined.");
-        echo "<script>alert('Request Rejected.');</script>";
+        if($userData) {
+            $to = $userData['Donor_Email'];
+            $subject = "Update on your Tax Receipt Request";
+            $message = "Dear " . $userData['Donor_Name'] . ",\n\nWe regret to inform you that your request for a tax exemption receipt for Order #$order_id has been declined due to incomplete information or verification issues.\n\nPlease contact us for further assistance.\n\nRegards,\nLove Bridge Admin";
+            mail($to, $subject, $message, "From: no-reply@lovebridge.org");
+        }
+        
+        echo "<script>alert('Request Rejected.'); window.location.href='admin_receipts.php';</script>";
     }
 }
 
 // ==========================================
-// 2. 获取数据 (JOIN Payment 表以获取详细信息)
+// 2. 获取数据列表 (支持搜索)
 // ==========================================
 $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
 
-// 注意：这里我们需要 JOIN payment 表，因为 Details 弹窗里需要显示 Payment Method 和 TXN Ref
 $sql_pending = "SELECT o.Order_ID, o.Order_Amount, o.Order_Created_At, o.Order_TXN_Ref, o.Order_Type, o.Order_Status,
                        d.Donor_Name, d.Donor_ICNumber, d.Donor_Email, d.Donor_ContactNumber, 
                        d.Donor_Address1, d.Donor_Address2, d.Donor_City, d.Donor_State, d.Donor_PostalCode,
@@ -113,7 +140,7 @@ $result_pending = $conn->query($sql_pending);
         .btn-action { margin: 2px; }
         .txn-highlight { background-color: #fff3cd; padding: 2px 5px; border-radius: 4px; font-family: monospace; font-weight: bold; }
         
-        /* Modal Styles matching Payment Settlement */
+        /* Modal Styles */
         .modal-header { background-color: #dc2626; color: white; }
         .group-title { font-size: 0.85rem; text-transform: uppercase; color: #999; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 15px; }
         .info-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.95rem; }
@@ -182,10 +209,10 @@ $result_pending = $conn->query($sql_pending);
 
                                         <form method="POST" style="display:inline-block;" onsubmit="return confirm('Confirm action?');">
                                             <input type="hidden" name="order_id" value="<?php echo $row['Order_ID']; ?>">
-                                            <button type="submit" name="action" value="approve" class="btn btn-success btn-sm btn-action">
+                                            <button type="submit" name="action" value="approve" class="btn btn-success btn-sm btn-action" title="Approve & Send Email">
                                                 <i class="fas fa-check"></i>
                                             </button>
-                                            <button type="submit" name="action" value="reject" class="btn btn-danger btn-sm btn-action">
+                                            <button type="submit" name="action" value="reject" class="btn btn-danger btn-sm btn-action" title="Reject Request">
                                                 <i class="fas fa-times"></i>
                                             </button>
                                         </form>
@@ -224,6 +251,7 @@ $result_pending = $conn->query($sql_pending);
         // 格式化完整地址
         let fullAddress = data.Donor_Address1;
         if(data.Donor_Address2) fullAddress += ", " + data.Donor_Address2;
+        if(data.Donor_Address3) fullAddress += ", " + data.Donor_Address3; // 支持 Address3
         fullAddress += ", " + data.Donor_PostalCode + " " + data.Donor_City + ", " + data.Donor_State;
 
         let html = `
