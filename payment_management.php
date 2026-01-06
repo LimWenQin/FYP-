@@ -2,165 +2,316 @@
 // payment_management.php
 session_start();
 
-// 检查用户是否已登录
+// Check if user is logged in
 if (!isset($_SESSION['admin_id'])) {
     header("Location: admin_login.php");
     exit();
 }
 
-// 包含数据库连接
 include 'dataconnection.php';
 
-// 获取统计数据
-function getTotalRevenue($conn) {
-    $sql = "SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus = 'Completed'";
-    $result = $conn->query($sql);
-    if ($result && $result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        return $row['total'] ? number_format($row['total'], 2) : '0.00';
-    }
-    return '0.00';
+// --- Get Current Admin Info ---
+$currentAdminId = $_SESSION['admin_id'];
+$adminSql = "SELECT Admin_Name, Admin_Role, Admin_ProfilePicture FROM admin WHERE Admin_ID = $currentAdminId";
+$adminResult = $conn->query($adminSql);
+
+if ($adminResult && $adminResult->num_rows > 0) {
+    $adminData = $adminResult->fetch_assoc();
+    $adminName = $adminData['Admin_Name'];
+    $adminPosition = $adminData['Admin_Role']; 
+    $adminProfilePicture = $adminData['Admin_ProfilePicture']; 
+} else {
+    $adminName = "Admin";
+    $adminPosition = "Admin"; 
+    $adminProfilePicture = null;
 }
 
-function getPendingPayments($conn) {
-    $sql = "SELECT COUNT(*) as count FROM orders WHERE Order_PaymentStatus = 'Pending'";
-    $result = $conn->query($sql);
-    if ($result && $result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        return $row['count'];
-    }
-    return 0;
-}
+// ==========================================
+// 0. HANDLE EXPORT TO EXCEL
+// ==========================================
+if (isset($_GET['export'])) {
+    $type = $_GET['export'];
+    $filename = "report_" . $type . "_" . date('Ymd') . ".xls";
+    
+    header("Content-Type: application/vnd.ms-excel");
+    header("Content-Disposition: attachment; filename=\"$filename\"");
+    header("Pragma: no-cache");
+    header("Expires: 0");
 
-function getPointsDistributed($conn) {
-    $sql = "SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus = 'Completed'";
-    $result = $conn->query($sql);
-    if ($result && $result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        return $row['total'] ? number_format($row['total']) : '0';
-    }
-    return '0';
-}
-
-function getSuccessRate($conn) {
-    $sql = "SELECT 
-            COUNT(*) as total_orders,
-            SUM(CASE WHEN Order_PaymentStatus = 'Completed' THEN 1 ELSE 0 END) as successful_orders
-            FROM orders";
-    $result = $conn->query($sql);
-    if ($result && $result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        if ($row['total_orders'] > 0) {
-            return round(($row['successful_orders'] / $row['total_orders']) * 100, 1);
+    echo '<table border="1">';
+    
+    if ($type == 'income') {
+        // Export Income
+        echo '<tr><th>Ref ID</th><th>Date</th><th>Donor Name</th><th>Donor Email</th><th>Target</th><th>Amount</th><th>Method</th><th>Status</th></tr>';
+        $sql = "SELECT o.Order_TXN_Ref, o.Order_Created_At, d.Donor_Name, d.Donor_Email, o.Order_Amount, o.Order_PaymentMethod, o.Order_PaymentStatus,
+                b.Branch_Name, a.Activity_Name, s.Case_Title
+                FROM orders o
+                JOIN donor d ON o.Donor_ID = d.Donor_ID
+                LEFT JOIN branch b ON o.Branch_ID = b.Branch_ID
+                LEFT JOIN activity a ON o.Activity_ID = a.Activity_ID
+                LEFT JOIN special_case s ON o.Case_ID = s.Case_ID
+                ORDER BY o.Order_Created_At DESC";
+        $res = $conn->query($sql);
+        while($row = $res->fetch_assoc()) {
+            $target = "General (Other)";
+            if($row['Branch_Name']) $target = "Branch: ".$row['Branch_Name'];
+            elseif($row['Activity_Name']) $target = "Activity: ".$row['Activity_Name'];
+            elseif($row['Case_Title']) $target = "Case: ".$row['Case_Title'];
+            
+            echo "<tr>
+                <td>{$row['Order_TXN_Ref']}</td>
+                <td>{$row['Order_Created_At']}</td>
+                <td>{$row['Donor_Name']}</td>
+                <td>{$row['Donor_Email']}</td>
+                <td>{$target}</td>
+                <td>{$row['Order_Amount']}</td>
+                <td>{$row['Order_PaymentMethod']}</td>
+                <td>{$row['Order_PaymentStatus']}</td>
+            </tr>";
+        }
+    } elseif ($type == 'expense') {
+        // Export Expense
+        echo '<tr><th>Date</th><th>Title</th><th>Category</th><th>Amount</th><th>Claimant Type</th><th>Claimant ID</th><th>Status</th><th>Description</th></tr>';
+        $sql = "SELECT * FROM expenses ORDER BY Expense_Date DESC";
+        $res = $conn->query($sql);
+        while($row = $res->fetch_assoc()) {
+            echo "<tr>
+                <td>{$row['Expense_Date']}</td>
+                <td>{$row['Expense_Title']}</td>
+                <td>{$row['Expense_Category']}</td>
+                <td>{$row['Expense_Amount']}</td>
+                <td>{$row['Claimant_Type']}</td>
+                <td>{$row['Claimant_ID']}</td>
+                <td>{$row['Expense_Status']}</td>
+                <td>{$row['Expense_Description']}</td>
+            </tr>";
         }
     }
-    return 0;
+    echo '</table>';
+    exit();
 }
 
-function getPaymentMethodsDistribution($conn) {
-    $sql = "SELECT Order_PaymentMethod, COUNT(*) as count 
-            FROM orders 
-            WHERE Order_PaymentStatus = 'Completed'
-            GROUP BY Order_PaymentMethod";
-    $result = $conn->query($sql);
-    $methods = [];
-    if ($result && $result->num_rows > 0) {
-        while($row = $result->fetch_assoc()) {
-            $methods[$row['Order_PaymentMethod']] = $row['count'];
+// --- FILE UPLOAD HELPER FUNCTION ---
+function handleProofUpload($files) {
+    if (!isset($files['name']) || empty($files['name'][0])) {
+        return null;
+    }
+
+    $uploadedPaths = [];
+    $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+    $uploadDir = 'uploads/expenses/';
+    if (!is_dir($uploadDir)) { mkdir($uploadDir, 0777, true); }
+
+    $count = count($files['name']);
+    
+    for ($i = 0; $i < $count; $i++) {
+        if ($files['error'][$i] == 0) {
+            if (in_array($files['type'][$i], $allowedTypes)) {
+                $fileExtension = pathinfo($files['name'][$i], PATHINFO_EXTENSION);
+                $fileName = 'receipt_' . time() . '_' . uniqid() . '_' . $i . '.' . $fileExtension;
+                $uploadPath = $uploadDir . $fileName;
+                
+                if (move_uploaded_file($files['tmp_name'][$i], $uploadPath)) {
+                    $uploadedPaths[] = $uploadPath;
+                }
+            }
         }
     }
-    return $methods;
+
+    return (!empty($uploadedPaths)) ? json_encode($uploadedPaths) : null;
 }
 
-function getRecentTransactions($conn, $limit = 25) {
-    $sql = "SELECT o.Order_ID, o.Order_TXN_Ref, 
-                   d.Donor_FName, d.Donor_LName, d.Donor_Email,
-                   o.Order_Amount, o.Order_Points_Earned,
-                   o.Order_Created_At, o.Order_PaymentMethod, o.Order_PaymentStatus
+// ==========================================
+// 1. HANDLE ADD DONATION (Select Existing Donor)
+// ==========================================
+$msg = "";
+$msgType = "";
+
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_donation_submit'])) {
+    
+    // 1. Get Selected Donor ID
+    $donor_id = $_POST['donor_id'];
+    
+    // 2. Donation Info
+    $amount = $_POST['amount'];
+    $payment_method = $_POST['payment_method']; 
+    $donation_frequency = $_POST['donation_frequency']; 
+    
+    // 3. Target Logic
+    $target_category = $_POST['target_category']; 
+    $branch_id = ($target_category == 'branch') ? $_POST['target_branch_id'] : null;
+    $activity_id = ($target_category == 'activity') ? $_POST['target_activity_id'] : null;
+    $case_id = ($target_category == 'case') ? $_POST['target_case_id'] : null;
+
+    $conn->begin_transaction();
+    try {
+        // A. Fetch Donor Details from Database (Since we only got ID)
+        $donorQ = $conn->query("SELECT * FROM donor WHERE Donor_ID = '$donor_id'");
+        if ($donorQ->num_rows == 0) {
+            throw new Exception("Selected donor not found.");
+        }
+        $donorData = $donorQ->fetch_assoc();
+        
+        // Data for Orders table
+        $d_name = $donorData['Donor_Name'];
+        $d_email = $donorData['Donor_Email'];
+        $d_phone = $donorData['Donor_ContactNumber'];
+        $d_ic = $donorData['Donor_ICNumber'];
+
+        // B. Create Payment Record
+        $txn_ref = "MAN-IN-" . date('YmdHis') . "-" . rand(100, 999); 
+        $paySql = "INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At) 
+                   VALUES (?, 'Success', ?, ?, NOW(), 'Manual Entry', 'N/A', NOW())";
+        $stmtPay = $conn->prepare($paySql);
+        
+        $stmtPay->bind_param("ssd", $payment_method, $txn_ref, $amount);
+        $stmtPay->execute();
+        $payment_insert_id = $conn->insert_id;
+        $stmtPay->close();
+
+        // C. Create Order Record
+        $points_earned = floor($amount / 10);
+        $orderSql = "INSERT INTO orders (Order_Name, Order_ContactNumber, Order_ICNumber, Order_Email, Order_Amount, Order_Points_Earned, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, Order_Admin_Status, Order_TXN_Ref, Order_Type, Order_Status, Is_Deleted, Order_Created_At, Order_Updated_At, Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID) 
+                     VALUES (?, ?, ?, ?, ?, ?, 'MYR', ?, 'Success', 'Completed', ?, ?, 'Completed', 0, NOW(), NOW(), ?, ?, ?, ?, ?)";
+        
+        $stmtOrder = $conn->prepare($orderSql);
+        
+        $stmtOrder->bind_param("ssssdissiiiii", 
+            $d_name, $d_phone, $d_ic, $d_email, 
+            $amount, $points_earned, $payment_method, $txn_ref, $donation_frequency,
+            $donor_id, $payment_insert_id, $branch_id, $activity_id, $case_id
+        );
+        $stmtOrder->execute();
+        $stmtOrder->close();
+
+        // D. Update Points
+        if ($points_earned > 0) {
+            $ptCheck = $conn->query("SELECT * FROM point WHERE Donor_ID = '$donor_id'");
+            if ($ptCheck->num_rows > 0) {
+                $conn->query("UPDATE point SET Points_Total = Points_Total + $points_earned, Points_Earned = Points_Earned + $points_earned, Points_Updated_At = NOW() WHERE Donor_ID = '$donor_id'");
+            } else {
+                $conn->query("INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES ($points_earned, $points_earned, NOW(), '$donor_id')");
+            }
+        }
+
+        $conn->commit();
+        $msg = "Donation successfully recorded for " . htmlspecialchars($d_name) . "!";
+        $msgType = "success";
+    } catch (Exception $e) {
+        $conn->rollback();
+        $msg = "Error: " . $e->getMessage();
+        $msgType = "error";
+    }
+}
+
+// ==========================================
+// 2. HANDLE RECORD TRANSACTION (Expense)
+// ==========================================
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_expense_submit'])) {
+    $ex_title = $_POST['ex_title'];
+    $ex_category = $_POST['ex_category'];
+    $ex_amount = $_POST['ex_amount'];
+    // $ex_claimed_by name from form is not stored because DB uses Claimant_ID
+    $ex_desc = $_POST['ex_desc'];
+    
+    $ex_status = ($adminPosition === 'Super Admin') ? 'Approved' : 'Pending';
+
+    $proofPathJson = null;
+    if (isset($_FILES['expense_proof'])) {
+        $proofPathJson = handleProofUpload($_FILES['expense_proof']); 
+    }
+
+    $stmtEx = $conn->prepare("INSERT INTO expenses (Expense_Title, Expense_Category, Expense_Amount, Claimant_Type, Claimant_ID, Expense_Date, Expense_Status, Expense_Description, Expense_Proof, Recorded_By_Admin_ID) VALUES (?, ?, ?, 'Admin', ?, NOW(), ?, ?, ?, ?)");
+    
+    // Bind: title(s), cat(s), amount(d), claimant_id(i), status(s), desc(s), proof(s), recorded_by(i)
+    $stmtEx->bind_param("ssdisssi", $ex_title, $ex_category, $ex_amount, $currentAdminId, $ex_status, $ex_desc, $proofPathJson, $currentAdminId);
+    
+    if ($stmtEx->execute()) {
+        $msg = "Expense recorded successfully! Status: " . $ex_status;
+        $msgType = "success";
+    } else {
+        $msg = "Error recording transaction: " . $conn->error;
+        $msgType = "error";
+    }
+    $stmtEx->close();
+}
+
+// --- Fetch Data for Dropdowns ---
+// Donors List for Select Box
+$donorsList = $conn->query("SELECT Donor_ID, Donor_Name, Donor_Email, Donor_ICNumber FROM donor ORDER BY Donor_Name ASC");
+
+$branchesList = $conn->query("SELECT Branch_ID, Branch_Name FROM branch WHERE Branch_OperationalStatus = 'Open'");
+$activitiesList = $conn->query("SELECT Activity_ID, Activity_Name FROM activity WHERE Activity_Status != 'Cancelled' AND Activity_Status != 'Completed' ORDER BY Activity_StartDate DESC");
+$casesList = $conn->query("SELECT Case_ID, Case_Title FROM special_case WHERE Case_Status = 'Active'");
+
+// --- Stats Functions ---
+$totalRevenue = $conn->query("SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus IN ('Completed', 'Success')")->fetch_assoc()['total'] ?? 0;
+$recurringRevenue = $conn->query("SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus IN ('Completed', 'Success') AND Order_Type = 'Recurring'")->fetch_assoc()['total'] ?? 0;
+$totalPoints = floor($totalRevenue / 10);
+$pendingCount = $conn->query("SELECT COUNT(*) as count FROM orders WHERE Order_PaymentStatus = 'Pending'")->fetch_assoc()['count'];
+
+// ==========================================
+// PAGINATION LOGIC (DUAL)
+// ==========================================
+$limit = 5;
+
+// 1. Income Pagination
+$page_inc = isset($_GET['page_inc']) && is_numeric($_GET['page_inc']) ? (int)$_GET['page_inc'] : 1;
+if ($page_inc < 1) $page_inc = 1;
+$offset_inc = ($page_inc - 1) * $limit;
+
+$sql_inc_count = "SELECT COUNT(*) as total FROM orders";
+$total_inc_recs = $conn->query($sql_inc_count)->fetch_assoc()['total'];
+$total_pages_inc = ceil($total_inc_recs / $limit);
+
+$sql_inc = "SELECT o.Order_TXN_Ref, o.Order_Type, d.Donor_Name, d.Donor_Email, o.Order_Amount, o.Order_Created_At, o.Order_PaymentMethod, o.Order_PaymentStatus,
+            b.Branch_Name, a.Activity_Name, s.Case_Title
             FROM orders o
             JOIN donor d ON o.Donor_ID = d.Donor_ID
-            ORDER BY o.Order_Created_At DESC
-            LIMIT ?";
-    
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $limit);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $transactions = [];
-    if ($result && $result->num_rows > 0) {
-        while($row = $result->fetch_assoc()) {
-            $transactions[] = $row;
-        }
+            LEFT JOIN branch b ON o.Branch_ID = b.Branch_ID
+            LEFT JOIN activity a ON o.Activity_ID = a.Activity_ID
+            LEFT JOIN special_case s ON o.Case_ID = s.Case_ID
+            ORDER BY o.Order_Created_At DESC LIMIT $offset_inc, $limit";
+$recentTransactions = $conn->query($sql_inc);
+
+$start_inc = ($total_inc_recs > 0) ? $offset_inc + 1 : 0;
+$end_inc = min($offset_inc + $limit, $total_inc_recs);
+
+// 2. Expense Pagination
+$page_exp = isset($_GET['page_exp']) && is_numeric($_GET['page_exp']) ? (int)$_GET['page_exp'] : 1;
+if ($page_exp < 1) $page_exp = 1;
+$offset_exp = ($page_exp - 1) * $limit;
+
+$sql_exp_count = "SELECT COUNT(*) as total FROM expenses";
+$total_exp_recs = $conn->query($sql_exp_count)->fetch_assoc()['total'];
+$total_pages_exp = ceil($total_exp_recs / $limit);
+
+$sql_exp = "SELECT * FROM expenses ORDER BY Expense_Date DESC LIMIT $offset_exp, $limit";
+$recentExpenses = $conn->query($sql_exp);
+
+$start_exp = ($total_exp_recs > 0) ? $offset_exp + 1 : 0;
+$end_exp = min($offset_exp + $limit, $total_exp_recs);
+
+// 3. Top Donors (Limit 10)
+$topDonors = $conn->query("SELECT d.Donor_Name, d.Donor_ProfilePicture, SUM(o.Order_Amount) as total_donated
+                           FROM orders o JOIN donor d ON o.Donor_ID = d.Donor_ID
+                           WHERE o.Order_PaymentStatus IN ('Completed', 'Success')
+                           GROUP BY o.Donor_ID ORDER BY total_donated DESC LIMIT 10");
+
+// Chart Data
+function getMonthlyRevenueChartData($conn) {
+    $data = [];
+    for ($i = 5; $i >= 0; $i--) {
+        $monthLabel = date('M Y', strtotime("-$i months"));
+        $monthStart = date('Y-m-01', strtotime("-$i months"));
+        $monthEnd = date('Y-m-t', strtotime("-$i months"));
+        $sql = "SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus IN ('Completed', 'Success') AND Order_Created_At BETWEEN '$monthStart 00:00:00' AND '$monthEnd 23:59:59'";
+        $data['labels'][] = $monthLabel;
+        $data['revenue'][] = $conn->query($sql)->fetch_assoc()['total'] ?? 0;
     }
-    $stmt->close();
-    return $transactions;
+    return $data;
 }
-
-function getRevenuePointsTrend($conn) {
-    $sql = "SELECT 
-            DATE(Order_Created_At) as date,
-            SUM(Order_Amount) as revenue,
-            SUM(Order_Amount) as points  -- 1 MYR = 1 Point
-            FROM orders 
-            WHERE Order_Created_At >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-            AND Order_PaymentStatus = 'Completed'
-            GROUP BY DATE(Order_Created_At)
-            ORDER BY date";
-    
-    $result = $conn->query($sql);
-    $trends = [
-        'dates' => [],
-        'revenue' => [],
-        'points' => []
-    ];
-    
-    if ($result && $result->num_rows > 0) {
-        while($row = $result->fetch_assoc()) {
-            $trends['dates'][] = date('M j', strtotime($row['date']));
-            $trends['revenue'][] = $row['revenue'];
-            $trends['points'][] = $row['points'];
-        }
-    }
-    
-    // 确保有7天的数据
-    while (count($trends['dates']) < 7) {
-        $trends['dates'][] = '';
-        $trends['revenue'][] = 0;
-        $trends['points'][] = 0;
-    }
-    
-    return $trends;
-}
-
-// 获取数据
-$totalRevenue = getTotalRevenue($conn);
-$pendingPayments = getPendingPayments($conn);
-$pointsDistributed = getPointsDistributed($conn);
-$successRate = getSuccessRate($conn);
-$paymentMethods = getPaymentMethodsDistribution($conn);
-$recentTransactions = getRecentTransactions($conn);
-$revenuePointsTrend = getRevenuePointsTrend($conn);
-
-// 获取管理员信息
-$adminId = $_SESSION['admin_id'];
-$adminName = $_SESSION['admin_name'];
-$adminEmail = $_SESSION['admin_email'];
-
-// 获取管理员头像
-$adminProfilePicture = null;
-$sql = "SELECT Admin_ProfilePicture FROM admin WHERE Admin_ID = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $adminId);
-$stmt->execute();
-$result = $stmt->get_result();
-if ($result && $result->num_rows > 0) {
-    $row = $result->fetch_assoc();
-    $adminProfilePicture = $row['Admin_ProfilePicture'];
-}
-$stmt->close();
-
-// 关闭数据库连接
+$chartData = getMonthlyRevenueChartData($conn);
 $conn->close();
 ?>
 
@@ -169,937 +320,797 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Management - Donation Management System</title>
+    <title>Payment Management - Love Bridge</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin_common.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <style>
-        /* Payment Management Specific Styles */
-        .payment-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
+        :root {
+            --primary: #F28585; 
+            --secondary: #6c757d;
+            --success: #28a745;
+            --danger: #dc3545;
+            --dark: #333;
+            --info: #17a2b8;
+            --warning: #ffc107;
+        }
+        body { background-color: #f4f6f9; }
+        .dashboard-content { padding: 25px; }
+
+        /* Floating Alert Styles */
+        .floating-alert { 
+            position: fixed; top: 20px; right: 20px; padding: 15px 20px; 
+            border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); 
+            z-index: 9999; display: flex; align-items: center; gap: 15px; 
+            animation: slideIn 0.5s ease-out;
+            min-width: 300px;
+        }
+        .floating-alert-success { background: white; color: var(--success); border-left: 5px solid var(--success); }
+        .floating-alert-danger { background: white; color: var(--danger); border-left: 5px solid var(--danger); }
+        .floating-alert i { font-size: 20px; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
 
-        .payment-stat-card {
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            transition: transform 0.3s;
-        }
-
-        .payment-stat-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .stat-main {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 15px;
-        }
-
-        .stat-info h3 {
-            font-size: 14px;
-            color: var(--gray);
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-
-        .stat-info h2 {
-            font-size: 28px;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-
-        .stat-trend {
-            display: flex;
-            align-items: center;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .stat-trend.up {
-            color: var(--success);
-        }
-
-        .stat-trend.down {
-            color: var(--danger);
-        }
-
-        .stat-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-        }
-
-        .stat-card-1 .stat-icon {
-            background: rgba(40, 167, 69, 0.1);
-            color: var(--success);
-        }
-
-        .stat-card-2 .stat-icon {
-            background: rgba(255, 193, 7, 0.1);
-            color: var(--warning);
-        }
-
-        .stat-card-3 .stat-icon {
-            background: rgba(23, 162, 184, 0.1);
-            color: var(--info);
-        }
-
-        .stat-card-4 .stat-icon {
-            background: rgba(242, 133, 133, 0.1);
-            color: var(--primary);
-        }
-
-        .stat-footer {
-            border-top: 1px solid var(--gray-light);
-            padding-top: 15px;
-            font-size: 12px;
-            color: var(--gray);
-        }
-
-        /* Main Content Layout */
-        .payment-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .chart-container, .recent-transactions, .payment-methods, .system-logic {
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        .section-header {
+        /* --- 1. Header Styling --- */
+        .page-header-flex {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
-
-        .section-header h2 {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .section-header a {
-            color: var(--primary);
-            text-decoration: none;
+        
+        .welcome-text h1 { font-size: 28px; color: #333; font-weight: 700; margin-bottom: 5px; margin-top: 0; }
+        .welcome-text p { color: #777; font-size: 14px; margin: 0; }
+        
+        .header-btn-group { display: flex; gap: 10px; }
+        
+        /* Buttons */
+        .btn-custom {
+            background-color: var(--primary); 
+            color: white; 
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px; 
             font-size: 14px;
-        }
-
-        .chart-wrapper {
-            height: 300px;
-            position: relative;
-        }
-
-        /* Payment Methods */
-        .payment-method-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 15px 0;
-            border-bottom: 1px solid var(--gray-light);
-        }
-
-        .payment-method-item:last-child {
-            border-bottom: none;
-        }
-
-        .method-info {
-            display: flex;
-            align-items: center;
-        }
-
-        .method-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            font-size: 18px;
-            background: var(--gray-light);
-            color: var(--dark);
-        }
-
-        .method-details h4 {
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 2px;
-        }
-
-        .method-details p {
-            font-size: 12px;
-            color: var(--gray);
-        }
-
-        .method-percentage {
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        /* System Logic */
-        .system-logic {
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            color: white;
-        }
-
-        .system-logic h3 {
-            font-size: 16px;
-            margin-bottom: 15px;
-            font-weight: 600;
-        }
-
-        .logic-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-        }
-
-        .logic-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .logic-icon {
-            width: 30px;
-            height: 30px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 12px;
-            background: rgba(255, 255, 255, 0.2);
-            font-size: 14px;
-        }
-
-        .logic-text {
-            font-size: 14px;
-        }
-
-        /* Recent Transactions Table */
-        .recent-transactions {
-            grid-column: 1 / -1;
-        }
-
-        .transactions-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .transactions-table th, .transactions-table td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid var(--gray-light);
-        }
-
-        .transactions-table th {
-            font-weight: 600;
-            color: var(--gray);
-            font-size: 14px;
-            background: var(--light);
-        }
-
-        .donor-info {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .donor-name {
-            font-weight: 600;
-            font-size: 14px;
-            margin-bottom: 2px;
-        }
-
-        .donor-email {
-            font-size: 12px;
-            color: var(--gray);
-        }
-
-        .amount-points {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .amount {
-            font-weight: 600;
-            font-size: 14px;
-            margin-bottom: 2px;
-        }
-
-        .points {
-            font-size: 12px;
-            color: var(--primary);
-        }
-
-        .status-badge {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-            display: inline-block;
-        }
-
-        .status-completed {
-            background: rgba(40, 167, 69, 0.1);
-            color: var(--success);
-        }
-
-        .status-pending {
-            background: rgba(255, 193, 7, 0.1);
-            color: var(--warning);
-        }
-
-        .status-failed {
-            background: rgba(220, 53, 69, 0.1);
-            color: var(--danger);
-        }
-
-        .pagination {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid var(--gray-light);
-        }
-
-        .pagination-info {
-            font-size: 14px;
-            color: var(--gray);
-        }
-
-        .pagination-controls {
-            display: flex;
-            gap: 5px;
-        }
-
-        .page-btn {
-            padding: 8px 12px;
-            border: 1px solid var(--gray-light);
-            background: white;
-            border-radius: 5px;
+            font-weight: 600; 
             cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.3s;
+            text-decoration: none;
+            height: 42px; 
+            min-width: 180px; 
+        }
+        .btn-custom:hover { background-color: #e07474; color: white; }
+        
+        .btn-export { background-color: #28a745; height: 36px; padding: 5px 15px; font-size: 12px; min-width: auto; color: white !important; }
+        .btn-export:hover { background-color: #218838; }
+
+        /* Stats Cards */
+        .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-info h3 { font-size: 14px; color: #6c757d; margin-bottom: 5px; }
+        .stat-info h2 { font-size: 24px; font-weight: 600; color: #333; margin-bottom: 5px; }
+        .stat-info p { font-size: 12px; margin: 0; font-weight: 500; display: flex; align-items: center; gap: 5px; }
+        
+        .text-success { color: var(--success); }
+        .text-info { color: var(--info); }
+        .text-warning { color: var(--warning); }
+        .text-danger { color: var(--danger); }
+
+        .stat-icon { width: 60px; height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        
+        /* --- Grid Layout --- */
+        .payment-content-grid {
+            display: grid;
+            grid-template-columns: 2.5fr 1fr; 
+            gap: 25px;
+            margin-bottom: 30px;
+            align-items: stretch; 
         }
 
-        .page-btn:hover {
-            background: var(--gray-light);
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
         }
 
-        .page-btn.active {
-            background: var(--primary);
+        /* --- Content Card & Fixed Height for Lists --- */
+        .content-card {
+            background: white; border-radius: 12px; padding: 25px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05); border: 1px solid #f0f0f0;
+            display: flex;
+            flex-direction: column; 
+            height: 100%; 
+        }
+
+        .table-responsive {
+            min-height: 420px; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; 
+        }
+
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .section-header h2 { font-size: 18px; font-weight: 700; color: #333; margin: 0; }
+
+        /* Tables */
+        .custom-table { width: 100%; border-collapse: separate; border-spacing: 0 10px; }
+        .custom-table thead th { color: #8898aa; font-weight: 600; text-transform: uppercase; font-size: 11px; padding: 0 15px 10px 15px; text-align: left; }
+        .custom-table tbody tr { background: white; transition: transform 0.2s; }
+        .custom-table tbody tr:hover { background-color: #fcfcfc; }
+        .custom-table td { padding: 15px; vertical-align: middle; color: #525f7f; font-size: 13px; border-top: 1px solid #f5f5f5; border-bottom: 1px solid #f5f5f5; }
+        .custom-table td:first-child { border-left: 1px solid #f5f5f5; border-radius: 8px 0 0 8px; }
+        .custom-table td:last-child { border-right: 1px solid #f5f5f5; border-radius: 0 8px 8px 0; }
+
+        .badge { padding: 5px 10px; border-radius: 20px; font-size: 10px; font-weight: bold; }
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-pending { background: #fff8e1; color: #ffca28; }
+        .badge-failed { background: #fee2e2; color: #f5365c; }
+        
+        /* Pagination Controls */
+        .pagination-container { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid #eee; margin-top: auto; }
+        .pagination-info { font-size: 13px; color: #8898aa; }
+        .pagination-controls { display: flex; gap: 5px; }
+        .pagination-btn { padding: 6px 12px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 13px; }
+        .pagination-btn:hover { background-color: #e9ecef; }
+        .pagination-btn.active { background-color: var(--primary); color: white; border-color: var(--primary); cursor: default; }
+        .pagination-btn.disabled { color: #ccc; cursor: not-allowed; pointer-events: none; }
+
+        /* Modal Styles */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 25px; border-radius: 12px; width: 600px; max-width: 90%; position: relative; max-height: 90vh; overflow-y: auto;}
+        .close-modal { float: right; font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa; }
+        .close-modal:hover { color: black; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 5px; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; background: #f9f9f9; }
+        .form-control:focus { border-color: var(--primary); outline: none; background: white; }
+        .row-group { display: flex; gap: 15px; }
+        .row-group .form-group { flex: 1; }
+        
+        /* Form Guide Text */
+        .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
+
+        /* REGISTER LINK BOX */
+        .register-hint {
+            margin-top: 5px;
+            padding: 10px;
+            background-color: #f0f8ff;
+            border-left: 3px solid #17a2b8;
+            font-size: 13px;
+            color: #555;
+            border-radius: 4px;
+        }
+        .register-hint a {
+            color: #F28585; /* Pink */
+            font-weight: 700;
+            text-decoration: underline;
+            margin-left: 5px;
+        }
+        .register-hint a:hover { color: #d65f5f; }
+
+        /* MULTI IMAGE PREVIEW STYLE */
+        .upload-center { text-align: center; }
+        .file-upload-label { display: inline-block; padding: 8px 15px; background: #f8f9fa; border: 1px dashed #ccc; border-radius: 5px; cursor: pointer; font-size: 13px; }
+        input[type="file"] { display: none; }
+
+        /* Container for multiple previews */
+        .multi-preview-container { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 10px; 
+            justify-content: center; 
+            align-items: center; 
+            margin-bottom: 10px; 
+            min-height: 120px; 
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 10px;
+            background: #fafafa;
+        }
+        
+        .preview-item {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .remove-btn {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: rgba(220, 53, 69, 0.8);
             color: white;
-            border-color: var(--primary);
+            border: none;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom-left-radius: 5px;
+        }
+        .remove-btn:hover { background: #dc3545; }
+        
+        .placeholder-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+            color: #ccc;
         }
 
-        /* Responsive Styles */
-        @media (max-width: 1200px) {
-            .payment-content {
-                grid-template-columns: 1fr;
-            }
+        /* Top Donors */
+        .rank-box { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; border-radius: 50%; color: white; }
+        .rank-1 { background: #FFD700; } .rank-2 { background: #C0C0C0; } .rank-3 { background: #CD7F32; } .rank-other { background: #e9ecef; color: #8898aa; }
+
+        /* Custom Style for Select2 to match theme */
+        .select2-container .select2-selection--single {
+            height: 42px !important;
+            border: 1px solid #ddd !important;
+            border-radius: 6px !important;
+            display: flex;
+            align-items: center;
+            background-color: #f9f9f9;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 40px !important;
+        }
+        .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable {
+            background-color: #F28585 !important;
+            color: white !important;
         }
 
-        @media (max-width: 768px) {
-            .payment-stats {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .transactions-table {
-                display: block;
-                overflow-x: auto;
-            }
-        }
-
-        @media (max-width: 576px) {
-            .payment-stats {
-                grid-template-columns: 1fr;
-            }
-            
-            .stat-main {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            
-            .stat-icon {
-                margin-top: 10px;
-            }
-        }
+        @media (max-width: 1200px) { .payment-content-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
-    <!-- Sidebar -->
-    <div class="sidebar collapsed" id="sidebar">
-        <div class="sidebar-menu">
-            <ul>
-                <li><a href="admin_dashboard.php"><i class="fas fa-home"></i> <span>Dashboard</span></a></li>
-                <li><a href="admin_donor_page.php"><i class="fas fa-users"></i> <span>Donor Management</span></a></li>
-                <li><a href="staff_management_page.php"><i class="fas fa-user-tie"></i> <span>Staff Management</span></a></li>
-                <li><a href="admin_management_page.php"><i class="fas fa-user-shield"></i> <span>Admin Management</span></a></li>
-                <li><a href="branch_management_page.php"><i class="fas fa-map-marker-alt"></i> <span>Branch Management</span></a></li>
-                <li><a href="activity_management.php"><i class="fas fa-calendar-alt"></i> <span>Activity Management</span></a></li>
-                <li><a href="payment_management.php" class="active"><i class="fas fa-credit-card"></i> <span>Payment Management</span></a></li>
-                <li><a href="reward_item_management.php" class="active"><i class="fas fa-gift"></i> <span>Reward Items</span></a></li>
-            </ul>
+
+    <?php if (!empty($msg)): ?>
+        <div class="floating-alert <?php echo $msgType == 'success' ? 'floating-alert-success' : 'floating-alert-danger'; ?>" id="floatingAlert">
+            <i class="fas <?php echo $msgType == 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'; ?>"></i>
+            <div><?php echo $msg; ?></div>
+        </div>
+    <?php endif; ?>
+
+    <?php include 'admin_sidebar.php'; ?>
+
+    <div class="main-content" id="mainContent">
+        <?php include 'admin_header.php'; ?>
+
+        <div class="dashboard-content">
+            
+            <div class="page-header-flex">
+                <div class="welcome-text">
+                    <h1>Payment Management</h1>
+                    <p>Monitor revenue, record offline transactions and manage expenses.</p>
+                </div>
+                <div class="header-btn-group">
+                    <button class="btn-custom" onclick="openDonationModal()">
+                        <i class="fas fa-plus-circle"></i> Add Donation
+                    </button>
+                    <button class="btn-custom" onclick="openExpenseModal()">
+                        <i class="fas fa-file-invoice-dollar"></i> Record Transaction
+                    </button>
+                </div>
+            </div>
+
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>TOTAL REVENUE</h3>
+                        <h2>RM <?php echo number_format($totalRevenue, 2); ?></h2>
+                        <p class="text-success"><i class="fas fa-arrow-up"></i> Lifetime</p>
+                    </div>
+                    <div class="stat-icon" style="background: rgba(40, 167, 69, 0.2); color: #28a745;"><i class="fas fa-wallet"></i></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>RECURRING</h3>
+                        <h2>RM <?php echo number_format($recurringRevenue, 2); ?></h2>
+                        <p class="text-info">Recurring</p>
+                    </div>
+                    <div class="stat-icon" style="background: rgba(23, 162, 184, 0.2); color: #17a2b8;"><i class="fas fa-sync"></i></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>POINTS ISSUED</h3>
+                        <h2><?php echo number_format($totalPoints); ?></h2>
+                        <p class="text-warning">RM 10 = 1 Point</p>
+                    </div>
+                    <div class="stat-icon" style="background: rgba(255, 193, 7, 0.2); color: #ffc107;"><i class="fas fa-star"></i></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <h3>PENDING</h3>
+                        <h2><?php echo $pendingCount; ?></h2>
+                        <p class="text-danger">Needs Action</p>
+                    </div>
+                    <div class="stat-icon" style="background: rgba(220, 53, 69, 0.2); color: #dc3545;"><i class="fas fa-exclamation"></i></div>
+                </div>
+            </div>
+
+            <div class="payment-content-grid">
+                
+                <div class="left-column">
+                    
+                    <div class="content-card">
+                        <div class="section-header">
+                            <h2>Transaction History (Income)</h2>
+                            <a href="?export=income" class="btn-custom btn-export"><i class="fas fa-download"></i> Export Data</a>
+                        </div>
+
+                        <div class="table-responsive">
+                            <div style="overflow-x: auto;">
+                                <table class="custom-table">
+                                    <thead><tr><th>Ref / Date</th><th>Donor</th><th>Target</th><th>Amount</th><th>Status</th></tr></thead>
+                                    <tbody>
+                                        <?php if($recentTransactions->num_rows > 0): ?>
+                                            <?php while($txn = $recentTransactions->fetch_assoc()): 
+                                                $targetName = "General (Other)";
+                                                if ($txn['Case_Title']) $targetName = "Case: " . $txn['Case_Title'];
+                                                elseif ($txn['Activity_Name']) $targetName = "Act: " . $txn['Activity_Name'];
+                                                elseif ($txn['Branch_Name']) $targetName = "Branch: " . $txn['Branch_Name'];
+                                            ?>
+                                            <tr>
+                                                <td>
+                                                    <div style="font-weight:600; color:#333;"><?php echo $txn['Order_TXN_Ref']; ?></div>
+                                                    <div style="font-size:11px; color:#888;"><?php echo date('M d, Y', strtotime($txn['Order_Created_At'])); ?></div>
+                                                </td>
+                                                <td>
+                                                    <div style="font-weight:600;"><?php echo htmlspecialchars($txn['Donor_Name']); ?></div>
+                                                    <div style="font-size:11px; color:#888;"><?php echo htmlspecialchars($txn['Donor_Email']); ?></div>
+                                                </td>
+                                                <td><span style="font-size:11px; display:block; max-width:120px;"><?php echo htmlspecialchars($targetName); ?></span></td>
+                                                <td style="font-weight:700; color:#28a745;">RM <?php echo number_format($txn['Order_Amount'], 2); ?></td>
+                                                <td><span class="badge <?php echo ($txn['Order_PaymentStatus']=='Success')?'badge-success':'badge-pending'; ?>"><?php echo $txn['Order_PaymentStatus']; ?></span></td>
+                                            </tr>
+                                            <?php endwhile; ?>
+                                        <?php else: ?>
+                                            <tr><td colspan="5" style="text-align:center; padding:30px; color:#999;">No transaction records found.</td></tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="pagination-container">
+                                <div class="pagination-info">Showing <?php echo $start_inc; ?> - <?php echo $end_inc; ?> of <?php echo $total_inc_recs; ?></div>
+                                <div class="pagination-controls">
+                                    <?php if ($page_inc > 1): ?>
+                                        <a href="?page_inc=<?php echo $page_inc-1; ?>&page_exp=<?php echo $page_exp; ?>" class="pagination-btn">Previous</a>
+                                    <?php else: ?>
+                                        <span class="pagination-btn disabled">Previous</span>
+                                    <?php endif; ?>
+
+                                    <?php for($i=1; $i<=$total_pages_inc; $i++): ?>
+                                        <a href="?page_inc=<?php echo $i; ?>&page_exp=<?php echo $page_exp; ?>" class="pagination-btn <?php echo ($i==$page_inc)?'active':''; ?>"><?php echo $i; ?></a>
+                                    <?php endfor; ?>
+
+                                    <?php if ($page_inc < $total_pages_inc): ?>
+                                        <a href="?page_inc=<?php echo $page_inc+1; ?>&page_exp=<?php echo $page_exp; ?>" class="pagination-btn">Next</a>
+                                    <?php else: ?>
+                                        <span class="pagination-btn disabled">Next</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-card">
+                        <div class="section-header">
+                            <h2>Expense / Reimbursement History</h2>
+                            <a href="?export=expense" class="btn-custom btn-export"><i class="fas fa-download"></i> Export Data</a>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <div style="overflow-x: auto;">
+                                <table class="custom-table">
+                                    <thead><tr><th>Date</th><th>Title / Desc</th><th>Category</th><th>Claimed By</th><th>Amount</th></tr></thead>
+                                    <tbody>
+                                        <?php if($recentExpenses->num_rows > 0): ?>
+                                            <?php while($exp = $recentExpenses->fetch_assoc()): ?>
+                                            <tr>
+                                                <td><?php echo date('M d, Y', strtotime($exp['Expense_Date'])); ?></td>
+                                                <td>
+                                                    <div style="font-weight:600; color:#333;"><?php echo htmlspecialchars($exp['Expense_Title']); ?></div>
+                                                    <div style="font-size:11px; color:#888;"><?php echo htmlspecialchars(substr($exp['Expense_Description'],0,30)); ?></div>
+                                                </td>
+                                                <td><span style="background:#f0f0f0; padding:3px 8px; border-radius:4px; font-size:11px;"><?php echo $exp['Expense_Category']; ?></span></td>
+                                                <td><?php echo $exp['Claimant_Type'] . ' #' . $exp['Claimant_ID']; ?> <br> <small style="color:<?php echo $exp['Expense_Status']=='Approved'?'green':'orange'; ?>">(<?php echo $exp['Expense_Status']; ?>)</small></td>
+                                                <td style="font-weight:700; color:#dc3545;">- RM <?php echo number_format($exp['Expense_Amount'], 2); ?></td>
+                                            </tr>
+                                            <?php endwhile; ?>
+                                        <?php else: ?>
+                                            <tr><td colspan="5" style="text-align:center; padding:30px; color:#999;">No expense records found.</td></tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="pagination-container">
+                                <div class="pagination-info">Showing <?php echo $start_exp; ?> - <?php echo $end_exp; ?> of <?php echo $total_exp_recs; ?></div>
+                                <div class="pagination-controls">
+                                    <?php if ($page_exp > 1): ?>
+                                        <a href="?page_exp=<?php echo $page_exp-1; ?>&page_inc=<?php echo $page_inc; ?>" class="pagination-btn">Previous</a>
+                                    <?php else: ?>
+                                        <span class="pagination-btn disabled">Previous</span>
+                                    <?php endif; ?>
+
+                                    <?php for($i=1; $i<=$total_pages_exp; $i++): ?>
+                                        <a href="?page_exp=<?php echo $i; ?>&page_inc=<?php echo $page_inc; ?>" class="pagination-btn <?php echo ($i==$page_exp)?'active':''; ?>"><?php echo $i; ?></a>
+                                    <?php endfor; ?>
+
+                                    <?php if ($page_exp < $total_pages_exp): ?>
+                                        <a href="?page_exp=<?php echo $page_exp+1; ?>&page_inc=<?php echo $page_inc; ?>" class="pagination-btn">Next</a>
+                                    <?php else: ?>
+                                        <span class="pagination-btn disabled">Next</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="right-column content-card">
+                    <div class="section-header">
+                        <h2><i class="fas fa-trophy" style="color: #FFD700;"></i> Top 10 Donors</h2>
+                    </div>
+                    
+                    <div class="top-donors-container">
+                        <table class="custom-table">
+                            <thead><tr><th>Rank</th><th>Donor</th><th style="text-align:right;">Total</th></tr></thead>
+                            <tbody>
+                                <?php $rank = 1; while($donor = $topDonors->fetch_assoc()): ?>
+                                <tr>
+                                    <td width="30"><div class="rank-box <?php echo $rank <= 3 ? 'rank-'.$rank : 'rank-other'; ?>"><?php echo $rank; ?></div></td>
+                                    <td>
+                                        <div style="display: flex; align-items: center;">
+                                            <?php if($donor['Donor_ProfilePicture']): ?>
+                                                <img src="<?php echo $donor['Donor_ProfilePicture']; ?>" style="width:25px; height:25px; border-radius:50%; margin-right:8px;">
+                                            <?php else: ?>
+                                                <div style="width:25px; height:25px; border-radius:50%; background:#eee; margin-right:8px; text-align:center; line-height:25px; font-size:10px;"><i class="fas fa-user"></i></div>
+                                            <?php endif; ?>
+                                            <span><?php echo htmlspecialchars($donor['Donor_Name']); ?></span>
+                                        </div>
+                                    </td>
+                                    <td style="text-align:right; font-weight:bold; color:#28a745;">RM <?php echo number_format($donor['total_donated']); ?></td>
+                                </tr>
+                                <?php $rank++; endwhile; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-card chart-section">
+                <div class="section-header"><h2>Revenue Analytics</h2></div>
+                <div style="height: 350px;"><canvas id="revenueChart"></canvas></div>
+            </div>
+
         </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="main-content" id="mainContent">
-        <!-- Top Navigation -->
-        <div class="top-nav">
-            <div class="nav-left">
-                <div class="logo">
-                    <a href="admin_dashboard.php">
-                        <img src="logo.jpg" alt="Logo">
-                        <h1>DonationMS</h1>
-                    </a>
-                </div>
-                <div class="search-bar">
-                    <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Search...">
-                </div>
-            </div>
-            <div class="nav-right">
-                <div class="notification" id="notificationDropdown">
-                    <i class="far fa-bell"></i>
-                    <span class="notification-count">5</span>
-                    <div class="notification-dropdown" id="notificationMenu">
-                        <div class="notification-header">
-                            <h3>Notifications</h3>
-                            <a href="#" onclick="markAllAsRead()">Mark all as read</a>
-                        </div>
-                        <div class="notification-list" id="notificationList">
-                            <!-- Notifications will be loaded here -->
-                        </div>
-                        <div class="notification-footer">
-                            <a href="notifications.php">View All Notifications</a>
-                        </div>
+    <div id="addDonationModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeDonationModal()">&times;</span>
+            <h2 style="color: black; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Add New Donation</h2>
+            <form method="POST" action="">
+                
+                <h4 style="color:#666; margin-bottom:10px;">Select Donor</h4>
+                <div class="form-group">
+                    <label>Registered Donor <span style="color:red">*</span></label>
+                    
+                    <select name="donor_id" id="donorSelect" class="form-control" required style="width: 100%;">
+                        <option value="">-- Select Existing Donor --</option>
+                        <?php while($d = $donorsList->fetch_assoc()): ?>
+                            <option value="<?php echo $d['Donor_ID']; ?>">
+                                <?php echo htmlspecialchars($d['Donor_Name']) . " (" . htmlspecialchars($d['Donor_Email']) . ")"; ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                    
+                    <div class="register-hint">
+                        <i class="fas fa-info-circle"></i> 
+                        Donor doesn't have an account? 
+                        <a href="admin_donor_page.php">Register Donor Here</a>
                     </div>
                 </div>
-                <div class="user-profile" id="userProfileDropdown">
-                    <div class="user-profile-with-avatar">
-                        <div class="user-avatar">
-                            <?php if (!empty($adminProfilePicture)): ?>
-                                <img src="<?php echo htmlspecialchars($adminProfilePicture); ?>" alt="Profile Picture">
-                            <?php else: ?>
-                                <?php echo substr($adminName, 0, 1); ?>
-                            <?php endif; ?>
-                        </div>
-                        <div class="user-details">
-                            <div class="user-name"><?php echo htmlspecialchars($adminName); ?></div>
-                            <div class="user-role">System Administrator</div>
-                        </div>
-                        <i class="fas fa-chevron-down" style="margin-left: 10px; font-size: 12px;"></i>
+
+                <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+
+                <h4 style="color:#666; margin-bottom:10px;">Donation Details</h4>
+                <div class="row-group">
+                    <div class="form-group">
+                        <label>Target Category</label>
+                        <select name="target_category" id="targetCategory" class="form-control" onchange="updateTargetOptions()" required>
+                            <option value="other">Other / General Fund</option>
+                            <option value="branch">Specific Branch</option>
+                            <option value="activity">Specific Activity</option>
+                            <option value="case">Special Case</option>
+                        </select>
                     </div>
-                    <div class="user-profile-dropdown" id="userProfileMenu">
-                        <a href="admin_profile.php">
-                            <i class="fas fa-user"></i> View Profile
-                        </a>
-                        <a href="admin_profile.php?edit=true">
-                            <i class="fas fa-edit"></i> Edit Profile
-                        </a>
-                        <div class="divider"></div>
-                        <a href="admin_logout.php">
-                            <i class="fas fa-sign-out-alt"></i> Logout
-                        </a>
+                    
+                    <div class="form-group" id="targetSelectContainer">
+                        <label>Select Item</label>
+                        <input type="text" class="form-control" value="General Fund" disabled id="otherInput">
+                        
+                        <select name="target_branch_id" id="selectBranch" class="form-control" style="display:none;">
+                            <?php while($b = $branchesList->fetch_assoc()): ?>
+                                <option value="<?php echo $b['Branch_ID']; ?>"><?php echo htmlspecialchars($b['Branch_Name']); ?></option>
+                            <?php endwhile; ?>
+                        </select>
+
+                        <select name="target_activity_id" id="selectActivity" class="form-control" style="display:none;">
+                            <?php while($a = $activitiesList->fetch_assoc()): ?>
+                                <option value="<?php echo $a['Activity_ID']; ?>"><?php echo htmlspecialchars($a['Activity_Name']); ?></option>
+                            <?php endwhile; ?>
+                        </select>
+
+                        <select name="target_case_id" id="selectCase" class="form-control" style="display:none;">
+                            <?php while($c = $casesList->fetch_assoc()): ?>
+                                <option value="<?php echo $c['Case_ID']; ?>"><?php echo htmlspecialchars($c['Case_Title']); ?></option>
+                            <?php endwhile; ?>
+                        </select>
                     </div>
                 </div>
-            </div>
+
+                <div class="row-group">
+                    <div class="form-group">
+                        <label>Frequency</label>
+                        <select name="donation_frequency" class="form-control">
+                            <option value="One-Time">One-Time</option>
+                            <option value="Recurring">Monthly</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Payment Method</label>
+                        <select name="payment_method" class="form-control">
+                            <option value="Cash">Cash</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Cheque">Cheque</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Amount (RM) <span style="color:red">*</span></label>
+                    <input type="number" name="amount" class="form-control" step="0.01" min="1" required>
+                    <span class="form-guide">Total donation amount in MYR.</span>
+                </div>
+
+                <button type="submit" name="add_donation_submit" class="btn-custom" style="width:100%; justify-content:center;">Confirm Donation</button>
+            </form>
         </div>
+    </div>
 
-        <!-- Dashboard Content -->
-        <div class="dashboard-content">
-            <div class="welcome-section">
-                <h1>Payment Management</h1>
-                <p>Track donations, manage transactions, and monitor point distribution.</p>
-            </div>
+    <div id="addExpenseModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeExpenseModal()">&times;</span>
+            <h2 style="color: black; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Record Transaction (Expense)</h2>
+            <form method="POST" action="" enctype="multipart/form-data">
+                
+                <div class="form-group upload-center">
+                    <label>Upload Receipt / Proof (Max 5 files)</label>
+                    
+                    <div class="multi-preview-container" id="expense-multi-preview">
+                        <div class="placeholder-icon">
+                            <i class="fas fa-receipt" style="font-size:60px;"></i>
+                        </div>
+                    </div>
 
-            <!-- Stats Cards -->
-            <div class="payment-stats">
-                <div class="payment-stat-card stat-card-1">
-                    <div class="stat-main">
-                        <div class="stat-info">
-                            <h3>Total Revenue</h3>
-                            <h2>RM <?php echo $totalRevenue; ?></h2>
-                            <div class="stat-trend up">
-                                <i class="fas fa-arrow-up"></i> +12.5%
-                            </div>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-money-bill-wave"></i>
-                        </div>
-                    </div>
-                    <div class="stat-footer">
-                        <span id="pendingCount"><?php echo $pendingPayments; ?></span> awaiting payments
-                    </div>
+                    <label for="expense_proof" class="file-upload-label">
+                        <i class="fas fa-upload"></i> Choose File
+                    </label>
+                    <input type="file" id="expense_proof" name="expense_proof[]" accept="image/*,application/pdf" multiple onchange="updateExpenseImages()">
+                    
+                    <span class="form-guide" style="text-align:center;">
+                        Supported formats: JPG, PNG, PDF. Max size 2MB. You can select multiple files.
+                    </span>
                 </div>
-                <div class="payment-stat-card stat-card-2">
-                    <div class="stat-main">
-                        <div class="stat-info">
-                            <h3>Pending Payments</h3>
-                            <h2>RM 0</h2>
-                            <div class="stat-trend down">
-                                <i class="fas fa-arrow-down"></i> -2.1%
-                            </div>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                    </div>
-                    <div class="stat-footer">
-                        All payments will be processed within 24 hours
-                    </div>
-                </div>
-                <div class="payment-stat-card stat-card-3">
-                    <div class="stat-main">
-                        <div class="stat-info">
-                            <h3>Points Distributed</h3>
-                            <h2><?php echo $pointsDistributed; ?> pts</h2>
-                            <div class="stat-trend up">
-                                <i class="fas fa-arrow-up"></i> +12.5%
-                            </div>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-gift"></i>
-                        </div>
-                    </div>
-                    <div class="stat-footer">
-                        1 MYR = 1 Point conversion rate
-                    </div>
-                </div>
-                <div class="payment-stat-card stat-card-4">
-                    <div class="stat-main">
-                        <div class="stat-info">
-                            <h3>Success Rate</h3>
-                            <h2><?php echo $successRate; ?>%</h2>
-                            <div class="stat-trend up">
-                                <i class="fas fa-arrow-up"></i> +3.2%
-                            </div>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                    </div>
-                    <div class="stat-footer">
-                        Based on last 30 days performance
-                    </div>
-                </div>
-            </div>
 
-            <!-- Main Content Area -->
-            <div class="payment-content">
-                <!-- Revenue & Points Chart -->
-                <div class="chart-container">
-                    <div class="section-header">
-                        <h2>Revenue & Points Overview</h2>
-                        <div>
-                            <span style="font-size: 14px; color: var(--gray);">Comparing donation income vs points generated (7 Days)</span>
-                        </div>
+                <div class="form-group">
+                    <label>Title <span style="color:red">*</span></label>
+                    <input type="text" name="ex_title" class="form-control" required placeholder="e.g. Office Supplies">
+                    <span class="form-guide">Short summary of the expense.</span>
+                </div>
+
+                <div class="row-group">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select name="ex_category" class="form-control">
+                            <option value="Reimbursement">Staff Reimbursement</option>
+                            <option value="Supplies">Office Supplies</option>
+                            <option value="Transport">Transportation</option>
+                            <option value="Utility">Utility</option>
+                            <option value="Event">Event Cost</option>
+                        </select>
                     </div>
-                    <div class="chart-wrapper">
-                        <canvas id="revenuePointsChart"></canvas>
+                    <div class="form-group">
+                        <label>Amount (RM) <span style="color:red">*</span></label>
+                        <input type="number" name="ex_amount" class="form-control" step="0.01" required>
+                        <span class="form-guide">Exact amount in MYR.</span>
                     </div>
                 </div>
 
-                <!-- Payment Methods -->
-                <div class="payment-methods">
-                    <div class="section-header">
-                        <h2>Payment Methods</h2>
-                        <a href="#">Distribution by channel</a>
-                    </div>
-                    <div class="methods-list">
-                        <div class="payment-method-item">
-                            <div class="method-info">
-                                <div class="method-icon">
-                                    <i class="fas fa-university"></i>
-                                </div>
-                                <div class="method-details">
-                                    <h4>FPX Banking</h4>
-                                    <p>Online Banking</p>
-                                </div>
-                            </div>
-                            <div class="method-percentage">
-                                <?php 
-                                $totalMethods = array_sum($paymentMethods);
-                                $fpxPercentage = isset($paymentMethods['FPX']) ? round(($paymentMethods['FPX'] / $totalMethods) * 100, 1) : 0;
-                                echo $fpxPercentage . '%';
-                                ?>
-                            </div>
-                        </div>
-                        <div class="payment-method-item">
-                            <div class="method-info">
-                                <div class="method-icon">
-                                    <i class="fas fa-credit-card"></i>
-                                </div>
-                                <div class="method-details">
-                                    <h4>Credit Card</h4>
-                                    <p>Visa, Mastercard</p>
-                                </div>
-                            </div>
-                            <div class="method-percentage">
-                                <?php 
-                                $ccPercentage = isset($paymentMethods['Credit Card']) ? round(($paymentMethods['Credit Card'] / $totalMethods) * 100, 1) : 0;
-                                echo $ccPercentage . '%';
-                                ?>
-                            </div>
-                        </div>
-                        <div class="payment-method-item">
-                            <div class="method-info">
-                                <div class="method-icon">
-                                    <i class="fas fa-mobile-alt"></i>
-                                </div>
-                                <div class="method-details">
-                                    <h4>E-Wallet</h4>
-                                    <p>Touch 'n Go, GrabPay</p>
-                                </div>
-                            </div>
-                            <div class="method-percentage">
-                                <?php 
-                                $ewalletPercentage = isset($paymentMethods['E-Wallet']) ? round(($paymentMethods['E-Wallet'] / $totalMethods) * 100, 1) : 0;
-                                echo $ewalletPercentage . '%';
-                                ?>
-                            </div>
-                        </div>
-                    </div>
+                <div class="form-group">
+                    <label>Claimed By</label>
+                    <input type="text" name="ex_claimed_by_display" class="form-control" value="<?php echo htmlspecialchars($adminName); ?> (You)" readonly>
+                    <span class="form-guide">Automatically recorded as Admin claim.</span>
                 </div>
 
-                <!-- System Logic -->
-                <div class="system-logic">
-                    <h3>SYSTEM LOGIC</h3>
-                    <div class="logic-item">
-                        <div class="logic-icon">
-                            <i class="fas fa-exchange-alt"></i>
-                        </div>
-                        <div class="logic-text">
-                            1.00 MYR Donation = 1 Point
-                        </div>
-                    </div>
-                    <div class="logic-item">
-                        <div class="logic-icon">
-                            <i class="fas fa-bolt"></i>
-                        </div>
-                        <div class="logic-text">
-                            Points are auto-credited upon completion.
-                        </div>
-                    </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="ex_desc" class="form-control" rows="2"></textarea>
+                    <span class="form-guide">Detailed explanation of the expense item.</span>
                 </div>
-            </div>
 
-            <!-- Recent Transactions -->
-            <div class="recent-transactions">
-                <div class="section-header">
-                    <h2>Recent Transactions</h2>
-                    <a href="#">Export Report</a>
-                </div>
-                <table class="transactions-table">
-                    <thead>
-                        <tr>
-                            <th>TRANSACTION ID</th>
-                            <th>DONOR</th>
-                            <th>AMOUNT / POINTS</th>
-                            <th>DATE</th>
-                            <th>METHOD</th>
-                            <th>STATUS</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (count($recentTransactions) > 0): ?>
-                            <?php foreach($recentTransactions as $transaction): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars($transaction['Order_TXN_Ref']); ?></td>
-                                <td>
-                                    <div class="donor-info">
-                                        <div class="donor-name">
-                                            <?php echo htmlspecialchars($transaction['Donor_FName'] . ' ' . $transaction['Donor_LName']); ?>
-                                        </div>
-                                        <div class="donor-email">
-                                            <?php echo htmlspecialchars($transaction['Donor_Email']); ?>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="amount-points">
-                                        <div class="amount">RM <?php echo number_format($transaction['Order_Amount'], 2); ?></div>
-                                        <div class="points">+<?php echo $transaction['Order_Amount']; ?> pts</div>
-                                    </div>
-                                </td>
-                                <td><?php echo date('Y-m-d', strtotime($transaction['Order_Created_At'])); ?></td>
-                                <td><?php echo htmlspecialchars($transaction['Order_PaymentMethod']); ?></td>
-                                <td>
-                                    <?php 
-                                    $statusClass = '';
-                                    switch($transaction['Order_PaymentStatus']) {
-                                        case 'Completed':
-                                            $statusClass = 'status-completed';
-                                            break;
-                                        case 'Pending':
-                                            $statusClass = 'status-pending';
-                                            break;
-                                        case 'Failed':
-                                            $statusClass = 'status-failed';
-                                            break;
-                                        default:
-                                            $statusClass = 'status-pending';
-                                    }
-                                    ?>
-                                    <span class="status-badge <?php echo $statusClass; ?>">
-                                        <?php echo htmlspecialchars($transaction['Order_PaymentStatus']); ?>
-                                    </span>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="6" style="text-align: center; padding: 30px;">
-                                    No transactions found
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-                <div class="pagination">
-                    <div class="pagination-info">
-                        Showing 1 to <?php echo min(25, count($recentTransactions)); ?> of <?php echo count($recentTransactions); ?> results
-                    </div>
-                    <div class="pagination-controls">
-                        <button class="page-btn">Previous</button>
-                        <button class="page-btn active">1</button>
-                        <button class="page-btn">2</button>
-                        <button class="page-btn">3</button>
-                        <button class="page-btn">Next</button>
-                    </div>
-                </div>
-            </div>
+                <button type="submit" name="add_expense_submit" class="btn-custom" style="width:100%; justify-content:center;">Record Expense</button>
+            </form>
         </div>
     </div>
 
     <script>
-        // Sidebar hover functionality
-        const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('mainContent');
-
-        sidebar.addEventListener('mouseenter', function() {
-            sidebar.classList.remove('collapsed');
-            mainContent.classList.add('expanded');
+        // Initialize Select2 when document is ready
+        $(document).ready(function() {
+            $('#donorSelect').select2({
+                placeholder: "-- Select Existing Donor --",
+                allowClear: true,
+                dropdownParent: $('#addDonationModal') // Important for proper focus in modal
+            });
         });
 
-        sidebar.addEventListener('mouseleave', function() {
-            sidebar.classList.add('collapsed');
-            mainContent.classList.remove('expanded');
-        });
-
-        // Revenue & Points Chart
-        const revenuePointsCtx = document.getElementById('revenuePointsChart').getContext('2d');
-        const revenuePointsChart = new Chart(revenuePointsCtx, {
+        // Chart
+        const ctx = document.getElementById('revenueChart').getContext('2d');
+        new Chart(ctx, {
             type: 'line',
             data: {
-                labels: <?php echo json_encode($revenuePointsTrend['dates']); ?>,
-                datasets: [
-                    {
-                        label: 'Revenue (RM)',
-                        data: <?php echo json_encode($revenuePointsTrend['revenue']); ?>,
-                        borderColor: '#f28585',
-                        backgroundColor: 'rgba(242, 133, 133, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4,
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'Points',
-                        data: <?php echo json_encode($revenuePointsTrend['points']); ?>,
-                        borderColor: '#17a2b8',
-                        backgroundColor: 'rgba(23, 162, 184, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4,
-                        yAxisID: 'y1'
-                    }
-                ]
+                labels: <?php echo json_encode($chartData['labels']); ?>,
+                datasets: [{
+                    label: 'Revenue (RM)',
+                    data: <?php echo json_encode($chartData['revenue']); ?>,
+                    borderColor: '#F28585', backgroundColor: 'rgba(242, 133, 133, 0.1)',
+                    fill: true, tension: 0.4
+                }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                },
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false
-                    }
-                },
-                scales: {
-                    y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        title: {
-                            display: true,
-                            text: 'Revenue (RM)'
-                        },
-                        grid: {
-                            drawBorder: false
-                        }
-                    },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'Points'
-                        },
-                        grid: {
-                            drawOnChartArea: false,
-                        },
-                    }
-                }
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        // Auto hide floating alert after 5 seconds
+        setTimeout(() => {
+            const alert = document.getElementById('floatingAlert');
+            if(alert) {
+                alert.style.display = 'none';
             }
-        });
+        }, 5000);
 
-        // Add active class to sidebar menu items on click
-        document.querySelectorAll('.sidebar-menu a').forEach(item => {
-            item.addEventListener('click', function() {
-                document.querySelectorAll('.sidebar-menu a').forEach(link => {
-                    link.classList.remove('active');
-                });
-                this.classList.add('active');
-            });
-        });
+        // Modals
+        function openDonationModal() { document.getElementById('addDonationModal').style.display = 'block'; }
+        function closeDonationModal() { document.getElementById('addDonationModal').style.display = 'none'; }
+        
+        function openExpenseModal() { 
+            document.getElementById('addExpenseModal').style.display = 'block'; 
+            // Reset file input on open
+            expenseFiles = new DataTransfer();
+            document.getElementById('expense_proof').files = expenseFiles.files;
+            document.getElementById('expense-multi-preview').innerHTML = '<div class="placeholder-icon"><i class="fas fa-receipt" style="font-size:60px;"></i></div>';
+        }
+        function closeExpenseModal() { document.getElementById('addExpenseModal').style.display = 'none'; }
+        
+        window.onclick = function(e) {
+            if(e.target == document.getElementById('addDonationModal')) closeDonationModal();
+            if(e.target == document.getElementById('addExpenseModal')) closeExpenseModal();
+        }
 
-        // Dropdown functionality
-        const notificationDropdown = document.getElementById('notificationDropdown');
-        const notificationMenu = document.getElementById('notificationMenu');
-        const userProfileDropdown = document.getElementById('userProfileDropdown');
-        const userProfileMenu = document.getElementById('userProfileMenu');
+        // Dynamic Dropdowns for Donation
+        function updateTargetOptions() {
+            const cat = document.getElementById('targetCategory').value;
+            const other = document.getElementById('otherInput');
+            const br = document.getElementById('selectBranch');
+            const act = document.getElementById('selectActivity');
+            const cs = document.getElementById('selectCase');
 
-        // Toggle notification dropdown
-        notificationDropdown.addEventListener('click', function(e) {
-            e.stopPropagation();
-            notificationMenu.classList.toggle('show');
-            userProfileMenu.classList.remove('show');
-        });
+            other.style.display='none'; br.style.display='none'; act.style.display='none'; cs.style.display='none';
 
-        // Toggle user profile dropdown
-        userProfileDropdown.addEventListener('click', function(e) {
-            e.stopPropagation();
-            userProfileMenu.classList.toggle('show');
-            notificationMenu.classList.remove('show');
-        });
+            if(cat==='other') other.style.display='block';
+            else if(cat==='branch') br.style.display='block';
+            else if(cat==='activity') act.style.display='block';
+            else if(cat==='case') cs.style.display='block';
+        }
 
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', function() {
-            notificationMenu.classList.remove('show');
-            userProfileMenu.classList.remove('show');
-        });
+        // --- NEW: Multiple Image Preview with Delete ---
+        let expenseFiles = new DataTransfer(); // Holds the files
 
-        // Load notifications
-        function loadNotifications() {
-            const notificationList = document.getElementById('notificationList');
-            const notifications = [
-                {
-                    type: 'success',
-                    icon: 'fas fa-donate',
-                    title: 'New Donation Received',
-                    message: 'John Smith donated RM 500.00',
-                    time: '5 minutes ago',
-                    unread: true
-                },
-                {
-                    type: 'info',
-                    icon: 'fas fa-user-plus',
-                    title: 'New Donor Registered',
-                    message: 'Sarah Johnson registered as a new donor',
-                    time: '1 hour ago',
-                    unread: true
-                },
-                {
-                    type: 'warning',
-                    icon: 'fas fa-exclamation-triangle',
-                    title: 'Low Stock Alert',
-                    message: 'Reward items are running low',
-                    time: '2 hours ago',
-                    unread: false
-                },
-                {
-                    type: 'danger',
-                    icon: 'fas fa-times-circle',
-                    title: 'Payment Failed',
-                    message: 'A recurring donation payment failed',
-                    time: '1 day ago',
-                    unread: false
-                },
-                {
-                    type: 'info',
-                    icon: 'fas fa-calendar-check',
-                    title: 'Activity Reminder',
-                    message: 'Charity event starts tomorrow',
-                    time: '2 days ago',
-                    unread: false
+        function updateExpenseImages() {
+            const input = document.getElementById('expense_proof');
+            const container = document.getElementById('expense-multi-preview');
+            const maxFiles = 5;
+
+            // Add new selected files to our DataTransfer object
+            for (let i = 0; i < input.files.length; i++) {
+                // Prevent adding if limit reached
+                if(expenseFiles.items.length >= maxFiles) {
+                    alert("Maximum 5 files allowed.");
+                    break;
                 }
-            ];
+                expenseFiles.items.add(input.files[i]);
+            }
 
-            let html = '';
-            notifications.forEach(notification => {
-                html += `
-                    <div class="notification-item ${notification.unread ? 'unread' : ''}">
-                        <div class="notification-content">
-                            <div class="notification-icon ${notification.type}">
-                                <i class="${notification.icon}"></i>
-                            </div>
-                            <div class="notification-details">
-                                <h4>${notification.title}</h4>
-                                <p>${notification.message}</p>
-                                <div class="notification-time">${notification.time}</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            notificationList.innerHTML = html;
+            // Sync input with DataTransfer
+            input.files = expenseFiles.files;
+
+            renderPreviews();
         }
 
-        // Mark all as read function
-        function markAllAsRead() {
-            const notificationItems = document.querySelectorAll('.notification-item.unread');
-            notificationItems.forEach(item => {
-                item.classList.remove('unread');
+        function renderPreviews() {
+            const container = document.getElementById('expense-multi-preview');
+            container.innerHTML = ''; // Clear current
+
+            if (expenseFiles.files.length === 0) {
+                container.innerHTML = '<div class="placeholder-icon"><i class="fas fa-receipt" style="font-size:60px;"></i></div>';
+                return;
+            }
+
+            Array.from(expenseFiles.files).forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    
+                    // Logic to display PDF icon vs Image
+                    let content = '';
+                    if(file.type === 'application/pdf') {
+                        content = '<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#eee;color:#d32f2f;font-weight:bold;font-size:12px;">PDF</div>';
+                    } else {
+                        content = `<img src="${e.target.result}">`;
+                    }
+
+                    div.innerHTML = `
+                        ${content}
+                        <button type="button" class="remove-btn" onclick="removeExpenseFile(${index})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    container.appendChild(div);
+                }
+                reader.readAsDataURL(file);
             });
-            
-            // Update notification count
-            const notificationCount = document.querySelector('.notification-count');
-            notificationCount.textContent = '0';
-            notificationCount.style.display = 'none';
-            
-            // Close dropdown
-            notificationMenu.classList.remove('show');
         }
 
-        // Load notifications when page loads
-        document.addEventListener('DOMContentLoaded', loadNotifications);
+        function removeExpenseFile(index) {
+            const dt = new DataTransfer();
+            const input = document.getElementById('expense_proof');
+            const { files } = input;
+
+            for (let i = 0; i < files.length; i++) {
+                if (index !== i) dt.items.add(files[i]);
+            }
+
+            expenseFiles = dt; // Update global
+            input.files = dt.files; // Sync input
+            renderPreviews(); // Re-render
+        }
     </script>
 </body>
 </html>

@@ -2,27 +2,98 @@
 session_start();
 include 'dataconnection.php';
 
+// 设置默认时区
+date_default_timezone_set('Asia/Kuala_Lumpur'); 
+
+// --- 逻辑修改 1: 处理 Email 显示逻辑 (优先显示刚才输入的，其次显示Cookie) ---
+$display_email = "";
+
+// 如果有 Cookie，先赋值给 display_email
+if (isset($_COOKIE['admin_remember_email'])) {
+    $display_email = $_COOKIE['admin_remember_email'];
+}
+
 // 处理登录逻辑
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
     $email = mysqli_real_escape_string($conn, $_POST['email']);
     $password = $_POST['password']; 
+    
+    // --- 逻辑修改 2: 如果用户刚刚提交了表单，无论对错，页面刷新后输入框都应该保留这个 Email ---
+    $display_email = $email;
 
+    // 检查是否勾选 Remember Me
+    if (isset($_POST['remember'])) {
+        setcookie('admin_remember_email', $email, time() + (86400 * 30), "/");
+    } else {
+        // 如果没勾选且登录成功(或者仅仅是为了清除旧cookie)，可以在这里清除
+        // 但通常只有登录成功才完全确定是否更新cookie，这里为了简单逻辑，保持原样或在成功后处理
+        if (isset($_COOKIE['admin_remember_email'])) {
+             // 注意：如果你想取消记住，应该在登录成功后清除，或者这里清除
+             // 这里保持你原本的逻辑
+            setcookie('admin_remember_email', '', time() - 3600, "/");
+        }
+    }
+
+    // 1. 先查找 Email 是否存在
     $sql = "SELECT * FROM admin WHERE Admin_Email = '$email'";
     $result = mysqli_query($conn, $sql);
 
     if (mysqli_num_rows($result) > 0) {
         $row = mysqli_fetch_assoc($result);
-        if ($password == $row['Admin_Password']) { 
-            $_SESSION['admin_id'] = $row['Admin_ID'];
-            $_SESSION['admin_name'] = $row['Admin_FName'] . ' ' . $row['Admin_LName'];
-            $_SESSION['admin_email'] = $row['Admin_Email'];
+        $admin_id = $row['Admin_ID'];
+        
+        // --- 检查是否被冻结 ---
+        $max_attempts = 5;
+        $lockout_time = 30 * 60; // 30分钟
+        $attempts = $row['Admin_LoginAttempts'];
+        
+        // 确保 Admin_LastFailedLogin 不是 NULL，否则 strtotime 会出错
+        $last_failed = $row['Admin_LastFailedLogin'] ? strtotime($row['Admin_LastFailedLogin']) : 0;
+        $current_time = time();
+
+        // 如果错误次数 >= 5，检查时间差
+        if ($attempts >= $max_attempts) {
+            $time_since_last_fail = $current_time - $last_failed;
             
-            mysqli_query($conn, "UPDATE admin SET Admin_LastLogin = NOW() WHERE Admin_ID = " . $row['Admin_ID']);
-            
-            header("Location: admin_dashboard.php");
-            exit();
-        } else {
-            $error = "Incorrect password.";
+            if ($time_since_last_fail < $lockout_time) {
+                // 还在冻结期内
+                $remaining_minutes = ceil(($lockout_time - $time_since_last_fail) / 60);
+                $error = "Account locked. Please try again in $remaining_minutes minutes.";
+            } else {
+                // 冻结时间已过，自动解冻 (重置 DB)
+                mysqli_query($conn, "UPDATE admin SET Admin_LoginAttempts = 0 WHERE Admin_ID = $admin_id");
+                $attempts = 0; 
+            }
+        }
+
+        // 如果没有报错 (没被冻结)，验证密码
+        if (!isset($error)) {
+            // ⚠️ 重点：数据库里的密码必须是 password_hash() 生成的乱码，不能是明文 'admin123'
+            if (password_verify($password, $row['Admin_Password'])) { 
+                // --- 登录成功 ---
+                $_SESSION['admin_id'] = $row['Admin_ID'];
+                $_SESSION['admin_name'] = $row['Admin_Name']; 
+                $_SESSION['admin_email'] = $row['Admin_Email'];
+                
+                // 重置错误次数为 0，并更新最后登录时间
+                mysqli_query($conn, "UPDATE admin SET Admin_LastLogin = NOW(), Admin_LoginAttempts = 0 WHERE Admin_ID = $admin_id");
+                
+                header("Location: admin_dashboard.php");
+                exit();
+            } else {
+                // --- 密码错误 ---
+                $attempts++;
+                
+                // 更新数据库
+                mysqli_query($conn, "UPDATE admin SET Admin_LoginAttempts = $attempts, Admin_LastFailedLogin = NOW() WHERE Admin_ID = $admin_id");
+
+                if ($attempts >= $max_attempts) {
+                    $error = "Account locked for 30 minutes due to 5 failed attempts.";
+                } else {
+                    $remaining_attempts = $max_attempts - $attempts;
+                    $error = "Incorrect password. You have $remaining_attempts attempts remaining.";
+                }
+            }
         }
     } else {
         $error = "Email not found.";
@@ -38,68 +109,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
     <title>Love Bridge - Admin Login</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* 全局重置 & 盒模型修复 */
+        /* 保持你原本的 CSS 不变 */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; transition: background-color 0.8s ease, color 0.5s ease, border-color 0.5s ease; }
-        
-        /* CSS Variables */
         :root { --bg-color: #FFF6E8; --accent-color: #D97706; --text-color: #5D4037; }
+        body.theme-stray { --bg-color: #FFF6E8; --accent-color: #D97706; }    
+        body.theme-disabled { --bg-color: #EFF6FF; --accent-color: #2563EB; } 
+        body.theme-orphan { --bg-color: #FFF1F2; --accent-color: #E11D48; }   
+        body.theme-senior { --bg-color: #F0FDF4; --accent-color: #16A34A; }   
+
+        body { background-color: var(--bg-color); height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; }
         
-        /* 4个主题颜色定义 */
-        body.theme-stray { --bg-color: #FFF6E8; --accent-color: #D97706; }    /* 橙色 */
-        body.theme-disabled { --bg-color: #EFF6FF; --accent-color: #2563EB; } /* 蓝色 */
-        body.theme-orphan { --bg-color: #FFF1F2; --accent-color: #E11D48; }   /* 红色 */
-        body.theme-senior { --bg-color: #F0FDF4; --accent-color: #16A34A; }   /* 绿色 */
+        .bg-circles { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: 0; margin: 0; padding: 0; }
+        .bg-circles li { position: absolute; display: block; list-style: none; width: 20px; height: 20px; background: var(--accent-color); animation: animate 25s linear infinite; bottom: -150px; opacity: 0.2; border-radius: 10%; }
+        @keyframes animate { 0% { transform: translateY(0) rotate(0deg); opacity: 0.2; border-radius: 10%; } 100% { transform: translateY(-1000px) rotate(720deg); opacity: 0; border-radius: 50%; } }
 
-        body { 
-            background-color: var(--bg-color); 
-            height: 100vh; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            overflow: hidden; 
-            position: relative; 
-        }
-        
-        /* --- 核心动画背景 (几何图形) --- */
-        .bg-circles {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            z-index: 0; /* 最底层 */
-            margin: 0;
-            padding: 0;
-        }
-
-        .bg-circles li {
-            position: absolute;
-            display: block;
-            list-style: none;
-            width: 20px;
-            height: 20px;
-            background: var(--accent-color); /* 纯色背景，跟随主题变色 */
-            animation: animate 25s linear infinite;
-            bottom: -150px;
-            opacity: 0.2; /* 降低透明度 */
-            border-radius: 10%; /* 初始形状：圆角矩形 */
-        }
-
-        @keyframes animate {
-            0% {
-                transform: translateY(0) rotate(0deg);
-                opacity: 0.2;
-                border-radius: 10%;
-            }
-            100% {
-                transform: translateY(-1000px) rotate(720deg);
-                opacity: 0;
-                border-radius: 50%;
-            }
-        }
-
-        /* 粒子随机大小和位置 */
         .bg-circles li:nth-child(1) { left: 25%; width: 80px; height: 80px; animation-delay: 0s; }
         .bg-circles li:nth-child(2) { left: 10%; width: 20px; height: 20px; animation-delay: 2s; animation-duration: 12s; }
         .bg-circles li:nth-child(3) { left: 70%; width: 20px; height: 20px; animation-delay: 4s; }
@@ -111,42 +134,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
         .bg-circles li:nth-child(9) { left: 20%; width: 15px; height: 15px; animation-delay: 2s; animation-duration: 35s; }
         .bg-circles li:nth-child(10){ left: 85%; width: 150px; height: 150px; animation-delay: 0s; animation-duration: 11s; }
 
-
-        /* --- 登录框 (白色盒子) --- */
-        .login-container { 
-            background: #fff; 
-            width: 900px; 
-            height: 550px; 
-            border-radius: 20px; 
-            box-shadow: 0 15px 35px rgba(0,0,0,0.1); 
-            display: flex; 
-            overflow: hidden; 
-            position: relative; 
-            z-index: 10; 
-        }
-        
-        /* Left Side */
+        .login-container { background: #fff; width: 900px; height: 550px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); display: flex; overflow: hidden; position: relative; z-index: 10; }
         .carousel-section { width: 45%; position: relative; background-color: var(--bg-color); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; text-align: center; transition: background-color 0.8s ease; z-index: 2; }
         
-        /* --- 修正后的 Header Logo 样式 (大尺寸) --- */
-        .header-logo {
-            position: absolute; 
-            top: 30px; 
-            left: 30px; 
-            font-weight: bold; 
-            color: #444; 
-            display: flex; 
-            align-items: center; 
-            gap: 15px; /* 图片和文字的间距 */
-            font-size: 18px; /* 文字稍微大一点以匹配Logo */
-            letter-spacing: 1px;
-        }
-
-        .header-logo img {
-            height: 75px; 
-            width: auto;  
-            object-fit: contain;
-        }
+        .header-logo { position: absolute; top: 30px; left: 30px; font-weight: bold; color: #444; display: flex; align-items: center; gap: 15px; font-size: 18px; letter-spacing: 1px; }
+        .header-logo img { height: 75px; width: auto; object-fit: contain; }
 
         .slide { display: none; flex-direction: column; align-items: center; animation: fadeIn 1s ease; }
         .slide.active { display: flex; }
@@ -159,7 +151,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
         .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; cursor: pointer; transition: 0.3s; }
         .dot.active { background: var(--accent-color); width: 20px; border-radius: 10px; }
 
-        /* Right Side */
         .form-section { width: 55%; padding: 50px; display: flex; flex-direction: column; justify-content: center; position: relative; overflow: hidden; }
         .admin-badge { background: #f0f0f0; padding: 5px 10px; border-radius: 15px; font-size: 10px; font-weight: bold; color: #666; width: fit-content; margin-bottom: 10px; text-transform: uppercase; z-index: 2; }
         .form-section h1 { font-size: 28px; margin-bottom: 5px; color: #222; z-index: 2; position: relative; }
@@ -177,7 +168,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
         .footer-text { margin-top: auto; text-align: center; font-size: 10px; color: #aaa; z-index: 2; position: relative; }
         .alert { padding: 10px; background: #fee2e2; color: #b91c1c; border-radius: 5px; font-size: 12px; margin-bottom: 15px; text-align: center; z-index: 2; position: relative; }
 
-        /* Form 内部的装饰 */
         .decor-shape { position: absolute; border-radius: 50%; background-color: var(--accent-color); opacity: 0.1; z-index: 1; filter: blur(40px); }
         .shape-1 { width: 300px; height: 300px; top: -100px; right: -100px; animation: float 6s ease-in-out infinite; }
         .shape-2 { width: 200px; height: 200px; bottom: -50px; right: -50px; animation: float 8s ease-in-out infinite reverse; opacity: 0.15; }
@@ -190,22 +180,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
 </head>
 <body class="theme-stray">
     
-    <!-- 背景层：简单的几何图形漂浮 -->
     <ul class="bg-circles">
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
+        <li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li>
     </ul>
 
     <div class="login-container">
-        <!-- 左侧轮播图 -->
         <div class="carousel-section">
             <div class="header-logo">
                 <img src="logo.jpg" alt="Logo">
@@ -245,7 +224,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
             </div>
         </div>
 
-        <!-- 右侧表单 -->
         <div class="form-section">
             <div class="decor-shape shape-1"></div>
             <div class="decor-shape shape-2"></div>
@@ -254,12 +232,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
             <div class="admin-badge">ADMIN ACCESS</div>
             <h1>Welcome Home</h1>
             <p class="welcome-text">Thank you for being the heart of our mission.</p>
+            
             <?php if(isset($error)) { echo "<div class='alert'>$error</div>"; } ?>
 
             <form action="" method="POST">
                 <div class="input-group">
                     <i class="fas fa-envelope"></i>
-                    <input type="email" name="email" placeholder="Email Address" required>
+                    <input type="email" name="email" placeholder="Email Address" required value="<?php echo htmlspecialchars($display_email); ?>">
                 </div>
                 <div class="input-group">
                     <i class="fas fa-lock"></i>
@@ -267,7 +246,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
                     <i class="fas fa-eye toggle-password" onclick="togglePassword()"></i>
                 </div>
                 <div class="form-options">
-                    <label style="display: flex; align-items: center; gap: 5px;"><input type="checkbox" name="remember"> Remember me</label>
+                    <label style="display: flex; align-items: center; gap: 5px;">
+                        <input type="checkbox" name="remember" <?php if(isset($_COOKIE['admin_remember_email']) || (isset($_POST['remember']))) echo "checked"; ?>> Remember me
+                    </label>
                     <a href="admin_forgot_password.php">Forgot Password?</a>
                 </div>
                 <button type="submit" name="login_btn" class="login-btn">Login</button>

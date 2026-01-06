@@ -37,12 +37,19 @@ if (isset($_POST['reset_request'])) {
                 $mail->isSMTP();
                 $mail->Host       = 'smtp.gmail.com';
                 $mail->SMTPAuth   = true;
-                $mail->Username   = 'thongyuenzhen@gmail.com'; 
-                $mail->Password   = 'yqha ohwv etrq jaxd'; 
+                
+                // --- 已更新的部分 ---
+                $mail->Username   = 'lovebridge1201@gmail.com'; // 新的发送邮箱
+                $mail->Password   = 'odaj iwrz gfrt vven';      // 新的 App Password
+                // ------------------
+
                 $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
                 $mail->Port       = 465;
 
-                $mail->setFrom('thongyuenzhen@gmail.com', 'Love Bridge Admin');
+                // --- 发件人地址也已同步更新 ---
+                $mail->setFrom('lovebridge1201@gmail.com', 'Love Bridge Admin');
+                // --------------------------
+                
                 $mail->addAddress($email);
 
                 $base_url = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']);
