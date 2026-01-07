@@ -33,8 +33,7 @@ $filterType = "";
 $filterValue = "";
 $whereConditions = [];
 
-// 【修改点 1】确保只显示没有被 Soft Delete (0) 的用户
-// 这样会自动应用到下面的列表显示和 Excel 导出中
+// 确保只显示没有被 Block/Delete (Is_Deleted = 0) 的用户
 $whereConditions[] = "d.Is_Deleted = 0";
 
 // 1. Check Search (Keyword)
@@ -79,7 +78,7 @@ if (count($whereConditions) > 0) {
     $whereClause = "WHERE " . implode(" AND ", $whereConditions);
 }
 
-// --- EXPORT TO EXCEL HANDLER (UPDATED: ALL DATA) ---
+// --- EXPORT TO EXCEL HANDLER ---
 if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
     $filename = "donor_complete_data_" . date('Ymd') . ".xls";
     
@@ -97,7 +96,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
             <th>Registered Date</th><th>Last Login</th>
           </tr>';
     
-    // $whereClause already includes Is_Deleted = 0
     $donorSql = "SELECT d.Donor_ID, d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber, d.Donor_ICNumber, 
                   d.Donor_State, d.Donor_City, d.Donor_RegisteredAt, d.Donor_LastLogin,
                   COALESCE((SELECT Points_Total FROM point p WHERE p.Donor_ID = d.Donor_ID), 0) as CurrentPoints,
@@ -200,14 +198,14 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_donor_history' && isset($_
     $type = $_GET['type'];
     
     if ($type == 'payment') {
-        $histSql = "SELECT Order_Created_At, Order_TXN_Ref, Order_Amount, Order_Status, Order_PaymentMethod 
+        $histSql = "SELECT Order_ID, Order_Created_At, Order_TXN_Ref, Order_Amount, Order_Status, Order_PaymentMethod 
                     FROM orders WHERE Donor_ID = $histDonorId ORDER BY Order_Created_At DESC";
         $histResult = $conn->query($histSql);
         $data = [];
         while($r = $histResult->fetch_assoc()) { $data[] = $r; }
         echo json_encode($data);
     } elseif ($type == 'redemption') {
-        $histSql = "SELECT r.Redemption_Updated_At, r.Redemption_PointsSpent, r.Redemption_Status, i.Reward_ItemName 
+        $histSql = "SELECT r.Redemption_ID, r.Redemption_Updated_At, r.Redemption_PointsSpent, r.Redemption_Status, i.Reward_ItemName 
                     FROM redemption_order r 
                     JOIN reward_item i ON r.Reward_ID = i.Reward_ID 
                     WHERE r.Donor_ID = $histDonorId ORDER BY r.Redemption_Updated_At DESC";
@@ -249,8 +247,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_donor'])) {
     $state = mysqli_real_escape_string($conn, $_POST['state']);
     $postalCode = mysqli_real_escape_string($conn, $_POST['postal_code']);
     $country = mysqli_real_escape_string($conn, $_POST['country']);
-    $description = mysqli_real_escape_string($conn, $_POST['description']); // Added description
-    $password = trim($_POST['password']);
+    $description = mysqli_real_escape_string($conn, $_POST['description']); 
     
     $profilePicture = null;
     if (isset($_FILES['profile_picture'])) {
@@ -258,9 +255,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_donor'])) {
         if ($uploadedPath) $profilePicture = $uploadedPath;
     }
     
-    // Server-side validation
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !preg_match('/\.(com|net|org|edu|gov|my)$/i', $email)) {
-        $errorMessage = "Invalid email format. Must contain @ and a valid domain.";
+    $emailPattern = '/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/';
+
+    if (!preg_match($emailPattern, $email)) {
+        $errorMessage = "Invalid email format.";
     }
     elseif (!preg_match('/^[a-zA-Z\s]+$/', $donorName)) $errorMessage = "Name can only contain letters.";
     elseif (!preg_match('/^\+60[0-9]{1,2}-[0-9]{7,10}$/', $contact)) $errorMessage = "Invalid phone format.";
@@ -270,23 +268,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_donor'])) {
             if ($age < 18) $errorMessage = "Donor must be 18+.";
         }
         if (!isset($errorMessage)) {
-            // Check if email exists AND user is active (not deleted) or if email exists in DB at all?
-            // Usually we check if email exists in the whole DB to avoid duplicates even with deleted users, 
-            // OR we allow reusing email if previous user was deleted. 
-            // For safety, let's keep it simple: unique email across the board.
             $checkEmailSql = "SELECT Donor_ID FROM donor WHERE Donor_Email = '$email'";
             if ($conn->query($checkEmailSql)->num_rows > 0) $errorMessage = "Email exists.";
             else {
-                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
                 $cols = "Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email, Donor_Password, 
                          Donor_Address1, Donor_Address2, Donor_Address3, Donor_City, Donor_State, Donor_PostalCode, Donor_Country, 
                          Donor_DOB, Donor_Description, Donor_RegisteredAt, Is_Deleted";
-                // Explicitly set Is_Deleted to 0
-                $vals = "'$donorName', '$contact', '$icNumber', '$email', '$hashedPassword', 
+                
+                // 默认状态: Is_Deleted = 0
+                $vals = "'$donorName', '$contact', '$icNumber', '$email', NULL, 
                          '$address1', '$address2', '$address3', '$city', '$state', '$postalCode', '$country', 
                          '$dob', '$description', NOW(), 0";
+                
                 if ($profilePicture) { $cols .= ", Donor_ProfilePicture"; $vals .= ", '$profilePicture'"; }
                 $sql = "INSERT INTO donor ($cols) VALUES ($vals)";
+                
                 if ($conn->query($sql)) {
                     $newDonorId = $conn->insert_id;
                     $conn->query("INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES (0, 0, NOW(), $newDonorId)");
@@ -314,7 +310,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_donor'])) {
     $state = mysqli_real_escape_string($conn, $_POST['state']);
     $postalCode = mysqli_real_escape_string($conn, $_POST['postal_code']);
     $country = mysqli_real_escape_string($conn, $_POST['country']);
-    $description = mysqli_real_escape_string($conn, $_POST['description']); // Added description
+    $description = mysqli_real_escape_string($conn, $_POST['description']);
 
     $picSql = "";
     if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] == 0) {
@@ -327,8 +323,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_donor'])) {
             $picSql = ", Donor_ProfilePicture = '$uploadedPath'";
         }
     }
+    
+    // Server-side validation for Update
+    $emailPattern = '/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/';
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errorMessage = "Invalid email."; 
+    if (!preg_match($emailPattern, $email)) {
+        $errorMessage = "Invalid email format.";
+    }
+    elseif (!preg_match('/^[a-zA-Z\s]+$/', $donorName)) $errorMessage = "Name can only contain letters.";
     else {
         $sql = "UPDATE donor SET Donor_Name = '$donorName', Donor_ContactNumber = '$contact', Donor_ICNumber = '$icNumber', 
                 Donor_Email = '$email', Donor_Address1 = '$address1', Donor_Address2 = '$address2', Donor_Address3 = '$address3',
@@ -340,7 +342,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_donor'])) {
     elseif (!empty($errorMessage)) { header("Location: admin_donor_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
 
-// --- PAGINATION & DELETE (MODIFIED FOR SOFT DELETE) ---
+// --- 【重要修复：Block 逻辑】 ---
+// 这里的修改确保了点击 Block 后，用户状态变为 Is_Deleted=1，从而从 Active 列表消失，进入 Blocked 列表。
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['block_donor'])) {
+    $blockId = intval($_POST['block_donor_id']);
+    
+    // 我们将 Is_Deleted 设置为 1。
+    // 这会让用户从 admin_donor_page.php (Is_Deleted=0) 消失
+    // 并出现在 admin_blocked_donors.php (Is_Deleted=1)
+    if ($conn->query("UPDATE donor SET Is_Deleted = 1 WHERE Donor_ID = $blockId")) { 
+        header("Location: admin_donor_page.php?success=" . urlencode("Donor blocked successfully!")); 
+        exit(); 
+    }
+    else {
+        $errorMessage = "Error blocking donor: " . $conn->error;
+        header("Location: admin_donor_page.php?error=" . urlencode($errorMessage));
+        exit();
+    }
+}
+
+// --- PAGINATION ---
 $results_per_page = 5;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
@@ -362,27 +383,13 @@ if ($result && $result->num_rows > 0) { while($row = $result->fetch_assoc()) $do
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
 $end_record = min($start_from + $results_per_page, $total_records);
 
-// 【修改点 2】 Soft Delete Logic
-if (isset($_GET['delete_id'])) {
-    $deleteId = $_GET['delete_id'];
-    // Update Is_Deleted to 1 instead of DELETE FROM
-    if ($conn->query("UPDATE donor SET Is_Deleted = 1 WHERE Donor_ID = $deleteId")) { 
-        header("Location: admin_donor_page.php?success=" . urlencode("Donor deleted successfully!")); 
-        exit(); 
-    }
-    else {
-        $errorMessage = "Error deleting donor: " . $conn->error;
-    }
-}
 
-// Stats Calculation (Modified to exclude deleted donors)
+// Stats Calculation
 function getStats($conn) {
-    // ... [Existing Stats Logic] ...
     $currentMonth = date('m'); $currentYear = date('Y');
     $lastMonthDate = new DateTime('first day of last month');
     $lastMonth = $lastMonthDate->format('m'); $lastMonthYear = $lastMonthDate->format('Y');
 
-    // 【修改点 3】 统计时排除已删除用户
     $resTotal = $conn->query("SELECT COUNT(*) as total FROM donor WHERE Is_Deleted = 0");
     $totalDonors = ($resTotal) ? $resTotal->fetch_assoc()['total'] : 0;
 
@@ -394,9 +401,6 @@ function getStats($conn) {
         $donorPercentChange = ($totalLastMonthEnd > 0) ? (($totalDonors - $totalLastMonthEnd) / $totalLastMonthEnd) * 100 : ($totalDonors > 0 ? 100 : 0);
     } else $donorPercentChange = 0; 
     
-    // For donations, we technically usually count ALL money even from deleted users, 
-    // but the query here uses JOIN implicitly or just orders table. 
-    // The current query selects from `orders` table directly, which is fine (money is still money).
     $resDonationThis = $conn->query("SELECT SUM(Order_Amount) as total FROM orders WHERE MONTH(Order_Created_At) = '$currentMonth' AND YEAR(Order_Created_At) = '$currentYear'");
     $donationThisMonth = ($resDonationThis && $row = $resDonationThis->fetch_assoc()) ? (float)$row['total'] : 0;
 
@@ -443,11 +447,11 @@ $exportUrl = "?" . http_build_query($exportParams);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Donor Management - Donation Management System</title>
+    <title>Donor Management - Love Bridge</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin_common.css">
     <style>
-        /* Existing Styles */
+        /* [保留你的所有 CSS 样式] */
         .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-5px); }
@@ -508,9 +512,7 @@ $exportUrl = "?" . http_build_query($exportParams);
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
         .form-input:read-only, .form-textarea:read-only { background-color: #f8f9fa; color: #555; cursor: default; }
 
-        /* --- UPDATED FORM GUIDE STYLE (MATCHING STAFF PAGE) --- */
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
-        /* ----------------------------------------------------- */
 
         .file-upload { text-align: center; margin-bottom: 20px; }
         .profile-picture-preview { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #f8f9fa; margin: 0 auto 15px; background: #eee; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
@@ -523,17 +525,8 @@ $exportUrl = "?" . http_build_query($exportParams);
         .file-info.active { display: inline-flex; }
         .file-remove { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 14px; padding: 0 5px; }
 
-        .password-input-group { display: flex; width: 100%; }
-        .password-input-container { flex: 1; display: flex; position: relative; }
-        .password-input-container input { flex: 1; border-radius: 5px 0 0 5px; border-right: none; }
-        .toggle-password { border: 1px solid var(--gray-light); border-left: none; background: white; padding: 0 10px; cursor: pointer; }
-        .btn-small { padding: 0 12px; border-radius: 0 5px 5px 0; border: 1px solid var(--gray-light); border-left: none; background: #f8f9fa; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--primary); }
-        .confirm-check { position: absolute; right: 50px; top: 50%; transform: translateY(-50%); color: var(--success); font-size: 14px; display: none; z-index: 2; }
         .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
         
-        .password-requirements { margin-top: 8px; font-size: 12px; }
-        .requirement-item { display: flex; align-items: center; margin-bottom: 3px; color: #888; }
-        .requirement-item.valid { color: var(--success); } .requirement-item.invalid { color: var(--gray); } 
         .phone-format { display: flex; align-items: center; }
         .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid var(--gray-light); border-right: none; border-radius: 5px 0 0 5px; color: var(--gray); font-weight: bold; }
         .phone-input { border-radius: 0 5px 5px 0 !important; }
@@ -650,7 +643,8 @@ $exportUrl = "?" . http_build_query($exportParams);
                                                 <div onclick='openEditDonorModal(<?php echo json_encode($donor); ?>)'><i class="fas fa-edit"></i> Edit Details</div>
                                                 <div onclick="openPaymentHistory(<?php echo $donor['Donor_ID']; ?>)"><i class="fas fa-history"></i> Payment History</div>
                                                 <div onclick="openRedemptionHistory(<?php echo $donor['Donor_ID']; ?>)"><i class="fas fa-gift"></i> Redemption History</div>
-                                                <a href="javascript:confirmDelete(<?php echo $donor['Donor_ID']; ?>)" class="text-delete"><i class="fas fa-trash"></i> Delete</a>
+                                                
+                                                <div onclick="openBlockModal(<?php echo $donor['Donor_ID']; ?>, '<?php echo addslashes($donor['Donor_Name']); ?>')" class="text-delete"><i class="fas fa-ban"></i> Block User</div>
                                             </div>
                                         </div>
                                     </div>
@@ -721,15 +715,16 @@ $exportUrl = "?" . http_build_query($exportParams);
                     
                     <div class="form-group">
                         <label class="form-label">Full Name <span class="required">*</span></label>
-                        <input type="text" name="donor_name" class="form-input" required oninput="validateName(this)" placeholder="e.g. John Doe">
+                        <input type="text" name="donor_name" id="donor_name" class="form-input" required oninput="validateName(this)" placeholder="e.g. John Doe">
                         <span class="form-guide">Enter full name as per IC. English letters only.</span>
+                        <div id="nameError" class="error-message">Name cannot contain numbers.</div>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Email <span class="required">*</span></label>
-                            <input type="email" id="email" name="email" class="form-input" required onblur="validateEmail()" placeholder="e.g. user@example.com">
-                            <span class="form-guide">Valid email address (e.g. name@domain.com, must contain @ and domain).</span>
+                            <input type="email" id="email" name="email" class="form-input" required onblur="validateEmail()" oninput="validateEmail()" placeholder="e.g. user@example.com">
+                            <span class="form-guide">Valid email address (e.g. .com, .my, .net, etc.).</span>
                             <div id="emailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
@@ -784,34 +779,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                         <textarea name="description" class="form-textarea" rows="2"></textarea>
                         <span class="form-guide">Optional: Enter remarks, preferences, or important notes about this donor.</span>
                     </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Password <span class="required">*</span></label>
-                        <div class="password-input-group">
-                            <div class="password-input-container">
-                                <input type="password" id="password" name="password" class="form-input" required oninput="validatePasswordRequirements()">
-                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('password')"><i class="fas fa-eye"></i></button>
-                            </div>
-                            <button type="button" class="btn-small" onclick="generateStrongPassword('password', 'confirm_password')">Auto Generate</button>
-                        </div>
-                        <div class="password-requirements">
-                            <div class="requirement-item invalid" id="lengthReq"><i class="fas fa-times"></i> Must be 8-15 characters long</div>
-                            <div class="requirement-item invalid" id="uppercaseReq"><i class="fas fa-times"></i> Must contain at least one Uppercase letter</div>
-                            <div class="requirement-item invalid" id="lowercaseReq"><i class="fas fa-times"></i> Must contain at least one Lowercase letter</div>
-                            <div class="requirement-item invalid" id="numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div>
-                            <div class="requirement-item invalid" id="specialReq"><i class="fas fa-times"></i> Must contain at least one Special character (e.g. !@#)</div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Confirm Password <span class="required">*</span></label>
-                        <div class="password-input-container">
-                            <input type="password" id="confirm_password" name="confirm_password" class="form-input" required oninput="validatePasswordMatch()">
-                            <i id="password-match-icon" class="fas fa-check-circle confirm-check"></i>
-                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('confirm_password')"><i class="fas fa-eye"></i></button>
-                        </div>
-                        <div id="confirmPasswordError" class="error-message">Passwords do not match</div>
-                    </div>
                     
                     <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Donor</button></div>
                 </form>
@@ -849,13 +816,14 @@ $exportUrl = "?" . http_build_query($exportParams);
                         <label class="form-label">Full Name <span class="required">*</span></label>
                         <input type="text" id="edit_donor_name" name="donor_name" class="form-input" required oninput="validateName(this)">
                         <span class="form-guide">Enter full name as per IC. English letters only.</span>
+                        <div id="editNameError" class="error-message">Name cannot contain numbers.</div>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Email <span class="required">*</span></label>
-                            <input type="email" id="edit_email" name="email" class="form-input" required onblur="validateEditEmail()">
-                            <span class="form-guide">Valid email address (e.g. name@domain.com).</span>
+                            <input type="email" id="edit_email" name="email" class="form-input" required onblur="validateEditEmail()" oninput="validateEditEmail()">
+                            <span class="form-guide">Valid email address (e.g. .com, .my).</span>
                             <div id="editEmailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
@@ -939,6 +907,33 @@ $exportUrl = "?" . http_build_query($exportParams);
         </div>
     </div>
 
+    <div class="modal" id="blockDonorModal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header" style="background-color: #dc3545; color: white;">
+                <h2 style="font-size: 16px;"><i class="fas fa-exclamation-triangle"></i> Block Confirmation</h2>
+                <button class="close-btn" onclick="closeModal('blockDonorModal')" style="color: white;">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align: center; padding: 30px;">
+                <form method="POST" action="admin_donor_page.php">
+                    <input type="hidden" name="block_donor" value="1">
+                    <input type="hidden" name="block_donor_id" id="block_donor_id">
+                    
+                    <i class="fas fa-ban" style="font-size: 50px; color: #dc3545; margin-bottom: 20px;"></i>
+                    <h3 style="margin-bottom: 10px;">Block this donor?</h3>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 25px;">
+                        Are you sure you want to block <strong id="block_donor_name_display"></strong>?<br>
+                        They will not be able to log in or make donations.
+                    </p>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: center;">
+                        <button type="button" class="btn" style="background: #eee; color: #333;" onclick="closeModal('blockDonorModal')">Cancel</button>
+                        <button type="submit" class="btn btn-danger">Yes, Block</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         function toggleFilterInputs() {
             const type = document.getElementById('filterType').value;
@@ -960,6 +955,12 @@ $exportUrl = "?" . http_build_query($exportParams);
                 if (event.target.classList.contains('modal')) event.target.style.display = "none";
             });
         });
+
+        function openBlockModal(id, name) {
+            document.getElementById('block_donor_id').value = id;
+            document.getElementById('block_donor_name_display').textContent = name;
+            document.getElementById('blockDonorModal').style.display = 'flex';
+        }
 
         function setupPostcodeState(postcodeId, stateSelectId) {
             const pcInput = document.getElementById(postcodeId); const stateSelect = document.getElementById(stateSelectId);
@@ -1001,17 +1002,6 @@ $exportUrl = "?" . http_build_query($exportParams);
             });
         }
 
-        function generateStrongPassword(passId, confirmId) {
-            const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; const lower = "abcdefghijklmnopqrstuvwxyz"; const numbers = "0123456789"; const specials = "!@#$%^&*"; const all = upper + lower + numbers + specials;
-            let password = ""; password += upper[Math.floor(Math.random() * upper.length)]; password += lower[Math.floor(Math.random() * lower.length)]; password += numbers[Math.floor(Math.random() * numbers.length)]; password += specials[Math.floor(Math.random() * specials.length)];
-            for (let i = 4; i < 12; i++) { password += all[Math.floor(Math.random() * all.length)]; }
-            password = password.split('').sort(() => 0.5 - Math.random()).join('');
-            document.getElementById(passId).value = password; if(confirmId) document.getElementById(confirmId).value = password;
-            const passInput = document.getElementById(passId); passInput.type = "text"; const toggleBtn = passInput.nextElementSibling; if(toggleBtn) toggleBtn.querySelector('i').className = 'fas fa-eye-slash';
-            if(confirmId) { const confirmInput = document.getElementById(confirmId); confirmInput.type = "text"; const confirmToggle = confirmInput.nextElementSibling; if(confirmToggle) confirmToggle.querySelector('i').className = 'fas fa-eye-slash'; }
-            if(passId === 'password') validatePasswordRequirements(); if(confirmId) validatePasswordMatch();
-        }
-
         function previewImage(input, containerId, infoId, nameId) {
             const container = document.getElementById(containerId); 
             const info = document.getElementById(infoId); 
@@ -1047,7 +1037,7 @@ $exportUrl = "?" . http_build_query($exportParams);
             document.getElementById('view_dob').value = donor.Donor_DOB;
             document.getElementById('view_registered').value = donor.Donor_RegisteredAt;
             document.getElementById('view_last_login').value = donor.Donor_LastLogin ? donor.Donor_LastLogin : 'Never';
-            document.getElementById('view_description').value = donor.Donor_Description ? donor.Donor_Description : ''; // Show Description
+            document.getElementById('view_description').value = donor.Donor_Description ? donor.Donor_Description : ''; 
 
             let address = donor.Donor_Address1;
             if(donor.Donor_Address2) address += ", " + donor.Donor_Address2;
@@ -1074,18 +1064,22 @@ $exportUrl = "?" . http_build_query($exportParams);
                         if(row.Order_Status.toLowerCase() === 'completed' || row.Order_Status.toLowerCase() === 'success') statusClass = 'status-success';
                         else if(row.Order_Status.toLowerCase() === 'failed' || row.Order_Status.toLowerCase() === 'cancelled') statusClass = 'status-failed';
                         
+                        const url = `admin_payment_details.php?id=${row.Order_ID}`;
+
                         const html = `
-                        <div class="history-card">
-                            <div class="h-info-left">
-                                <span class="h-date">${row.Order_Created_At}</span>
-                                <span class="h-title">${row.Order_PaymentMethod}</span>
-                                <span class="h-subtitle">Ref: ${row.Order_TXN_Ref}</span>
+                        <a href="${url}" target="_blank" style="text-decoration:none; color:inherit; display:block; width:100%;">
+                            <div class="history-card">
+                                <div class="h-info-left">
+                                    <span class="h-date">${row.Order_Created_At}</span>
+                                    <span class="h-title">${row.Order_PaymentMethod}</span>
+                                    <span class="h-subtitle">Ref: ${row.Order_TXN_Ref}</span>
+                                </div>
+                                <div class="h-info-right">
+                                    <span class="h-amount">RM ${row.Order_Amount}</span>
+                                    <span class="status-badge ${statusClass}">${row.Order_Status}</span>
+                                </div>
                             </div>
-                            <div class="h-info-right">
-                                <span class="h-amount">RM ${row.Order_Amount}</span>
-                                <span class="status-badge ${statusClass}">${row.Order_Status}</span>
-                            </div>
-                        </div>`;
+                        </a>`;
                         listContainer.innerHTML += html;
                     }); 
                 }
@@ -1106,20 +1100,26 @@ $exportUrl = "?" . http_build_query($exportParams);
                 } else { 
                     data.forEach(row => { 
                         let statusClass = 'status-pending';
-                        if(row.Redemption_Status.toLowerCase() === 'completed' || row.Redemption_Status.toLowerCase() === 'delivered') statusClass = 'status-success';
-                        else if(row.Redemption_Status.toLowerCase() === 'rejected') statusClass = 'status-failed';
+                        let status = row.Redemption_Status.toLowerCase();
+                        
+                        if(status === 'completed' || status === 'delivered' || status === 'shipped') statusClass = 'status-success';
+                        else if(status === 'rejected' || status === 'cancelled') statusClass = 'status-failed';
+
+                        const url = `admin_redemption_details.php?id=${row.Redemption_ID}`;
 
                         const html = `
-                        <div class="history-card">
-                            <div class="h-info-left">
-                                <span class="h-date">${row.Redemption_Updated_At}</span>
-                                <span class="h-title">${row.Reward_ItemName}</span>
+                        <a href="${url}" target="_blank" style="text-decoration:none; color:inherit; display:block; width:100%;">
+                            <div class="history-card">
+                                <div class="h-info-left">
+                                    <span class="h-date">${row.Redemption_Updated_At}</span>
+                                    <span class="h-title">${row.Reward_ItemName}</span>
+                                </div>
+                                <div class="h-info-right">
+                                    <span class="h-points">-${row.Redemption_PointsSpent} pts</span>
+                                    <span class="status-badge ${statusClass}">${row.Redemption_Status}</span>
+                                </div>
                             </div>
-                            <div class="h-info-right">
-                                <span class="h-points">-${row.Redemption_PointsSpent} pts</span>
-                                <span class="status-badge ${statusClass}">${row.Redemption_Status}</span>
-                            </div>
-                        </div>`;
+                        </a>`;
                         listContainer.innerHTML += html;
                     }); 
                 }
@@ -1132,7 +1132,8 @@ $exportUrl = "?" . http_build_query($exportParams);
             document.getElementById('addDonorForm').reset(); 
             document.getElementById('add-preview-container').innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; 
             document.getElementById('add-file-info').style.display = 'none'; 
-            document.querySelectorAll('.requirement-item').forEach(el => { el.className = 'requirement-item invalid'; el.querySelector('i').className = 'fas fa-times'; }); 
+            document.getElementById('emailError').style.display = 'none';
+            document.getElementById('nameError').style.display = 'none';
         }
         
         function openEditDonorModal(donor) {
@@ -1150,9 +1151,8 @@ $exportUrl = "?" . http_build_query($exportParams);
             document.getElementById('edit_state').value = donor.Donor_State;
             document.getElementById('edit_postal_code').value = donor.Donor_PostalCode;
             document.getElementById('edit_country').value = donor.Donor_Country;
-            document.getElementById('edit_description').value = donor.Donor_Description ? donor.Donor_Description : ''; // Populate Description
+            document.getElementById('edit_description').value = donor.Donor_Description ? donor.Donor_Description : ''; 
             
-            // Edit Preview
             const container = document.getElementById('edit-preview-container');
             if (donor.Donor_ProfilePicture) { 
                 container.innerHTML = `<img src="${donor.Donor_ProfilePicture}" alt="Preview">`; 
@@ -1161,44 +1161,73 @@ $exportUrl = "?" . http_build_query($exportParams);
             }
             document.getElementById('edit_profile_picture').value = '';
             document.getElementById('edit-file-info').style.display = 'none';
+            document.getElementById('editEmailError').style.display = 'none';
+            document.getElementById('editNameError').style.display = 'none';
             
             document.getElementById('editDonorModal').style.display = 'flex';
         }
 
         function closeEditDonorModal() { document.getElementById('editDonorModal').style.display = 'none'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-        function confirmDelete(id) { if(confirm("Are you sure?")) window.location.href = "admin_donor_page.php?delete_id=" + id; }
         
-        function validateName(input) { input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); }
+        // Name Validation
+        function validateName(input) { 
+            const hasNumber = /\d/.test(input.value);
+            const errorDiv = input.id === 'donor_name' ? document.getElementById('nameError') : document.getElementById('editNameError');
+            
+            if (hasNumber) {
+                input.value = input.value.replace(/\d/g, '');
+                errorDiv.style.display = 'block';
+                setTimeout(() => { errorDiv.style.display = 'none'; }, 3000);
+            }
+            input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); 
+        }
         
-        // Updated Email Validation with Visual Feedback
         function validateEmail() { 
             const val = document.getElementById('email').value;
-            // Check for @ AND a domain extension (basic check)
-            const v = /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val); 
-            document.getElementById('emailError').style.display = v ? 'none' : 'block'; 
-            return v; 
+            const errorDiv = document.getElementById('emailError');
+            if (!val) {
+                errorDiv.style.display = 'none';
+                return false;
+            }
+            if (!val.includes('@')) {
+                 errorDiv.innerText = "Missing '@' symbol.";
+                 errorDiv.style.display = 'block';
+                 return false;
+            }
+            const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailPattern.test(val)) {
+                errorDiv.innerText = "Missing domain extension (e.g., .com, .my).";
+                errorDiv.style.display = 'block';
+                return false;
+            }
+            errorDiv.style.display = 'none';
+            return true; 
         }
+
         function validateEditEmail() { 
             const val = document.getElementById('edit_email').value;
-            const v = /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val); 
-            document.getElementById('editEmailError').style.display = v ? 'none' : 'block';
-            return v; 
+            const errorDiv = document.getElementById('editEmailError');
+            if (!val) return false;
+            if (!val.includes('@')) {
+                 errorDiv.innerText = "Missing '@' symbol.";
+                 errorDiv.style.display = 'block';
+                 return false;
+            }
+            const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailPattern.test(val)) {
+                errorDiv.innerText = "Missing domain extension (e.g., .com, .my).";
+                errorDiv.style.display = 'block';
+                return false;
+            }
+            errorDiv.style.display = 'none';
+            return true; 
         }
         
         function validateAge() { const d = document.getElementById('dob').value; if(!d) return true; return (new Date().getFullYear() - new Date(d).getFullYear()) >= 18; }
         function validateEditAge() { const d = document.getElementById('edit_dob').value; if(!d) return true; return (new Date().getFullYear() - new Date(d).getFullYear()) >= 18; }
         
-        function validatePasswordRequirements() {
-            const pw = document.getElementById('password').value;
-            const reqs = { lengthReq: pw.length >= 8 && pw.length <= 15, uppercaseReq: /[A-Z]/.test(pw), lowercaseReq: /[a-z]/.test(pw), numberReq: /\d/.test(pw), specialReq: /[!@#$%^&*]/.test(pw) };
-            let allValid = true;
-            for (const [id, valid] of Object.entries(reqs)) { const el = document.getElementById(id); const icon = el.querySelector('i'); if (valid) { el.className = 'requirement-item valid'; icon.className = 'fas fa-check'; } else { el.className = 'requirement-item invalid'; icon.className = 'fas fa-times'; allValid = false; } }
-            if(document.getElementById('confirm_password').value) validatePasswordMatch(); return allValid;
-        }
-        function validatePasswordMatch() { const m = document.getElementById('password').value === document.getElementById('confirm_password').value; document.getElementById('confirmPasswordError').style.display = m ? 'none' : 'block'; document.getElementById('password-match-icon').style.display = m ? 'block' : 'none'; return m; }
-        function togglePasswordVisibility(id) { const f = document.getElementById(id); const toggleBtn = f.nextElementSibling; if(f.type === 'password') { f.type = 'text'; if(toggleBtn) toggleBtn.querySelector('i').className = 'fas fa-eye-slash'; } else { f.type = 'password'; if(toggleBtn) toggleBtn.querySelector('i').className = 'fas fa-eye'; } }
-        function validateForm() { return validateEmail() && validatePasswordRequirements() && validatePasswordMatch(); }
+        function validateForm() { return validateEmail() && validateAge(); }
         function validateEditForm() { return validateEditEmail() && validateEditAge(); }
     </script>
 </body>

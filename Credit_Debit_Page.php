@@ -1,6 +1,8 @@
 <?php
 // 1. 开启 Session
 session_start();
+include 'dataconnection.php';
+date_default_timezone_set("Asia/Kuala_Lumpur");
 
 // 2. 检查登录
 if (!isset($_SESSION['donor_id'])) {
@@ -10,24 +12,31 @@ if (!isset($_SESSION['donor_id'])) {
 
 $current_donor_id = $_SESSION['donor_id']; 
 
-// 引入数据库
-include 'dataconnection.php';
-date_default_timezone_set("Asia/Kuala_Lumpur");
+// 3. [NEW] 检查 Session 数据 (确保是从正常流程进来的)
+if (empty($_SESSION['donation_data'])) {
+    header("Location: Donate_Page.php");
+    exit();
+}
 
-// 3. 获取用户信息
-// ✅ 修正：根据您的数据库，donor 表只有 Donor_Name，没有 FName/LName
+// 从 Session 提取数据 (用于显示和填入隐藏字段)
+$sess_data = $_SESSION['donation_data'];
+$amount = $sess_data['amount'];
+$donation_type = $sess_data['type'];
+$branch_id = $sess_data['branch_id'] ?: null; // 转为 null 以防 SQL 报错
+$case_id = $sess_data['case_id'] ?: null;
+$activity_id = $sess_data['activity_id'] ?: null;
+
+// 4. 获取用户信息 (用于填入 Order 表)
 $user_sql = "SELECT Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
 $u_stmt = $conn->prepare($user_sql);
 $u_stmt->bind_param("i", $current_donor_id);
 $u_stmt->execute();
-$u_result = $u_stmt->get_result();
-$user_data = $u_result->fetch_assoc();
+$user_data = $u_stmt->get_result()->fetch_assoc();
 $u_stmt->close();
 
-// 🛑 安全检查
 if (!$user_data) {
     session_destroy();
-    echo "<script>alert('User data not found. Please login again.'); window.location.href='donor_login.php';</script>";
+    echo "<script>alert('User data not found.'); window.location.href='donor_login.php';</script>";
     exit();
 }
 
@@ -36,17 +45,13 @@ if (!$user_data) {
 // ---------------------------------------------------------
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
 
-    $donation_type = $_POST['donation_type']; 
-    $amount = $_POST['amount'];
-    $bank_name = $_POST['bank_display']; // 获取自动识别的卡类型
-    $card_number = str_replace(' ', '', $_POST['card']); // 去除空格
+    // 获取表单提交的数据 (Hidden Inputs)
+    $p_amount = $_POST['amount'];
+    $p_type = $_POST['donation_type'];
+    $bank_name = $_POST['bank_display']; 
+    $card_number = str_replace(' ', '', $_POST['card']); 
     
-    // ✅ 处理 ID (空值转为 NULL)
-    // 这样存入数据库时就是 NULL，而不是 0，避免外键报错
-    $branch_id = !empty($_POST['branch_id']) ? $_POST['branch_id'] : null;
-    $case_id = !empty($_POST['case_id']) ? $_POST['case_id'] : null;
-    $activity_id = !empty($_POST['activity_id']) ? $_POST['activity_id'] : null;
-    
+    // 生成交易信息
     $txn_ref = "TXN-" . date("YmdHis");
     $now = date("Y-m-d H:i:s");
     $status = "Success";
@@ -55,79 +60,68 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
 
     // 1️⃣ 插入 payment 表
     $stmt = $conn->prepare("INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("sssissss", $payment_method, $status, $txn_ref, $amount, $now, $bank_name, $masked_card, $now);
+    $stmt->bind_param("sssissss", $payment_method, $status, $txn_ref, $p_amount, $now, $bank_name, $masked_card, $now);
     $stmt->execute();
     $payment_id = $stmt->insert_id;
     $stmt->close();
 
     // 2️⃣ 插入 orders 表
-    $order_type = ($donation_type == "monthly") ? "Recurring" : "One-time";
+    $order_type = ($p_type == "monthly") ? "Recurring" : "One-time";
     $order_status = "Completed";
     
-    // ✅ 修正：使用 Donor_Name (数据库 donor 表对应字段)
+    // 决定报税状态
+    $tax_status = ($sess_data['tax_receipt'] == '1') ? 'Requested' : 'Not_Requested';
+
     $full_name = $user_data['Donor_Name']; 
 
-    // ✅ 修正：orders 表使用的是 Order_Name
     $stmt = $conn->prepare("INSERT INTO orders 
         (Order_Name, Order_ContactNumber, Order_ICNumber, Order_Email, 
          Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, 
-         Order_TXN_Ref, Order_Type, Order_Status, Order_Created_At, Order_Updated_At, 
+         Order_TXN_Ref, Order_Type, Order_Status, Tax_Receipt_Status, Order_Created_At, Order_Updated_At, 
          Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID)
-        VALUES (?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        VALUES (?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    $stmt->bind_param("ssssdsssssssiiiii", 
+    // 注意：增加了 Tax_Receipt_Status 参数绑定
+    $stmt->bind_param("ssssdssssssssiiiii", 
         $full_name, 
         $user_data['Donor_ContactNumber'], 
         $user_data['Donor_ICNumber'], 
         $user_data['Donor_Email'], 
-        $amount, $payment_method, $status, $txn_ref, $order_type, $order_status, $now, $now, 
+        $p_amount, $payment_method, $status, $txn_ref, $order_type, $order_status, $tax_status, $now, $now, 
         $current_donor_id, $payment_id, $branch_id, $activity_id, $case_id
     );
     $stmt->execute();
     $stmt->close();
 
     // 3️⃣ 插入 recurring_donation 表 (如果是月捐)
-    if ($donation_type == "monthly") {
+    if ($p_type == "monthly") {
         $deduction_date = date("Y-m-d", strtotime("+1 month"));
-        
-        // 【关键修复】这里加入了 Branch_ID, Activity_ID, Case_ID
         $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?)");
-        
-        // 注意参数绑定：dssssiiii (对应上面的占位符)
-        $stmt->bind_param("dssssiiii", $amount, $payment_method, $deduction_date, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
-        
+        $stmt->bind_param("dssssiiii", $p_amount, $payment_method, $deduction_date, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
         $stmt->execute();
         $stmt->close();
     }
 
-    // ==========================================
-    // 4️⃣ [新增] 更新筹款进度 (Raised Amount)
-    // ==========================================
-    
-    // 如果是 Special Case 捐款，增加 Raised_Amount
+    // 4️⃣ [新增] 更新筹款进度
     if ($case_id != null) {
-        $update_case = $conn->prepare("UPDATE special_case SET Raised_Amount = Raised_Amount + ? WHERE Case_ID = ?");
-        $update_case->bind_param("di", $amount, $case_id);
-        $update_case->execute();
-        $update_case->close();
+        $conn->query("UPDATE special_case SET Raised_Amount = Raised_Amount + $p_amount WHERE Case_ID = $case_id");
+    }
+    if ($activity_id != null) {
+        $conn->query("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + $p_amount WHERE Activity_ID = $activity_id");
     }
 
-    // 如果是 Activity 捐款，增加 Activity_GetAmount
-    if ($activity_id != null) {
-        $update_act = $conn->prepare("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + ? WHERE Activity_ID = ?");
-        $update_act->bind_param("di", $amount, $activity_id);
-        $update_act->execute();
-        $update_act->close();
-    }
+    // 5️⃣ [重要] 清除 Session，防止重复提交
+    // unset($_SESSION['donation_data']); // 可以选择在这里清空，或者在 Settlement 页面清空
 
     // 跳转
     header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
     exit();
 }
 
-// 引入头部
 include 'header_UI.php'; 
 ?>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
     /* Hero Banner */
@@ -141,7 +135,7 @@ include 'header_UI.php';
     }
     .hero-wrap .overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); }
     .hero-content { position: relative; z-index: 2; max-width: 800px; }
-    .hero-content h1 { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; font-size: 4rem; margin-bottom: 10px; }
+    .hero-content h1 { font-family: 'Segoe UI', sans-serif; color: #fff; font-size: 4rem; margin-bottom: 10px; }
     .hero-content p { font-size: 1.2rem; color: rgba(255, 255, 255, 0.9); }
 
     /* 表单样式 */
@@ -157,21 +151,24 @@ include 'header_UI.php';
     .form-control:focus { border-color: #00a651; box-shadow: none; outline: none; }
     
     /* 银行图标 */
-    .card-icon {
-        position: absolute;
-        right: 15px;
-        top: 45px; /* 调整位置 */
-        font-size: 24px;
-        color: #999;
-    }
+    .card-icon { position: absolute; right: 15px; top: 45px; font-size: 24px; color: #999; }
     .input-wrapper { position: relative; }
 
-    /* 按钮 */
-    .btn-confirm {
-        background-color: #00a651; color: #fff; font-weight: bold; font-size: 18px;
-        padding: 15px; border: none; border-radius: 4px; width: 100%; cursor: pointer; transition: 0.3s;
+    /* 按钮组样式 (New) */
+    .nav-buttons { display: flex; gap: 20px; margin-top: 30px; }
+    .btn-nav {
+        flex: 1; padding: 15px; border-radius: 8px; font-size: 1.1rem; font-weight: bold;
+        cursor: pointer; border: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; transition: 0.2s;
+        text-decoration: none; /* for <a> tag */
     }
-    .btn-confirm:hover { background-color: #008f45; }
+    
+    /* Previous Button */
+    .btn-prev { background: #e5e7eb; color: #374151; border: 1px solid #d1d5db; }
+    .btn-prev:hover { background: #d1d5db; color: #111; text-decoration: none; }
+
+    /* Confirm Button */
+    .btn-confirm { background: #00a651; color: white; }
+    .btn-confirm:hover { background: #008f45; color: white; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 166, 81, 0.3); }
 
     .card-row { display: flex; gap: 20px; }
     .card-col { flex: 1; }
@@ -188,20 +185,16 @@ include 'header_UI.php';
 </div>
 
 <?php 
-    // 检查是否有 case_id (Special Case)
-    // 这里的 case_id 可能是通过 POST 传过来的
-    $is_special_case = (isset($_POST['case_id']) && !empty($_POST['case_id']));
-
-    if ($is_special_case) {
-        $flow_type = 'special';
-        $current_step = 2; // Special Flow Step 2 (Payment)
-    } else {
-        $flow_type = 'standard';
-        $current_step = 3; // Standard Flow Step 3 (Payment)
-    }
-
+    // 判断显示哪个 Step
+    $flow_type = ($case_id || $activity_id) ? 'special' : 'standard';
+    $current_step = ($case_id || $activity_id) ? 2 : 4; // 如果是 Standard，这是第 4 步 (Donate->Branch->Way->Card)
+    // 注意：根据你之前的逻辑，Donate->Branch->Way->Card 应该是 Step 4。
+    // 如果你之前的 Payment_Ways 是 Step 3，那这里就是 Step 4。
+    // 为了保险起见，这里我设置为 4 (Standard)
+    
     include 'stepper.php'; 
 ?>
+
 <div class="site-section" style="padding: 5em 0;">
     <div class="container">
         <div class="row">
@@ -209,7 +202,8 @@ include 'header_UI.php';
             <div class="col-md-6 mb-5">
                 <img src="images/about_1.jpg" alt="Donation Story" class="img-fluid rounded mb-4 shadow-sm">
                 <h3 class="text-cursive mb-4" style="color: #00a651;">Thank You!</h3>
-                <p>Your donation of <strong>RM <?php echo htmlspecialchars($_POST['amount'] ?? 0); ?></strong> makes a difference.</p>
+                <p>Your donation of <strong style="font-size:1.2rem; color:#dc2626;">RM <?php echo number_format($amount, 2); ?></strong> makes a difference.</p>
+                
                 <div class="alert alert-success">
                     <i class="fas fa-shield-alt"></i> Your card information is encrypted and secure.
                 </div>
@@ -221,11 +215,11 @@ include 'header_UI.php';
                     
                     <form class="bank-form" method="POST" action="">
                         
-                        <input type="hidden" name="donation_type" value="<?php echo $_POST['donation_type'] ?? 'one-time'; ?>">
-                        <input type="hidden" name="amount" value="<?php echo $_POST['amount'] ?? 50; ?>">
-                        <input type="hidden" name="branch_id" value="<?php echo $_POST['branch_id'] ?? 0; ?>">
-                        <input type="hidden" name="case_id" value="<?php echo $_POST['case_id'] ?? 0; ?>">
-                        <input type="hidden" name="activity_id" value="<?php echo $_POST['activity_id'] ?? ''; ?>">
+                        <input type="hidden" name="donation_type" value="<?php echo htmlspecialchars($donation_type); ?>">
+                        <input type="hidden" name="amount" value="<?php echo htmlspecialchars($amount); ?>">
+                        <input type="hidden" name="branch_id" value="<?php echo htmlspecialchars($branch_id); ?>">
+                        <input type="hidden" name="case_id" value="<?php echo htmlspecialchars($case_id); ?>">
+                        <input type="hidden" name="activity_id" value="<?php echo htmlspecialchars($activity_id); ?>">
 
                         <div class="form-group mb-3 input-wrapper">
                             <label for="card">Card Number</label>
@@ -249,7 +243,15 @@ include 'header_UI.php';
                             </div>
                         </div>
 
-                        <button type="submit" class="btn-confirm">Confirm Payment</button>
+                        <div class="nav-buttons">
+                            <a href="Payment_Ways_Page.php" class="btn-nav btn-prev">
+                                <i class="fas fa-arrow-left"></i> Previous
+                            </a>
+
+                            <button type="submit" class="btn-nav btn-confirm">
+                                Confirm Payment
+                            </button>
+                        </div>
                         
                     </form>
                 </div>
@@ -261,85 +263,79 @@ include 'header_UI.php';
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.bank-form'); 
     const cardInput = document.getElementById('card');
     const bankDisplay = document.getElementById('bank_display');
     const cardIcon = document.getElementById('card-brand-icon');
     const expInput = document.getElementById('exp');
+    const cvcInput = document.getElementById('cvc');
 
-    // 1. 卡号输入格式化 (每4位加空格) + 识别
+    // 1. 卡号输入格式化
     cardInput.addEventListener('input', function(e) {
-        let value = e.target.value.replace(/\D/g, ''); // 去除非数字
+        let value = e.target.value.replace(/\D/g, ''); 
         let formattedValue = '';
-        
-        // 格式化：每4位加空格
         for (let i = 0; i < value.length; i++) {
-            if (i > 0 && i % 4 === 0) {
-                formattedValue += ' ';
-            }
+            if (i > 0 && i % 4 === 0) formattedValue += ' ';
             formattedValue += value[i];
         }
         e.target.value = formattedValue;
-
-        // 识别卡类型
         identifyCardType(value);
     });
 
-    // 2. 有效期格式化 (自动加斜杠)
+    // 2. 有效期格式化
     expInput.addEventListener('input', function(e) {
-        let value = e.target.value.replace(/\D/g, '');
+        let value = e.target.value.replace(/\D/g, ''); 
         if (value.length >= 3) {
             e.target.value = value.slice(0, 2) + '/' + value.slice(2, 4);
+        } else {
+            e.target.value = value;
         }
     });
 
-    // 3. 识别函数
+    // 3. CVC 限制
+    cvcInput.addEventListener('input', function(e) {
+        e.target.value = e.target.value.replace(/\D/g, ''); 
+    });
+
+    // 4. 表单提交验证 (SweetAlert2)
+    form.addEventListener('submit', function(e) {
+        const expValue = expInput.value; 
+        
+        if (expValue.length !== 5) {
+            e.preventDefault();
+            Swal.fire({ title: 'Error', text: 'Please enter a valid expiration date (MM/YY).', icon: 'warning', confirmButtonColor: '#00a651' });
+            return;
+        }
+
+        const [mm, yy] = expValue.split('/').map(num => parseInt(num, 10));
+        const now = new Date();
+        const currentYear = parseInt(now.getFullYear().toString().substr(-2)); 
+        const currentMonth = now.getMonth() + 1; 
+
+        let errorMsg = '';
+        if (mm < 1 || mm > 12) errorMsg = "Invalid month.";
+        else if (yy < currentYear) errorMsg = "Card has expired.";
+        else if (yy === currentYear && mm < currentMonth) errorMsg = "Card has expired.";
+
+        if (errorMsg !== '') {
+            e.preventDefault(); 
+            Swal.fire({ title: 'Error', text: errorMsg, icon: 'error', confirmButtonColor: '#00a651' });
+        }
+    });
+
     function identifyCardType(number) {
-        // 正则表达式匹配
-        const patterns = {
-            visa: /^4/,
-            mastercard: /^5[1-5]/,
-            amex: /^3[47]/,
-            discover: /^6(?:011|5)/,
-            jcb: /^(?:2131|1800|35\d{3})/
-        };
-
-        // 图标类名映射 (FontAwesome)
-        const icons = {
-            visa: 'fa-cc-visa',
-            mastercard: 'fa-cc-mastercard',
-            amex: 'fa-cc-amex',
-            discover: 'fa-cc-discover',
-            jcb: 'fa-cc-jcb',
-            unknown: 'fa-credit-card'
-        };
-
+        const patterns = { visa: /^4/, mastercard: /^5[1-5]/, amex: /^3[47]/ };
+        const icons = { visa: 'fa-cc-visa', mastercard: 'fa-cc-mastercard', amex: 'fa-cc-amex', unknown: 'fa-credit-card' };
         let type = 'unknown';
         let bankName = 'Unknown Card';
 
-        if (patterns.visa.test(number)) {
-            type = 'visa';
-            bankName = 'Visa Card'; // 默认 Visa
-            // 如果您想根据前6位 BIN 码识别是否是 Maybank/CIMB，需要庞大的数据库
-            // 这里简单处理：
-            if(number.startsWith('4585')) bankName = 'Visa (Maybank)';
-            if(number.startsWith('4378')) bankName = 'Visa (CIMB)';
-        } 
-        else if (patterns.mastercard.test(number)) {
-            type = 'mastercard';
-            bankName = 'MasterCard';
-            if(number.startsWith('5588')) bankName = 'MasterCard (Public Bank)';
-        } 
-        else if (patterns.amex.test(number)) {
-            type = 'amex';
-            bankName = 'American Express';
-        }
+        if (patterns.visa.test(number)) { type = 'visa'; bankName = 'Visa Card'; } 
+        else if (patterns.mastercard.test(number)) { type = 'mastercard'; bankName = 'MasterCard'; } 
+        else if (patterns.amex.test(number)) { type = 'amex'; bankName = 'American Express'; }
 
-        // 更新 UI
         bankDisplay.value = bankName;
-        
-        // 更新图标颜色和类型
         cardIcon.className = `fab ${icons[type]} card-icon`;
-        cardIcon.style.color = type === 'unknown' ? '#999' : '#00a651'; // 识别成功变绿
+        cardIcon.style.color = type === 'unknown' ? '#999' : '#00a651';
     }
 });
 </script>
