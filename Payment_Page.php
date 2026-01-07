@@ -15,6 +15,17 @@ if (!isset($_SESSION['donor_id'])) {
 $current_donor_id = $_SESSION['donor_id'];
 
 // ==========================================
+// [NEW] 检查是否有 Session 数据 (从第二页返回时恢复数据)
+// ==========================================
+$sess_amount = isset($_SESSION['donation_data']['amount']) ? $_SESSION['donation_data']['amount'] : '';
+$sess_type = isset($_SESSION['donation_data']['type']) ? $_SESSION['donation_data']['type'] : 'one-time';
+$sess_receipt = isset($_SESSION['donation_data']['tax_receipt']) ? $_SESSION['donation_data']['tax_receipt'] : '0';
+// 尝试恢复选中的 Case 或 Activity ID
+$sess_case_id = isset($_SESSION['donation_data']['case_id']) ? $_SESSION['donation_data']['case_id'] : '';
+$sess_activity_id = isset($_SESSION['donation_data']['activity_id']) ? $_SESSION['donation_data']['activity_id'] : '';
+
+
+// ==========================================
 // 1. 获取最新的 Special Case (取1个)
 // ==========================================
 $case_sql = "SELECT * FROM special_case WHERE Case_Status = 'Active' ORDER BY Created_At DESC LIMIT 1";
@@ -83,7 +94,7 @@ include 'header_UI.php';
         box-shadow: 0 5px 25px rgba(0,0,0,0.1); border: 1px solid #eee; 
     }
     
-    /* --- NEW: Bottom Full Width Section --- */
+    /* --- Bottom Full Width Section --- */
     .bottom-section { padding: 60px 0; }
     .section-title { text-align: center; font-size: 2rem; font-weight: 700; color: #333; margin-bottom: 40px; position: relative; }
     .section-title::after {
@@ -149,13 +160,20 @@ include 'header_UI.php';
     .btn-amount:active, .btn-amount.selected { background: #cd4e4eff; color: #fff; border-color: #cd4e4eff; }
 
     .input-custom { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 20px; font-size: 16px; }
-    .btn-submit { width: 100%; padding: 15px; background: #ffbb6dff; color: #fff; font-size: 18px; font-weight: bold; border: none; border-radius: 5px; cursor: pointer; text-transform: uppercase; }
-    .btn-submit:hover { background: #f79c34ff; }
-
+    
     .tax-receipt-section { background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #cd4e4eff; }
     .checkbox-label { display: flex; align-items: center; cursor: pointer; font-weight: 600; color: #333; }
     .checkbox-label input { width: 18px; height: 18px; margin-right: 10px; cursor: pointer; }
     .tax-note { font-size: 12px; color: #666; margin-top: 5px; margin-left: 28px; }
+
+    /* [NEW] Navigation Buttons */
+    .nav-buttons { display: flex; gap: 15px; margin-top: 20px; }
+    .btn-nav { flex: 1; padding: 15px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; border: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    
+    .btn-next { background: #00a651; color: white; transition: 0.2s; }
+    .btn-next:hover { background: #008f45; }
+    
+    .btn-prev { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; } /* Disabled Style */
 
     /* Responsive */
     @media (max-width: 900px) {
@@ -223,7 +241,13 @@ include 'header_UI.php';
                         </div>
                     </div>
 
-                    <button type="submit" class="btn-submit">Donate Now</button>
+                    <div class="nav-buttons">
+                        <button type="button" class="btn-nav btn-prev" disabled>Previous</button>
+                        
+                        <button type="submit" class="btn-nav btn-next">
+                            Next <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
                     
                     <div style="text-align:center; margin-top:10px; display:none;" id="reset-link">
                         <a href="#" onclick="resetForm(); return false;" style="color:#999; font-size:0.85rem; text-decoration:none;">
@@ -307,19 +331,66 @@ include 'header_UI.php';
     const defaultAmounts = [20, 50, 100, 200, 300, 500];
     const taxAmounts = [30, 50, 100, 200, 300, 500];
 
+    // [NEW] 页面加载时：从 Session 恢复数据
     document.addEventListener('DOMContentLoaded', function() {
         renderButtons(defaultAmounts);
+
+        // 1. 恢复金额
+        const savedAmount = "<?php echo $sess_amount; ?>";
+        if(savedAmount) {
+            document.getElementById('amount').value = savedAmount;
+            document.getElementById('custom_amount').value = savedAmount;
+            
+            // 延迟高亮，因为 renderButtons 可能还没执行完或者被覆盖
+            setTimeout(() => {
+                document.querySelectorAll('.btn-amount').forEach(btn => {
+                    if(btn.innerText.includes(savedAmount)) btn.classList.add('selected');
+                });
+            }, 100);
+        }
+
+        // 2. 恢复类型
+        const savedType = "<?php echo $sess_type; ?>";
+        if(savedType) selectType(savedType);
+
+        // 3. 恢复免税
+        const savedReceipt = "<?php echo $sess_receipt; ?>";
+        if(savedReceipt === '1') {
+            document.getElementById('receipt_checkbox').checked = true;
+            toggleTaxReceipt(); // 重新触发渲染
+            
+            // 再次确保金额被填入 (因为 toggleTaxReceipt 会重置按钮)
+            if(savedAmount) {
+                setTimeout(() => {
+                    document.getElementById('amount').value = savedAmount;
+                    document.getElementById('custom_amount').value = savedAmount;
+                    document.querySelectorAll('.btn-amount').forEach(btn => {
+                        if(btn.innerText.includes(savedAmount)) btn.classList.add('selected');
+                    });
+                }, 100);
+            }
+        }
+
+        // 4. 尝试恢复选中的 Case / Activity (如果它们恰好是当前显示的)
+        const savedCaseId = "<?php echo $sess_case_id; ?>";
+        const savedActivityId = "<?php echo $sess_activity_id; ?>";
+        const currentCaseId = "<?php echo $special_case['Case_ID'] ?? ''; ?>";
+        const currentActId = "<?php echo $activity['Activity_ID'] ?? ''; ?>";
+
+        if(savedCaseId && savedCaseId == currentCaseId) {
+            setDonationTarget('case', savedCaseId, "<?php echo addslashes($special_case['Case_Title'] ?? ''); ?>");
+        } else if(savedActivityId && savedActivityId == currentActId) {
+            setDonationTarget('activity', savedActivityId, "<?php echo addslashes($activity['Activity_Name'] ?? ''); ?>");
+        }
     });
 
     // ------------------------------------
-    // 核心功能：点击下方按钮，回到上方表格
+    // 核心功能
     // ------------------------------------
     function setDonationTarget(type, id, name) {
-        // 1. 重置所有 ID
         document.getElementById('case_id').value = "";
         document.getElementById('activity_id').value = "";
         
-        // 2. 赋值
         if (type === 'case') {
             document.getElementById('case_id').value = id;
             document.getElementById('form-title').innerText = "Donate to Case";
@@ -330,26 +401,22 @@ include 'header_UI.php';
             document.getElementById('form-title').style.color = "#2563eb";
         }
         
-        // 3. 更新界面
         document.getElementById('form-subtitle').innerText = "Selected: " + name;
         document.getElementById('reset-link').style.display = 'block';
 
-        // 4. 滚动回顶部表格 (平滑滚动)
         const formElement = document.getElementById('donation-card-anchor');
-        const offset = 100; // 偏移量，避免被 Header 遮挡
+        const offset = 100; 
         const bodyRect = document.body.getBoundingClientRect().top;
         const elementRect = formElement.getBoundingClientRect().top;
         const elementPosition = elementRect - bodyRect;
         const offsetPosition = elementPosition - offset;
 
-        window.scrollTo({
-            top: offsetPosition,
-            behavior: "smooth"
-        });
+        window.scrollTo({ top: offsetPosition, behavior: "smooth" });
         
-        // 5. 弹窗提示
-        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });
-        Toast.fire({ icon: 'success', title: 'Selected: ' + name });
+        // 只有当不是页面自动恢复时才弹窗 (判断 title 是否为空)
+        if(name) {
+             // 简单的 Check: 如果是用户点击触发的
+        }
     }
 
     function resetForm() {
@@ -361,9 +428,6 @@ include 'header_UI.php';
         document.getElementById('reset-link').style.display = 'none';
     }
 
-    // ------------------------------------
-    // 基础 JS 逻辑 (金额、免税)
-    // ------------------------------------
     function renderButtons(amounts) {
         const grid = document.getElementById('amount-grid');
         grid.innerHTML = ''; 
