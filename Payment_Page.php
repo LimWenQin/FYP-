@@ -120,7 +120,7 @@ include 'header_UI.php';
     <div class="content-section">
         
         <div class="col-left">
-            <img src="images/hero_2.jpg" alt="Donation Story" class="story-img">
+            <img src="images/hero_3.jpg" alt="Donation Story" class="story-img">
             <h2 class="text-cursive">Why Donate?</h2>
             <p>This is background information on the donation drive, such as helping to improve living conditions in senior citizen communities. Donations will be used to purchase daily necessities and medicines.</p>
             <p>Your contribution makes a direct impact on the lives of the elderly and orphans we support. Every penny counts towards building a bridge of love.</p>
