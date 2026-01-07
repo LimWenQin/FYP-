@@ -178,7 +178,7 @@ include 'header_UI.php';
                     
                     <div class="col-md-6">
                         <div class="payment-option">
-                            <img src="images/BankTransfer.webp" alt="Bank Transfer" class="payment-img">
+                            <img src="images/BankTransfer.jpg" alt="Bank Transfer" class="payment-img">
                             <span class="payment-title">Credit / Debit Card</span>
                             <p class="payment-desc">Visa, Mastercard, Online Banking</p>
                             
