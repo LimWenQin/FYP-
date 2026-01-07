@@ -15,7 +15,6 @@ include 'dataconnection.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
 // 3. 获取用户信息
-// ✅ 修正：根据您的数据库，donor 表只有 Donor_Name，没有 FName/LName
 $user_sql = "SELECT Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
 $u_stmt = $conn->prepare($user_sql);
 $u_stmt->bind_param("i", $current_donor_id);
@@ -42,7 +41,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
     $card_number = str_replace(' ', '', $_POST['card']); // 去除空格
     
     // ✅ 处理 ID (空值转为 NULL)
-    // 这样存入数据库时就是 NULL，而不是 0，避免外键报错
     $branch_id = !empty($_POST['branch_id']) ? $_POST['branch_id'] : null;
     $case_id = !empty($_POST['case_id']) ? $_POST['case_id'] : null;
     $activity_id = !empty($_POST['activity_id']) ? $_POST['activity_id'] : null;
@@ -64,10 +62,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
     $order_type = ($donation_type == "monthly") ? "Recurring" : "One-time";
     $order_status = "Completed";
     
-    // ✅ 修正：使用 Donor_Name (数据库 donor 表对应字段)
     $full_name = $user_data['Donor_Name']; 
 
-    // ✅ 修正：orders 表使用的是 Order_Name
     $stmt = $conn->prepare("INSERT INTO orders 
         (Order_Name, Order_ContactNumber, Order_ICNumber, Order_Email, 
          Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, 
@@ -90,21 +86,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
     if ($donation_type == "monthly") {
         $deduction_date = date("Y-m-d", strtotime("+1 month"));
         
-        // 【关键修复】这里加入了 Branch_ID, Activity_ID, Case_ID
         $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?)");
         
-        // 注意参数绑定：dssssiiii (对应上面的占位符)
         $stmt->bind_param("dssssiiii", $amount, $payment_method, $deduction_date, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
         
         $stmt->execute();
         $stmt->close();
     }
 
-    // ==========================================
     // 4️⃣ [新增] 更新筹款进度 (Raised Amount)
-    // ==========================================
-    
-    // 如果是 Special Case 捐款，增加 Raised_Amount
     if ($case_id != null) {
         $update_case = $conn->prepare("UPDATE special_case SET Raised_Amount = Raised_Amount + ? WHERE Case_ID = ?");
         $update_case->bind_param("di", $amount, $case_id);
@@ -112,7 +102,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
         $update_case->close();
     }
 
-    // 如果是 Activity 捐款，增加 Activity_GetAmount
     if ($activity_id != null) {
         $update_act = $conn->prepare("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + ? WHERE Activity_ID = ?");
         $update_act->bind_param("di", $amount, $activity_id);
@@ -128,6 +117,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
 // 引入头部
 include 'header_UI.php'; 
 ?>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
     /* Hero Banner */
@@ -189,7 +180,6 @@ include 'header_UI.php';
 
 <?php 
     // 检查是否有 case_id (Special Case)
-    // 这里的 case_id 可能是通过 POST 传过来的
     $is_special_case = (isset($_POST['case_id']) && !empty($_POST['case_id']));
 
     if ($is_special_case) {
@@ -261,14 +251,18 @@ include 'header_UI.php';
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.bank-form'); // 获取表单
     const cardInput = document.getElementById('card');
     const bankDisplay = document.getElementById('bank_display');
     const cardIcon = document.getElementById('card-brand-icon');
     const expInput = document.getElementById('exp');
+    const cvcInput = document.getElementById('cvc');
 
+    // -------------------------------------------------
     // 1. 卡号输入格式化 (每4位加空格) + 识别
+    // -------------------------------------------------
     cardInput.addEventListener('input', function(e) {
-        let value = e.target.value.replace(/\D/g, ''); // 去除非数字
+        let value = e.target.value.replace(/\D/g, ''); // 🚫 限制：去除非数字 (abc 输不进去)
         let formattedValue = '';
         
         // 格式化：每4位加空格
@@ -280,21 +274,88 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         e.target.value = formattedValue;
 
-        // 识别卡类型
         identifyCardType(value);
     });
 
-    // 2. 有效期格式化 (自动加斜杠)
+    // -------------------------------------------------
+    // 2. 有效期格式化 + 限制只能输入数字
+    // -------------------------------------------------
     expInput.addEventListener('input', function(e) {
-        let value = e.target.value.replace(/\D/g, '');
+        let value = e.target.value.replace(/\D/g, ''); // 🚫 限制：去除非数字
+        
+        // 自动添加斜杠 /
         if (value.length >= 3) {
             e.target.value = value.slice(0, 2) + '/' + value.slice(2, 4);
+        } else {
+            e.target.value = value;
         }
     });
 
-    // 3. 识别函数
+    // -------------------------------------------------
+    // 3. CVC 限制只能输入数字
+    // -------------------------------------------------
+    cvcInput.addEventListener('input', function(e) {
+        e.target.value = e.target.value.replace(/\D/g, ''); // 🚫 限制：去除非数字
+    });
+
+    // -------------------------------------------------
+    // 4. 表单提交时验证：检查是否过期 (使用 SweetAlert2)
+    // -------------------------------------------------
+    form.addEventListener('submit', function(e) {
+        const expValue = expInput.value; // 格式 MM/YY
+        
+        // 简单验证长度
+        if (expValue.length !== 5) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Error :',
+                text: 'Please enter a valid expiration date (MM/YY).',
+                icon: 'warning',
+                confirmButtonColor: '#00a651'
+            });
+            return;
+        }
+
+        const [mm, yy] = expValue.split('/').map(num => parseInt(num, 10));
+        
+        // 获取当前时间
+        const now = new Date();
+        const currentYear = parseInt(now.getFullYear().toString().substr(-2)); // 获取当前年份后两位，例如 24
+        const currentMonth = now.getMonth() + 1; // 获取当前月份 (1-12)
+
+        // 逻辑判断
+        let errorMsg = '';
+
+        // 1. 月份必须在 1-12 之间
+        if (mm < 1 || mm > 12) {
+            errorMsg = "Invalid month. Please enter 01-12.";
+        }
+        // 2. 年份小于当前年份
+        else if (yy < currentYear) {
+            errorMsg = "Your card has expired or the date is invalid.";
+        }
+        // 3. 年份等于当前年份，但月份小于当前月份
+        else if (yy === currentYear && mm < currentMonth) {
+            errorMsg = "Your card has expired or the date is invalid.";
+        }
+
+        if (errorMsg !== '') {
+            e.preventDefault(); // 🛑 阻止表单提交
+            
+            // 使用 SweetAlert2 弹窗
+            Swal.fire({
+                title: 'Error:',
+                text: errorMsg,
+                icon: 'error',
+                confirmButtonColor: '#00a651'
+            });
+        }
+    });
+
+    // -------------------------------------------------
+    // 5. 卡类型识别函数 (保持不变)
+    // -------------------------------------------------
     function identifyCardType(number) {
-        // 正则表达式匹配
         const patterns = {
             visa: /^4/,
             mastercard: /^5[1-5]/,
@@ -303,7 +364,6 @@ document.addEventListener('DOMContentLoaded', function() {
             jcb: /^(?:2131|1800|35\d{3})/
         };
 
-        // 图标类名映射 (FontAwesome)
         const icons = {
             visa: 'fa-cc-visa',
             mastercard: 'fa-cc-mastercard',
@@ -318,9 +378,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (patterns.visa.test(number)) {
             type = 'visa';
-            bankName = 'Visa Card'; // 默认 Visa
-            // 如果您想根据前6位 BIN 码识别是否是 Maybank/CIMB，需要庞大的数据库
-            // 这里简单处理：
+            bankName = 'Visa Card';
             if(number.startsWith('4585')) bankName = 'Visa (Maybank)';
             if(number.startsWith('4378')) bankName = 'Visa (CIMB)';
         } 
@@ -334,12 +392,9 @@ document.addEventListener('DOMContentLoaded', function() {
             bankName = 'American Express';
         }
 
-        // 更新 UI
         bankDisplay.value = bankName;
-        
-        // 更新图标颜色和类型
         cardIcon.className = `fab ${icons[type]} card-icon`;
-        cardIcon.style.color = type === 'unknown' ? '#999' : '#00a651'; // 识别成功变绿
+        cardIcon.style.color = type === 'unknown' ? '#999' : '#00a651';
     }
 });
 </script>
