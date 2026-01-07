@@ -11,10 +11,10 @@ if (!isset($_SESSION['donor_id'])) {
 $current_donor_id = $_SESSION['donor_id'];
 
 // ==========================================
-// 2. 处理 POST 请求 (更新资料 & 申请收据)
+// 2. 处理 POST 请求 (仅保留更新个人资料逻辑，以防万一)
 // ==========================================
 
-// A. 处理：更新个人资料 (包含详细地址和 IC)
+// A. 处理：更新个人资料 (虽然这里不再强制弹窗，但保留逻辑以备不时之需)
 if (isset($_POST['update_profile'])) {
     $ic = trim($_POST['ic_number']);
     $addr1 = trim($_POST['addr1']);
@@ -25,7 +25,6 @@ if (isset($_POST['update_profile'])) {
     $zip = trim($_POST['zip']);
     $country = trim($_POST['country']);
     
-    // 验证必填项
     if(!empty($ic) && !empty($addr1) && !empty($city) && !empty($state) && !empty($zip)){
         $sql = "UPDATE donor SET 
                 Donor_ICNumber=?, 
@@ -37,38 +36,10 @@ if (isset($_POST['update_profile'])) {
         $stmt->bind_param("ssssssssi", $ic, $addr1, $addr2, $addr3, $city, $state, $zip, $country, $current_donor_id);
         
         if ($stmt->execute()) {
-            echo "<script>alert('Profile updated successfully! You can now request your receipt.'); window.location.href='Track_Records.php';</script>";
+            echo "<script>alert('Profile updated successfully!'); window.location.href='Track_Records.php';</script>";
         } else {
-            echo "<script>alert('Update failed. Please try again.');</script>";
+            echo "<script>alert('Update failed.');</script>";
         }
-    } else {
-        echo "<script>alert('Please fill in all required fields.');</script>";
-    }
-}
-
-// B. 处理：申请报税收据
-if (isset($_POST['request_receipt'])) {
-    $order_id = $_POST['order_id'];
-    
-    // 安全验证：确保是本人的订单，且金额达标
-    // 同时检查地址是否完整 (Address1 不能为空)
-    $check_sql = "SELECT d.Donor_ICNumber, d.Donor_Address1, o.Order_Amount 
-                  FROM orders o JOIN donor d ON o.Donor_ID = d.Donor_ID 
-                  WHERE o.Order_ID = ? AND o.Donor_ID = ?";
-    $stmt_check = $conn->prepare($check_sql);
-    $stmt_check->bind_param("ii", $order_id, $current_donor_id);
-    $stmt_check->execute();
-    $result_check = $stmt_check->get_result();
-    $data = $result_check->fetch_assoc();
-
-    if ($data && $data['Order_Amount'] >= 30 && !empty($data['Donor_ICNumber']) && !empty($data['Donor_Address1'])) {
-        $stmt = $conn->prepare("UPDATE orders SET Tax_Receipt_Status = 'Requested' WHERE Order_ID = ?");
-        $stmt->bind_param("i", $order_id);
-        if ($stmt->execute()) {
-            echo "<script>alert('Request submitted! Admin will verify shortly.'); window.location.href='Track_Records.php';</script>";
-        }
-    } else {
-        echo "<script>alert('Error: Profile incomplete or amount less than RM30.');</script>";
     }
 }
 
@@ -76,22 +47,12 @@ if (isset($_POST['request_receipt'])) {
 // 3. 获取数据
 // ==========================================
 
-// --- 获取用户资料状态 (用于预填表单和检查完整性) ---
+// --- 获取用户资料 (用于预填 Modal) ---
 $user_sql = "SELECT * FROM donor WHERE Donor_ID = ?";
 $stmt_user = $conn->prepare($user_sql);
 $stmt_user->bind_param("i", $current_donor_id);
 $stmt_user->execute();
 $user_data = $stmt_user->get_result()->fetch_assoc();
-
-// 检查关键字段是否完整
-$is_profile_complete = (
-    !empty($user_data['Donor_ICNumber']) && 
-    !empty($user_data['Donor_Address1']) && 
-    !empty($user_data['Donor_City']) && 
-    !empty($user_data['Donor_State']) && 
-    !empty($user_data['Donor_PostalCode'])
-) ? 'true' : 'false';
-
 
 // --- 获取筛选参数 ---
 $filter_type = isset($_GET['type']) ? $_GET['type'] : 'All';
@@ -100,7 +61,7 @@ $filter_status = isset($_GET['status']) ? $_GET['status'] : 'All';
 $records = [];
 
 // --- A. 获取现金捐款记录 (Orders) ---
-$is_cash_related = ($filter_type == 'All' || $filter_type == 'TNG eWallet' || $filter_type == 'Credit/Debit Card' || $filter_type == 'Cash'); // 添加 Cash 支持
+$is_cash_related = ($filter_type == 'All' || $filter_type == 'TNG eWallet' || $filter_type == 'Credit/Debit Card' || $filter_type == 'Cash'); 
 
 if ($is_cash_related) {
     $sql_orders = "SELECT Order_ID, Order_TXN_Ref, Order_Amount, Order_Status, Order_Created_At, Order_PaymentMethod, Tax_Receipt_Status, 'Cash' as Record_Type 
@@ -108,7 +69,6 @@ if ($is_cash_related) {
                    WHERE Donor_ID = ? AND Order_Status != 'Failed'";
     
     if ($filter_type != 'All') {
-        // 简单模糊匹配
         $sql_orders .= " AND Order_PaymentMethod LIKE '%$filter_type%'";
     }
 
@@ -130,7 +90,7 @@ if ($is_cash_related) {
             'date' => $row['Order_Created_At'],
             'status' => $row['Order_Status'],
             'raw_amount' => $row['Order_Amount'],
-            'tax_status' => $row['Tax_Receipt_Status']
+            'tax_status' => $row['Tax_Receipt_Status'] // 这里现在可能是 'Not_Requested', 'Requested', 'Generated'
         ];
     }
     $stmt->close();
@@ -256,7 +216,7 @@ usort($records, function($a, $b) {
         .status-completed, .status-success, .status-generated { background-color: #dcfce7; color: #166534; }
         .status-pending, .status-requested { background-color: #fef3c7; color: #92400e; }
         .status-failed, .status-rejected { background-color: #fee2e2; color: #991b1b; }
-        .status-not_requested { background-color: #f3f4f6; color: #6b7280; }
+        .status-not_requested { background-color: #f3f4f6; color: #9ca3af; } /* 灰色 */
 
         /* Action Buttons */
         .btn-action {
@@ -265,24 +225,13 @@ usort($records, function($a, $b) {
         }
         .btn-view { background: white; border: 1px solid var(--primary-red); color: var(--primary-red); }
         .btn-view:hover { background: var(--primary-red); color: white; }
-        .btn-tax { background: var(--primary-red); color: white; border: 1px solid var(--primary-red); }
-        .btn-tax:hover { background: var(--dark-red); }
-        .btn-processing { background: #fbbf24; color: white; cursor: default; }
 
         /* Modal Styles */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
         .modal-box { background: white; padding: 30px; border-radius: 10px; width: 90%; max-width: 500px; border-top: 6px solid var(--primary-red); position: relative; }
-        
         .modal-title { font-size: 1.5rem; font-weight: 800; color: var(--primary-red); margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        
         .close-btn { position: absolute; right: 20px; top: 15px; border: none; background: none; font-size: 1.8rem; cursor: pointer; color: #999; }
         .close-btn:hover { color: #333; }
-
-        /* Form Inputs in Modal */
-        .form-group { margin-bottom: 15px; text-align: left; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; color: #333; }
-        .form-control { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        .form-control:focus { border-color: var(--primary-red); outline: none; }
 
         @media (max-width: 768px) {
             .styled-table thead { display: none; }
@@ -373,21 +322,21 @@ usort($records, function($a, $b) {
                                 
                                 <?php else: ?>
                                     <?php if ($rec['raw_amount'] < 30): ?>
-                                        <span class="status-badge status-not_requested">Min RM30</span>
+                                        <span class="status-badge status-not_requested">N/A (< RM30)</span>
                                     
                                     <?php elseif ($rec['tax_status'] == 'Requested'): ?>
-                                        <button class="btn-action btn-processing" disabled><i class="fas fa-clock"></i> Processing</button>
+                                        <span class="status-badge status-requested"><i class="fas fa-clock"></i> Processing</span>
                                     
                                     <?php elseif ($rec['tax_status'] == 'Generated'): ?>
                                         <span class="status-badge status-generated">
-                                            <i class="fas fa-envelope"></i> Sent via Email
+                                            <i class="fas fa-check-circle"></i> Sent via Email
                                         </span>
 
                                     <?php elseif ($rec['tax_status'] == 'Rejected'): ?>
                                         <span class="status-badge status-rejected">Rejected</span>
 
                                     <?php else: ?>
-                                        <button onclick="handleRequest(<?php echo $rec['id']; ?>)" class="btn-action btn-tax">Request</button>
+                                        <span class="status-badge status-not_requested">Not Requested</span>
                                     <?php endif; ?>
                                 <?php endif; ?>
                             </td>
@@ -415,81 +364,14 @@ usort($records, function($a, $b) {
 
 <div id="profileModal" class="modal-overlay">
     <div class="modal-box">
-        <div class="modal-title">Complete Your Profile</div>
+        <div class="modal-title">Edit Profile</div>
         <button class="close-btn" onclick="closeProfileModal()">&times;</button>
-        
-        <p style="margin-bottom: 20px; color: #666; font-size: 0.9rem;">
-            To issue a valid Tax Exemption Receipt (LHDN requirement), we need your IC Number and Full Address.
-        </p>
         
         <form method="POST" action="Track_Records.php">
             <input type="hidden" name="update_profile" value="1">
-
-            <div class="form-group">
-                <label>IC Number (MyKad) <span style="color:red">*</span></label>
-                <input type="text" name="ic_number" class="form-control" required 
-                       placeholder="e.g. 990101-01-1234"
-                       value="<?php echo htmlspecialchars($user_data['Donor_ICNumber'] ?? ''); ?>">
-            </div>
-
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-
-            <div class="form-group">
-                <label>Address Line 1 <span style="color:red">*</span></label>
-                <input type="text" name="addr1" class="form-control" required 
-                       placeholder="House No, Street Name"
-                       value="<?php echo htmlspecialchars($user_data['Donor_Address1'] ?? ''); ?>">
-            </div>
-
-            <div class="form-group">
-                <label>Address Line 2 (Optional)</label>
-                <input type="text" name="addr2" class="form-control" 
-                       placeholder="Apartment, Suite, Unit, etc."
-                       value="<?php echo htmlspecialchars($user_data['Donor_Address2'] ?? ''); ?>">
-            </div>
-
-            <div class="form-group">
-                <label>Address Line 3 (Optional)</label>
-                <input type="text" name="addr3" class="form-control" 
-                       placeholder="Landmark / Additional Info"
-                       value="<?php echo htmlspecialchars($user_data['Donor_Address3'] ?? ''); ?>">
-            </div>
-
-            <div style="display: flex; gap: 15px;">
-                <div class="form-group" style="flex:1">
-                    <label>City <span style="color:red">*</span></label>
-                    <input type="text" name="city" class="form-control" required 
-                           value="<?php echo htmlspecialchars($user_data['Donor_City'] ?? ''); ?>">
-                </div>
-                <div class="form-group" style="flex:1">
-                    <label>State <span style="color:red">*</span></label>
-                    <input type="text" name="state" class="form-control" required 
-                           value="<?php echo htmlspecialchars($user_data['Donor_State'] ?? ''); ?>">
-                </div>
-            </div>
-
-            <div style="display: flex; gap: 15px;">
-                <div class="form-group" style="flex:1">
-                    <label>Postal Code <span style="color:red">*</span></label>
-                    <input type="text" name="zip" class="form-control" required 
-                           value="<?php echo htmlspecialchars($user_data['Donor_PostalCode'] ?? ''); ?>">
-                </div>
-                <div class="form-group" style="flex:1">
-                    <label>Country <span style="color:red">*</span></label>
-                    <input type="text" name="country" class="form-control" required 
-                           value="<?php echo htmlspecialchars($user_data['Donor_Country'] ?? 'Malaysia'); ?>">
-                </div>
-            </div>
-
-            <button type="submit" class="btn-filter" style="width:100%; margin-top: 10px;">Save & Continue</button>
-        </form>
+            </form>
     </div>
 </div>
-
-<form id="directRequestForm" method="POST" style="display:none;">
-    <input type="hidden" name="order_id" id="hidden_order_id">
-    <input type="hidden" name="request_receipt" value="true">
-</form>
 
 <?php include 'footer.php'; ?>
 
@@ -514,28 +396,10 @@ usort($records, function($a, $b) {
         document.getElementById('recordModal').style.display = 'flex';
     }
     function closeDetailModal() { document.getElementById('recordModal').style.display = 'none'; }
-
-    const isProfileComplete = <?php echo $is_profile_complete; ?>;
-    
-    function handleRequest(orderId) {
-        if (isProfileComplete) {
-            // 如果资料完整，直接确认提交
-            if(confirm("Request Tax Receipt for this donation?")) {
-                document.getElementById('hidden_order_id').value = orderId;
-                document.getElementById('directRequestForm').submit();
-            }
-        } else {
-            // 资料不全，弹出填表窗口
-            document.getElementById('profileModal').style.display = 'flex';
-        }
-    }
-    
-    function closeProfileModal() { document.getElementById('profileModal').style.display = 'none'; }
     
     // 点击窗口外部关闭
     window.onclick = function(e) {
         if(e.target == document.getElementById('recordModal')) closeDetailModal();
-        if(e.target == document.getElementById('profileModal')) closeProfileModal();
     }
 </script>
 
