@@ -22,11 +22,7 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
 
         /* --- 颜色变量 --- */
         :root {
-<<<<<<< HEAD
             --primary-color: #e16161ff;
-=======
-            --primary-color: #e16161ff; /* Colorlib 绿色 */
->>>>>>> 26b09c4993dc508854ff014f276f0ef0676e7cc8
             --dark-bg: #333;
             --light-text: #fff;
             --hover-color: #8b1a00ff;
@@ -274,11 +270,7 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             box-shadow: 0 4px 10px rgba(209, 47, 2, 0.3);
         }
         .header-donate-btn:hover {
-<<<<<<< HEAD
             background-color: #f79c34ff ;
-=======
-            background-color: #f79c34ff;
->>>>>>> 26b09c4993dc508854ff014f276f0ef0676e7cc8
             transform: translateY(-2px);
         }
 
