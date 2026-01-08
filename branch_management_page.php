@@ -416,7 +416,7 @@ $result = $conn->query($sql);
 $branches = [];
 if ($result) { while($row = $result->fetch_assoc()) $branches[] = $row; }
 
-$conn->close();
+// ⚠️ 已删除 $conn->close(); 以修复 "mysqli object is already closed" 错误
 
 // Prepare Export URL
 $exportParams = $_GET;
@@ -1055,9 +1055,12 @@ $exportUrl = "?" . http_build_query($exportParams);
                                 <?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?>
                             </select>
                         </div>
-                        <div class="form-group"><label class="form-label">Country</label><input type="text" name="country" id="edit_country" class="form-input" readonly style="background:#f8f9fa;"></div>
+                        <div class="form-group">
+                            <label class="form-label">Country</label>
+                            <input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly>
+                        </div>
                     </div>
-
+                    
                     <div class="form-group">
                         <label class="form-label">Description</label>
                         <textarea name="description" id="edit_description" class="form-textarea"></textarea>

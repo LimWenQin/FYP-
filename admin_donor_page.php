@@ -342,14 +342,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_donor'])) {
     elseif (!empty($errorMessage)) { header("Location: admin_donor_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
 
-// --- 【重要修复：Block 逻辑】 ---
-// 这里的修改确保了点击 Block 后，用户状态变为 Is_Deleted=1，从而从 Active 列表消失，进入 Blocked 列表。
+// --- Block Logic ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['block_donor'])) {
     $blockId = intval($_POST['block_donor_id']);
     
-    // 我们将 Is_Deleted 设置为 1。
-    // 这会让用户从 admin_donor_page.php (Is_Deleted=0) 消失
-    // 并出现在 admin_blocked_donors.php (Is_Deleted=1)
     if ($conn->query("UPDATE donor SET Is_Deleted = 1 WHERE Donor_ID = $blockId")) { 
         header("Location: admin_donor_page.php?success=" . urlencode("Donor blocked successfully!")); 
         exit(); 
@@ -435,7 +431,7 @@ function formatAddress($donor) {
     return implode("<br>", $addressParts);
 }
 
-$conn->close();
+// ⚠️ 已删除 $conn->close(); 以修复 "mysqli object is already closed" 错误
 
 $malaysiaStates = [ 'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu' ];
 $years = range(date('Y'), 2020); 

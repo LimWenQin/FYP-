@@ -3,13 +3,21 @@
 session_start();
 
 // Check if user is logged in
-if (!isset($_SESSION['admin_id'])) {
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
 }
 
 // Include database connection
 include 'dataconnection.php';
+
+// --- 引入 PHPMailer ---
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
+require 'PHPMailer/Exception.php';
+require 'PHPMailer/PHPMailer.php';
+require 'PHPMailer/SMTP.php';
 
 // --- 0. HANDLE EXPORT TO EXCEL ---
 if (isset($_GET['export']) && $_GET['export'] == 'excel') {
@@ -46,8 +54,6 @@ if (isset($_GET['export']) && $_GET['export'] == 'excel') {
     if ($result->num_rows > 0) {
         while($row = $result->fetch_assoc()) {
             echo '<tr>';
-            
-            // --- 图片列 ---
             echo '<td style="text-align:center; vertical-align:middle; height:80px;">';
             if (!empty($row['Staff_ProfilePicture']) && file_exists($row['Staff_ProfilePicture'])) {
                 $fullImageUrl = $baseUrl . $row['Staff_ProfilePicture'];
@@ -56,8 +62,6 @@ if (isset($_GET['export']) && $_GET['export'] == 'excel') {
                 echo 'No Image';
             }
             echo '</td>';
-            // -------------
-
             echo '<td style="vertical-align:middle;">' . $row['Staff_ID'] . '</td>';
             echo '<td style="vertical-align:middle;">' . htmlspecialchars($row['Staff_FullName']) . '</td>';
             echo '<td style="vertical-align:middle;">' . htmlspecialchars($row['Staff_Email']) . '</td>';
@@ -94,7 +98,31 @@ function handleProfileUpload($file) {
     return null;
 }
 
-// --- 1. Handle Add Staff ---
+// --- HELPER: Generate Strong Random Password (Updated) ---
+function generateStrongRandomPassword($length = 12) {
+    $upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    $lower = "abcdefghijklmnopqrstuvwxyz";
+    $numbers = "0123456789";
+    $symbols = "!@#$%^&*()";
+    
+    // 确保每种类型至少有一个
+    $password = "";
+    $password .= $upper[rand(0, strlen($upper) - 1)];
+    $password .= $lower[rand(0, strlen($lower) - 1)];
+    $password .= $numbers[rand(0, strlen($numbers) - 1)];
+    $password .= $symbols[rand(0, strlen($symbols) - 1)];
+    
+    // 填充剩余长度
+    $allChars = $upper . $lower . $numbers . $symbols;
+    for ($i = 0; $i < $length - 4; $i++) {
+        $password .= $allChars[rand(0, strlen($allChars) - 1)];
+    }
+    
+    // 打乱顺序
+    return str_shuffle($password);
+}
+
+// --- 1. Handle Add Staff (UPDATED WITH AUTO PASSWORD & EMAIL) ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
     $fullName = mysqli_real_escape_string($conn, trim($_POST['full_name']));
     $email = mysqli_real_escape_string($conn, trim($_POST['email']));
@@ -116,7 +144,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
     $role = "Staff"; 
     $status = mysqli_real_escape_string($conn, $_POST['status']);
     $comment = mysqli_real_escape_string($conn, $_POST['comment']);
-    $adminId = $_SESSION['admin_id'];
+    
+    // Check who is adding (Admin or Staff)
+    $adminId = isset($_SESSION['admin_id']) ? $_SESSION['admin_id'] : (isset($_SESSION['staff_id']) ? $_SESSION['staff_id'] : 1);
 
     $profilePicturePath = null;
     if (isset($_FILES['profile_picture'])) {
@@ -127,27 +157,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
     }
 
     // --- SERVER SIDE VALIDATION ---
-    if (empty($fullName)) {
-        $errorMessage = "Full Name is required.";
-    } elseif (empty($email)) {
-        $errorMessage = "Email is required.";
-    } elseif (empty($contactRaw)) {
-        $errorMessage = "Contact Number is required.";
-    } elseif (empty($icNumber)) {
-        $errorMessage = "IC Number is required.";
-    } elseif (empty($dob)) {
-        $errorMessage = "Date of Birth is required.";
-    }
-    // Specific Format Validation
-    elseif (!preg_match('/^[a-zA-Z\s]+$/', $fullName)) {
-        $errorMessage = "Name can only contain letters and spaces.";
-    }
-    elseif (strpos($email, '@') === false) {
-        $errorMessage = "Invalid email: Missing '@' symbol.";
-    }
-    elseif (!preg_match('/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) {
-        $errorMessage = "Invalid email: Missing valid domain extension (e.g. .com).";
-    }
+    if (empty($fullName)) { $errorMessage = "Full Name is required."; } 
+    elseif (empty($email)) { $errorMessage = "Email is required."; } 
+    elseif (empty($contactRaw)) { $errorMessage = "Contact Number is required."; } 
+    elseif (empty($icNumber)) { $errorMessage = "IC Number is required."; } 
+    elseif (empty($dob)) { $errorMessage = "Date of Birth is required."; }
+    elseif (!preg_match('/^[a-zA-Z\s]+$/', $fullName)) { $errorMessage = "Name can only contain letters and spaces."; }
+    elseif (strpos($email, '@') === false) { $errorMessage = "Invalid email: Missing '@' symbol."; }
+    elseif (!preg_match('/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) { $errorMessage = "Invalid email: Missing valid domain extension (e.g. .com)."; }
     else {
         // --- Phone Validation ---
         $phoneParts = explode('-', $contactRaw);
@@ -166,9 +183,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
                 $birthDate = new DateTime($dob);
                 $today = new DateTime();
                 $age = $today->diff($birthDate)->y;
-                if ($age < 18) {
-                    $errorMessage = "Staff must be at least 18 years old.";
-                }
+                if ($age < 18) { $errorMessage = "Staff must be at least 18 years old."; }
             }
 
             if (!isset($errorMessage)) {
@@ -178,24 +193,68 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
                 if ($emailResult && $emailResult->num_rows > 0) {
                     $errorMessage = "Email already exists in the system.";
                 } else {
+                    // --- 1. GENERATE STRONG PASSWORD ---
+                    $rawPassword = generateStrongRandomPassword(12);
+                    $hashedPassword = password_hash($rawPassword, PASSWORD_DEFAULT);
+                    $isFirstLogin = 1; // 强制首次登录修改密码
+
                     $dbProfilePic = $profilePicturePath ? "'$profilePicturePath'" : "NULL";
 
                     $sql = "INSERT INTO staff (
                         Staff_FullName, Staff_ContactNumber, Staff_ICNumber, 
-                        Staff_Email, Staff_Password, Staff_DOB, 
+                        Staff_Email, Staff_Password, Staff_IsFirstLogin, Staff_DOB, 
                         Staff_Address1, Staff_Address2, Staff_Address3, 
                         Staff_City, Staff_State, Staff_PostalCode, Staff_Country,
                         Staff_Comment, Staff_Role, Staff_Status, Staff_ProfilePicture, Admin_ID, Staff_JoinDate
                     ) VALUES (
                         '$fullName', '$contact', '$icNumber', 
-                        '$email', NULL, '$dob',
+                        '$email', '$hashedPassword', $isFirstLogin, '$dob',
                         '$address1', '$address2', '$address3',
                         '$city', '$state', '$postalCode', '$country',
                         '$comment', '$role', '$status', $dbProfilePic, '$adminId', NOW()
                     )";
                     
                     if ($conn->query($sql)) {
-                        $successMessage = "Staff added successfully!";
+                        // --- 2. SEND EMAIL VIA PHPMAILER ---
+                        $mail = new PHPMailer(true);
+                        try {
+                            // Server settings
+                            $mail->isSMTP();
+                            $mail->Host       = 'smtp.gmail.com';
+                            $mail->SMTPAuth   = true;
+                            $mail->Username   = 'lovebridge1201@gmail.com'; // 你的邮箱
+                            $mail->Password   = 'odaj iwrz gfrt vven';      // 你的 App Password
+                            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                            $mail->Port       = 465;
+
+                            // Recipients
+                            $mail->setFrom('lovebridge1201@gmail.com', 'Love Bridge Admin');
+                            $mail->addAddress($email, $fullName);
+
+                            // Content
+                            $mail->isHTML(true);
+                            $mail->Subject = 'Welcome to Love Bridge - Your Login Details';
+                            $mail->Body    = "
+                                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;'>
+                                    <h2 style='color: #D97706;'>Welcome to Love Bridge, $fullName!</h2>
+                                    <p>Your staff account has been successfully created.</p>
+                                    
+                                    <div style='background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;'>
+                                        <p style='margin: 5px 0;'><strong>Email:</strong> $email</p>
+                                        <p style='margin: 5px 0;'><strong>Temporary Password:</strong> <span style='font-family: monospace; background: #e2e8f0; padding: 3px 6px; border-radius: 3px; color: #d97706; font-weight: bold;'>$rawPassword</span></p>
+                                    </div>
+
+                                    <p><strong>Important:</strong> For security reasons, you will be required to create a new password immediately upon your first login.</p>
+                                    
+                                    <p style='margin-top: 30px; font-size: 12px; color: #888;'>If you have any issues, please contact the system administrator.</p>
+                                </div>
+                            ";
+
+                            $mail->send();
+                            $successMessage = "Staff added successfully! An email with the temporary password has been sent.";
+                        } catch (Exception $e) {
+                            $successMessage = "Staff added, but email failed. Error: {$mail->ErrorInfo}. Temp Password: $rawPassword";
+                        }
                     } else {
                         $errorMessage = "Error adding staff: " . $conn->error;
                     }
@@ -252,41 +311,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_staff'])) {
     }
 
     // --- SERVER SIDE VALIDATION ---
-    if (empty($fullName)) {
-        $errorMessage = "Full Name is required.";
-    } elseif (empty($email)) {
-        $errorMessage = "Email is required.";
-    } elseif (empty($contactRaw)) {
-        $errorMessage = "Contact Number is required.";
-    } elseif (empty($icNumber)) {
-        $errorMessage = "IC Number is required.";
-    } elseif (empty($dob)) {
-        $errorMessage = "Date of Birth is required.";
-    }
-    // Format Checks
-    elseif (!preg_match('/^[a-zA-Z\s]+$/', $fullName)) {
-        $errorMessage = "Name can only contain letters and spaces.";
-    }
-    elseif (strpos($email, '@') === false) {
-        $errorMessage = "Invalid email: Missing '@' symbol.";
-    }
-    elseif (!preg_match('/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) {
-        $errorMessage = "Invalid email: Missing valid domain extension (e.g. .com).";
-    }
-    else {
-        // Phone Check
-        $phoneParts = explode('-', $contactRaw);
-        if (count($phoneParts) != 2) {
-            $errorMessage = "Invalid phone number format. Must contain '-' (e.g., 12-3456789).";
-        } else {
-            $backDigits = $phoneParts[1];
-            if (strlen($backDigits) < 7 || strlen($backDigits) > 8) {
-                $errorMessage = "Invalid phone number: There must be 7 or 8 digits after the hyphen (-).";
-            }
-        }
-    }
-
-    if (!isset($errorMessage)) {
+    if (empty($fullName) || empty($email) || empty($contactRaw) || empty($icNumber) || empty($dob)) {
+        $errorMessage = "All required fields must be filled.";
+    } else {
         $sql = "UPDATE staff SET 
                 Staff_FullName = '$fullName', 
                 Staff_ContactNumber = '$contact', 
@@ -322,34 +349,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_staff'])) {
     }
 }
 
-// --- 3. Handle Change Password ---
+// --- 3. Handle Change Password (Manual via Admin) ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     $targetStaffId = mysqli_real_escape_string($conn, $_POST['target_staff_id']);
     $authPassword = $_POST['auth_password']; 
     $newPassword = $_POST['new_password'];
     $confirmPassword = $_POST['confirm_new_password'];
     
-    $loggedInAdminId = $_SESSION['admin_id'];
+    $loggedInAdminId = isset($_SESSION['admin_id']) ? $_SESSION['admin_id'] : 0;
     
-    $authSql = "SELECT Admin_Password FROM admin WHERE Admin_ID = $loggedInAdminId";
-    $authResult = $conn->query($authSql);
-    $currentUser = $authResult->fetch_assoc();
-    
-    if (!$currentUser || !password_verify($authPassword, $currentUser['Admin_Password'])) {
-        $errorMessage = "Authorization failed: Your current admin password is incorrect.";
-    } elseif ($newPassword !== $confirmPassword) {
-        $errorMessage = "New passwords do not match.";
-    } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>])[A-Za-z\d!@#$%^&*()\-_=+{};:,<.>]{8,15}$/', $newPassword)) {
-        $errorMessage = "New password does not meet security requirements.";
-    } else {
-        $newHashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
-        $updatePassSql = "UPDATE staff SET Staff_Password = '$newHashedPassword' WHERE Staff_ID = $targetStaffId";
+    if ($loggedInAdminId) {
+        $authSql = "SELECT Admin_Password FROM admin WHERE Admin_ID = $loggedInAdminId";
+        $authResult = $conn->query($authSql);
+        $currentUser = $authResult->fetch_assoc();
         
-        if ($conn->query($updatePassSql)) {
-            $successMessage = "Staff password changed successfully!";
+        if (!$currentUser || !password_verify($authPassword, $currentUser['Admin_Password'])) {
+            $errorMessage = "Authorization failed: Your current admin password is incorrect.";
+        } elseif ($newPassword !== $confirmPassword) {
+            $errorMessage = "New passwords do not match.";
+        } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>])[A-Za-z\d!@#$%^&*()\-_=+{};:,<.>]{8,15}$/', $newPassword)) {
+            $errorMessage = "New password does not meet security requirements.";
         } else {
-            $errorMessage = "Error changing password: " . $conn->error;
+            $newHashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+            $updatePassSql = "UPDATE staff SET Staff_Password = '$newHashedPassword' WHERE Staff_ID = $targetStaffId";
+            
+            if ($conn->query($updatePassSql)) {
+                $successMessage = "Staff password changed successfully!";
+            } else {
+                $errorMessage = "Error changing password: " . $conn->error;
+            }
         }
+    } else {
+        $errorMessage = "Authorization failed: Only Admin can change passwords here.";
     }
     
     if (!empty($successMessage)) { header("Location: staff_management_page.php?success=" . urlencode($successMessage)); exit(); }
@@ -357,11 +388,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
 }
 
 // --- 4. Handle BLOCK Staff (SOFT DELETE) ---
-// Changed from Delete to Block logic using POST for better security and modal UI
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['block_staff'])) {
     $blockId = intval($_POST['block_staff_id']);
-    
-    // Set Is_Deleted to 1. Moves staff to admin_blocked_staff.php
     $blockSql = "UPDATE staff SET Is_Deleted = 1 WHERE Staff_ID = $blockId";
     
     if ($conn->query($blockSql)) {
@@ -375,23 +403,37 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['block_staff'])) {
     }
 }
 
-// --- Get Admin Info ---
-$adminId = $_SESSION['admin_id'];
-$adminName = isset($_SESSION['admin_name']) ? $_SESSION['admin_name'] : 'Admin';
-$adminPosition = "System Administrator";
-
+// --- Get Admin/User Info ---
+$adminName = 'User';
 $adminProfilePicture = null;
-$sql = "SELECT Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $adminId);
-$stmt->execute();
-$result = $stmt->get_result();
-if ($result && $result->num_rows > 0) {
-    $row = $result->fetch_assoc();
-    $adminProfilePicture = $row['Admin_ProfilePicture'];
-    $adminPosition = $row['Admin_Role'];
+
+if(isset($_SESSION['admin_id'])) {
+    $adminId = $_SESSION['admin_id'];
+    $sql = "SELECT Admin_ProfilePicture, Admin_Role, Admin_Name FROM admin WHERE Admin_ID = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $adminId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $adminProfilePicture = $row['Admin_ProfilePicture'];
+        $adminName = $row['Admin_Name'];
+    }
+    $stmt->close();
+} elseif (isset($_SESSION['staff_id'])) {
+    $staffId = $_SESSION['staff_id'];
+    $sql = "SELECT Staff_ProfilePicture, Staff_FullName FROM staff WHERE Staff_ID = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $staffId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $adminProfilePicture = $row['Staff_ProfilePicture'];
+        $adminName = $row['Staff_FullName'];
+    }
+    $stmt->close();
 }
-$stmt->close();
 
 // --- PAGINATION & SEARCH & FILTER LOGIC ---
 $results_per_page = 6;
@@ -401,18 +443,12 @@ $start_from = ($page - 1) * $results_per_page;
 
 $search = "";
 $filterType = "";
-$filterValue = "";
 $statusFilter = "";
-
-$conditions = [];
-// IMPORTANT: Only show staff who are NOT deleted (Is_Deleted = 0)
-$conditions[] = "Is_Deleted = 0";
+$conditions = ["Is_Deleted = 0"];
 
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $search = $conn->real_escape_string($_GET['search']);
-    $conditions[] = "(Staff_FullName LIKE '%$search%' OR 
-                      Staff_Email LIKE '%$search%' OR 
-                      Staff_ICNumber LIKE '%$search%')";
+    $conditions[] = "(Staff_FullName LIKE '%$search%' OR Staff_Email LIKE '%$search%' OR Staff_ICNumber LIKE '%$search%')";
 }
 
 if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
@@ -420,62 +456,31 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
     if ($filterType == 'status' && isset($_GET['filter_val_status']) && !empty($_GET['filter_val_status'])) {
         $statusFilter = $conn->real_escape_string($_GET['filter_val_status']);
         $conditions[] = "Staff_Status = '$statusFilter'";
-        $filterValue = $statusFilter;
     }
 }
 
-$whereClause = "";
-if (count($conditions) > 0) {
-    $whereClause = "WHERE " . implode(" AND ", $conditions);
-}
-
+$whereClause = "WHERE " . implode(" AND ", $conditions);
 $count_sql = "SELECT COUNT(*) as total FROM staff $whereClause";
 $count_result = $conn->query($count_sql);
-$total_records = 0;
-if ($count_result && $count_result->num_rows > 0) {
-    $row = $count_result->fetch_assoc();
-    $total_records = $row['total'];
-}
-
+$total_records = ($count_result && $row = $count_result->fetch_assoc()) ? $row['total'] : 0;
 $total_pages = ceil($total_records / $results_per_page);
-if ($page > $total_pages && $total_pages > 0) {
-    $page = $total_pages;
-    $start_from = ($page - 1) * $results_per_page;
-}
 
 $sql = "SELECT * FROM staff $whereClause ORDER BY Staff_JoinDate DESC, Staff_ID DESC LIMIT $start_from, $results_per_page";
 $result = $conn->query($sql);
-
 $staffMembers = [];
 if ($result && $result->num_rows > 0) {
-    while($row = $result->fetch_assoc()) {
-        $staffMembers[] = $row;
-    }
+    while($row = $result->fetch_assoc()) { $staffMembers[] = $row; }
 }
 
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
 $end_record = min($start_from + $results_per_page, $total_records);
 
 // Stats
-function getTotalStaffStats($conn) {
-    $result = $conn->query("SELECT COUNT(*) as total FROM staff WHERE Is_Deleted = 0");
-    return ($result && $result->num_rows > 0) ? $result->fetch_assoc()['total'] : 0;
-}
-function getActiveStaffStats($conn) {
-    $result = $conn->query("SELECT COUNT(*) as total FROM staff WHERE Staff_Status = 'Active' AND Is_Deleted = 0");
-    return ($result && $result->num_rows > 0) ? $result->fetch_assoc()['total'] : 0;
-}
-
-$totalStaffStats = getTotalStaffStats($conn);
-$activeStaffStats = getActiveStaffStats($conn);
+$totalStaffStats = $conn->query("SELECT COUNT(*) as total FROM staff WHERE Is_Deleted = 0")->fetch_assoc()['total'];
+$activeStaffStats = $conn->query("SELECT COUNT(*) as total FROM staff WHERE Staff_Status = 'Active' AND Is_Deleted = 0")->fetch_assoc()['total'];
 $inactiveStaffStats = $totalStaffStats - $activeStaffStats;
 
-$conn->close();
-
-$malaysiaStates = [
-    'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 
-    'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'
-];
+$malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1346,17 +1351,15 @@ $malaysiaStates = [
         
         function validateEmail(id) {
             const val = document.getElementById(id).value;
-            // 检查 @ 符号
             if (val.indexOf('@') === -1) return "Missing '@' symbol";
-            // 检查域名后缀 (TLD)
             const domainPattern = /@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
             if (!domainPattern.test(val)) return "Missing domain extension (e.g. .com)";
-            return ""; // Success
+            return ""; 
         }
         
         function validateAge(id, errId) {
             const val = document.getElementById(id).value;
-            if(!val) return false; // empty is handled by required check
+            if(!val) return false; 
             const age = new Date().getFullYear() - new Date(val).getFullYear();
             const valid = age >= 18;
             document.getElementById(errId).style.display = valid ? 'none' : 'block';
@@ -1366,15 +1369,13 @@ $malaysiaStates = [
         function validatePhone(id) {
             const val = document.getElementById(id).value;
             if (!val.includes('-')) return "Format must be XX-XXXXXXX (dash is missing)";
-            
             const parts = val.split('-');
             if (parts.length !== 2) return "Invalid format";
-            
             const back = parts[1];
             if (back.length < 7 || back.length > 8) {
                 return "Phone number must have 7 or 8 digits after the hyphen (-)";
             }
-            return ""; // Success
+            return ""; 
         }
 
         function validatePasswordRequirements(passId, listContainerId, prefix = '') {
@@ -1426,19 +1427,15 @@ $malaysiaStates = [
             let errors = [];
 
             if (type === 'add') {
-                // 1. Email check
                 let emailMsg = validateEmail('email');
                 if(emailMsg) errors.push("Email: " + emailMsg);
                 document.getElementById('emailError').style.display = emailMsg ? 'block' : 'none';
 
-                // 2. Age check
                 if(!validateAge('dob', 'ageError')) errors.push("Age: Must be at least 18 years old.");
 
-                // 3. Phone check
                 let phoneMsg = validatePhone('add_contact');
                 if(phoneMsg) errors.push("Contact Number: " + phoneMsg);
 
-                // 4. Other empty checks
                 if(!document.getElementById('ic_number').value) errors.push("IC Number is required.");
             }
             else if (type === 'edit') {
@@ -1454,9 +1451,9 @@ $malaysiaStates = [
 
             if (errors.length > 0) {
                 alert("Please correct the following errors before saving:\n\n- " + errors.join("\n- "));
-                return false; // Stop submission
+                return false; 
             }
-            return true; // Allow submission
+            return true; 
         }
         
         function validateChangePassword() {

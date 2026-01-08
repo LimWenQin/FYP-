@@ -230,7 +230,8 @@ $exportParams = $_GET;
 $exportParams['action'] = 'export_excel';
 if(isset($exportParams['page'])) unset($exportParams['page']);
 $exportUrl = "?" . http_build_query($exportParams);
-$conn->close();
+
+// ⚠️ Removed $conn->close(); to allow sidebar to use connection
 ?>
 
 <!DOCTYPE html>
@@ -559,7 +560,7 @@ $conn->close();
                         <?php endif; ?>
                     </div>
                 </div>
-                </div>
+            </div>
         </div>
     </div>
 

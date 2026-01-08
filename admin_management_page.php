@@ -11,6 +11,14 @@ if (!isset($_SESSION['admin_id'])) {
 // Include database connection
 include 'dataconnection.php';
 
+// --- 引入 PHPMailer (与 Staff Management 保持一致) ---
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
+require 'PHPMailer/Exception.php';
+require 'PHPMailer/PHPMailer.php';
+require 'PHPMailer/SMTP.php';
+
 // --- 0. FETCH CURRENT ADMIN INFO ---
 $currentAdminId = $_SESSION['admin_id'];
 $headerSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $currentAdminId";
@@ -18,13 +26,34 @@ $headerResult = $conn->query($headerSql);
 
 if ($headerResult && $headerResult->num_rows > 0) {
     $headerRow = $headerResult->fetch_assoc();
-    $adminName = $headerRow['Admin_Name'];         
+    $adminName = $headerRow['Admin_Name'];          
     $adminProfilePicture = $headerRow['Admin_ProfilePicture'];
     $adminPosition = $headerRow['Admin_Role'];
 } else {
     $adminName = "Admin";
     $adminProfilePicture = null;
     $adminPosition = "System Admin";
+}
+
+// --- HELPER: Generate Strong Random Password ---
+function generateStrongRandomPassword($length = 12) {
+    $upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    $lower = "abcdefghijklmnopqrstuvwxyz";
+    $numbers = "0123456789";
+    $symbols = "!@#$%^&*()";
+    
+    $password = "";
+    $password .= $upper[rand(0, strlen($upper) - 1)];
+    $password .= $lower[rand(0, strlen($lower) - 1)];
+    $password .= $numbers[rand(0, strlen($numbers) - 1)];
+    $password .= $symbols[rand(0, strlen($symbols) - 1)];
+    
+    $allChars = $upper . $lower . $numbers . $symbols;
+    for ($i = 0; $i < $length - 4; $i++) {
+        $password .= $allChars[rand(0, strlen($allChars) - 1)];
+    }
+    
+    return str_shuffle($password);
 }
 
 // --- 1. EXPORT TO EXCEL LOGIC ---
@@ -35,8 +64,8 @@ if (isset($_POST['export_excel'])) {
     header("Pragma: no-cache");
     header("Expires: 0");
 
-    // 导出时过滤掉已删除的 Admin
-    $exportSql = "SELECT * FROM admin WHERE Is_Deleted = 0 ORDER BY Admin_ID ASC";
+    // 导出时过滤掉已删除的 Admin，并按创建时间倒序排列 (最新的在最上面)
+    $exportSql = "SELECT * FROM admin WHERE Is_Deleted = 0 ORDER BY Admin_CreatedAt DESC";
     $exportResult = $conn->query($exportSql);
 
     $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
@@ -48,7 +77,7 @@ if (isset($_POST['export_excel'])) {
     echo '<tr>
             <th style="width: 80px;">Profile Picture</th> <th>ID</th>
             <th>Name</th><th>Email</th><th>Contact</th><th>IC Number</th>
-            <th>Role</th><th>Status</th><th>Address</th><th>Comment</th>
+            <th>Role</th><th>Status</th><th>Address</th><th>Join Date</th><th>Comment</th>
           </tr>';
 
     if ($exportResult->num_rows > 0) {
@@ -71,6 +100,7 @@ if (isset($_POST['export_excel'])) {
             echo '<td style="vertical-align:middle;">' . htmlspecialchars($row['Admin_Role']) . '</td>';
             echo '<td style="vertical-align:middle;">' . htmlspecialchars($row['Admin_Status']) . '</td>';
             echo '<td style="vertical-align:middle;">' . htmlspecialchars($fullAddr) . '</td>';
+            echo '<td style="vertical-align:middle;">' . htmlspecialchars($row['Admin_CreatedAt']) . '</td>';
             echo '<td style="vertical-align:middle;">' . htmlspecialchars($row['Admin_Comment']) . '</td>';
             echo '</tr>';
         }
@@ -182,24 +212,65 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
             if ($res && $res->num_rows > 0) {
                 $errorMessage = "Email already exists in the system.";
             } else {
-                // 密码存入 NULL
-                $cols = "Admin_Name, Admin_ContactNumber, Admin_ICNUMBER, Admin_Email, Admin_Password, 
-                        Admin_Address1, Admin_Address2, Admin_Address3, Admin_City, Admin_State, Admin_PostalCode, Admin_Country, 
-                        Admin_DOB, Admin_Role, Admin_Status, Admin_Comment, Is_Deleted";
-                
-                $vals = "'$name', '$contact', '$icNumber', '$email', NULL, 
-                        '$address1', '$address2', '$address3', '$city', '$state', '$postalCode', '$country',
-                        '$dob', '$role', '$status', '$comment', 0";
+                // --- 1. 生成随机密码并加密 ---
+                $rawPassword = generateStrongRandomPassword(12);
+                $hashedPassword = password_hash($rawPassword, PASSWORD_DEFAULT);
+                $isFirstLogin = 1; // 强制首次登录修改密码
 
-                if ($profilePicture) {
-                    $cols .= ", Admin_ProfilePicture";
-                    $vals .= ", '$profilePicture'";
-                }
+                $dbProfilePic = $profilePicture ? "'$profilePicture'" : "NULL";
 
-                $sql = "INSERT INTO admin ($cols) VALUES ($vals)";
+                // Insert into Database
+                $sql = "INSERT INTO admin (
+                            Admin_Name, Admin_ContactNumber, Admin_ICNUMBER, Admin_Email, Admin_Password, Admin_IsFirstLogin,
+                            Admin_Address1, Admin_Address2, Admin_Address3, Admin_City, Admin_State, Admin_PostalCode, Admin_Country, 
+                            Admin_DOB, Admin_Role, Admin_Status, Admin_Comment, Admin_ProfilePicture, Is_Deleted
+                        ) VALUES (
+                            '$name', '$contact', '$icNumber', '$email', '$hashedPassword', $isFirstLogin,
+                            '$address1', '$address2', '$address3', '$city', '$state', '$postalCode', '$country',
+                            '$dob', '$role', '$status', '$comment', $dbProfilePic, 0
+                        )";
                 
                 if ($conn->query($sql)) {
-                    $successMessage = "Admin added successfully!";
+                    // --- 2. SEND EMAIL VIA PHPMAILER ---
+                    $mail = new PHPMailer(true);
+                    try {
+                        // Server settings
+                        $mail->isSMTP();
+                        $mail->Host       = 'smtp.gmail.com';
+                        $mail->SMTPAuth   = true;
+                        $mail->Username   = 'lovebridge1201@gmail.com'; // 你的邮箱
+                        $mail->Password   = 'odaj iwrz gfrt vven';      // 你的 App Password
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                        $mail->Port       = 465;
+
+                        // Recipients
+                        $mail->setFrom('lovebridge1201@gmail.com', 'Love Bridge Admin System');
+                        $mail->addAddress($email, $name);
+
+                        // Content
+                        $mail->isHTML(true);
+                        $mail->Subject = 'Welcome to Love Bridge - Admin Account Details';
+                        $mail->Body    = "
+                            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;'>
+                                <h2 style='color: #D97706;'>Welcome to Love Bridge, $name!</h2>
+                                <p>Your <strong>$role</strong> account has been successfully created.</p>
+                                
+                                <div style='background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;'>
+                                    <p style='margin: 5px 0;'><strong>Email:</strong> $email</p>
+                                    <p style='margin: 5px 0;'><strong>Temporary Password:</strong> <span style='font-family: monospace; background: #e2e8f0; padding: 3px 6px; border-radius: 3px; color: #d97706; font-weight: bold;'>$rawPassword</span></p>
+                                </div>
+
+                                <p><strong>Important:</strong> For security reasons, you will be required to create a new password immediately upon your first login.</p>
+                                
+                                <p style='margin-top: 30px; font-size: 12px; color: #888;'>If you did not request this account, please contact the system administrator immediately.</p>
+                            </div>
+                        ";
+
+                        $mail->send();
+                        $successMessage = "Admin added successfully! Login details sent to email.";
+                    } catch (Exception $e) {
+                        $successMessage = "Admin added, but email failed. Error: {$mail->ErrorInfo}. Temp Password: $rawPassword";
+                    }
                 } else {
                     $errorMessage = "Error adding admin: " . $conn->error;
                 }
@@ -418,7 +489,8 @@ if ($count_result && $count_result->num_rows > 0) {
 
 $total_pages = ceil($total_admins / $results_per_page);
 
-$sql = "SELECT * FROM admin $whereClause ORDER BY Admin_Name LIMIT $start_from, $results_per_page";
+// --- KEY CHANGE: Sorted by Admin_CreatedAt DESC (Newest to Oldest) ---
+$sql = "SELECT * FROM admin $whereClause ORDER BY Admin_CreatedAt DESC LIMIT $start_from, $results_per_page";
 $result = $conn->query($sql);
 $admins = [];
 if ($result && $result->num_rows > 0) {
@@ -439,7 +511,7 @@ $malaysiaStates = [
     'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'
 ];
 
-$conn->close();
+// ⚠️ 已删除 $conn->close(); 以修复 "mysqli object is already closed" 错误
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -930,7 +1002,7 @@ $conn->close();
                         </div>
                         <div class="form-group">
                             <label class="form-label">Country</label>
-                            <input type="text" name="country" class="form-input" value="Malaysia" readonly>
+                            <input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly>
                             <span class="form-guide">Default country is Malaysia.</span>
                         </div>
                     </div>
@@ -1078,13 +1150,12 @@ $conn->close();
             setupICInput('ic_number', 'dob'); 
             setupICInput('edit_ic_number', 'edit_dob'); 
             
-            // Floating alerts
+            // Auto hide alerts
             const s = document.getElementById('floatingSuccess');
             const e = document.getElementById('floatingError');
-            if(s) { s.style.opacity='0'; setTimeout(()=>s.style.display='none',3000); }
-            if(e) { e.style.opacity='0'; setTimeout(()=>e.style.display='none',3000); }
+            if(s) setTimeout(() => { s.style.opacity = '0'; setTimeout(() => s.style.display='none', 500); }, 5000);
+            if(e) setTimeout(() => { e.style.opacity = '0'; setTimeout(() => e.style.display='none', 500); }, 5000);
             
-            // Modal closing logic
             window.onclick = function(e) { 
                 if (!e.target.matches('.menu-btn') && !e.target.matches('.menu-btn *')) { 
                     document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); 

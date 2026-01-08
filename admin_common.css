@@ -291,90 +291,33 @@ body {
     .user-details { display: none; }
 }
 
-/* =======================================================
-   Admin Notification Inbox Styles (Outlook Style)
-   ======================================================= */
-.notif-container { padding: 30px; max-width: 1100px; margin: 0 auto; }
-
-/* Toolbar */
-.toolbar { 
-    display: flex; justify-content: space-between; align-items: center; 
-    margin-bottom: 20px; background: white; padding: 15px 25px; 
-    border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+/* --- Form Guide & Required Style (Added for Consistency) --- */
+.form-guide {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 5px;
+    display: block;
+    font-style: italic;
+    background: #fbfbfb;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border-left: 3px solid #ddd;
+    line-height: 1.4;
 }
-.toolbar h2 { margin: 0; font-size: 22px; color: #2c3e50; display: flex; align-items: center; gap: 10px; }
-.badge-count { background: #ff4757; color: white; font-size: 12px; padding: 2px 8px; border-radius: 12px; vertical-align: middle; }
+.required { color: #dc3545; font-weight: bold; margin-left: 3px; }
 
-.actions-group { display: flex; gap: 10px; }
-.btn-tool { 
-    border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; 
-    font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; transition: 0.2s;
+/* Locked Items */
+.sidebar-menu a[onclick="showAccessDenied()"],
+.locked-item { 
+    color: rgba(255, 255, 255, 0.5) !important; 
+    cursor: not-allowed !important; 
 }
-.btn-read { background: #e2e6ea; color: #555; }
-.btn-read:hover { background: #dbe0e5; color: #333; }
-.btn-clear { background: #fff0f0; color: #dc3545; }
-.btn-clear:hover { background: #ffe0e0; }
-
-/* Email List Container */
-.email-list { background: white; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow: hidden; }
-
-/* Single Email Row */
-.email-item { 
-    display: flex; align-items: center; padding: 18px 25px; border-bottom: 1px solid #f1f1f1; 
-    transition: all 0.2s ease; position: relative;
+.sidebar-menu a[onclick="showAccessDenied()"]:hover,
+.locked-item:hover { 
+    background: none !important; 
+    color: rgba(255, 255, 255, 0.5) !important; 
 }
-.email-item:hover { background-color: #f8f9fa; z-index: 1; box-shadow: 0 0 10px rgba(0,0,0,0.02); }
-.email-item:last-child { border-bottom: none; }
-
-/* Unread State */
-.email-item.unread { background-color: #fffdfd; }
-.email-item.unread::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #ff4757;
-}
-.email-item.unread .email-subject { font-weight: 700; color: #000; }
-.email-item.unread .email-time { color: #ff4757; font-weight: 600; }
-
-/* Icon Area */
-.email-icon { 
-    width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; 
-    color: white; font-size: 18px; margin-right: 20px; flex-shrink: 0;
-}
-
-/* Content Area */
-.email-content { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
-.email-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
-.email-subject { font-size: 15px; color: #333; line-height: 1.4; margin-right: 15px; }
-.email-meta { font-size: 13px; color: #888; display: flex; gap: 15px; }
-
-/* Action Buttons (Hover to show) */
-.email-actions { 
-    display: flex; align-items: center; gap: 10px; opacity: 0; transition: opacity 0.2s; 
-    margin-left: 20px; min-width: 100px; justify-content: flex-end;
-}
-.email-item:hover .email-actions { opacity: 1; }
-
-.action-btn { 
-    width: 35px; height: 35px; border-radius: 50%; border: 1px solid #eee; background: white; 
-    display: flex; align-items: center; justify-content: center; color: #666; cursor: pointer; transition: 0.2s;
-}
-.action-btn:hover { transform: translateY(-2px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-.action-btn.delete:hover { color: #dc3545; border-color: #dc3545; }
-.action-btn.reply:hover { color: #17a2b8; border-color: #17a2b8; }
-
-/* Colors */
-.bg-green { background: linear-gradient(135deg, #2ecc71, #26af61); box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3); }
-.bg-red { background: linear-gradient(135deg, #e74c3c, #c0392b); box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3); }
-.bg-blue { background: linear-gradient(135deg, #3498db, #2980b9); box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3); }
-.bg-yellow { background: linear-gradient(135deg, #f1c40f, #f39c12); box-shadow: 0 4px 10px rgba(241, 196, 15, 0.3); }
-.bg-purple { background: linear-gradient(135deg, #9b59b6, #8e44ad); box-shadow: 0 4px 10px rgba(155, 89, 182, 0.3); }
-.bg-gray { background: #95a5a6; }
-
-/* Empty State */
-.empty-state { text-align: center; padding: 60px 20px; color: #aab; }
-.empty-state i { font-size: 50px; margin-bottom: 20px; opacity: 0.5; }
-
-/* Responsive adjustments for notification list */
-@media (max-width: 768px) {
-    .email-meta { flex-direction: column; gap: 2px; }
-    .email-actions { opacity: 1; } /* Always show actions on mobile */
+.sidebar-menu a[onclick="showAccessDenied()"] .fa-lock,
+.locked-item .fa-lock {
+    opacity: 0.7;
 }

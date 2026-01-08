@@ -336,7 +336,7 @@ $years = range(date('Y'), 2023);
 $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'];
 $exportParams = $_GET; $exportParams['action'] = 'export_excel'; $exportUrl = "?" . http_build_query($exportParams);
 
-$conn->close();
+// ⚠️ Removed $conn->close(); to allow sidebar to use connection
 ?>
 
 <!DOCTYPE html>

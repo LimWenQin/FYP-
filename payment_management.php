@@ -312,7 +312,8 @@ function getMonthlyRevenueChartData($conn) {
     return $data;
 }
 $chartData = getMonthlyRevenueChartData($conn);
-$conn->close();
+
+// ⚠️ Removed $conn->close(); to prevent sidebar error
 ?>
 
 <!DOCTYPE html>

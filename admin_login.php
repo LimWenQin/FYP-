@@ -26,28 +26,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
         setcookie('admin_remember_email', $email, time() + (86400 * 30), "/");
     } else {
         // 如果没勾选且登录成功(或者仅仅是为了清除旧cookie)，可以在这里清除
-        // 但通常只有登录成功才完全确定是否更新cookie，这里为了简单逻辑，保持原样或在成功后处理
         if (isset($_COOKIE['admin_remember_email'])) {
-             // 注意：如果你想取消记住，应该在登录成功后清除，或者这里清除
-             // 这里保持你原本的逻辑
             setcookie('admin_remember_email', '', time() - 3600, "/");
         }
     }
 
-    // 1. 先查找 Email 是否存在
-    $sql = "SELECT * FROM admin WHERE Admin_Email = '$email'";
-    $result = mysqli_query($conn, $sql);
+    // --- 1. 优先查找 Admin 表 ---
+    $sql_admin = "SELECT * FROM admin WHERE Admin_Email = '$email' AND Is_Deleted = 0";
+    $result_admin = mysqli_query($conn, $sql_admin);
 
-    if (mysqli_num_rows($result) > 0) {
-        $row = mysqli_fetch_assoc($result);
+    if (mysqli_num_rows($result_admin) > 0) {
+        // === 是 Admin ===
+        $row = mysqli_fetch_assoc($result_admin);
         $admin_id = $row['Admin_ID'];
         
-        // --- 检查是否被冻结 ---
+        // --- 检查是否被冻结 (Admin Only Logic) ---
         $max_attempts = 5;
         $lockout_time = 30 * 60; // 30分钟
         $attempts = $row['Admin_LoginAttempts'];
         
-        // 确保 Admin_LastFailedLogin 不是 NULL，否则 strtotime 会出错
         $last_failed = $row['Admin_LastFailedLogin'] ? strtotime($row['Admin_LastFailedLogin']) : 0;
         $current_time = time();
 
@@ -68,12 +65,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
 
         // 如果没有报错 (没被冻结)，验证密码
         if (!isset($error)) {
-            // ⚠️ 重点：数据库里的密码必须是 password_hash() 生成的乱码，不能是明文 'admin123'
             if (password_verify($password, $row['Admin_Password'])) { 
-                // --- 登录成功 ---
+                // --- Admin 登录成功 ---
                 $_SESSION['admin_id'] = $row['Admin_ID'];
                 $_SESSION['admin_name'] = $row['Admin_Name']; 
                 $_SESSION['admin_email'] = $row['Admin_Email'];
+                $_SESSION['role'] = 'Admin';
                 
                 // 重置错误次数为 0，并更新最后登录时间
                 mysqli_query($conn, "UPDATE admin SET Admin_LastLogin = NOW(), Admin_LoginAttempts = 0 WHERE Admin_ID = $admin_id");
@@ -81,7 +78,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
                 header("Location: admin_dashboard.php");
                 exit();
             } else {
-                // --- 密码错误 ---
+                // --- Admin 密码错误 ---
                 $attempts++;
                 
                 // 更新数据库
@@ -96,7 +93,37 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
             }
         }
     } else {
-        $error = "Email not found.";
+        // --- 2. Admin 表没找到，检查 Staff 表 ---
+        // 只允许 Is_Deleted = 0 (未被 Block) 且 Staff_Status = 'Active' 的员工登录
+        $sql_staff = "SELECT * FROM staff WHERE Staff_Email = '$email' AND Is_Deleted = 0 AND Staff_Status = 'Active'";
+        $result_staff = mysqli_query($conn, $sql_staff);
+
+        if (mysqli_num_rows($result_staff) > 0) {
+            // === 是 Staff ===
+            $row = mysqli_fetch_assoc($result_staff);
+
+            if (password_verify($password, $row['Staff_Password'])) {
+                // --- Staff 登录成功 ---
+                $_SESSION['staff_id'] = $row['Staff_ID'];
+                $_SESSION['staff_name'] = $row['Staff_FullName'];
+                $_SESSION['role'] = 'Staff';
+
+                // --- 关键修改：检查是否第一次登录 ---
+                if ($row['Staff_IsFirstLogin'] == 1) {
+                    // 设置 Flag，admin_dashboard.php 会捕捉到并弹出 Modal
+                    $_SESSION['is_first_login'] = true; 
+                }
+
+                header("Location: admin_dashboard.php");
+                exit();
+            } else {
+                // Staff 密码错误
+                $error = "Incorrect password.";
+            }
+        } else {
+            // 两个表都没找到
+            $error = "Email not found or account inactive.";
+        }
     }
 }
 ?>
@@ -106,7 +133,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Love Bridge - Admin Login</title>
+    <title>Love Bridge - Login</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* 保持你原本的 CSS 不变 */
@@ -229,9 +256,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
             <div class="decor-shape shape-2"></div>
             <div class="decor-shape shape-3"></div>
             
-            <div class="admin-badge">ADMIN ACCESS</div>
-            <h1>Welcome Home</h1>
-            <p class="welcome-text">Thank you for being the heart of our mission.</p>
+            <div class="admin-badge">SYSTEM ACCESS</div>
+            <h1>Welcome Back</h1>
+            <p class="welcome-text">Login to access your dashboard.</p>
             
             <?php if(isset($error)) { echo "<div class='alert'>$error</div>"; } ?>
 

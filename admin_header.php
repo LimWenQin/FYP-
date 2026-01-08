@@ -1,3 +1,48 @@
+<?php
+// admin_header.php
+
+// 确保 Session 已开启
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// 包含数据库连接 (使用 require_once 防止重复包含)
+require_once 'dataconnection.php';
+
+// --- 统一获取当前登录用户信息 (Admin 或 Staff) ---
+$header_Name = "User";
+$header_Role = "";
+$header_Pic = null;
+
+if (isset($_SESSION['admin_id'])) {
+    // === 如果是 ADMIN ===
+    $currentId = $_SESSION['admin_id'];
+    $stmt = $conn->prepare("SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = ?");
+    $stmt->bind_param("i", $currentId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
+        $header_Name = $row['Admin_Name'];
+        $header_Pic = $row['Admin_ProfilePicture'];
+        $header_Role = $row['Admin_Role'];
+    }
+    $stmt->close();
+} elseif (isset($_SESSION['staff_id'])) {
+    // === 如果是 STAFF ===
+    $currentId = $_SESSION['staff_id'];
+    $stmt = $conn->prepare("SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role FROM staff WHERE Staff_ID = ?");
+    $stmt->bind_param("i", $currentId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
+        $header_Name = $row['Staff_FullName'];
+        $header_Pic = $row['Staff_ProfilePicture'];
+        $header_Role = $row['Staff_Role'];
+    }
+    $stmt->close();
+}
+?>
+
 <div class="top-nav">
     <div class="nav-left">
         <div class="logo">
@@ -6,13 +51,13 @@
                 <h1>Love Bridge</h1>
             </a>
         </div>
-        </div>
+    </div>
     
     <div class="nav-right">
-        
         <div class="settings-dropdown-container" id="settingsDropdown">
             <div class="settings-icon" onclick="toggleSettingsMenu()">
-                <i class="fas fa-cog"></i> </div>
+                <i class="fas fa-cog"></i> 
+            </div>
             <div class="settings-menu" id="settingsMenu">
                 <a href="admin_manage_stories.php"><i class="fas fa-book-open"></i> Manage Stories</a>
                 <a href="admin_manage_pages.php?type=about_us"><i class="fas fa-info-circle"></i> About Us</a>
@@ -43,30 +88,43 @@
         <div class="user-profile" id="userProfileDropdown">
             <div class="user-profile-with-avatar" onclick="toggleUserMenu()">
                 <div class="user-avatar">
-                    <?php if (!empty($adminProfilePicture) && file_exists($adminProfilePicture)): ?>
-                        <img src="<?php echo htmlspecialchars($adminProfilePicture); ?>" alt="Profile Picture">
+                    <?php if (!empty($header_Pic) && file_exists($header_Pic)): ?>
+                        <img src="<?php echo htmlspecialchars($header_Pic); ?>" alt="Profile Picture">
                     <?php else: ?>
-                        <div style="width: 100%; height: 100%; background: #ccc; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white;">
-                            <?php echo isset($adminName) ? substr($adminName, 0, 1) : 'A'; ?>
+                        <div style="width: 100%; height: 100%; background: #ccc; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight:bold;">
+                            <?php echo substr($header_Name, 0, 1); ?>
                         </div>
                     <?php endif; ?>
                 </div>
                 <div class="user-details">
-                    <div class="user-name"><?php echo isset($adminName) ? htmlspecialchars($adminName) : 'Admin'; ?></div>
-                    <div class="user-role"><?php echo isset($adminPosition) ? htmlspecialchars($adminPosition) : 'Role'; ?></div>
+                    <div class="user-name"><?php echo htmlspecialchars($header_Name); ?></div>
+                    <div class="user-role"><?php echo htmlspecialchars($header_Role); ?></div>
                 </div>
                 <i class="fas fa-chevron-down" style="margin-left: 10px; font-size: 12px;"></i>
             </div>
             <div class="user-profile-dropdown" id="userProfileMenu">
-                <a href="admin_profile.php">
-                    <i class="fas fa-user"></i> View Profile
-                </a>
-                <a href="admin_profile.php?edit=true">
-                    <i class="fas fa-edit"></i> Edit Profile
-                </a>
-                <a href="admin_profile.php?action=change_password" onclick="smartPasswordModal(event)">
-                    <i class="fas fa-key"></i> Change Password
-                </a>
+                <?php if(isset($_SESSION['staff_id'])): ?>
+                    <a href="staff_profile.php">
+                        <i class="fas fa-user"></i> View Profile
+                    </a>
+                    <a href="staff_profile.php?edit=true">
+                        <i class="fas fa-edit"></i> Edit Profile
+                    </a>
+                    <a href="staff_profile.php?action=change_password" onclick="smartPasswordModal(event)">
+                        <i class="fas fa-key"></i> Change Password
+                    </a>
+                <?php else: ?>
+                    <a href="admin_profile.php">
+                        <i class="fas fa-user"></i> View Profile
+                    </a>
+                    <a href="admin_profile.php?edit=true">
+                        <i class="fas fa-edit"></i> Edit Profile
+                    </a>
+                    <a href="admin_profile.php?action=change_password" onclick="smartPasswordModal(event)">
+                        <i class="fas fa-key"></i> Change Password
+                    </a>
+                <?php endif; ?>
+                
                 <div class="divider"></div>
                 <a href="admin_logout.php" class="logout-link">
                     <i class="fas fa-sign-out-alt"></i> Logout
@@ -93,102 +151,62 @@
 </div>
 
 <style>
-    /* Notification Styles */
     .notification-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; align-items: start; gap: 10px; }
     .notification-item.unread { background-color: #f0f7ff; }
     .notif-icon { margin-top: 3px; }
     .notif-content p { margin: 0; font-size: 13px; color: #333; }
     .notif-time { font-size: 11px; color: #888; display: block; margin-top: 4px; }
     
-    /* --- NEW NOTIFICATION BADGE DESIGN --- */
     .notification-count { 
-        position: absolute; 
-        top: -6px; 
-        right: -6px; 
-        
-        /* Modern Gradient Background */
-        background: linear-gradient(135deg, #ff4757, #ff6b81); 
-        color: white; 
-        
-        /* Perfect Circle */
-        border-radius: 50%; 
-        min-width: 18px; 
-        height: 18px; 
-        padding: 0 4px; /* Slight padding for wider numbers */
-        
-        /* Centering Text */
-        display: flex; 
-        align-items: center; 
-        justify-content: center;
-        
-        /* Typography */
-        font-size: 10px; 
-        font-weight: 700;
-        
-        /* Aesthetics */
-        border: 2px solid #fff; /* White border to separate from icon */
-        box-shadow: 0 2px 5px rgba(255, 71, 87, 0.4); /* Soft shadow */
-        z-index: 10;
-        
-        /* Pulse Animation */
+        position: absolute; top: -6px; right: -6px; 
+        background: linear-gradient(135deg, #ff4757, #ff6b81); color: white; 
+        border-radius: 50%; min-width: 18px; height: 18px; padding: 0 4px; 
+        display: flex; align-items: center; justify-content: center;
+        font-size: 10px; font-weight: 700;
+        border: 2px solid #fff; box-shadow: 0 2px 5px rgba(255, 71, 87, 0.4); z-index: 10;
         animation: pulse-red 2s infinite;
     }
-
     @keyframes pulse-red {
         0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
         70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(255, 71, 87, 0); }
         100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
     }
-    /* ------------------------------------- */
-
     .notification-dropdown, .user-profile-dropdown, .settings-menu { display: none; }
     .notification-dropdown.active, .user-profile-dropdown.active, .settings-menu.active { display: block; }
     @keyframes fadeInModal { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 </style>
 
 <script>
-    // --- GLOBAL LOGOUT LOGIC ---
     document.addEventListener("DOMContentLoaded", function() {
-        // Find all links pointing to admin_logout.php
         const logoutLinks = document.querySelectorAll('a[href*="admin_logout.php"]');
         logoutLinks.forEach(link => {
-            // Remove any existing onclick handlers if necessary, or just add event listener
             link.addEventListener('click', function(e) {
-                // If the link has 'proceedLogout' attached or is inside the modal, ignore
                 if(this.hasAttribute('onclick') && this.getAttribute('onclick') === 'proceedLogout()') return;
-                
-                e.preventDefault(); // Stop navigation
-                document.getElementById('globalLogoutModal').style.display = 'flex'; // Show modal
-                
-                // Close dropdown if open
+                e.preventDefault(); 
+                document.getElementById('globalLogoutModal').style.display = 'flex'; 
                 closeAllMenus(null);
             });
         });
     });
 
-    function closeGlobalLogoutModal() {
-        document.getElementById('globalLogoutModal').style.display = 'none';
-    }
-    
-    function proceedLogout() {
-        // Allow the link to work naturally
-        return true;
-    }
+    function closeGlobalLogoutModal() { document.getElementById('globalLogoutModal').style.display = 'none'; }
+    function proceedLogout() { return true; }
 
-    // --- 0. Smart Password Logic ---
     function smartPasswordModal(e) {
-        if (window.location.pathname.includes('admin_profile.php')) {
+        const isStaff = window.location.pathname.includes('staff_profile.php');
+        const targetPage = isStaff ? 'staff_profile.php' : 'admin_profile.php';
+
+        if (window.location.pathname.includes(targetPage)) {
             e.preventDefault();
             if (typeof openChangePasswordModal === 'function') {
                 openChangePasswordModal();
                 document.getElementById("userProfileMenu").classList.remove("active");
             } else {
-                window.location.href = 'admin_profile.php?action=change_password';
+                window.location.href = targetPage + '?action=change_password';
             }
         }
     }
 
-    // --- 1. Menu Toggles ---
     function toggleSettingsMenu() { closeAllMenus('settingsMenu'); document.getElementById("settingsMenu").classList.toggle("active"); }
     function toggleNotificationMenu() { closeAllMenus('notificationMenu'); document.getElementById("notificationMenu").classList.toggle("active"); }
     function toggleUserMenu() { closeAllMenus('userProfileMenu'); document.getElementById("userProfileMenu").classList.toggle("active"); }
@@ -207,31 +225,30 @@
         if (!event.target.closest('.settings-dropdown-container') && 
             !event.target.closest('.notification') && 
             !event.target.closest('.user-profile') &&
-            !event.target.closest('.modal')) { // Prevent closing if clicking inside modal
+            !event.target.closest('.modal')) { 
             closeAllMenus(null);
         }
     }
 
-    // --- 2. Real-time Notification Logic ---
     function fetchNotifications() {
         fetch('fetch_admin_notifications.php')
             .then(response => response.json())
             .then(data => { updateNotificationUI(data); })
-            .catch(error => console.error('Error fetching notifications:', error));
+            .catch(error => { });
     }
 
     function updateNotificationUI(data) {
         const countSpan = document.getElementById('notifCount');
         const listContainer = document.getElementById('notificationList');
-        if (data.count > 0) {
-            countSpan.style.display = 'flex'; // Ensure flex display for centering
+        if (data && data.count > 0) {
+            countSpan.style.display = 'flex'; 
             countSpan.innerText = data.count > 99 ? '99+' : data.count;
         } else {
             countSpan.style.display = 'none';
         }
-        if (data.notifications.length === 0) {
+        if (data && data.notifications.length === 0) {
             listContainer.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">No notifications yet</div>';
-        } else {
+        } else if (data) {
             let html = '';
             data.notifications.forEach(notif => {
                 const isUnreadClass = notif.is_read == 0 ? 'unread' : '';
@@ -253,7 +270,6 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        // If fetch_admin_notifications.php exists, this runs
         if(typeof fetchNotifications === "function") {
              fetchNotifications();
              setInterval(fetchNotifications, 5000);

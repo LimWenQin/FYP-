@@ -2,17 +2,91 @@
 // admin_dashboard.php
 session_start();
 
-// Check if user is logged in
-if (!isset($_SESSION['admin_id'])) {
+// --- 检查权限：Admin 或 Staff 均可进入 ---
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
 }
 
 include 'dataconnection.php';
 
+// --- 动态获取当前登录者的信息 (用于 Dashboard 欢迎语) ---
+// 虽然 admin_header.php 也会获取，但在 dashboard body 中显示 "Welcome back" 需要这个变量
+$currentUserId = 0;
+$currentUserRole = "";
+$currentUserName = "User";
+$currentUserPic = null;
+$isFirstLogin = 0; // 【新增】默认不是首次登录
+
+if (isset($_SESSION['admin_id'])) {
+    // 如果是 Admin
+    $currentUserId = $_SESSION['admin_id'];
+    // 【修改】多查询 Admin_IsFirstLogin
+    $stmt = $conn->prepare("SELECT Admin_Name, Admin_ProfilePicture, Admin_Role, Admin_IsFirstLogin FROM admin WHERE Admin_ID = ?");
+    $stmt->bind_param("i", $currentUserId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
+        $currentUserName = $row['Admin_Name'];
+        $currentUserPic = $row['Admin_ProfilePicture'];
+        $currentUserRole = $row['Admin_Role'];
+        $isFirstLogin = $row['Admin_IsFirstLogin']; // 【新增】获取状态
+    }
+    $stmt->close();
+} elseif (isset($_SESSION['staff_id'])) {
+    // 如果是 Staff
+    $currentUserId = $_SESSION['staff_id'];
+    // 【修改】多查询 Staff_IsFirstLogin
+    $stmt = $conn->prepare("SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role, Staff_IsFirstLogin FROM staff WHERE Staff_ID = ?");
+    $stmt->bind_param("i", $currentUserId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
+        $currentUserName = $row['Staff_FullName'];
+        $currentUserPic = $row['Staff_ProfilePicture'];
+        $currentUserRole = $row['Staff_Role'];
+        $isFirstLogin = $row['Staff_IsFirstLogin']; // 【新增】获取状态
+    }
+    $stmt->close();
+}
+
+// ==========================================
+// 【新增】处理强制修改密码逻辑
+// ==========================================
+$passwordMessage = "";
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['force_update_password'])) {
+    $newPass = $_POST['new_password'];
+    $confirmPass = $_POST['confirm_password'];
+
+    if ($newPass !== $confirmPass) {
+        $passwordMessage = "Passwords do not match.";
+    } elseif (strlen($newPass) < 8) {
+        $passwordMessage = "Password must be at least 8 characters.";
+    } else {
+        $newHash = password_hash($newPass, PASSWORD_DEFAULT);
+        
+        if (isset($_SESSION['admin_id'])) {
+            // 更新 Admin
+            $updateStmt = $conn->prepare("UPDATE admin SET Admin_Password = ?, Admin_IsFirstLogin = 0 WHERE Admin_ID = ?");
+            $updateStmt->bind_param("si", $newHash, $currentUserId);
+        } elseif (isset($_SESSION['staff_id'])) {
+            // 更新 Staff
+            $updateStmt = $conn->prepare("UPDATE staff SET Staff_Password = ?, Staff_IsFirstLogin = 0 WHERE Staff_ID = ?");
+            $updateStmt->bind_param("si", $newHash, $currentUserId);
+        }
+
+        if ($updateStmt->execute()) {
+            $isFirstLogin = 0; // 更新当前变量，关闭模态框
+            $passwordMessage = "Password updated successfully! Welcome.";
+        } else {
+            $passwordMessage = "Error updating password. Please try again.";
+        }
+        $updateStmt->close();
+    }
+}
+
 // ==========================================
 // 1. HANDLE ADD DONATION LOGIC (From Payment Management)
-// 保留你原本的 Add Donation 逻辑，因为你只要求改 Donor/Activity/Case
 // ==========================================
 $msg = "";
 $msgType = "";
@@ -34,7 +108,7 @@ function handleFileUpload($file, $targetDir) {
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
-    // --- A. ADD DONATION (保留不动) ---
+    // --- A. ADD DONATION ---
     if (isset($_POST['add_donation_submit'])) {
         $donor_id = $_POST['donor_id'];
         $amount = $_POST['amount'];
@@ -230,23 +304,6 @@ $malaysiaStates = [ 'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mel
 $branches = []; 
 while($bRow = $allBranches->fetch_assoc()) $branches[] = $bRow; // Cache for Activity Modal
 
-// Admin Info
-$adminId = $_SESSION['admin_id'];
-$adminName = isset($_SESSION['admin_name']) ? $_SESSION['admin_name'] : 'Admin'; 
-$adminPosition = 'Admin';
-$adminProfilePicture = null;
-
-$stmt = $conn->prepare("SELECT Admin_ProfilePicture, Admin_Name, Admin_Role FROM admin WHERE Admin_ID = ?");
-$stmt->bind_param("i", $adminId);
-$stmt->execute();
-$res = $stmt->get_result();
-if ($res && $row = $res->fetch_assoc()) {
-    $adminProfilePicture = $row['Admin_ProfilePicture'];
-    $adminName = $row['Admin_Name'];
-    $adminPosition = $row['Admin_Role']; 
-}
-$stmt->close();
-
 // Fetch Statistics
 $totalDonors = getTotalDonors($conn);
 $totalDonations = getTotalDonations($conn);
@@ -270,7 +327,7 @@ $chartData = getDynamicDonationTrends($conn);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Love Bridge</title>
+    <title>Dashboard - Love Bridge</title>
     
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -391,30 +448,45 @@ $chartData = getDynamicDonationTrends($conn);
         .file-info { display: none; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; background: #f1f1f1; padding: 5px 10px; border-radius: 5px; }
         .file-remove { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 14px; padding: 0 5px; }
         
-        /* Password */
-        .password-input-group { display: flex; width: 100%; }
-        .password-input-container { flex: 1; display: flex; position: relative; }
-        .password-input-container input { flex: 1; border-radius: 5px 0 0 5px; border-right: none; }
-        .toggle-password { border: 1px solid #ddd; border-left: none; background: white; padding: 0 10px; cursor: pointer; }
-        .btn-small { padding: 0 12px; border-radius: 0 5px 5px 0; border: 1px solid #ddd; border-left: none; background: #f8f9fa; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--primary); }
-        .password-requirements { margin-top: 8px; font-size: 12px; }
-        .requirement-item { display: flex; align-items: center; margin-bottom: 3px; color: #888; }
-        .requirement-item.valid { color: var(--success); } .requirement-item.invalid { color: var(--gray); } 
-        .phone-format { display: flex; align-items: center; }
-        .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid #ddd; border-right: none; border-radius: 5px 0 0 5px; color: var(--gray); font-weight: bold; }
-        .phone-input { border-radius: 0 5px 5px 0 !important; }
-        .confirm-check { position: absolute; right: 50px; top: 50%; transform: translateY(-50%); color: var(--success); font-size: 14px; display: none; z-index: 2; }
-        .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
-        .hidden-field { display: none; }
-
         /* Floating Alert */
-        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1300; display: flex; align-items: center; gap: 10px; }
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1300; display: flex; align-items: center; gap: 10px; animation: slideIn 0.5s ease-out; }
         .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
         /* Select2 Fix */
         .select2-container .select2-selection--single { height: 42px !important; border: 1px solid #ddd !important; border-radius: 5px !important; display: flex; align-items: center; }
         .select2-container--default .select2-selection--single .select2-selection__arrow { height: 40px !important; }
+        
+        /* --- Force Password Change Modal Styles (Added) --- */
+        .force-modal { 
+            display: <?php echo ($isFirstLogin == 1) ? 'flex' : 'none'; ?>; 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.9); z-index: 9999; 
+            justify-content: center; align-items: center; 
+        }
+        .force-modal-content { 
+            background: white; width: 450px; padding: 40px; 
+            border-radius: 12px; text-align: center; 
+            box-shadow: 0 15px 40px rgba(0,0,0,0.5); 
+        }
+        .force-modal h2 { color: #333; margin-bottom: 10px; font-size: 22px; }
+        .force-modal p { color: #666; margin-bottom: 25px; font-size: 14px; line-height: 1.5; }
+        .force-input { 
+            width: 100%; padding: 12px; margin-bottom: 15px; 
+            border: 1px solid #ddd; border-radius: 6px; 
+            font-size: 14px; box-sizing: border-box; 
+        }
+        .force-btn { 
+            width: 100%; padding: 12px; background: #F28585; 
+            color: white; border: none; border-radius: 6px; 
+            font-size: 16px; font-weight: 600; cursor: pointer; 
+            transition: 0.3s; 
+        }
+        .force-btn:hover { background: #e07474; }
+        .alert-message { 
+            display: block; margin-bottom: 15px; font-size: 14px; font-weight: 500; 
+        }
 
         @media (max-width: 1024px) { .charts-tables { grid-template-columns: 1fr; } }
         @media (max-width: 768px) { .stats-cards, .quick-actions { grid-template-columns: repeat(2, 1fr); } }
@@ -427,7 +499,13 @@ $chartData = getDynamicDonationTrends($conn);
             <i class="fas <?php echo $msgType == 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'; ?>"></i>
             <div><?php echo $msg; ?></div>
         </div>
-        <script>setTimeout(() => { document.getElementById('floatingAlert').style.display='none'; }, 5000);</script>
+        <script>
+            // 5秒后自动消失
+            setTimeout(() => { 
+                const el = document.getElementById('floatingAlert');
+                if(el) el.style.display='none'; 
+            }, 5000);
+        </script>
     <?php endif; ?>
 
     <?php include 'admin_sidebar.php'; ?>
@@ -438,7 +516,7 @@ $chartData = getDynamicDonationTrends($conn);
         <div class="dashboard-content">
             <div class="welcome-section">
                 <h1>System Overview</h1>
-                <p>Welcome back, <?php echo htmlspecialchars($adminName); ?>.</p>
+                <p>Welcome back, <?php echo htmlspecialchars($currentUserName); ?>.</p>
             </div>
             
             <div class="stats-cards">
@@ -510,7 +588,6 @@ $chartData = getDynamicDonationTrends($conn);
                                     if ($d['status'] == 'Success' || $d['status'] == 'Completed') $statusClass = 'status-success';
                                     elseif ($d['status'] == 'Failed') $statusClass = 'status-failed';
                                     
-                                    // 1. DATE FORMAT (Year / Month / Day in 3 lines)
                                     $dateObj = new DateTime($d['Order_Created_At']);
                                 ?>
                                 <tr>
@@ -614,6 +691,30 @@ $chartData = getDynamicDonationTrends($conn);
         </div>
     </div>
 
+    <div class="force-modal" id="forcePasswordModal">
+        <div class="force-modal-content">
+            <i class="fas fa-lock" style="font-size: 40px; color: #F28585; margin-bottom: 20px;"></i>
+            <h2>Security Update Required</h2>
+            <p>For the security of your account, you must update your password before proceeding further.</p>
+            
+            <?php if (!empty($passwordMessage)): ?>
+                <span class="alert-message" style="color: <?php echo strpos($passwordMessage, 'successfully') !== false ? 'green' : 'red'; ?>;">
+                    <?php echo $passwordMessage; ?>
+                </span>
+                <?php if (strpos($passwordMessage, 'successfully') !== false): ?>
+                    <script>setTimeout(() => { document.querySelector('.force-modal').style.display = 'none'; }, 1500);</script>
+                <?php endif; ?>
+            <?php endif; ?>
+
+            <form method="POST" action="admin_dashboard.php">
+                <input type="hidden" name="force_update_password" value="1">
+                <input type="password" name="new_password" class="force-input" placeholder="New Password (Min 8 chars)" required minlength="8">
+                <input type="password" name="confirm_password" class="force-input" placeholder="Confirm New Password" required minlength="8">
+                <button type="submit" class="force-btn">Update Password</button>
+            </form>
+        </div>
+    </div>
+
     <div class="modal" id="activitySelectionModal">
         <div class="modal-content" style="position: relative; max-width:400px;">
             <span class="modal-close" onclick="closeActivitySelectionModal()">&times;</span>
@@ -646,7 +747,6 @@ $chartData = getDynamicDonationTrends($conn);
                             </option>
                         <?php endwhile; ?>
                     </select>
-                    <span class="form-guide">Select the donor who is making this donation. Use search to find by name or email.</span>
                 </div>
                 <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
                 <h4 style="color:#666; margin-bottom:10px;">Donation Details</h4>
@@ -659,7 +759,6 @@ $chartData = getDynamicDonationTrends($conn);
                             <option value="activity">Specific Activity</option>
                             <option value="case">Special Case</option>
                         </select>
-                        <span class="form-guide">If this donation is for a specific cause, select the category here.</span>
                     </div>
                     <div class="form-group" id="targetSelectContainer">
                         <label>Select Item</label>
@@ -688,7 +787,6 @@ $chartData = getDynamicDonationTrends($conn);
                             <option value="One-Time">One-Time</option>
                             <option value="Recurring">Monthly</option>
                         </select>
-                        <span class="form-guide">Is this a one-time donation or a recurring monthly pledge?</span>
                     </div>
                     <div class="form-group">
                         <label>Payment Method</label>
@@ -697,13 +795,11 @@ $chartData = getDynamicDonationTrends($conn);
                             <option value="Bank Transfer">Bank Transfer</option>
                             <option value="Cheque">Cheque</option>
                         </select>
-                        <span class="form-guide">Method used for this payment (e.g. Cash, Bank Transfer).</span>
                     </div>
                 </div>
                 <div class="form-group">
                     <label>Amount (RM) <span style="color:red">*</span></label>
                     <input type="number" name="amount" class="form-control" step="0.01" min="1" required>
-                    <span class="form-guide">The total amount in MYR.</span>
                 </div>
                 <button type="submit" name="add_donation_submit" class="btn-submit">Confirm Donation</button>
             </form>
@@ -711,164 +807,17 @@ $chartData = getDynamicDonationTrends($conn);
     </div>
 
     <div class="modal" id="addDonorModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Add New Donor</h2><button class="close-btn" onclick="closeAddDonorModal()">&times;</button></div>
-            <div class="modal-body">
-                <form id="addDonorForm" action="admin_donor_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm()">
-                    <input type="hidden" name="add_donor" value="1">
-                    <div class="form-group">
-                        <label>Profile Picture</label>
-                        <div class="profile-picture-preview" id="add-preview-container"><div style="font-size:48px; color:#ccc;"><i class="fas fa-user"></i></div></div>
-                        <div class="file-upload">
-                            <label for="add_profile_picture" class="file-upload-label"><i class="fas fa-upload"></i> Choose Profile Picture</label>
-                            <input type="file" id="add_profile_picture" name="profile_picture" accept="image/*" onchange="previewImage(this, 'add-preview-container', 'add-file-info', 'add-file-name')">
-                            <div id="add-file-info" class="file-info"><span id="add-file-name" class="file-name"></span><button type="button" class="file-remove" onclick="removeImage('add_profile_picture', 'add-preview-container', 'add-file-info')"><i class="fas fa-times"></i></button></div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Full Name <span class="required">*</span></label>
-                        <input type="text" name="donor_name" class="form-input" required oninput="validateName(this)" placeholder="e.g. John Doe">
-                        <span class="form-guide">Enter full name as per IC. English letters only.</span>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Email <span class="required">*</span></label>
-                            <input type="email" id="email" name="email" class="form-input" required onblur="validateEmail()" placeholder="e.g. user@example.com">
-                            <span class="form-guide">Valid email address (e.g. name@domain.com, must contain @ and domain).</span>
-                            <div id="emailError" class="error-message">Invalid email format.</div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Contact Number <span class="required">*</span></label>
-                            <div class="phone-format"><span class="phone-prefix">+60</span><input type="text" id="contact" name="contact" class="form-input phone-input" required placeholder="11-12345678" maxlength="11"></div>
-                            <span class="form-guide">Format: 12-3456789 or 11-12345678 (No need for +60).</span>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">IC Number</label>
-                            <input type="text" id="ic_number" name="ic_number" class="form-input" placeholder="XXXXXX-XX-XXXX" maxlength="14">
-                            <span class="form-guide">Format: YYMMDD-PB-#### (e.g. 990101-07-1234).</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Date of Birth</label>
-                            <input type="date" id="dob" name="dob" class="form-input" onchange="validateAge()">
-                            <div id="ageError" class="error-message">Must be 18+</div>
-                        </div>
-                    </div>
-                    <div class="form-group"><label class="form-label">Address Line 1</label><input type="text" name="address1" class="form-input" placeholder="e.g. No. 123, Jalan Example"><span class="form-guide">House unit no., floor, building, street name.</span></div>
-                    <div class="form-group"><label class="form-label">Address Line 2</label><input type="text" name="address2" class="form-input" placeholder="e.g. Taman Sri"><span class="form-guide">Residential area, village, or section.</span></div>
-                    <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" name="address3" class="form-input" placeholder="Address Line 3 (Optional)"></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Postal Code</label><input type="text" id="postal_code" name="postal_code" class="form-input" placeholder="e.g. 50000"></div><div class="form-group"><label class="form-label">City</label><input type="text" name="city" class="form-input" placeholder="e.g. Kuala Lumpur"></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">State</label><select id="state_select" name="state" class="form-select"><option value="">Select State</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div><div class="form-group"><label class="form-label">Country</label><input type="text" name="country" class="form-input" value="Malaysia" readonly></div></div>
-                    <div class="form-group"><label class="form-label">Remarks / Description</label><textarea name="description" class="form-textarea" rows="2"></textarea><span class="form-guide">Optional: Enter remarks, preferences, or important notes about this donor.</span></div>
-                    <div class="form-group">
-                        <label class="form-label">Password <span class="required">*</span></label>
-                        <div class="password-input-group">
-                            <div class="password-input-container"><input type="password" id="password" name="password" class="form-input" required oninput="validatePasswordRequirements()"><button type="button" class="toggle-password" onclick="togglePasswordVisibility('password')"><i class="fas fa-eye"></i></button></div>
-                            <button type="button" class="btn-small" onclick="generateStrongPassword('password', 'confirm_password')">Auto Generate</button>
-                        </div>
-                        <div class="password-requirements">
-                            <div class="requirement-item invalid" id="lengthReq"><i class="fas fa-times"></i> Must be 8-15 characters long</div>
-                            <div class="requirement-item invalid" id="uppercaseReq"><i class="fas fa-times"></i> Must contain at least one Uppercase letter</div>
-                            <div class="requirement-item invalid" id="lowercaseReq"><i class="fas fa-times"></i> Must contain at least one Lowercase letter</div>
-                            <div class="requirement-item invalid" id="numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div>
-                            <div class="requirement-item invalid" id="specialReq"><i class="fas fa-times"></i> Must contain at least one Special character (e.g. !@#)</div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Confirm Password <span class="required">*</span></label>
-                        <div class="password-input-container"><input type="password" id="confirm_password" name="confirm_password" class="form-input" required oninput="validatePasswordMatch()"><i id="password-match-icon" class="fas fa-check-circle confirm-check"></i><button type="button" class="toggle-password" onclick="togglePasswordVisibility('confirm_password')"><i class="fas fa-eye"></i></button></div>
-                        <div id="confirmPasswordError" class="error-message">Passwords do not match</div>
-                    </div>
-                    <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Donor</button></div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal" id="addActivityModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Add New Activity</h2><button class="close-btn" onclick="closeAddActivityModal()">&times;</button></div>
-            <div class="modal-body">
-                <form id="addActivityForm" action="activity_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateActivityForm('add')">
-                    <input type="hidden" name="add_activity" value="1">
-                    <div class="form-group">
-                        <label class="form-label">Activity Cover Image</label>
-                        <div class="profile-picture-preview case-preview-box" id="add-act-preview-container"><div style="color:#ccc; font-size:40px;"><i class="fas fa-image"></i></div></div>
-                        <div class="file-upload">
-                            <label for="add_activity_picture" class="file-upload-label"><i class="fas fa-upload"></i> Choose File</label>
-                            <input type="file" id="add_activity_picture" name="activity_picture" accept="image/*" onchange="previewImage(this, 'add-act-preview-container', 'add-act-file-info', 'add-act-file-name')">
-                            <div id="add-act-file-info" class="file-info"><span id="add-act-file-name" class="file-name"></span><button type="button" class="file-remove" onclick="removeImage('add_activity_picture', 'add-act-preview-container', 'add-act-file-info')"><i class="fas fa-times"></i></button></div>
-                        </div>
-                        <span class="form-guide" style="text-align: center;">Recommended size: 800x600px (JPG, PNG). Max 2MB.</span>
-                    </div>
-                    <div class="form-group"><label class="form-label">Activity Name <span class="required">*</span></label><input type="text" name="activity_name" class="form-input" required placeholder="e.g. Annual Charity Run"></div>
-                    <div class="form-row">
-                        <div class="form-group"><label class="form-label">Start Date <span class="required">*</span></label><input type="date" id="add_start_date" name="start_date" class="form-input" required></div>
-                        <div class="form-group">
-                            <label class="form-label">End Date <span class="required">*</span></label>
-                            <input type="date" id="add_end_date" name="end_date" class="form-input" required onchange="validateDates('add_start_date', 'add_end_date', 'add_date_error')">
-                            <div id="add_date_error" class="error-message">End date must be after or equal to Start date.</div>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group"><label class="form-label">Branch <span class="required">*</span></label><select name="branch_id" class="form-select" required><option value="">Select Branch</option><?php foreach($branches as $branch): ?><option value="<?php echo htmlspecialchars($branch['Branch_ID']); ?>"><?php echo htmlspecialchars($branch['Branch_Name']); ?></option><?php endforeach; ?></select></div>
-                        <div class="form-group">
-                            <label class="form-label">Target Amount (RM) <span class="required">*</span></label>
-                            <input type="number" id="add_target_amount" name="target_amount" class="form-input" step="0.01" min="0" required placeholder="0.00" oninput="validateActAmount('add_target_amount', 'add_amount_error')">
-                            <div id="add_amount_error" class="error-message">Amount cannot be negative.</div>
-                        </div>
-                    </div>
-                    <div class="form-group"><label class="form-label">Status <span class="required">*</span></label><select name="activity_status" class="form-select" required><option value="Active">Active</option><option value="Upcoming">Upcoming</option><option value="Completed">Completed</option></select></div>
-                    <div class="form-group"><label class="form-label">Address Line 1 <span class="required">*</span></label><input type="text" name="address1" class="form-input" required placeholder="Street address"></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Address Line 2</label><input type="text" name="address2" class="form-input" placeholder="Apartment, unit, etc."></div><div class="form-group"><label class="form-label">Address Line 3</label><input type="text" name="address3" class="form-input" placeholder="Optional"></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Postal Code <span class="required">*</span></label><input type="text" id="add_act_postal_code" name="postal_code" class="form-input" required placeholder="e.g. 50000"></div><div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" id="add_city" name="city" class="form-input" required placeholder="City"></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">State <span class="required">*</span></label><select id="add_act_state" name="state" class="form-select" required><option value="">Select State</option><?php foreach($malaysiaStates as $state): ?><option value="<?php echo htmlspecialchars($state); ?>"><?php echo htmlspecialchars($state); ?></option><?php endforeach; ?></select><span class="form-guide">Auto-detected from Postcode</span></div><div class="form-group"><label class="form-label">Country</label><input type="text" name="country" class="form-input" value="Malaysia" readonly></div></div>
-                    <div class="form-group"><label class="form-label">Details</label><textarea name="activity_details" class="form-textarea" placeholder="Enter full activity description..."></textarea></div>
-                    <div class="form-group"><button type="submit" class="btn btn-primary" style="width:100%"><i class="fas fa-save"></i> Save Activity</button></div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal" id="addSpecialCaseModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Add Special Case</h2><button class="close-btn" onclick="closeAddSpecialCaseModal()">&times;</button></div>
-            <div class="modal-body">
-                <form id="addSpecialCaseForm" action="special_case_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateCaseForm('addSpecialCaseForm')">
-                    <input type="hidden" name="add_special_case" value="1">
-                    <div class="form-group">
-                        <label class="form-label">Case Image (Banner) <span class="required">*</span></label>
-                        <div class="profile-picture-preview case-preview-box" id="add-case-preview-container"><div style="color:#ccc; font-size:40px;"><i class="fas fa-image"></i></div></div>
-                        <div class="file-upload">
-                            <label for="add_case_image" class="file-upload-label"><i class="fas fa-upload"></i> Choose File</label>
-                            <input type="file" id="add_case_image" name="case_image" accept="image/jpeg,image/png,image/jpg" required onchange="previewImage(this, 'add-case-preview-container', 'add-case-file-info', 'add-case-file-name')">
-                            <div id="add-case-file-info" class="file-info"><span id="add-case-file-name" class="file-name"></span><button type="button" class="file-remove" onclick="removeImage('add_case_image', 'add-case-preview-container', 'add-case-file-info')"><i class="fas fa-times"></i></button></div>
-                        </div>
-                        <div style="text-align: center;"><span class="form-guide" style="font-size: 11px;">Only JPG or PNG files allowed. Max size 2MB recommended.</span></div>
-                    </div>
-                    <div class="form-group"><label class="form-label">Case Title <span class="required">*</span></label><input type="text" name="case_title" class="form-input" required maxlength="100" placeholder="e.g., Emergency Heart Surgery Fund"><span class="form-guide">Keep it short and catchy. Max 100 characters.</span></div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Target Amount (RM) <span class="required">*</span></label>
-                            <input type="number" id="add_case_target_amount" name="target_amount" class="form-input" step="0.01" min="1000" required oninput="validateCaseAmount('add_case_target_amount', 'addCaseAmountError')">
-                            <div id="addCaseAmountError" class="error-message">Target amount must be at least RM 1,000.00.</div>
-                            <span class="form-guide">Minimum target amount is RM 1,000.00.</span>
-                        </div>
-                        <div class="form-group"><label class="form-label">Initial Status</label><select name="case_status" id="add_case_status" class="form-select" onchange="toggleAddDate()"><option value="Active">Active</option><option value="Upcoming">Upcoming</option></select></div>
-                    </div>
-                    <div class="form-group hidden-field" id="add_case_date_container"><label class="form-label">Start Date <span class="required">*</span></label><input type="date" name="start_date" id="add_case_start_date" class="form-input"><span class="form-guide">When will this campaign effectively start?</span></div>
-                    <div class="form-group">
-                        <label class="form-label">Description / Story <span class="required">*</span></label>
-                        <textarea name="case_description" id="add_case_description" class="form-textarea" required minlength="20" placeholder="Explain the background story, the need, and how funds will be used..." oninput="validateDescription('add_case_description', 'addCaseDescError')"></textarea>
-                        <div id="addCaseDescError" class="error-message">Description must be at least 20 characters long.</div>
-                        <span class="form-guide">Detailed explanation helps donors trust the cause (Min 20 chars).</span>
-                    </div>
-                    <div class="form-group"><button type="submit" class="btn btn-primary" style="width:100%"><i class="fas fa-save"></i> Save Case</button></div>
-                </form>
-            </div>
-        </div>
-    </div>
+         <div class="modal-content">
+             <div class="modal-header"><h2>Add New Donor</h2><button class="close-btn" onclick="closeAddDonorModal()">&times;</button></div>
+             <div class="modal-body">
+                 <form id="addDonorForm" action="admin_donor_page.php" method="POST" enctype="multipart/form-data">
+                     <input type="hidden" name="add_donor" value="1">
+                     <p style="text-align:center; color:#666;">(Form content managed in Donor Page)</p>
+                     <div class="form-group"><button type="submit" class="btn btn-primary" onclick="window.location.href='admin_donor_page.php'; return false;">Go to Donor Management</button></div>
+                 </form>
+             </div>
+         </div>
+     </div>
 
     <script>
         // --- CHART JS ---
@@ -902,7 +851,6 @@ $chartData = getDynamicDonationTrends($conn);
             });
         }
 
-        // --- EXPORT FUNCTION ---
         function exportChartData() {
             let csvContent = "data:text/csv;charset=utf-8,Date,Amount (RM)\n";
             chartDataRaw.labels.forEach((label, index) => {
@@ -927,86 +875,31 @@ $chartData = getDynamicDonationTrends($conn);
             document.getElementById(inputId).value = ''; if(infoId) document.getElementById(infoId).style.display = 'none'; 
             const container = document.getElementById(containerId); 
             if (originalSrc) { container.innerHTML = `<img src="${originalSrc}" alt="Preview">`; } 
-            else { 
-                if(containerId.includes('case') || containerId.includes('act')) container.innerHTML = '<div style="color:#ccc; font-size:40px;"><i class="fas fa-image"></i></div>';
-                else container.innerHTML = '<div style="font-size:48px; color:#ccc;"><i class="fas fa-user"></i></div>';
-            } 
+            else { container.innerHTML = '<div style="font-size:48px; color:#ccc;"><i class="fas fa-user"></i></div>'; } 
         }
-        function setupPostcodeState(postcodeId, stateSelectId) {
-            const pcInput = document.getElementById(postcodeId); const stateSelect = document.getElementById(stateSelectId); if (!pcInput || !stateSelect) return;
-            pcInput.addEventListener('input', function() {
-                const val = this.value.replace(/\D/g, '');
-                if (val.length >= 2) {
-                    const prefix = parseInt(val.substring(0, 2)); let state = "";
-                    if (prefix >= 1 && prefix <= 2) state = "Perlis"; else if (prefix >= 5 && prefix <= 9) state = "Kedah"; else if (prefix >= 10 && prefix <= 14) state = "Penang";
-                    else if (prefix >= 15 && prefix <= 18) state = "Kelantan"; else if (prefix >= 20 && prefix <= 24) state = "Terengganu"; else if (prefix >= 25 && prefix <= 28) state = "Pahang";
-                    else if (prefix >= 30 && prefix <= 36) state = "Perak"; else if (prefix >= 40 && prefix <= 48) state = "Selangor"; else if (prefix >= 50 && prefix <= 60) state = "Kuala Lumpur";
-                    else if (prefix >= 62 && prefix <= 62) state = "Putrajaya"; else if (prefix >= 63 && prefix <= 68) state = "Selangor"; else if (prefix >= 70 && prefix <= 73) state = "Negeri Sembilan";
-                    else if (prefix >= 75 && prefix <= 78) state = "Melaka"; else if (prefix >= 79 && prefix <= 86) state = "Johor"; else if (prefix == 87) state = "Labuan";
-                    else if (prefix >= 88 && prefix <= 91) state = "Sabah"; else if (prefix >= 93 && prefix <= 98) state = "Sarawak";
-                    if (state) stateSelect.value = state;
-                }
-            });
-        }
-        
+
         // --- MODAL CONTROLS ---
         function openActivitySelectionModal() { document.getElementById('activitySelectionModal').style.display = 'flex'; }
         function closeActivitySelectionModal() { document.getElementById('activitySelectionModal').style.display = 'none'; }
         
-        function openAddActivityModal() { closeActivitySelectionModal(); document.getElementById('addActivityModal').style.display = 'flex'; }
-        function closeAddActivityModal() { document.getElementById('addActivityModal').style.display = 'none'; document.getElementById('addActivityForm').reset(); document.getElementById('add-act-preview-container').innerHTML = '<div style="color:#ccc; font-size:40px;"><i class="fas fa-image"></i></div>'; document.getElementById('add-act-file-info').style.display = 'none'; document.getElementById('add_date_error').style.display='none'; document.getElementById('add_amount_error').style.display='none'; }
-
-        function openAddSpecialCaseModal() { closeActivitySelectionModal(); document.getElementById('addSpecialCaseModal').style.display = 'flex'; toggleAddDate(); }
-        function closeAddSpecialCaseModal() { document.getElementById('addSpecialCaseModal').style.display = 'none'; document.getElementById('addSpecialCaseForm').reset(); document.getElementById('add-case-preview-container').innerHTML = '<div style="color:#ccc; font-size:40px;"><i class="fas fa-image"></i></div>'; document.getElementById('add-case-file-info').style.display = 'none'; document.getElementById('addCaseAmountError').style.display = 'none'; document.getElementById('addCaseDescError').style.display = 'none'; toggleAddDate(); }
+        function openAddActivityModal() { closeActivitySelectionModal(); window.location.href='activity_management.php?open_add=1'; }
+        function openAddSpecialCaseModal() { closeActivitySelectionModal(); window.location.href='special_case_management.php?open_add=1'; }
 
         function openDonationModal() { document.getElementById('addDonationModal').style.display = 'flex'; }
         function closeDonationModal() { document.getElementById('addDonationModal').style.display = 'none'; }
 
-        function openAddDonorModal() { document.getElementById('addDonorModal').style.display = 'flex'; }
-        function closeAddDonorModal() { document.getElementById('addDonorModal').style.display = 'none'; document.getElementById('addDonorForm').reset(); document.getElementById('add-preview-container').innerHTML = '<div style="font-size:48px; color:#ccc;"><i class="fas fa-user"></i></div>'; document.getElementById('add-file-info').style.display = 'none'; document.querySelectorAll('.requirement-item').forEach(el => { el.className = 'requirement-item invalid'; el.querySelector('i').className = 'fas fa-times'; }); }
+        function openAddDonorModal() { window.location.href='admin_donor_page.php?open_add=1'; } // Redirect to actual page for cleaner logic
 
         window.onclick = function(event) {
             if (event.target == document.getElementById('activitySelectionModal')) closeActivitySelectionModal();
-            if (event.target == document.getElementById('addActivityModal')) closeAddActivityModal();
-            if (event.target == document.getElementById('addSpecialCaseModal')) closeAddSpecialCaseModal();
             if (event.target == document.getElementById('addDonationModal')) closeDonationModal();
-            if (event.target == document.getElementById('addDonorModal')) closeAddDonorModal();
         }
-
-        // --- VALIDATION & LOGIC (COPIED FROM SOURCE FILES) ---
-        // DONOR
-        function setupPhoneInput(inputId) { const input = document.getElementById(inputId); if(!input) return; input.addEventListener('input', function(e) { let val = this.value.replace(/\D/g, ''); if (val.length > 11) val = val.substring(0, 11); let newVal = val; if (val.length > 2) newVal = val.substring(0, 2) + '-' + val.substring(2); this.value = newVal; }); }
-        function setupICInput(inputId, dobInputId) { const input = document.getElementById(inputId); const dobInput = document.getElementById(dobInputId); if(!input) return; input.addEventListener('input', function(e) { let val = this.value.replace(/\D/g, ''); if (val.length > 12) val = val.substring(0, 12); let newVal = ''; newVal += val.substring(0, 6); if (val.length > 6) newVal += '-' + val.substring(6, 8); if (val.length > 8) newVal += '-' + val.substring(8, 12); this.value = newVal; if (val.length >= 6 && dobInput) { const yy = parseInt(val.substring(0, 2)); const mm = val.substring(2, 4); const dd = val.substring(4, 6); const prefix = (yy > (new Date().getFullYear() % 100)) ? '19' : '20'; const fullDate = `${prefix}${val.substring(0, 2)}-${mm}-${dd}`; const dateObj = new Date(fullDate); if (!isNaN(dateObj.getTime())) { dobInput.value = fullDate; validateAge(); } } }); }
-        function generateStrongPassword(passId, confirmId) { const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; const lower = "abcdefghijklmnopqrstuvwxyz"; const numbers = "0123456789"; const specials = "!@#$%^&*"; const all = upper + lower + numbers + specials; let password = ""; password += upper[Math.floor(Math.random() * upper.length)]; password += lower[Math.floor(Math.random() * lower.length)]; password += numbers[Math.floor(Math.random() * numbers.length)]; password += specials[Math.floor(Math.random() * specials.length)]; for (let i = 4; i < 12; i++) { password += all[Math.floor(Math.random() * all.length)]; } password = password.split('').sort(() => 0.5 - Math.random()).join(''); document.getElementById(passId).value = password; if(confirmId) document.getElementById(confirmId).value = password; const passInput = document.getElementById(passId); passInput.type = "text"; const toggleBtn = passInput.nextElementSibling; if(toggleBtn) toggleBtn.querySelector('i').className = 'fas fa-eye-slash'; if(confirmId) { const confirmInput = document.getElementById(confirmId); confirmInput.type = "text"; const confirmToggle = confirmInput.nextElementSibling; if(confirmToggle) confirmToggle.querySelector('i').className = 'fas fa-eye-slash'; } if(passId === 'password') validatePasswordRequirements(); if(confirmId) validatePasswordMatch(); }
-        function validateName(input) { input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); }
-        function validateEmail() { const val = document.getElementById('email').value; const v = /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val); document.getElementById('emailError').style.display = v ? 'none' : 'block'; return v; }
-        function validateAge() { const d = document.getElementById('dob').value; if(!d) return true; return (new Date().getFullYear() - new Date(d).getFullYear()) >= 18; }
-        function validatePasswordRequirements() { const pw = document.getElementById('password').value; const reqs = { lengthReq: pw.length >= 8 && pw.length <= 15, uppercaseReq: /[A-Z]/.test(pw), lowercaseReq: /[a-z]/.test(pw), numberReq: /\d/.test(pw), specialReq: /[!@#$%^&*]/.test(pw) }; let allValid = true; for (const [id, valid] of Object.entries(reqs)) { const el = document.getElementById(id); const icon = el.querySelector('i'); if (valid) { el.className = 'requirement-item valid'; icon.className = 'fas fa-check'; } else { el.className = 'requirement-item invalid'; icon.className = 'fas fa-times'; allValid = false; } } if(document.getElementById('confirm_password').value) validatePasswordMatch(); return allValid; }
-        function validatePasswordMatch() { const m = document.getElementById('password').value === document.getElementById('confirm_password').value; document.getElementById('confirmPasswordError').style.display = m ? 'none' : 'block'; document.getElementById('password-match-icon').style.display = m ? 'block' : 'none'; return m; }
-        function togglePasswordVisibility(id) { const f = document.getElementById(id); const toggleBtn = f.nextElementSibling; if(f.type === 'password') { f.type = 'text'; if(toggleBtn) toggleBtn.querySelector('i').className = 'fas fa-eye-slash'; } else { f.type = 'password'; if(toggleBtn) toggleBtn.querySelector('i').className = 'fas fa-eye'; } }
-        function validateForm() { return validateEmail() && validatePasswordRequirements() && validatePasswordMatch(); }
-
-        // ACTIVITY
-        function validateDates(startId, endId, errorId) { const start = document.getElementById(startId).value; const end = document.getElementById(endId).value; const errorDiv = document.getElementById(errorId); if (start && end) { if (new Date(end) < new Date(start)) { errorDiv.style.display = 'block'; return false; } } errorDiv.style.display = 'none'; return true; }
-        function validateActAmount(amountId, errorId) { const val = document.getElementById(amountId).value; const errorDiv = document.getElementById(errorId); if(val && parseFloat(val) < 0) { errorDiv.style.display = 'block'; return false; } errorDiv.style.display = 'none'; return true; }
-        function validateActivityForm(prefix) { const startId = prefix + '_start_date'; const endId = prefix + '_end_date'; const dateErrId = prefix + '_date_error'; const amountId = prefix + '_target_amount'; const amountErrId = prefix + '_amount_error'; return validateDates(startId, endId, dateErrId) && validateActAmount(amountId, amountErrId); }
-
-        // SPECIAL CASE
-        function toggleAddDate() { const status = document.getElementById('add_case_status').value; const container = document.getElementById('add_case_date_container'); const input = document.getElementById('add_case_start_date'); if (status === 'Upcoming') { container.style.display = 'block'; input.required = true; } else { container.style.display = 'none'; input.required = false; } }
-        function validateCaseAmount(inputId, errorId) { const val = parseFloat(document.getElementById(inputId).value); const errorEl = document.getElementById(errorId); if (isNaN(val) || val < 1000) { errorEl.style.display = 'block'; return false; } else { errorEl.style.display = 'none'; return true; } }
-        function validateDescription(inputId, errorId) { const val = document.getElementById(inputId).value; const errorEl = document.getElementById(errorId); if (val.length < 20) { errorEl.style.display = 'block'; return false; } else { errorEl.style.display = 'none'; return true; } }
-        function validateCaseForm(formId) { let amountId = 'add_case_target_amount'; let amountError = 'addCaseAmountError'; let descId = 'add_case_description'; let descError = 'addCaseDescError'; let isValid = true; if (!validateCaseAmount(amountId, amountError)) isValid = false; if (!validateDescription(descId, descError)) isValid = false; return isValid; }
 
         // Initialize Select2 & Helpers
         $(document).ready(function() {
             $('#donorSelect').select2({ placeholder: "-- Select Existing Donor --", allowClear: true, dropdownParent: $('#addDonationModal') });
-            setupPostcodeState('postal_code', 'state_select'); // Donor
-            setupPostcodeState('add_act_postal_code', 'add_act_state'); // Activity
-            setupPhoneInput('contact'); 
-            setupICInput('ic_number', 'dob');
         });
 
-        // Dynamic Dropdowns for Donation Modal
         function updateTargetOptions() {
             const cat = document.getElementById('targetCategory').value;
             const other = document.getElementById('otherInput');
