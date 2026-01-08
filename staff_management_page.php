@@ -26,7 +26,7 @@ if (isset($_GET['export']) && $_GET['export'] == 'excel') {
     $path = dirname($_SERVER['PHP_SELF']); 
     $baseUrl = rtrim($protocol . "://" . $host . $path, '/\\') . '/';
 
-    // 【修改点 1】导出时过滤掉已删除的员工
+    // 导出时过滤掉已删除的员工
     $sql = "SELECT * FROM staff WHERE Is_Deleted = 0 ORDER BY Staff_ID DESC";
     $result = $conn->query($sql);
 
@@ -113,11 +113,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
     $postalCode = mysqli_real_escape_string($conn, trim($_POST['postal_code']));
     $country = mysqli_real_escape_string($conn, "Malaysia");
     
-    // Role is hardcoded to Staff in logic, though form sends "Staff"
     $role = "Staff"; 
     $status = mysqli_real_escape_string($conn, $_POST['status']);
-    
-    $password = trim($_POST['password']); 
     $comment = mysqli_real_escape_string($conn, $_POST['comment']);
     $adminId = $_SESSION['admin_id'];
 
@@ -129,58 +126,79 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
         }
     }
 
-    // Validation
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !preg_match('/\.(com|net|org|edu|gov|my)$/i', $email)) {
-        $errorMessage = "Invalid email format.";
+    // --- SERVER SIDE VALIDATION ---
+    if (empty($fullName)) {
+        $errorMessage = "Full Name is required.";
+    } elseif (empty($email)) {
+        $errorMessage = "Email is required.";
+    } elseif (empty($contactRaw)) {
+        $errorMessage = "Contact Number is required.";
+    } elseif (empty($icNumber)) {
+        $errorMessage = "IC Number is required.";
+    } elseif (empty($dob)) {
+        $errorMessage = "Date of Birth is required.";
     }
+    // Specific Format Validation
     elseif (!preg_match('/^[a-zA-Z\s]+$/', $fullName)) {
-        $errorMessage = "Name can only contain letters and spaces";
+        $errorMessage = "Name can only contain letters and spaces.";
     }
-    elseif (strlen($contactRaw) < 9 || strlen($contactRaw) > 11) {
-         $errorMessage = "Invalid phone number length.";
+    elseif (strpos($email, '@') === false) {
+        $errorMessage = "Invalid email: Missing '@' symbol.";
     }
-    elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>])[A-Za-z\d!@#$%^&*()\-_=+{};:,<.>]{8,15}$/', $password)) {
-        $errorMessage = "Password does not meet requirements.";
+    elseif (!preg_match('/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) {
+        $errorMessage = "Invalid email: Missing valid domain extension (e.g. .com).";
     }
     else {
-        if (!empty($dob)) {
-            $birthDate = new DateTime($dob);
-            $today = new DateTime();
-            $age = $today->diff($birthDate)->y;
-            if ($age < 18) {
-                $errorMessage = "Staff must be at least 18 years old";
+        // --- Phone Validation ---
+        $phoneParts = explode('-', $contactRaw);
+        if (count($phoneParts) != 2) {
+            $errorMessage = "Invalid phone number format. Must contain '-' (e.g., 12-3456789).";
+        } else {
+            $backDigits = $phoneParts[1];
+            if (strlen($backDigits) < 7 || strlen($backDigits) > 8) {
+                $errorMessage = "Invalid phone number: There must be 7 or 8 digits after the hyphen (-).";
             }
         }
 
         if (!isset($errorMessage)) {
-            $checkEmailSql = "SELECT Staff_ID FROM staff WHERE Staff_Email = '$email'";
-            $emailResult = $conn->query($checkEmailSql);
-            
-            if ($emailResult && $emailResult->num_rows > 0) {
-                $errorMessage = "Email already exists in the system";
-            } else {
-                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-                $dbProfilePic = $profilePicturePath ? "'$profilePicturePath'" : "NULL";
+            // Age Check
+            if (!empty($dob)) {
+                $birthDate = new DateTime($dob);
+                $today = new DateTime();
+                $age = $today->diff($birthDate)->y;
+                if ($age < 18) {
+                    $errorMessage = "Staff must be at least 18 years old.";
+                }
+            }
 
-                // Is_Deleted will default to 0 in DB, so no need to change INSERT
-                $sql = "INSERT INTO staff (
-                    Staff_FullName, Staff_ContactNumber, Staff_ICNumber, 
-                    Staff_Email, Staff_Password, Staff_DOB, 
-                    Staff_Address1, Staff_Address2, Staff_Address3, 
-                    Staff_City, Staff_State, Staff_PostalCode, Staff_Country,
-                    Staff_Comment, Staff_Role, Staff_Status, Staff_ProfilePicture, Admin_ID, Staff_JoinDate
-                ) VALUES (
-                    '$fullName', '$contact', '$icNumber', 
-                    '$email', '$hashedPassword', '$dob',
-                    '$address1', '$address2', '$address3',
-                    '$city', '$state', '$postalCode', '$country',
-                    '$comment', '$role', '$status', $dbProfilePic, '$adminId', NOW()
-                )";
+            if (!isset($errorMessage)) {
+                $checkEmailSql = "SELECT Staff_ID FROM staff WHERE Staff_Email = '$email'";
+                $emailResult = $conn->query($checkEmailSql);
                 
-                if ($conn->query($sql)) {
-                    $successMessage = "Staff added successfully!";
+                if ($emailResult && $emailResult->num_rows > 0) {
+                    $errorMessage = "Email already exists in the system.";
                 } else {
-                    $errorMessage = "Error adding staff: " . $conn->error;
+                    $dbProfilePic = $profilePicturePath ? "'$profilePicturePath'" : "NULL";
+
+                    $sql = "INSERT INTO staff (
+                        Staff_FullName, Staff_ContactNumber, Staff_ICNumber, 
+                        Staff_Email, Staff_Password, Staff_DOB, 
+                        Staff_Address1, Staff_Address2, Staff_Address3, 
+                        Staff_City, Staff_State, Staff_PostalCode, Staff_Country,
+                        Staff_Comment, Staff_Role, Staff_Status, Staff_ProfilePicture, Admin_ID, Staff_JoinDate
+                    ) VALUES (
+                        '$fullName', '$contact', '$icNumber', 
+                        '$email', NULL, '$dob',
+                        '$address1', '$address2', '$address3',
+                        '$city', '$state', '$postalCode', '$country',
+                        '$comment', '$role', '$status', $dbProfilePic, '$adminId', NOW()
+                    )";
+                    
+                    if ($conn->query($sql)) {
+                        $successMessage = "Staff added successfully!";
+                    } else {
+                        $errorMessage = "Error adding staff: " . $conn->error;
+                    }
                 }
             }
         }
@@ -215,7 +233,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_staff'])) {
     $postalCode = mysqli_real_escape_string($conn, trim($_POST['postal_code']));
     $country = mysqli_real_escape_string($conn, "Malaysia");
     
-    // Role hardcoded
     $role = "Staff";
     $status = mysqli_real_escape_string($conn, $_POST['status']);
     $comment = mysqli_real_escape_string($conn, $_POST['comment']);
@@ -234,9 +251,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_staff'])) {
         }
     }
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $errorMessage = "Invalid email format.";
-    } else {
+    // --- SERVER SIDE VALIDATION ---
+    if (empty($fullName)) {
+        $errorMessage = "Full Name is required.";
+    } elseif (empty($email)) {
+        $errorMessage = "Email is required.";
+    } elseif (empty($contactRaw)) {
+        $errorMessage = "Contact Number is required.";
+    } elseif (empty($icNumber)) {
+        $errorMessage = "IC Number is required.";
+    } elseif (empty($dob)) {
+        $errorMessage = "Date of Birth is required.";
+    }
+    // Format Checks
+    elseif (!preg_match('/^[a-zA-Z\s]+$/', $fullName)) {
+        $errorMessage = "Name can only contain letters and spaces.";
+    }
+    elseif (strpos($email, '@') === false) {
+        $errorMessage = "Invalid email: Missing '@' symbol.";
+    }
+    elseif (!preg_match('/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) {
+        $errorMessage = "Invalid email: Missing valid domain extension (e.g. .com).";
+    }
+    else {
+        // Phone Check
+        $phoneParts = explode('-', $contactRaw);
+        if (count($phoneParts) != 2) {
+            $errorMessage = "Invalid phone number format. Must contain '-' (e.g., 12-3456789).";
+        } else {
+            $backDigits = $phoneParts[1];
+            if (strlen($backDigits) < 7 || strlen($backDigits) > 8) {
+                $errorMessage = "Invalid phone number: There must be 7 or 8 digits after the hyphen (-).";
+            }
+        }
+    }
+
+    if (!isset($errorMessage)) {
         $sql = "UPDATE staff SET 
                 Staff_FullName = '$fullName', 
                 Staff_ContactNumber = '$contact', 
@@ -272,7 +322,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_staff'])) {
     }
 }
 
-// --- 3. Handle Change Password (NEW) ---
+// --- 3. Handle Change Password ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     $targetStaffId = mysqli_real_escape_string($conn, $_POST['target_staff_id']);
     $authPassword = $_POST['auth_password']; 
@@ -281,7 +331,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     
     $loggedInAdminId = $_SESSION['admin_id'];
     
-    // 1. Verify Logged-in Admin's Password (Authorization)
     $authSql = "SELECT Admin_Password FROM admin WHERE Admin_ID = $loggedInAdminId";
     $authResult = $conn->query($authSql);
     $currentUser = $authResult->fetch_assoc();
@@ -293,7 +342,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>])[A-Za-z\d!@#$%^&*()\-_=+{};:,<.>]{8,15}$/', $newPassword)) {
         $errorMessage = "New password does not meet security requirements.";
     } else {
-        // 2. Update Target Staff's Password
         $newHashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
         $updatePassSql = "UPDATE staff SET Staff_Password = '$newHashedPassword' WHERE Staff_ID = $targetStaffId";
         
@@ -308,25 +356,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     elseif (!empty($errorMessage)) { header("Location: staff_management_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
 
-// --- 4. Handle Delete Staff (UPDATED: SOFT DELETE) ---
-if (isset($_GET['delete_id'])) {
-    $deleteId = mysqli_real_escape_string($conn, $_GET['delete_id']);
+// --- 4. Handle BLOCK Staff (SOFT DELETE) ---
+// Changed from Delete to Block logic using POST for better security and modal UI
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['block_staff'])) {
+    $blockId = intval($_POST['block_staff_id']);
     
-    // 【修改点 2】 更新 Is_Deleted 状态而不是删除整行
-    $deleteSql = "UPDATE staff SET Is_Deleted = 1 WHERE Staff_ID = $deleteId";
+    // Set Is_Deleted to 1. Moves staff to admin_blocked_staff.php
+    $blockSql = "UPDATE staff SET Is_Deleted = 1 WHERE Staff_ID = $blockId";
     
-    if ($conn->query($deleteSql)) {
-        $successMessage = "Staff deleted successfully!";
+    if ($conn->query($blockSql)) {
+        $successMessage = "Staff blocked successfully! They have been moved to the Blocked Staff list.";
         header("Location: staff_management_page.php?success=" . urlencode($successMessage));
         exit();
     } else {
-        $errorMessage = "Error deleting staff: " . $conn->error;
+        $errorMessage = "Error blocking staff: " . $conn->error;
         header("Location: staff_management_page.php?error=" . urlencode($errorMessage));
         exit();
     }
 }
 
-// --- Get Admin Info (Necessary for Header) ---
+// --- Get Admin Info ---
 $adminId = $_SESSION['admin_id'];
 $adminName = isset($_SESSION['admin_name']) ? $_SESSION['admin_name'] : 'Admin';
 $adminPosition = "System Administrator";
@@ -353,11 +402,10 @@ $start_from = ($page - 1) * $results_per_page;
 $search = "";
 $filterType = "";
 $filterValue = "";
-// Removed Role filter logic since role is only Staff
 $statusFilter = "";
 
-// 【修改点 3】 默认只显示未删除的员工
 $conditions = [];
+// IMPORTANT: Only show staff who are NOT deleted (Is_Deleted = 0)
 $conditions[] = "Is_Deleted = 0";
 
 if (isset($_GET['search']) && !empty($_GET['search'])) {
@@ -408,7 +456,7 @@ if ($result && $result->num_rows > 0) {
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
 $end_record = min($start_from + $results_per_page, $total_records);
 
-// 【修改点 4】 统计数据过滤掉已删除员工
+// Stats
 function getTotalStaffStats($conn) {
     $result = $conn->query("SELECT COUNT(*) as total FROM staff WHERE Is_Deleted = 0");
     return ($result && $result->num_rows > 0) ? $result->fetch_assoc()['total'] : 0;
@@ -494,7 +542,7 @@ $malaysiaStates = [
         .menu-btn { width: 32px; height: 32px; border-radius: 50%; background: white; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: #777; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 14px; }
         .menu-btn:hover { background: #f8f9fa; color: var(--primary); border-color: #ddd; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
 
-        /* Modals & Forms (Local styles) */
+        /* Modals & Forms */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background-color: white; border-radius: 10px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--gray-light); }
@@ -510,10 +558,10 @@ $malaysiaStates = [
         .form-input:read-only, .form-textarea:read-only { background-color: #f8f9fa; color: #555; cursor: default; }
         
         .required { color: red; margin-left: 3px; font-weight: bold; }
-        /* Expanded Form Guide Style */
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
         .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
         
+        /* Password styles */
         .password-requirements { margin-top: 8px; font-size: 12px; }
         .requirement-item { display: flex; align-items: center; margin-bottom: 3px; color: #888; }
         .requirement-item.valid { color: var(--success); }
@@ -544,7 +592,6 @@ $malaysiaStates = [
         .file-name { font-size: 12px; color: #555; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .file-remove { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 14px; padding: 0 5px; }
 
-        /* Alerts */
         .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; max-width: 400px; }
         .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
@@ -652,7 +699,7 @@ $malaysiaStates = [
                                     <div onclick="openViewStaffModal(<?php echo htmlspecialchars(json_encode($staff)); ?>)"><i class="fas fa-eye"></i> View Details</div>
                                     <div onclick='openEditStaffModal(<?php echo json_encode($staff); ?>)'><i class="fas fa-edit"></i> Edit Details</div>
                                     <div onclick="openChangePasswordModal(<?php echo $staff['Staff_ID']; ?>)"><i class="fas fa-key"></i> Change Password</div>
-                                    <a href="javascript:confirmDelete(<?php echo $staff['Staff_ID']; ?>)" class="text-delete"><i class="fas fa-trash"></i> Delete Staff</a>
+                                    <div onclick="openBlockStaffModal(<?php echo $staff['Staff_ID']; ?>, '<?php echo addslashes($staff['Staff_FullName']); ?>')" class="text-delete"><i class="fas fa-ban"></i> Block Staff</div>
                                 </div>
                             </div>
                         </div>
@@ -699,12 +746,10 @@ $malaysiaStates = [
                     <div class="pagination-info">Showing <?php echo $start_record; ?> to <?php echo $end_record; ?> of <?php echo $total_records; ?> results</div>
                     <div class="pagination-controls">
                         <?php 
-                        // Build pagination URL parameters
                         $queryParams = [];
                         if(!empty($search)) $queryParams['search'] = $search;
                         if(!empty($filterType)) {
                             $queryParams['filter_type'] = $filterType;
-                            // Role parameter removed here too
                             if($filterType == 'status' && !empty($statusFilter)) $queryParams['filter_val_status'] = $statusFilter;
                         }
                         
@@ -755,7 +800,7 @@ $malaysiaStates = [
         <div class="modal-content">
             <div class="modal-header"><h2>Add New Staff</h2><button class="close-btn" onclick="closeAddStaffModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="addStaffForm" action="staff_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm()">
+                <form id="addStaffForm" action="staff_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')">
                     <input type="hidden" name="add_staff" value="1">
                     
                     <div class="form-group">
@@ -777,15 +822,15 @@ $malaysiaStates = [
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Email <span class="required">*</span></label>
-                            <input type="email" id="email" name="email" class="form-input" required onblur="validateEmail('email', 'emailError')" placeholder="e.g. user@example.com">
+                            <input type="text" id="email" name="email" class="form-input" required onblur="validateEmail('email', 'emailError')" placeholder="e.g. user@example.com">
                             <span class="form-guide">Valid email address (e.g. name@domain.com).</span>
-                            <div id="emailError" class="error-message">Invalid email format</div>
+                            <div id="emailError" class="error-message">Invalid email format (missing @ or valid domain).</div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Contact Number <span class="required">*</span></label>
                             <div class="phone-format">
                                 <span class="phone-prefix">+60</span>
-                                <input type="text" id="contact" name="contact" class="form-input phone-input" required placeholder="12-3456789" maxlength="11">
+                                <input type="text" id="add_contact" name="contact" class="form-input phone-input" required placeholder="12-3456789" maxlength="11">
                             </div>
                             <span class="form-guide">Format: 12-3456789 or 11-23456789 (No need for +60).</span>
                         </div>
@@ -805,14 +850,14 @@ $malaysiaStates = [
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Address Line 1 <span class="required">*</span></label>
-                        <input type="text" name="address1" class="form-input" required placeholder="e.g. No. 123, Jalan Example">
+                        <label class="form-label">Address Line 1</label>
+                        <input type="text" name="address1" class="form-input" placeholder="e.g. No. 123, Jalan Example">
                         <span class="form-guide">House unit no., floor, building, street name.</span>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Address Line 2 <span class="required">*</span></label>
-                        <input type="text" name="address2" class="form-input" required placeholder="e.g. Taman Sri">
+                        <label class="form-label">Address Line 2</label>
+                        <input type="text" name="address2" class="form-input" placeholder="e.g. Taman Sri">
                         <span class="form-guide">Residential area, village, or section.</span>
                     </div>
 
@@ -821,14 +866,14 @@ $malaysiaStates = [
                         <input type="text" name="address3" class="form-input" placeholder="Address Line 3 (Optional)">
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" name="city" class="form-input" required placeholder="e.g. Kuala Lumpur"></div>
-                        <div class="form-group"><label class="form-label">State <span class="required">*</span></label><select id="state" name="state" class="form-select" required><option value="">Select State</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div>
+                        <div class="form-group"><label class="form-label">City</label><input type="text" name="city" class="form-input" placeholder="e.g. Kuala Lumpur"></div>
+                        <div class="form-group"><label class="form-label">State</label><select id="state" name="state" class="form-select"><option value="">Select State</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div>
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">Postal Code <span class="required">*</span></label>
-                            <input type="text" id="postal_code" name="postal_code" class="form-input" required oninput="detectStateFromPostcode('postal_code', 'state')" placeholder="e.g. 50000">
+                            <label class="form-label">Postal Code</label>
+                            <input type="text" id="postal_code" name="postal_code" class="form-input" oninput="detectStateFromPostcode('postal_code', 'state')" placeholder="e.g. 50000">
                             <span class="form-guide">5-digit postcode.</span>
                         </div>
                         <div class="form-group"><label class="form-label">Country</label><input type="text" name="country" class="form-input" value="Malaysia" readonly></div>
@@ -848,35 +893,6 @@ $malaysiaStates = [
                         <span class="form-guide">Optional notes (e.g., specific skills, emergency contact info, or department details).</span>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Password <span class="required">*</span></label>
-                        <div class="password-input-group">
-                            <div class="password-input-container">
-                                <input type="password" id="password" name="password" class="form-input" required oninput="validatePasswordRequirements()">
-                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('password')"><i class="fas fa-eye"></i></button>
-                            </div>
-                            <button type="button" class="btn-small" onclick="generateStrongPassword('password', 'confirm_password')">Auto Generate</button>
-                        </div>
-                        <div class="password-requirements">
-                            <div class="requirement-item invalid" id="lengthReq"><i class="fas fa-times"></i> Must be 8-15 characters long</div>
-                            <div class="requirement-item invalid" id="uppercaseReq"><i class="fas fa-times"></i> Must contain at least one Uppercase letter</div>
-                            <div class="requirement-item invalid" id="lowercaseReq"><i class="fas fa-times"></i> Must contain at least one Lowercase letter</div>
-                            <div class="requirement-item invalid" id="numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div>
-                            <div class="requirement-item invalid" id="specialReq"><i class="fas fa-times"></i> Must contain at least one Special character (e.g. !@#)</div>
-                        </div>
-                        <div id="passwordError" class="error-message">Password does not meet requirements</div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Confirm Password <span class="required">*</span></label>
-                        <div class="password-input-container">
-                            <input type="password" id="confirm_password" name="confirm_password" class="form-input" required oninput="validateMatch()">
-                            <i id="password-match-icon" class="fas fa-check-circle confirm-check"></i>
-                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('confirm_password')"><i class="fas fa-eye"></i></button>
-                        </div>
-                        <div id="confirmPasswordError" class="error-message">Passwords do not match</div>
-                    </div>
-                    
                     <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Staff</button></div>
                 </form>
             </div>
@@ -887,7 +903,7 @@ $malaysiaStates = [
         <div class="modal-content">
             <div class="modal-header"><h2>Edit Staff</h2><button class="close-btn" onclick="closeEditStaffModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="editStaffForm" action="staff_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateEditForm()">
+                <form id="editStaffForm" action="staff_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('edit')">
                     <input type="hidden" name="update_staff" value="1">
                     <input type="hidden" id="edit_staff_id" name="staff_id">
                     
@@ -934,13 +950,13 @@ $malaysiaStates = [
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Address Line 1 <span class="required">*</span></label>
-                        <input type="text" id="edit_address1" name="address1" class="form-input" required placeholder="Line 1">
+                        <label class="form-label">Address Line 1</label>
+                        <input type="text" id="edit_address1" name="address1" class="form-input" placeholder="Line 1">
                         <span class="form-guide">House unit no., floor, building, street name.</span>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Address Line 2 <span class="required">*</span></label>
-                        <input type="text" id="edit_address2" name="address2" class="form-input" required placeholder="Line 2">
+                        <label class="form-label">Address Line 2</label>
+                        <input type="text" id="edit_address2" name="address2" class="form-input" placeholder="Line 2">
                         <span class="form-guide">Residential area, village, or section.</span>
                     </div>
                     <div class="form-group">
@@ -949,13 +965,13 @@ $malaysiaStates = [
                     </div>
 
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" id="edit_city" name="city" class="form-input" required></div>
-                        <div class="form-group"><label class="form-label">State <span class="required">*</span></label><select id="edit_state" name="state" class="form-select" required><option value="">Select State</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div>
+                        <div class="form-group"><label class="form-label">City</label><input type="text" id="edit_city" name="city" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">State</label><select id="edit_state" name="state" class="form-select"><option value="">Select State</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">Postal Code <span class="required">*</span></label>
-                            <input type="text" id="edit_postal_code" name="postal_code" class="form-input" required oninput="detectStateFromPostcode('edit_postal_code', 'edit_state')">
+                            <label class="form-label">Postal Code</label>
+                            <input type="text" id="edit_postal_code" name="postal_code" class="form-input" oninput="detectStateFromPostcode('edit_postal_code', 'edit_state')">
                             <span class="form-guide">5-digit postcode.</span>
                         </div>
                         <div class="form-group"><label class="form-label">Country</label><input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly></div>
@@ -1001,7 +1017,7 @@ $malaysiaStates = [
                         <label class="form-label">New Password for Staff <span class="required">*</span></label>
                         <div class="password-input-group">
                             <div class="password-input-container">
-                                <input type="password" id="cp_new_password" name="new_password" class="form-input" required oninput="validatePasswordRequirements(this.id, 'cp_req_list', 'cp_')">
+                                <input type="password" id="cp_new_password" name="new_password" class="form-input" required oninput="validatePasswordRequirements('cp_new_password', 'cp_req_list', 'cp_')">
                                 <button type="button" class="toggle-password" onclick="togglePasswordVisibility('cp_new_password')"><i class="fas fa-eye"></i></button>
                             </div>
                             <button type="button" class="btn-small" onclick="generateStrongPassword('cp_new_password', 'cp_confirm_password')">Auto Generate</button>
@@ -1030,6 +1046,33 @@ $malaysiaStates = [
         </div>
     </div>
 
+    <div class="modal" id="blockStaffModal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header" style="background-color: #dc3545; color: white;">
+                <h2 style="font-size: 16px;"><i class="fas fa-exclamation-triangle"></i> Block Confirmation</h2>
+                <button class="close-btn" onclick="closeModal('blockStaffModal')" style="color: white;">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align: center; padding: 30px;">
+                <form method="POST" action="staff_management_page.php">
+                    <input type="hidden" name="block_staff" value="1">
+                    <input type="hidden" name="block_staff_id" id="block_staff_id">
+                    
+                    <i class="fas fa-ban" style="font-size: 50px; color: #dc3545; margin-bottom: 20px;"></i>
+                    <h3 style="margin-bottom: 10px;">Block this staff?</h3>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 25px;">
+                        Are you sure you want to block <strong id="block_staff_name_display"></strong>?<br>
+                        They will be moved to the blocked list and cannot access the system.
+                    </p>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: center;">
+                        <button type="button" class="btn" style="background: #eee; color: #333;" onclick="closeModal('blockStaffModal')">Cancel</button>
+                        <button type="submit" class="btn btn-danger">Yes, Block</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         function toggleFilterInputs() {
             const type = document.getElementById('filterType').value;
@@ -1037,7 +1080,6 @@ $malaysiaStates = [
                 el.classList.remove('active');
                 el.querySelector('select').disabled = true;
             });
-            // Role check removed
             if (type === 'status') {
                 const el = document.getElementById('filter_status_container');
                 el.classList.add('active'); el.querySelector('select').disabled = false;
@@ -1047,7 +1089,7 @@ $malaysiaStates = [
         document.addEventListener('DOMContentLoaded', function() {
             toggleFilterInputs();
             
-            setupPhoneInput('contact');
+            setupPhoneInput('add_contact');
             setupPhoneInput('edit_contact');
             setupICInput('ic_number', 'dob');
             setupICInput('edit_ic_number', 'edit_dob');
@@ -1067,8 +1109,16 @@ $malaysiaStates = [
                 if (event.target == document.getElementById('editStaffModal')) closeEditStaffModal();
                 if (event.target == document.getElementById('viewStaffModal')) closeModal('viewStaffModal');
                 if (event.target == document.getElementById('changePasswordModal')) closeChangePasswordModal();
+                if (event.target == document.getElementById('blockStaffModal')) closeModal('blockStaffModal');
             }
         });
+
+        // New function for Block Modal
+        function openBlockStaffModal(id, name) {
+            document.getElementById('block_staff_id').value = id;
+            document.getElementById('block_staff_name_display').textContent = name;
+            document.getElementById('blockStaffModal').style.display = 'flex';
+        }
         
         function setupPhoneInput(inputId) {
             const input = document.getElementById(inputId);
@@ -1132,7 +1182,6 @@ $malaysiaStates = [
             password = password.split('').sort(() => 0.5 - Math.random()).join('');
             
             document.getElementById(passId).value = password;
-            // Trigger input event for validation
             document.getElementById(passId).dispatchEvent(new Event('input'));
 
             if(confirmId) {
@@ -1142,7 +1191,6 @@ $malaysiaStates = [
             
             const passInput = document.getElementById(passId);
             passInput.type = "text";
-            // Update icon
             if(passInput.parentNode.querySelector('.toggle-password i')) {
                 passInput.parentNode.querySelector('.toggle-password i').className = 'fas fa-eye-slash';
             }
@@ -1204,7 +1252,6 @@ $malaysiaStates = [
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
         function openViewStaffModal(staff) {
-            // -- LOGIC FOR VIEW MODAL PHOTO --
             const img = document.getElementById('view_profile_picture');
             const icon = document.getElementById('view_default_icon');
             
@@ -1216,7 +1263,6 @@ $malaysiaStates = [
                 img.style.display = 'none';
                 icon.style.display = 'flex';
             }
-            // ---------------------------------
 
             document.getElementById('view_fullname').value = staff.Staff_FullName;
             document.getElementById('view_email').value = staff.Staff_Email;
@@ -1239,7 +1285,7 @@ $malaysiaStates = [
             document.getElementById('addStaffForm').reset();
             document.getElementById('add-preview-container').innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>';
             document.getElementById('add-file-info').style.display = 'none';
-            document.querySelectorAll('.requirement-item').forEach(el => { el.className = 'requirement-item invalid'; el.querySelector('i').className = 'fas fa-times'; }); 
+            document.getElementById('emailError').style.display = 'none';
         }
 
         function openEditStaffModal(staff) {
@@ -1262,10 +1308,6 @@ $malaysiaStates = [
             document.getElementById('edit_city').value = staff.Staff_City;
             document.getElementById('edit_state').value = staff.Staff_State;
             document.getElementById('edit_postal_code').value = staff.Staff_PostalCode;
-            
-            // Role is Readonly, so we just set value
-            // document.getElementById('edit_role').value = staff.Staff_Role; 
-            
             document.getElementById('edit_status').value = staff.Staff_Status;
             document.getElementById('edit_comment').value = staff.Staff_Comment;
 
@@ -1281,18 +1323,17 @@ $malaysiaStates = [
             document.getElementById('edit_profile_picture').value = '';
             fileInfo.style.display = 'none';
             document.getElementById('edit-file-remove-btn').onclick = function() { removeImage('edit_profile_picture', 'edit-preview-container', 'edit-file-info', originalSrc); };
+            document.getElementById('editEmailError').style.display = 'none';
             document.getElementById('editStaffModal').style.display = 'flex';
         }
         function closeEditStaffModal() { document.getElementById('editStaffModal').style.display = 'none'; }
         
-        // --- Change Password Functions ---
         function openChangePasswordModal(id) {
             if (!id) return;
             document.getElementById('changePasswordModal').style.display = 'flex';
             document.getElementById('cp_target_id').value = id;
             document.getElementById('changePasswordForm').reset();
             
-            // Reset requirement icons
             document.querySelectorAll('#cp_req_list .requirement-item').forEach(el => {
                 el.className = 'requirement-item invalid';
                 el.querySelector('i').className = 'fas fa-times';
@@ -1301,28 +1342,42 @@ $malaysiaStates = [
         }
         function closeChangePasswordModal() { document.getElementById('changePasswordModal').style.display = 'none'; }
         
-        function confirmDelete(id) { if(confirm('Are you sure you want to delete this staff member?')) window.location.href = 'staff_management_page.php?delete_id=' + id; }
-
         function validateName(input) { input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); }
         
-        function validateEmail(id, errId) {
+        function validateEmail(id) {
             const val = document.getElementById(id).value;
-            const valid = /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val);
-            document.getElementById(errId).style.display = valid ? 'none' : 'block';
-            return valid;
+            // 检查 @ 符号
+            if (val.indexOf('@') === -1) return "Missing '@' symbol";
+            // 检查域名后缀 (TLD)
+            const domainPattern = /@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!domainPattern.test(val)) return "Missing domain extension (e.g. .com)";
+            return ""; // Success
         }
         
         function validateAge(id, errId) {
             const val = document.getElementById(id).value;
-            if(!val) return true;
+            if(!val) return false; // empty is handled by required check
             const age = new Date().getFullYear() - new Date(val).getFullYear();
             const valid = age >= 18;
             document.getElementById(errId).style.display = valid ? 'none' : 'block';
             return valid;
         }
 
-        // Adapted to handle generic IDs or prefixed IDs for different modals
-        function validatePasswordRequirements(passId = 'password', listContainerId = null, prefix = '') {
+        function validatePhone(id) {
+            const val = document.getElementById(id).value;
+            if (!val.includes('-')) return "Format must be XX-XXXXXXX (dash is missing)";
+            
+            const parts = val.split('-');
+            if (parts.length !== 2) return "Invalid format";
+            
+            const back = parts[1];
+            if (back.length < 7 || back.length > 8) {
+                return "Phone number must have 7 or 8 digits after the hyphen (-)";
+            }
+            return ""; // Success
+        }
+
+        function validatePasswordRequirements(passId, listContainerId, prefix = '') {
             const pw = document.getElementById(passId).value;
             const reqs = { 
                 lengthReq: pw.length >= 8 && pw.length <= 15, 
@@ -1333,12 +1388,8 @@ $malaysiaStates = [
             };
             let allValid = true;
             
-            // If prefix provided (like cp_), check those IDs
             for (const [key, valid] of Object.entries(reqs)) {
                 let elId = prefix + key;
-                // fallback for default form
-                if(prefix === '' && !document.getElementById(key)) continue;
-
                 const el = document.getElementById(elId);
                 if(el) {
                     const icon = el.querySelector('i');
@@ -1346,75 +1397,76 @@ $malaysiaStates = [
                     else { el.className = 'requirement-item invalid'; icon.className = 'fas fa-times'; allValid = false; }
                 }
             }
-            
-            // Only show main error message for Add Staff form (which uses 'passwordError')
-            if(passId === 'password') {
-                document.getElementById('passwordError').style.display = (pw && !allValid) ? 'block' : 'none';
-                if(document.getElementById('confirm_password').value) validateMatch();
-            }
-            
             return allValid;
         }
         
-        function validateMatch(confirmId = 'confirm_password', passId = 'password', errorId = 'confirmPasswordError') {
-            // Handle element passing (sometimes passed as ID string, sometimes defaulting)
-            if(typeof confirmId !== 'string') confirmId = confirmId.id; // defensive
-            
+        function validateMatch(confirmId, passId, errorId) {
             const pw = document.getElementById(passId).value;
             const cpw = document.getElementById(confirmId).value;
             const match = pw === cpw && pw !== "";
-            
             document.getElementById(errorId).style.display = (match || cpw === "") ? 'none' : 'block';
-            
-            // Only toggle check icon for Add Staff form
-            if(confirmId === 'confirm_password') {
-                document.getElementById('password-match-icon').style.display = match ? 'block' : 'none';
-            }
             return match;
         }
 
         function togglePasswordVisibility(idOrElement) {
             let f;
-            if (typeof idOrElement === 'string') {
-                f = document.getElementById(idOrElement);
-            } else {
-                // If the element itself is passed (like the button or input)
-                f = idOrElement; 
-            }
+            if (typeof idOrElement === 'string') { f = document.getElementById(idOrElement); } 
+            else { f = idOrElement; }
             
             if (!f) return;
-
-            // Find the icon. It's usually inside the button which is a sibling
             let icon;
-            if (f.nextElementSibling && f.nextElementSibling.tagName === 'BUTTON') {
-                icon = f.nextElementSibling.querySelector('i');
-            } else if (f.parentNode.querySelector('button i')) {
-                // If f is the input, find the button in the same container
-                icon = f.parentNode.querySelector('button i');
-            }
+            if (f.nextElementSibling && f.nextElementSibling.tagName === 'BUTTON') { icon = f.nextElementSibling.querySelector('i'); } 
+            else if (f.parentNode.querySelector('button i')) { icon = f.parentNode.querySelector('button i'); }
             
             if(f.type === 'password') { f.type = 'text'; if(icon) icon.className = 'fas fa-eye-slash'; }
             else { f.type = 'password'; if(icon) icon.className = 'fas fa-eye'; }
         }
 
-        function validateForm() {
-            const vEmail = validateEmail('email', 'emailError');
-            const vPass = validatePasswordRequirements();
-            const vMatch = validateMatch();
-            const vAge = validateAge('dob', 'ageError');
-            return vEmail && vPass && vMatch && vAge;
-        }
+        function validateForm(type) {
+            let errors = [];
 
-        function validateEditForm() {
-            const vEmail = validateEmail('edit_email', 'editEmailError');
-            const vAge = validateAge('edit_dob', 'editAgeError');
-            return vEmail && vAge;
+            if (type === 'add') {
+                // 1. Email check
+                let emailMsg = validateEmail('email');
+                if(emailMsg) errors.push("Email: " + emailMsg);
+                document.getElementById('emailError').style.display = emailMsg ? 'block' : 'none';
+
+                // 2. Age check
+                if(!validateAge('dob', 'ageError')) errors.push("Age: Must be at least 18 years old.");
+
+                // 3. Phone check
+                let phoneMsg = validatePhone('add_contact');
+                if(phoneMsg) errors.push("Contact Number: " + phoneMsg);
+
+                // 4. Other empty checks
+                if(!document.getElementById('ic_number').value) errors.push("IC Number is required.");
+            }
+            else if (type === 'edit') {
+                let emailMsg = validateEmail('edit_email');
+                if(emailMsg) errors.push("Email: " + emailMsg);
+                document.getElementById('editEmailError').style.display = emailMsg ? 'block' : 'none';
+
+                if(!validateAge('edit_dob', 'editAgeError')) errors.push("Age: Must be at least 18 years old.");
+
+                let phoneMsg = validatePhone('edit_contact');
+                if(phoneMsg) errors.push("Contact Number: " + phoneMsg);
+            }
+
+            if (errors.length > 0) {
+                alert("Please correct the following errors before saving:\n\n- " + errors.join("\n- "));
+                return false; // Stop submission
+            }
+            return true; // Allow submission
         }
         
         function validateChangePassword() {
             const vPass = validatePasswordRequirements('cp_new_password', 'cp_req_list', 'cp_');
             const vMatch = validateMatch('cp_confirm_password', 'cp_new_password', 'cp_match_error');
-            return vPass && vMatch;
+            if(!vPass || !vMatch) {
+                alert("Please fix password requirements or matching issues.");
+                return false;
+            }
+            return true;
         }
     </script>
 </body>

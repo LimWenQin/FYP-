@@ -11,25 +11,23 @@ if (!isset($_SESSION['admin_id'])) {
 // Include database connection
 include 'dataconnection.php';
 
-// --- 0. FETCH CURRENT ADMIN INFO (FIX FOR HEADER WARNING) ---
-// This must be done BEFORE including admin_header.php
+// --- 0. FETCH CURRENT ADMIN INFO ---
 $currentAdminId = $_SESSION['admin_id'];
 $headerSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $currentAdminId";
 $headerResult = $conn->query($headerSql);
 
 if ($headerResult && $headerResult->num_rows > 0) {
     $headerRow = $headerResult->fetch_assoc();
-    $adminName = $headerRow['Admin_Name'];         // Fixes the $adminName warning
+    $adminName = $headerRow['Admin_Name'];         
     $adminProfilePicture = $headerRow['Admin_ProfilePicture'];
     $adminPosition = $headerRow['Admin_Role'];
 } else {
-    // Fallback if something goes wrong
     $adminName = "Admin";
     $adminProfilePicture = null;
     $adminPosition = "System Admin";
 }
 
-// --- 1. EXPORT TO EXCEL LOGIC (Modified) ---
+// --- 1. EXPORT TO EXCEL LOGIC ---
 if (isset($_POST['export_excel'])) {
     $filename = "admin_list_" . date('Ymd') . ".xls";
     header("Content-Type: application/vnd.ms-excel");
@@ -37,7 +35,7 @@ if (isset($_POST['export_excel'])) {
     header("Pragma: no-cache");
     header("Expires: 0");
 
-    // 【修改点 1】 导出时过滤掉已删除的 Admin
+    // 导出时过滤掉已删除的 Admin
     $exportSql = "SELECT * FROM admin WHERE Is_Deleted = 0 ORDER BY Admin_ID ASC";
     $exportResult = $conn->query($exportSql);
 
@@ -106,6 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
     $name = mysqli_real_escape_string($conn, trim($_POST['name']));
     $email = mysqli_real_escape_string($conn, trim($_POST['email']));
     
+    // 处理电话号码：去掉空格，确保格式正确
     $contactRaw = trim($_POST['contact']);
     $contact = "+60" . $contactRaw;
     
@@ -122,10 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
     
     $role = mysqli_real_escape_string($conn, $_POST['role']);
     $status = mysqli_real_escape_string($conn, $_POST['status']);
-    // Added Comment
     $comment = mysqli_real_escape_string($conn, $_POST['comment']); 
-    
-    $password = trim($_POST['password']);
     
     $profilePicture = null;
     if (isset($_FILES['profile_picture'])) {
@@ -135,16 +131,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
         }
     }
     
-    // Validation
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !preg_match('/\.(com|net|org|edu|gov|my)$/i', $email)) {
-        $errorMessage = "Invalid email format. Must contain @ and a valid domain.";
-    } elseif (!preg_match('/^[a-zA-Z\s]+$/', $name)) {
+    // --- SERVER SIDE VALIDATION ---
+    // 1. Check for Empty Required Fields
+    if (empty($name)) {
+        $errorMessage = "Full Name is required.";
+    } elseif (empty($email)) {
+        $errorMessage = "Email is required.";
+    } elseif (empty($contactRaw)) {
+        $errorMessage = "Contact Number is required.";
+    } elseif (empty($icNumber)) {
+        $errorMessage = "IC Number is required.";
+    } elseif (empty($dob)) {
+        $errorMessage = "Date of Birth is required.";
+    } 
+    // 2. Validate Specific Formats
+    elseif (!preg_match('/^[a-zA-Z\s]+$/', $name)) {
         $errorMessage = "Name can only contain letters.";
-    } elseif (!preg_match('/^\+60[0-9]{1,2}-[0-9]{7,10}$/', $contact)) { 
-        $errorMessage = "Invalid phone format.";
-    } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>])[A-Za-z\d!@#$%^&*()\-_=+{};:,<.>]{8,15}$/', $password)) {
-        $errorMessage = "Password does not meet security requirements.";
+    } elseif (strpos($email, '@') === false) {
+        $errorMessage = "Invalid email: Missing '@' symbol.";
+    } elseif (!preg_match('/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) {
+        $errorMessage = "Invalid email: Missing valid domain extension (e.g. .com).";
     } else {
+        // --- 电话号码严格验证 (PHP端) ---
+        $phoneParts = explode('-', $contactRaw);
+        if (count($phoneParts) != 2) {
+            $errorMessage = "Invalid phone number format. Must contain '-' (e.g., 12-3456789).";
+        } else {
+            $backDigits = $phoneParts[1];
+            if (strlen($backDigits) < 7 || strlen($backDigits) > 8) {
+                $errorMessage = "Invalid phone number: There must be 7 or 8 digits after the hyphen (-).";
+            }
+        }
+    }
+
+    if (!isset($errorMessage)) {
+        // Age Check
         if (!empty($dob)) {
             $birthDate = new DateTime($dob);
             $today = new DateTime();
@@ -155,24 +176,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
         }
 
         if (!isset($errorMessage)) {
-            // Note: We check if email exists in the system. 
-            // Usually unique constraint is on the email column, so even deleted users retain the email.
-            // If you want to allow re-using email of deleted users, this query needs Is_Deleted = 0.
-            // For now, I'll keep it strict (email must be unique globally).
             $checkEmailSql = "SELECT Admin_ID FROM admin WHERE Admin_Email = '$email'";
             $res = $conn->query($checkEmailSql);
             
             if ($res && $res->num_rows > 0) {
                 $errorMessage = "Email already exists in the system.";
             } else {
-                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-                
-                // Added Admin_Comment to query
+                // 密码存入 NULL
                 $cols = "Admin_Name, Admin_ContactNumber, Admin_ICNUMBER, Admin_Email, Admin_Password, 
                         Admin_Address1, Admin_Address2, Admin_Address3, Admin_City, Admin_State, Admin_PostalCode, Admin_Country, 
                         Admin_DOB, Admin_Role, Admin_Status, Admin_Comment, Is_Deleted";
                 
-                $vals = "'$name', '$contact', '$icNumber', '$email', '$hashedPassword', 
+                $vals = "'$name', '$contact', '$icNumber', '$email', NULL, 
                         '$address1', '$address2', '$address3', '$city', '$state', '$postalCode', '$country',
                         '$dob', '$role', '$status', '$comment', 0";
 
@@ -208,6 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
     $icNumber = mysqli_real_escape_string($conn, trim($_POST['ic_number']));
     $dob = mysqli_real_escape_string($conn, $_POST['dob']);
     
+    // 地址非必填
     $address1 = mysqli_real_escape_string($conn, trim($_POST['address1']));
     $address2 = mysqli_real_escape_string($conn, trim($_POST['address2']));
     $address3 = mysqli_real_escape_string($conn, trim($_POST['address3']));
@@ -218,7 +234,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
     
     $role = mysqli_real_escape_string($conn, $_POST['role']);
     $status = mysqli_real_escape_string($conn, $_POST['status']);
-    // Added Comment Update
     $comment = mysqli_real_escape_string($conn, $_POST['comment']);
     
     $picSql = "";
@@ -235,17 +250,46 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
         }
     }
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-         $errorMessage = "Invalid email format.";
-    } elseif (!preg_match('/^[a-zA-Z\s]+$/', $name)) {
+    // --- SERVER SIDE VALIDATION ---
+    // 1. Check Empty
+    if (empty($name)) {
+        $errorMessage = "Full Name is required.";
+    } elseif (empty($email)) {
+        $errorMessage = "Email is required.";
+    } elseif (empty($contactRaw)) {
+        $errorMessage = "Contact Number is required.";
+    } elseif (empty($icNumber)) {
+        $errorMessage = "IC Number is required.";
+    } elseif (empty($dob)) {
+        $errorMessage = "Date of Birth is required.";
+    }
+    // 2. Format Check
+    elseif (!preg_match('/^[a-zA-Z\s]+$/', $name)) {
         $errorMessage = "Name can only contain letters and spaces.";
+    } elseif (strpos($email, '@') === false) {
+        $errorMessage = "Invalid email: Missing '@' symbol.";
+    } elseif (!preg_match('/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) {
+        $errorMessage = "Invalid email: Missing valid domain extension (e.g. .com).";
     } else {
-        // Added Admin_Comment to update query
+        // --- 电话号码严格验证 (PHP端) ---
+        $phoneParts = explode('-', $contactRaw);
+        if (count($phoneParts) != 2) {
+            $errorMessage = "Invalid phone number format. Must contain '-' (e.g., 12-3456789).";
+        } else {
+            $backDigits = $phoneParts[1];
+            if (strlen($backDigits) < 7 || strlen($backDigits) > 8) {
+                $errorMessage = "Invalid phone number: There must be 7 or 8 digits after the hyphen (-).";
+            }
+        }
+    }
+
+    if (!isset($errorMessage)) {
+        // Validation Passed
         $sql = "UPDATE admin SET 
                 Admin_Name = '$name', 
                 Admin_ContactNumber = '$contact', 
                 Admin_ICNUMBER = '$icNumber', 
-                Admin_Email = '$email',
+                Admin_Email = '$email', 
                 Admin_Address1 = '$address1', 
                 Admin_Address2 = '$address2', 
                 Admin_Address3 = '$address3',
@@ -271,7 +315,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
     elseif (!empty($errorMessage)) { header("Location: admin_management_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
 
-// --- HANDLE CHANGE PASSWORD (unchanged) ---
+// --- HANDLE CHANGE PASSWORD ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     $targetAdminId = mysqli_real_escape_string($conn, $_POST['target_admin_id']);
     $authPassword = $_POST['auth_password']; 
@@ -304,29 +348,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     elseif (!empty($errorMessage)) { header("Location: admin_management_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
 
-// --- DELETE ADMIN (Modified for Soft Delete) ---
-if (isset($_GET['delete_id'])) {
-    $deleteId = $_GET['delete_id'];
-    if ($deleteId == $_SESSION['admin_id']) {
-        $errorMessage = "You cannot delete your own account!";
+// --- HANDLE BLOCK ADMIN (REPLACED DELETE) ---
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['block_admin'])) {
+    $blockId = intval($_POST['block_admin_id']);
+    
+    if ($blockId == $_SESSION['admin_id']) {
+        $errorMessage = "You cannot block your own account!";
         header("Location: admin_management_page.php?error=" . urlencode($errorMessage));
         exit();
     } else {
-        // 【修改点 2】 Soft Delete Logic
-        $deleteSql = "UPDATE admin SET Is_Deleted = 1 WHERE Admin_ID = $deleteId";
-        if ($conn->query($deleteSql)) {
-            $successMessage = "Admin deleted successfully!";
+        // Block: Set Is_Deleted = 1
+        $blockSql = "UPDATE admin SET Is_Deleted = 1 WHERE Admin_ID = $blockId";
+        
+        if ($conn->query($blockSql)) {
+            $successMessage = "Admin blocked successfully!";
             header("Location: admin_management_page.php?success=" . urlencode($successMessage));
             exit();
         } else {
-            $errorMessage = "Error deleting admin: " . $conn->error;
+            $errorMessage = "Error blocking admin: " . $conn->error;
             header("Location: admin_management_page.php?error=" . urlencode($errorMessage));
             exit();
         }
     }
 }
 
-// --- PAGINATION & SEARCH & FILTER (Modified) ---
+// --- PAGINATION & SEARCH & FILTER ---
 $results_per_page = 6;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $page = max(1, $page);
@@ -336,7 +382,7 @@ $searchTerm = isset($_GET['search']) ? mysqli_real_escape_string($conn, $_GET['s
 $filterType = isset($_GET['filter_type']) ? $_GET['filter_type'] : "";
 $filterValue = "";
 
-// 【修改点 3】 默认只显示未删除的 Admin
+// 默认只显示未删除的 Admin
 $conditions = [];
 $conditions[] = "Is_Deleted = 0";
 
@@ -384,7 +430,7 @@ if ($result && $result->num_rows > 0) {
 $start_record = ($total_admins > 0) ? $start_from + 1 : 0;
 $end_record = min($page * $results_per_page, $total_admins);
 
-// 【修改点 4】 统计数据过滤掉已删除的 Admin
+// 统计数据
 $totalAdminsCount = $conn->query("SELECT COUNT(*) as total FROM admin WHERE Is_Deleted = 0")->fetch_assoc()['total'];
 $activeAdminsCount = $conn->query("SELECT COUNT(*) as total FROM admin WHERE Admin_Status = 'Active' AND Is_Deleted = 0")->fetch_assoc()['total'];
 
@@ -493,7 +539,6 @@ $conn->close();
 
         .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
         
-        /* Updated Form Guide Style to match Staff/Donor Page */
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
         .required { color: red; margin-left: 3px; font-weight: bold; }
 
@@ -609,7 +654,8 @@ $conn->close();
                                     <div onclick="openViewAdminModal(<?php echo htmlspecialchars(json_encode($admin)); ?>)"><i class="fas fa-eye"></i> View Details</div>
                                     <div onclick='openEditAdminModal(<?php echo json_encode($admin); ?>)'><i class="fas fa-edit"></i> Edit Details</div>
                                     <div onclick="openChangePasswordModal(<?php echo $admin['Admin_ID']; ?>)"><i class="fas fa-key"></i> Change Password</div>
-                                    <a href="javascript:confirmDelete(<?php echo $admin['Admin_ID']; ?>, '<?php echo htmlspecialchars($admin['Admin_Name']); ?>')" class="text-delete"><i class="fas fa-trash"></i> Delete</a>
+                                    
+                                    <div onclick="openBlockAdminModal(<?php echo $admin['Admin_ID']; ?>, '<?php echo htmlspecialchars($admin['Admin_Name'], ENT_QUOTES); ?>')" class="text-delete"><i class="fas fa-ban"></i> Block Admin</div>
                                 </div>
                             </div>
                         </div>
@@ -708,16 +754,16 @@ $conn->close();
                         <div class="form-group">
                             <label class="form-label">Email <span class="required">*</span></label>
                             <input type="email" id="email" name="email" class="form-input" required onblur="validateEmail('email', 'emailError')" placeholder="e.g. admin@lovebridge.org.my">
-                            <span class="form-guide">Valid email address (e.g. name@domain.com, must contain @ and domain).</span>
-                            <div id="emailError" class="error-message">Invalid email format.</div>
+                            <span class="form-guide">Valid email address (e.g. name@domain.com).</span>
+                            <div id="emailError" class="error-message">Invalid email format (missing @ or valid domain).</div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Contact Number <span class="required">*</span></label>
                             <div class="phone-format">
                                 <span class="phone-prefix">+60</span>
-                                <input type="text" id="contact" name="contact" class="form-input phone-input" required maxlength="11" placeholder="1X-XXXXXXX">
+                                <input type="text" id="add_contact" name="contact" class="form-input phone-input" required maxlength="11" placeholder="1X-XXXXXXX">
                             </div>
-                            <span class="form-guide">Format: 12-3456789 or 11-12345678 (No need for +60).</span>
+                            <span class="form-guide">Format: 12-3456789 (No need for +60).</span>
                         </div>
                     </div>
                     
@@ -735,14 +781,14 @@ $conn->close();
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Address Line 1 <span class="required">*</span></label>
-                        <input type="text" name="address1" class="form-input" required placeholder="House No, Street">
+                        <label class="form-label">Address Line 1</label>
+                        <input type="text" name="address1" class="form-input" placeholder="House No, Street">
                         <span class="form-guide">House unit no., floor, building, street name.</span>
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Address Line 2 <span class="required">*</span></label>
-                        <input type="text" name="address2" class="form-input" required placeholder="Area / Taman">
+                        <label class="form-label">Address Line 2</label>
+                        <input type="text" name="address2" class="form-input" placeholder="Area / Taman">
                         <span class="form-guide">Residential area, village, or section.</span>
                     </div>
                     
@@ -754,21 +800,21 @@ $conn->close();
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">Postal Code <span class="required">*</span></label>
-                            <input type="text" id="postal_code" name="postal_code" class="form-input" required oninput="autoSelectState('postal_code', 'state')">
+                            <label class="form-label">Postal Code</label>
+                            <input type="text" id="postal_code" name="postal_code" class="form-input" oninput="autoSelectState('postal_code', 'state')">
                             <span class="form-guide">Enter postal code first to auto-detect State.</span>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">City <span class="required">*</span></label>
-                            <input type="text" name="city" class="form-input" required>
+                            <label class="form-label">City</label>
+                            <input type="text" name="city" class="form-input">
                             <span class="form-guide">City or Municipality.</span>
                         </div>
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">State <span class="required">*</span></label>
-                            <select id="state" name="state" class="form-select" required>
+                            <label class="form-label">State</label>
+                            <select id="state" name="state" class="form-select">
                                 <option value="">Select State</option>
                                 <?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?>
                             </select>
@@ -790,34 +836,6 @@ $conn->close();
                     <div class="form-row">
                         <div class="form-group"><label class="form-label">Role <span class="required">*</span></label><select name="role" class="form-select" required><option value="Admin">Admin</option><option value="Super Admin">Super Admin</option></select></div>
                         <div class="form-group"><label class="form-label">Status <span class="required">*</span></label><select name="status" class="form-select" required><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Password <span class="required">*</span></label>
-                        <div class="password-input-group">
-                            <div class="password-input-container">
-                                <input type="password" id="password" name="password" class="form-input" required oninput="validatePasswordRequirements('password')">
-                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('password', this)"><i class="fas fa-eye"></i></button>
-                            </div>
-                            <button type="button" class="btn-small" onclick="generateStrongPassword('password', 'confirm_password')">Auto Generate</button>
-                        </div>
-                        <div class="password-requirements" id="passReqList">
-                            <div class="requirement-item invalid" id="lengthReq"><i class="fas fa-times"></i> Must be 8-15 characters long</div>
-                            <div class="requirement-item invalid" id="uppercaseReq"><i class="fas fa-times"></i> Must contain at least one Uppercase letter</div>
-                            <div class="requirement-item invalid" id="lowercaseReq"><i class="fas fa-times"></i> Must contain at least one Lowercase letter</div>
-                            <div class="requirement-item invalid" id="numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div>
-                            <div class="requirement-item invalid" id="specialReq"><i class="fas fa-times"></i> Must contain at least one Special character (e.g. !@#)</div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Confirm Password <span class="required">*</span></label>
-                        <div class="password-input-container">
-                            <input type="password" id="confirm_password" name="confirm_password" class="form-input" required oninput="validatePasswordMatch('password', 'confirm_password', 'confirmPasswordError')">
-                            <i id="password-match-icon" class="fas fa-check-circle confirm-check"></i>
-                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('confirm_password', this)"><i class="fas fa-eye"></i></button>
-                        </div>
-                        <div id="confirmPasswordError" class="error-message">Passwords do not match</div>
                     </div>
                     
                     <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Admin</button></div>
@@ -873,13 +891,13 @@ $conn->close();
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Address Line 1 <span class="required">*</span></label>
-                        <input type="text" id="edit_address1" name="address1" class="form-input" required>
+                        <label class="form-label">Address Line 1</label>
+                        <input type="text" id="edit_address1" name="address1" class="form-input">
                         <span class="form-guide">House unit no., floor, building, street name.</span>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Address Line 2 <span class="required">*</span></label>
-                        <input type="text" id="edit_address2" name="address2" class="form-input" required>
+                        <label class="form-label">Address Line 2</label>
+                        <input type="text" id="edit_address2" name="address2" class="form-input">
                         <span class="form-guide">Residential area, village, or section.</span>
                     </div>
                     <div class="form-group">
@@ -890,21 +908,21 @@ $conn->close();
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">Postal Code <span class="required">*</span></label>
-                            <input type="text" id="edit_postal_code" name="postal_code" class="form-input" required oninput="autoSelectState('edit_postal_code', 'edit_state')">
+                            <label class="form-label">Postal Code</label>
+                            <input type="text" id="edit_postal_code" name="postal_code" class="form-input" oninput="autoSelectState('edit_postal_code', 'edit_state')">
                             <span class="form-guide">Enter postal code first to auto-detect State.</span>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">City <span class="required">*</span></label>
-                            <input type="text" id="edit_city" name="city" class="form-input" required>
+                            <label class="form-label">City</label>
+                            <input type="text" id="edit_city" name="city" class="form-input">
                             <span class="form-guide">City or Municipality.</span>
                         </div>
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">State <span class="required">*</span></label>
-                            <select id="edit_state" name="state" class="form-select" required>
+                            <label class="form-label">State</label>
+                            <select id="edit_state" name="state" class="form-select">
                                 <option value="">Select State</option>
                                 <?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?>
                             </select>
@@ -1006,6 +1024,33 @@ $conn->close();
             </div>
         </div>
     </div>
+
+    <div class="modal" id="blockAdminModal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header" style="background-color: #dc3545; color: white;">
+                <h2 style="font-size: 16px;"><i class="fas fa-exclamation-triangle"></i> Block Admin</h2>
+                <button class="close-btn" onclick="closeModal('blockAdminModal')" style="color: white;">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align: center; padding: 30px;">
+                <form method="POST" action="admin_management_page.php">
+                    <input type="hidden" name="block_admin" value="1">
+                    <input type="hidden" name="block_admin_id" id="block_admin_id">
+                    
+                    <i class="fas fa-ban" style="font-size: 50px; color: #dc3545; margin-bottom: 20px;"></i>
+                    <h3 style="margin-bottom: 10px;">Block this admin?</h3>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 25px;">
+                        Are you sure you want to block <strong id="block_admin_name_display"></strong>?<br>
+                        They will not be able to log in to the admin panel.
+                    </p>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: center;">
+                        <button type="button" class="btn" style="background: #eee; color: #333;" onclick="closeModal('blockAdminModal')">Cancel</button>
+                        <button type="submit" class="btn btn-danger">Yes, Block</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     
     <script>
         // Filters Logic
@@ -1028,7 +1073,7 @@ $conn->close();
 
         document.addEventListener('DOMContentLoaded', function() {
             toggleFilterInputs();
-            setupPhoneInput('contact'); 
+            setupPhoneInput('add_contact'); 
             setupPhoneInput('edit_contact');
             setupICInput('ic_number', 'dob'); 
             setupICInput('edit_ic_number', 'edit_dob'); 
@@ -1038,22 +1083,21 @@ $conn->close();
             const e = document.getElementById('floatingError');
             if(s) { s.style.opacity='0'; setTimeout(()=>s.style.display='none',3000); }
             if(e) { e.style.opacity='0'; setTimeout(()=>e.style.display='none',3000); }
+            
+            // Modal closing logic
+            window.onclick = function(e) { 
+                if (!e.target.matches('.menu-btn') && !e.target.matches('.menu-btn *')) { 
+                    document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); 
+                } 
+                if (e.target.classList.contains('modal')) e.target.style.display = "none"; 
+            }
         });
 
         // Dropdown Logic for Table Actions
         function toggleMenu(e, id) { 
             e.stopPropagation(); 
-            // Close all other dropdowns
             document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); 
-            // Toggle current one
             document.getElementById('menu-' + id).style.display = 'block'; 
-        }
-        
-        window.onclick = function(e) { 
-            if (!e.target.matches('.menu-btn') && !e.target.matches('.menu-btn *')) { 
-                document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); 
-            } 
-            if (e.target.classList.contains('modal')) e.target.style.display = "none"; 
         }
 
         // --- Image Preview Logic ---
@@ -1084,14 +1128,12 @@ $conn->close();
             document.getElementById('edit_name').value = admin.Admin_Name;
             document.getElementById('edit_email').value = admin.Admin_Email;
             
-            // Edit: Remove +60 for display in input
             let cleanContact = admin.Admin_ContactNumber;
             if(cleanContact.startsWith('+60')) cleanContact = cleanContact.substring(3);
             document.getElementById('edit_contact').value = cleanContact;
             
             let icInput = document.getElementById('edit_ic_number');
             icInput.value = admin.Admin_ICNUMBER;
-            // Trigger IC formatting to add dashes if stored without them
             if (typeof icInput.dispatchEvent === "function") {
                  icInput.dispatchEvent(new Event('input'));
             }
@@ -1106,7 +1148,6 @@ $conn->close();
             document.getElementById('edit_postal_code').value = admin.Admin_PostalCode;
             document.getElementById('edit_role').value = admin.Admin_Role;
             document.getElementById('edit_status').value = admin.Admin_Status || 'Active';
-            // Set Comment
             document.getElementById('edit_comment').value = admin.Admin_Comment ? admin.Admin_Comment : '';
             
             const container = document.getElementById('edit-preview-container');
@@ -1163,11 +1204,13 @@ $conn->close();
         }
         function closeViewAdminModal() { document.getElementById('viewAdminModal').style.display = 'none'; }
 
-        function confirmDelete(id, name) {
-            if (confirm("Are you sure you want to delete admin '" + name + "'? This action cannot be undone.")) {
-                window.location.href = "admin_management_page.php?delete_id=" + id;
-            }
+        // --- 【新增点：Block Admin Modal Functions】 ---
+        function openBlockAdminModal(id, name) {
+            document.getElementById('block_admin_id').value = id;
+            document.getElementById('block_admin_name_display').textContent = name;
+            document.getElementById('blockAdminModal').style.display = 'flex';
         }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
         // --- Helper Functions (Formatting & Validation) ---
         function setupPhoneInput(id) { 
@@ -1206,7 +1249,6 @@ $conn->close();
                     const dateObj = new Date(fullDate);
                     if (!isNaN(dateObj.getTime())) { 
                         dobInput.value = fullDate; 
-                        // Trigger validation if function exists
                         if (inputId === 'ic_number') validateAge('dob', 'ageError');
                         if (inputId === 'edit_ic_number') validateAge('edit_dob', 'editAgeError');
                     }
@@ -1260,9 +1302,33 @@ $conn->close();
         
         function validateEmail(id, errorId) { 
             const val = document.getElementById(id).value;
-            const v = /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val); 
-            document.getElementById(errorId).style.display = v ? 'none' : 'block'; 
-            return v; 
+            const errorDiv = document.getElementById(errorId);
+            if (val.indexOf('@') === -1) {
+                errorDiv.innerText = "Missing '@' symbol";
+                errorDiv.style.display = 'block';
+                return false;
+            }
+            const domainPattern = /@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!domainPattern.test(val)) {
+                errorDiv.innerText = "Missing domain extension (e.g. .com)";
+                errorDiv.style.display = 'block';
+                return false;
+            }
+            errorDiv.style.display = 'none';
+            return true;
+        }
+        
+        // --- Added: Phone Validation ---
+        function validatePhone(id) {
+            const val = document.getElementById(id).value;
+            if (!val.includes('-')) return "Format must be XX-XXXXXXX (dash is missing)";
+            const parts = val.split('-');
+            if (parts.length !== 2) return "Invalid format";
+            const back = parts[1];
+            if (back.length < 7 || back.length > 8) {
+                return "Phone number must have 7 or 8 digits after the hyphen (-)";
+            }
+            return ""; 
         }
         
         function validateAge(id, errorId) { 
@@ -1293,7 +1359,6 @@ $conn->close();
             document.getElementById(passId).dispatchEvent(new Event('input'));
             document.getElementById(confirmId).dispatchEvent(new Event('input'));
             
-            // Show password
             const passInput = document.getElementById(passId);
             passInput.type = "text";
             if(passInput.nextElementSibling) passInput.nextElementSibling.querySelector('i').className = 'fas fa-eye-slash';
@@ -1328,36 +1393,50 @@ $conn->close();
         function validatePasswordMatch(passId, confirmId, errorId) {
             const m = document.getElementById(passId).value === document.getElementById(confirmId).value;
             document.getElementById(errorId).style.display = m ? 'none' : 'block';
-            
-            // Show check icon if matching
             const container = document.getElementById(confirmId).parentElement;
             const checkIcon = container.querySelector('.confirm-check');
             if(checkIcon) checkIcon.style.display = (m && document.getElementById(passId).value.length > 0) ? 'block' : 'none';
-            
             return m;
         }
 
         function validateForm(type) { 
-            let vEmail, vAge, vPass = true, vMatch = true;
+            let errors = [];
             if (type === 'add') {
-                vEmail = validateEmail('email', 'emailError');
-                vAge = validateAge('dob', 'ageError');
-                vPass = validatePasswordRequirements('password');
-                vMatch = validatePasswordMatch('password', 'confirm_password', 'confirmPasswordError');
-                return vEmail && vAge && vPass && vMatch;
+                let emailMsg = validateEmail('email', 'emailError');
+                if(!emailMsg) errors.push("Invalid Email format (check @ and domain)."); 
+                
+                if(!validateAge('dob', 'ageError')) errors.push("Age: Must be at least 18 years old.");
+                
+                let phoneMsg = validatePhone('add_contact');
+                if(phoneMsg) errors.push("Contact Number: " + phoneMsg);
+                
+                if(!document.getElementById('ic_number').value) errors.push("IC Number is required.");
             } 
             else if (type === 'edit') {
-                vEmail = validateEmail('edit_email', 'editEmailError');
-                vAge = validateAge('edit_dob', 'editAgeError');
-                return vEmail && vAge;
+                let emailMsg = validateEmail('edit_email', 'editEmailError');
+                if(!emailMsg) errors.push("Invalid Email format."); 
+                
+                if(!validateAge('edit_dob', 'editAgeError')) errors.push("Age: Must be at least 18 years old.");
+                
+                let phoneMsg = validatePhone('edit_contact');
+                if(phoneMsg) errors.push("Contact Number: " + phoneMsg);
             }
-            return false;
+
+            if (errors.length > 0) {
+                alert("Please correct the following errors before saving:\n\n- " + errors.join("\n- "));
+                return false; 
+            }
+            return true; 
         }
         
         function validateChangePassword() {
             const vPass = validatePasswordRequirements('cp_new_password', 'cp_req_list', 'cp_');
             const vMatch = validatePasswordMatch('cp_new_password', 'cp_confirm_password', 'cp_match_error');
-            return vPass && vMatch;
+            if(!vPass || !vMatch) {
+                alert("Please fix password requirements or matching issues.");
+                return false;
+            }
+            return true;
         }
     </script>
 </body>

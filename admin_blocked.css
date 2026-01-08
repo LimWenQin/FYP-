@@ -1,0 +1,185 @@
+/* admin_blocked.css */
+
+/* 容器样式 */
+.blocked-table-container { 
+    background: white; 
+    padding: 25px; 
+    border-radius: 12px; 
+    box-shadow: 0 5px 20px rgba(0,0,0,0.05); 
+}
+
+.table-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 25px; 
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 15px;
+}
+
+.table-header h2 { 
+    margin: 0; 
+    color: #dc3545; 
+    font-size: 22px; /* 字体加大 */
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* 筛选栏样式 */
+.search-filter-container { 
+    margin-bottom: 20px; 
+    display: flex; 
+    gap: 15px; 
+    align-items: center; 
+    background: #f8f9fa; 
+    padding: 15px 20px; 
+    border-radius: 10px; 
+    border: 1px solid #eee; 
+    flex-wrap: wrap;
+}
+
+.filter-select {
+    padding: 10px 15px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    outline: none;
+    background-color: white;
+    color: #495057;
+    font-size: 15px; /* 字体加大 */
+    min-width: 160px;
+    cursor: pointer;
+    height: 45px; /* 高度增加 */
+}
+/* 修改: 聚焦颜色改为 #f28585 */
+.filter-select:focus { border-color: #f28585; }
+
+.search-input { 
+    flex: 1; 
+    padding: 10px 15px; 
+    border: 1px solid #ced4da; 
+    border-radius: 6px; 
+    outline: none; 
+    background: white; 
+    font-size: 15px; /* 字体加大 */
+    min-width: 250px; 
+    height: 45px; /* 高度增加 */
+}
+/* 修改: 聚焦颜色改为 #f28585 */
+.search-input:focus { border-color: #f28585; }
+
+/* 按钮通用样式 */
+.btn { 
+    padding: 0 20px; /* 使用高度控制，padding只控制左右 */
+    height: 45px;
+    border-radius: 6px; 
+    border: none; 
+    cursor: pointer; 
+    font-weight: 600; 
+    transition: all 0.3s; 
+    display: inline-flex; 
+    align-items: center; 
+    justify-content: center;
+    gap: 8px; 
+    text-decoration: none; 
+    font-size: 14px; 
+}
+
+/* 修改: btn-primary 背景色改为 #f28585 (Love Bridge Pink) */
+.btn-primary { background: #f28585; color: white; }
+
+.btn-danger { background: #dc3545; color: white; }
+.btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+/* 表格样式 - 宽松版 */
+table { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 0; }
+
+th { 
+    background: #f8f9fa; 
+    color: #495057; 
+    font-weight: 700; 
+    font-size: 15px; /* 字体加大 */
+    padding: 18px 20px; /* 大幅增加 Padding */
+    text-align: left; 
+    border-top: 1px solid #dee2e6; 
+    border-bottom: 2px solid #dee2e6; 
+}
+
+td { 
+    padding: 20px 20px; /* 大幅增加 Padding，让内容不拥挤 */
+    border-bottom: 1px solid #f0f0f0; 
+    vertical-align: middle; 
+    color: #333; 
+    font-size: 15px; /* 字体加大 */
+}
+tr:hover td { background-color: #fcfcfc; }
+
+/* Action Cell 居中 */
+.action-cell { 
+    text-align: center !important; 
+    width: 100px;
+}
+
+/* Action Menu */
+.action-menu { 
+    position: relative; 
+    display: inline-flex; 
+    justify-content: center;
+}
+
+.menu-btn { 
+    background: white; border: 1px solid #dee2e6; 
+    width: 36px; height: 36px; /* 按钮加大 */
+    border-radius: 50%; 
+    color: #6c757d; display: flex; align-items: center; justify-content: center; 
+    cursor: pointer; transition: all 0.2s; font-size: 16px;
+}
+/* 修改: Hover 颜色改为 #f28585 */
+.menu-btn:hover { background: #f1f3f5; color: #f28585; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+
+.dropdown-content { 
+    display: none; position: absolute; right: 0; top: 40px; 
+    background: white; min-width: 160px; 
+    box-shadow: 0 5px 20px rgba(0,0,0,0.15); 
+    z-index: 1000; border-radius: 8px; border: 1px solid #eee; overflow: hidden; 
+    text-align: left; 
+}
+.dropdown-content a { 
+    color: #333; padding: 12px 18px; text-decoration: none; 
+    display: flex; align-items: center; gap: 10px; font-size: 14px; 
+    transition: background 0.2s; 
+}
+/* 修改: 下拉菜单 Hover 颜色改为 #f28585 */
+.dropdown-content a:hover { background: #f8f9fa; color: #f28585; }
+
+.text-restore { color: #28a745 !important; }
+.text-delete { color: #dc3545 !important; border-top: 1px solid #f1f1f1; }
+
+/* 用户信息列样式 */
+.user-info { display: flex; align-items: center; gap: 15px; }
+.avatar-circle { 
+    width: 45px; height: 45px; /* 头像加大 */
+    border-radius: 50%; 
+    background: #e9ecef; color: #adb5bd;
+    display: flex; align-items: center; justify-content: center; 
+    overflow: hidden; flex-shrink: 0; font-size: 20px;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+.avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
+.user-details strong { display: block; color: #212529; font-size: 16px; line-height: 1.4; } /* 名字加大 */
+.user-details small { color: #868e96; font-size: 13px; display: none; /* ID如果独立一列，这里可以隐藏或者保留作为副标题 */ } 
+
+.empty-state { text-align: center; padding: 50px; color: #adb5bd; font-style: italic; font-size: 16px; }
+
+/* Alert */
+.floating-alert { 
+    position: fixed; top: 30px; right: 30px; 
+    padding: 15px 25px; border-radius: 8px; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
+    z-index: 9999; background: white; font-weight: 600; font-size: 15px;
+    display: flex; align-items: center; gap: 12px;
+    animation: slideIn 0.3s ease-out;
+}
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

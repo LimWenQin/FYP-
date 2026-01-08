@@ -4,7 +4,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 
 <style>
-    /* 默认情况（展开时）：箭头显示，并且靠右 */
     .sidebar-menu li a .arrow {
         display: inline-block;
         margin-left: auto;
@@ -12,16 +11,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
         float: right; 
         margin-top: 5px;
     }
-
-    /* 折叠时隐藏箭头 */
-    .sidebar.collapsed .sidebar-menu li a .arrow {
-        display: none !important;
-    }
-
-    /* 展开时箭头旋转 */
-    .sidebar-menu li.open > a .arrow {
-        transform: rotate(180deg);
-    }
+    .sidebar.collapsed .sidebar-menu li a .arrow { display: none !important; }
+    .sidebar-menu li.open > a .arrow { transform: rotate(180deg); }
 </style>
 
 <div class="sidebar collapsed" id="sidebar">
@@ -38,7 +29,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <i class="fas fa-users"></i> <span>Donor Management</span>
                 </a>
             </li>
-
             <li>
                 <a href="staff_management_page.php" class="<?php echo $current_page == 'staff_management_page.php' ? 'active' : ''; ?>">
                     <i class="fas fa-user-tie"></i> <span>Staff Management</span>
@@ -49,6 +39,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <i class="fas fa-user-shield"></i> <span>Admin Management</span>
                 </a>
             </li>
+
             <li>
                 <a href="branch_management_page.php" class="<?php echo $current_page == 'branch_management_page.php' ? 'active' : ''; ?>">
                     <i class="fas fa-map-marker-alt"></i> <span>Branch Management</span>
@@ -65,16 +56,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <i class="fas fa-chevron-down arrow"></i>
                 </a>
                 <ul class="submenu <?php echo $is_campaign_active ? 'show' : ''; ?>">
-                    <li>
-                        <a href="activity_management.php" class="<?php echo $current_page == 'activity_management.php' ? 'active' : ''; ?>">
-                            In-Person Activity
-                        </a>
-                    </li>
-                    <li>
-                        <a href="special_case_management.php" class="<?php echo $current_page == 'special_case_management.php' ? 'active' : ''; ?>">
-                            Special Case
-                        </a>
-                    </li>
+                    <li><a href="activity_management.php" class="<?php echo $current_page == 'activity_management.php' ? 'active' : ''; ?>">In-Person Activity</a></li>
+                    <li><a href="special_case_management.php" class="<?php echo $current_page == 'special_case_management.php' ? 'active' : ''; ?>">Special Case</a></li>
                 </ul>
             </li>
 
@@ -100,23 +83,25 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <i class="fas fa-chevron-down arrow"></i>
                 </a>
                 <ul class="submenu <?php echo $is_reward_active ? 'show' : ''; ?>">
-                    <li>
-                        <a href="reward_item_management.php" class="<?php echo $current_page == 'reward_item_management.php' ? 'active' : ''; ?>">
-                            Reward Items
-                        </a>
-                    </li>
-                    <li>
-                        <a href="redemption_order_management.php" class="<?php echo $current_page == 'redemption_order_management.php' ? 'active' : ''; ?>">
-                            Redemption Orders
-                        </a>
-                    </li>
+                    <li><a href="reward_item_management.php" class="<?php echo $current_page == 'reward_item_management.php' ? 'active' : ''; ?>">Reward Items</a></li>
+                    <li><a href="redemption_order_management.php" class="<?php echo $current_page == 'redemption_order_management.php' ? 'active' : ''; ?>">Redemption Orders</a></li>
                 </ul>
             </li>
 
-            <li>
-                <a href="admin_blocked_donors.php" class="<?php echo $current_page == 'admin_blocked_donors.php' ? 'active' : ''; ?>" style="font-size: 0.9em; padding-left: 20px; color: #8B0000;">
-                    <i class="fas fa-user-slash"></i> <span>Blocked Donors</span>
+            <?php 
+                $is_block_active = ($current_page == 'admin_blocked_donors.php' || $current_page == 'admin_blocked_staff.php' || $current_page == 'admin_blocked_admins.php');
+            ?>
+            <li class="has-submenu <?php echo $is_block_active ? 'open' : ''; ?>">
+                <a href="javascript:void(0)" onclick="toggleSubmenu(this)">
+                    <i class="fas fa-ban" style="color: #dc3545;"></i> 
+                    <span style="color: #dc3545;">Block List</span>
+                    <i class="fas fa-chevron-down arrow" style="color: #dc3545;"></i>
                 </a>
+                <ul class="submenu <?php echo $is_block_active ? 'show' : ''; ?>">
+                    <li><a href="admin_blocked_donors.php" class="<?php echo $current_page == 'admin_blocked_donors.php' ? 'active' : ''; ?>">Blocked Donors</a></li>
+                    <li><a href="admin_blocked_staff.php" class="<?php echo $current_page == 'admin_blocked_staff.php' ? 'active' : ''; ?>">Blocked Staff</a></li>
+                    <li><a href="admin_blocked_admins.php" class="<?php echo $current_page == 'admin_blocked_admins.php' ? 'active' : ''; ?>">Blocked Admins</a></li>
+                </ul>
             </li>
 
         </ul>
@@ -125,7 +110,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // --- 1. Sidebar Logic ---
     const sidebar = document.getElementById('sidebar');
     const mainContent = document.getElementById('mainContent');
 
@@ -134,45 +118,13 @@ document.addEventListener('DOMContentLoaded', function() {
             sidebar.classList.remove('collapsed');
             mainContent.classList.add('expanded');
         });
-
         sidebar.addEventListener('mouseleave', function() {
             sidebar.classList.add('collapsed');
             mainContent.classList.remove('expanded');
-
-            const submenus = document.querySelectorAll('.sidebar-menu .submenu');
-            const menuItems = document.querySelectorAll('.sidebar-menu .has-submenu');
-
-            submenus.forEach(menu => menu.classList.remove('show'));
-            menuItems.forEach(item => item.classList.remove('open'));
+            document.querySelectorAll('.sidebar-menu .submenu').forEach(menu => menu.classList.remove('show'));
+            document.querySelectorAll('.sidebar-menu .has-submenu').forEach(item => item.classList.remove('open'));
         });
     }
-
-    // --- 2. Header Dropdown Logic ---
-    const notificationDropdown = document.getElementById('notificationDropdown');
-    const notificationMenu = document.getElementById('notificationMenu');
-    const userProfileDropdown = document.getElementById('userProfileDropdown');
-    const userProfileMenu = document.getElementById('userProfileMenu');
-
-    if(notificationDropdown) {
-        notificationDropdown.addEventListener('click', function(e) {
-            e.stopPropagation();
-            notificationMenu.classList.toggle('show');
-            if(userProfileMenu) userProfileMenu.classList.remove('show');
-        });
-    }
-
-    if(userProfileDropdown) {
-        userProfileDropdown.addEventListener('click', function(e) {
-            e.stopPropagation();
-            userProfileMenu.classList.toggle('show');
-            if(notificationMenu) notificationMenu.classList.remove('show');
-        });
-    }
-
-    document.addEventListener('click', function() {
-        if(notificationMenu) notificationMenu.classList.remove('show');
-        if(userProfileMenu) userProfileMenu.classList.remove('show');
-    });
 });
 
 function toggleSubmenu(element) {
@@ -184,10 +136,5 @@ function toggleSubmenu(element) {
     
     parentLi.classList.toggle('open');
     submenu.classList.toggle('show');
-}
-
-function markAllAsRead() {
-    const badge = document.querySelector('.notification-count');
-    if(badge) badge.style.display = 'none';
 }
 </script>
