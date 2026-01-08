@@ -12,16 +12,13 @@ include 'dataconnection.php';
 require_once 'mail_receipt.php'; 
 
 // ==========================================
-// 2. 获取管理员资料 (用于 Header 显示)
+// 2. 获取管理员资料 (用于 Header/Sidebar 显示)
 // ==========================================
 $adminId = $_SESSION['admin_id'];
-
-// 初始化变量
 $adminName = 'Admin';
 $adminPosition = 'Role';
-$adminProfilePicture = '';
+$adminProfilePicture = 'images/default_profile.png'; // 默认图
 
-// 抓取管理员资料
 $stmt = $conn->prepare("SELECT Admin_Name, Admin_Role, Admin_ProfilePicture FROM admin WHERE Admin_ID = ?");
 $stmt->bind_param("i", $adminId);
 $stmt->execute();
@@ -29,7 +26,9 @@ $res = $stmt->get_result();
 if ($res && $row = $res->fetch_assoc()) {
     $adminName = $row['Admin_Name'];
     $adminPosition = $row['Admin_Role'];
-    $adminProfilePicture = $row['Admin_ProfilePicture'];
+    if(!empty($row['Admin_ProfilePicture'])) {
+        $adminProfilePicture = $row['Admin_ProfilePicture'];
+    }
 }
 $stmt->close();
 
@@ -42,7 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'approve') {
         // --- APPROVE 逻辑 ---
-        $sql = "SELECT p.*, o.Order_ID, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Case_ID, o.Order_Created_At, o.Donor_ID, o.Order_TXN_Ref,
+        
+        // 1. 获取详细信息 (!!! 关键修复：加入了 o.Order_TXN_Ref !!!)
+        $sql = "SELECT p.*, o.Order_ID, o.Order_TXN_Ref, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Case_ID, o.Order_Created_At, o.Donor_ID,
                        d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber, d.Donor_Address1, d.Donor_Address2, d.Donor_City, d.Donor_State, d.Donor_PostalCode
                 FROM orders o 
                 JOIN payment p ON o.Payment_ID = p.Payment_ID 
@@ -57,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
 
         if ($row) {
-            // 确定项目名称
+            // 2. 确定项目名称
             $project_name = "Love Bridge Fund"; 
             if (!empty($row['Case_ID'])) {
                 $c_stmt = $conn->prepare("SELECT Case_Title FROM special_case WHERE Case_ID = ?");
@@ -73,22 +74,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $b_stmt->close();
             }
 
-            // 发送邮件
+            // 3. 发送邮件
             if (sendReceiptEmail($row, $project_name)) {
                 $receipt_no = "REC-" . date("Y") . "-" . str_pad($order_id, 6, "0", STR_PAD_LEFT);
                 $file_name = "receipt_" . $order_id . ".pdf";
 
+                // 4. 更新数据库 (防止重复插入)
+                $check_sql = "SELECT Receipt_ID FROM receipt WHERE Order_ID = ?";
+                $check_stmt = $conn->prepare($check_sql);
+                $check_stmt->bind_param("i", $order_id);
+                $check_stmt->execute();
+                
+                if ($check_stmt->get_result()->num_rows == 0) {
+                    // 只有不存在时才插入
+                    $stmt_ins = $conn->prepare("INSERT INTO receipt (Receipt_Receipt_Number, Receipt_Generated_At, Receipt_Receipt_File, Donor_ID, Order_ID) VALUES (?, NOW(), ?, ?, ?)");
+                    $stmt_ins->bind_param("ssii", $receipt_no, $file_name, $row['Donor_ID'], $order_id);
+                    $stmt_ins->execute();
+                    $stmt_ins->close();
+                }
+                $check_stmt->close();
+
                 // 更新 Order 状态
                 $conn->query("UPDATE orders SET Tax_Receipt_Status = 'Generated' WHERE Order_ID = $order_id");
-                
-                // 插入 Receipt 记录
-                $stmt_ins = $conn->prepare("INSERT INTO receipt (Receipt_Receipt_Number, Receipt_Generated_At, Receipt_Receipt_File, Donor_ID, Order_ID) VALUES (?, NOW(), ?, ?, ?)");
-                $stmt_ins->bind_param("ssii", $receipt_no, $file_name, $row['Donor_ID'], $order_id);
-                $stmt_ins->execute();
 
                 echo "<script>alert('Receipt Approved & Sent Successfully!'); window.location.href='admin_receipts.php';</script>";
             } else {
-                echo "<script>alert('Error: Email sending failed. Check internet or SMTP settings.'); window.location.href='admin_receipts.php';</script>";
+                echo "<script>alert('Error: Email sending failed. Please check your internet connection or SMTP settings.'); window.location.href='admin_receipts.php';</script>";
             }
         }
 
@@ -100,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ==========================================
-// 4. 获取数据 (Requested 状态)
+// 4. 获取数据列表 (Requested 状态)
 // ==========================================
 $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
 
@@ -131,19 +142,17 @@ $result_pending = $conn->query($sql_pending);
     <link rel="stylesheet" href="admin_common.css">
     
     <style>
-        /* 复用 Donor Page 的样式风格，确保对其 */
+        /* UI Styling */
         .receipt-management { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); margin-bottom: 30px; }
         
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .section-header h2 { font-size: 18px; font-weight: 600; color: #333; margin: 0; }
         .badge-danger { background-color: #dc3545; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px; margin-left: 10px; }
 
-        /* 搜索栏样式 (参考 Donor Page) */
         .receipt-search { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
-        .search-input { flex: 1; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; background: white; font-size: 14px; }
-        .search-input:focus { border-color: var(--primary); }
+        .search-input { flex: 1; padding: 10px 15px; border: 1px solid #ccc; border-radius: 5px; outline: none; background: white; font-size: 14px; }
+        .search-input:focus { border-color: #F28585; }
         
-        /* 按钮样式 */
         .btn { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: 500; transition: all 0.3s; display: inline-flex; align-items: center; gap: 5px; text-decoration: none; font-size: 13px; color: white; }
         .btn-primary { background: #F28585; }
         .btn-primary:hover { background: #e07474; }
@@ -153,18 +162,16 @@ $result_pending = $conn->query($sql_pending);
         .btn-danger { background: #dc3545; }
         .btn-info { background: #17a2b8; }
         
-        /* 表格样式 (完全复用 Donor Table 风格) */
         .custom-table { width: 100%; border-collapse: collapse; }
         .custom-table th, .custom-table td { padding: 15px; text-align: left; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
         .custom-table th { font-weight: 600; color: #666; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; background: #fff; border-bottom: 2px solid #eee; }
         .custom-table tbody tr:hover { background-color: #fcfcfc; }
         
-        /* 详情样式 */
         .txn-highlight { background-color: #fff3cd; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-weight: bold; color: #856404; font-size: 12px; }
         .text-muted { color: #888; font-size: 12px; display: block; margin-top: 3px; }
         .amount-text { color: #28a745; font-weight: bold; font-size: 15px; }
 
-        /* Modal Styles (参考 Donor Page 的原生 Modal) */
+        /* Modal Styles */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 1100; justify-content: center; align-items: center; }
         .modal-content { background-color: white; border-radius: 10px; width: 90%; max-width: 500px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15); animation: fadeIn 0.3s; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid #eee; background: #F28585; color: white; border-radius: 10px 10px 0 0; }
@@ -174,7 +181,6 @@ $result_pending = $conn->query($sql_pending);
         .modal-body { padding: 20px; max-height: 80vh; overflow-y: auto; }
         .modal-footer { padding: 15px 20px; border-top: 1px solid #eee; text-align: right; background: #f9f9f9; border-radius: 0 0 10px 10px; }
 
-        /* Modal 内部排版 */
         .info-group { margin-bottom: 15px; }
         .info-label { font-size: 12px; color: #666; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 5px; }
         .info-value { font-size: 14px; color: #333; font-weight: 500; }
@@ -277,7 +283,7 @@ $result_pending = $conn->query($sql_pending);
     </div>
 
     <script>
-        // --- 1. Sidebar Logic (必须手动添加，因为admin_sidebar.php没有包含这段JS) ---
+        // --- 1. Sidebar Logic ---
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('mainContent');
         
@@ -292,7 +298,7 @@ $result_pending = $conn->query($sql_pending);
             });
         }
 
-        // --- 2. Modal Logic (原生 JS) ---
+        // --- 2. Modal Logic ---
         function openModal(data) {
             let fullAddress = data.Donor_Address1;
             if(data.Donor_Address2) fullAddress += ", " + data.Donor_Address2;
@@ -333,7 +339,6 @@ $result_pending = $conn->query($sql_pending);
             document.getElementById('detailModal').style.display = 'none';
         }
 
-        // 点击 Modal 外部关闭
         window.onclick = function(event) {
             const modal = document.getElementById('detailModal');
             if (event.target == modal) {

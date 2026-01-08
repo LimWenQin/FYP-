@@ -22,17 +22,24 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
 
         /* --- 颜色变量 --- */
         :root {
-            --primary-color: #c82e03ff; /* Colorlib 绿色 */
+<<<<<<< HEAD
+            --primary-color: #e16161ff;
+=======
+            --primary-color: #e16161ff; /* Colorlib 绿色 */
+>>>>>>> 26b09c4993dc508854ff014f276f0ef0676e7cc8
             --dark-bg: #333;
             --light-text: #fff;
             --hover-color: #8b1a00ff;
         }
-/* --- 1. 顶部深色条 (Top Bar) --- */
+
+        /* --- 1. 顶部深色条 (Top Bar) --- */
         .header-top-bar {
             background-color: var(--primary-color);
             color: var(--light-text);
             padding: 10px 0;
             font-size: 14px;
+            position: relative;
+            z-index: 2000; 
         }
         .header-container {
             width: 90%;
@@ -43,41 +50,163 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             align-items: center;
         }
         
-        /* 新增：左侧信息容器样式 */
         .header-info {
             display: flex;
             align-items: center;
-            gap: 20px; /* 信息之间的间隔 */
+            /* gap: 20px;  <-- 移除这个，改用 a 标签的 margin 控制间距，更灵活 */
         }
+        
+        /* --- 修改重点：顶部左侧联系方式样式 --- */
         .header-info a {
             color: var(--light-text);
-            margin-right: 10px;
+            margin-right: 25px; /* 两个联系方式之间的距离 */
+            
+            /* 新增：让图标和文字对齐 */
+            display: flex;
+            align-items: center;
+            gap: 8px; /* 图标和文字的间距 */
         }
-        .header-info span {
-            margin-right: 5px; /* 增加图标和文本的间距 */
-        }
-
-
-        .header-auth-links a {
-            color: var(--light-text);
-            margin-left: 15px;
-            font-weight: bold;
-        }
-        .header-auth-links a:hover { opacity: 0.8; }
         
-        /* 新增：右侧用户/认证容器样式 */
+        .header-info a:hover {
+            opacity: 0.8;
+        }
+
+        /* 用户认证区域样式 */
         .header-user-auth {
             display: flex;
             align-items: center;
-            gap: 15px; /* 欢迎信息和登录按钮之间的间隔 */
+            gap: 15px;
+            position: relative;
         }
 
+        .header-auth-links {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-auth-links a {
+            color: var(--light-text);
+            font-weight: bold;
+        }
+
+        /* --- 用户 Account 区域 --- */
+        .user-profile-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .profile-trigger {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            gap: 8px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+
+        .profile-trigger:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* --- 通用 SVG 图标样式 (Phone, Email, Account, Logout 共用) --- */
+        .icon-svg {
+            width: 18px; /*稍微调小一点，适配顶部文字大小*/
+            height: 18px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .account-text {
+            font-weight: bold;
+            font-size: 14px;
+            user-select: none;
+        }
+
+        /* --- 下拉菜单 --- */
+        .profile-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 10px;
+            background: white;
+            min-width: 200px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 15px 0;
+            display: none;
+            z-index: 9999; 
+            color: #333;
+        }
+
+        .profile-dropdown.active {
+            display: block;
+        }
+
+        .profile-dropdown::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            right: 15px;
+            border-width: 0 10px 10px 10px;
+            border-style: solid;
+            border-color: transparent transparent white transparent;
+        }
+
+        .welcome-message {
+            padding: 0 15px 10px 15px;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .welcome-message b {
+            color: var(--primary-color);
+        }
+
+        .dropdown-item {
+            display: block;
+            padding: 10px 15px;
+            color: #333;
+            transition: all 0.3s ease;
+        }
+
+        .dropdown-item:hover {
+            background: #f5f5f5;
+            color: var(--primary-color);
+            padding-left: 20px;
+        }
+
+        /* --- Logout 按钮样式 --- */
+        .logout-btn {
+            background: transparent;
+            color: var(--light-text);
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+            transition: all 0.3s ease;
+            display: flex; 
+            align-items: center;
+            gap: 6px; 
+        }
+
+        .logout-btn:hover {
+            background: var(--light-text);
+            color: var(--primary-color);
+        }
 
         /* --- 2. 主导航栏 (Main Navbar) --- */
         .header-navbar {
             background: #fff;
             padding: 20px 0;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05); /* 底部阴影 */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             position: sticky;
             top: 0;
             z-index: 1000;
@@ -89,7 +218,6 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             align-items: center;
         }
 
-        /* Logo 样式 */
         .header-logo a {
             font-size: 28px;
             font-weight: 900;
@@ -103,7 +231,6 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             margin-right: 10px;
         }
 
-        /* 菜单链接 */
         .header-menu {
             display: flex;
             gap: 25px;
@@ -113,11 +240,9 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             font-weight: 500;
             font-size: 16px;
             padding: 10px 5px;
-            position: relative;
         }
         .header-menu a:hover { color: var(--primary-color); }
 
-        /* 搜索框 (嵌入式) */
         .header-search {
             display: flex;
             align-items: center;
@@ -139,9 +264,8 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             color: #777;
         }
 
-        /* 捐款按钮 */
         .header-donate-btn {
-            background-color: var(--primary-color);
+            background-color: #ffbb6dff;
             color: #fff !important;
             padding: 10px 25px;
             border-radius: 30px;
@@ -150,54 +274,85 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             box-shadow: 0 4px 10px rgba(209, 47, 2, 0.3);
         }
         .header-donate-btn:hover {
-            background-color: var(--hover-color);
+<<<<<<< HEAD
+            background-color: #f79c34ff ;
+=======
+            background-color: #f79c34ff;
+>>>>>>> 26b09c4993dc508854ff014f276f0ef0676e7cc8
             transform: translateY(-2px);
         }
 
-        /* 响应式: 平板/手机端调整 */
         @media (max-width: 900px) {
-            .header-menu { display: none; } /* 暂时隐藏菜单，可后续加汉堡菜单 */
+            .header-menu { display: none; }
             .header-search { display: none; }
-            
-            /* 手机上隐藏顶部信息以节省空间 */
             .header-info { display: none; }
-            .header-user-auth { 
-                gap: 10px; 
-            }
-            .header-welcome {
-                 font-size: 12px;
-            }
+            .header-user-auth { gap: 10px; }
         }
     </style>
 </head>
 <body>
 
-   <div class="header-top-bar">
+    <div class="header-top-bar">
         <div class="header-container">
             <div class="header-info">
-                <a href="tel:+60123456789"><span>📞</span> +60 12-345 6789</a>
-                <a href="mailto:info@lovebridge.org"><span>✉️</span> info@lovebridge.org</a>
+                <a href="tel:+60123456789">
+                    <svg class="icon-svg" viewBox="0 0 24 24">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                    +60 12-345 6789
+                </a>
+                
+                <a href="mailto:info@lovebridge.org">
+                    <svg class="icon-svg" viewBox="0 0 24 24">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                    info@lovebridge.org
+                </a>
             </div>
             
             <div class="header-user-auth">
-                 <div class="header-welcome">
-                    Welcome, <b><?php echo $donor_name; ?></b>
-                </div>
-                
-                <div class="header-auth-links">
-                    <?php if ($logged_in): ?>
-                        <a href="donor_logout.php">Log out</a>
-                    <?php else: ?>
-                        <a href="donor_login.php">Login</a> | <a href="donor_register.php">Register</a>
-                    <?php endif; ?>
-                </div>
+                <?php if ($logged_in): ?>
+                    <div class="user-profile-container">
+                        <div class="profile-trigger" onclick="toggleDropdown()">
+                            <svg class="icon-svg" viewBox="0 0 24 24">
+                                <circle cx="12" cy="8" r="4"></circle>
+                                <path d="M20 21a8 8 0 1 0-16 0"></path>
+                            </svg>
+                            <span class="account-text">Account</span>
+                        </div>
+
+                        <div class="profile-dropdown" id="profileDropdown">
+                            <div class="welcome-message">
+                                Welcome, <b><?php echo $donor_name; ?></b>
+                            </div>
+                            <a href="point.php" class="dropdown-item">Points</a>
+                            <a href="Track_record.php" class="dropdown-item">Track Record</a>
+                            <a href="Profile.php" class="dropdown-item">Profile</a>
+                        </div>
+                    </div>
+                    
+                    <a href="donor_logout.php" class="logout-btn">
+                        <svg class="icon-svg" viewBox="0 0 24 24">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        <span>Log out</span>
+                    </a>
+
+                <?php else: ?>
+                    <div class="header-auth-links">
+                        <a href="donor_login.php">Login</a> | 
+                        <a href="donor_register.php">Register</a>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 
     <header class="header-navbar">
         <div class="header-container header-nav-content">
-            
             <div class="header-logo">
                 <a href="Homepage.php">
                     <img src="logo.jpg" alt="Logo" onerror="this.style.display='none'"> 
@@ -211,7 +366,9 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
                     <li><a href="Campaign_Page.php">Campaign</a></li>
                     <li><a href="New&Story.php">News & Story</a></li>
                     <li><a href="Special_case Page.php">Special Case</a></li>
-                    <li><a href="Profile.php">Profile</a></li>
+                    <?php if ($logged_in): ?>
+                        <li><a href="Profile.php">Profile</a></li>
+                    <?php endif; ?>
                 </ul>
             </nav>
 
@@ -223,8 +380,27 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
 
                 <a href="Payment_page.php" class="header-donate-btn">Donate</a>
             </div>
-
         </div>
     </header>
+
+    <script>
+        function toggleDropdown() {
+            const dropdown = document.getElementById('profileDropdown');
+            dropdown.classList.toggle('active');
+        }
+
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('profileDropdown');
+            const profileTrigger = document.querySelector('.profile-trigger');
+            
+            if (profileTrigger && !profileTrigger.contains(event.target) && !dropdown.contains(event.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+
+        document.getElementById('profileDropdown').addEventListener('click', function(event) {
+            event.stopPropagation();
+        });
+    </script>
 </body>
 </html>

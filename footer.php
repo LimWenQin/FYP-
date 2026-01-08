@@ -63,7 +63,7 @@
         
 
         /* --- 社交媒体图标 (用字符代替) --- */
-        .social-links a {
+        /*.social-links a {
             display: inline-block;
             width: 35px;
             height: 35px;
@@ -79,7 +79,7 @@
         }
         .social-links a:hover {
             background: #c82e03ff;
-        }
+        }*/
 
         /* --- 版权信息 --- */
         .copyright-section {
@@ -117,12 +117,24 @@
             <div class="footer-col">
                
 
-                <h3 class="footer-heading" style="margin-top: 20px; font-size: 16px;">Follow Us</h3>
-                <div class="social-links">
-                    <a href="#" title="Facebook">f</a>
-                    <a href="#" title="WhatsApp">t</a>
-                    <a href="#" title="Instagram">in</a>
-                </div>
+               <div class="footer-col">
+            <h3 class="footer-heading">Contact Us</h3>
+            <ul class="footer-links">
+                <li style="color: #b3b3b3; margin-bottom: 15px;">
+                <span style="color: #fff; font-weight:bold;">Address:</span><br>
+                123, Jalan Love Bridge,<br>
+                75450 Melaka, Malaysia
+            </li>
+            <li>
+            <span style="color: #fff; font-weight:bold;">Phone:</span><br>
+            <a href="tel:+60123456789">+60 12-345 6789</a>
+        </li>
+        <li>
+            <span style="color: #fff; font-weight:bold;">Email:</span><br>
+            <a href="mailto:info@lovebridge.org">info@lovebridge.org</a>
+        </li>
+    </ul>
+</div>
             </div>
 
         </div>
