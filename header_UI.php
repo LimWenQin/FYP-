@@ -339,7 +339,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             
             <div class="header-user-auth">
                 <?php if ($logged_in): ?>
-                    <a href="E-Wallet.php" class="wallet-display" title="View Wallet">
+                    <a href="E_Wallet.php" class="wallet-display" title="View Wallet">
                         <svg class="icon-svg" viewBox="0 0 24 24">
                             <path d="M21 12V7H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16"></path>
                             <path d="M3 6v13a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5"></path>

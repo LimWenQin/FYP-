@@ -10,25 +10,25 @@ if (!isset($_SESSION['donor_id'])) {
 }
 
 $current_donor_id = $_SESSION['donor_id'];
+$topup_successful = false; // [修改点] 初始化成功标记
+$success_amount = 0;
 
 // ==========================================
-// 2. 处理充值逻辑 (当用户点击 Pay Now)
+// 2. 处理充值逻辑
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_topup'])) {
     
     $amount = $_POST['amount'];
-    $method = $_POST['payment_method']; // 'Credit/Debit Card' 或 'TNG eWallet'
+    $method = $_POST['payment_method']; 
 
-    if ($amount <= 0 || empty($method)) {
-        echo "<script>alert('Please select an amount and payment method.');</script>";
-    } else {
+    if ($amount > 0 && !empty($method)) {
         // A. 更新 Donor Wallet (加钱)
         $stmt = $conn->prepare("UPDATE donor SET Donor_Wallet = Donor_Wallet + ? WHERE Donor_ID = ?");
         $stmt->bind_param("di", $amount, $current_donor_id);
         $stmt->execute();
         $stmt->close();
 
-        // B. 记录 Payment (充值记录)
+        // B. 记录 Payment
         $txn_ref = "TXN-TOPUP-" . date("YmdHis");
         $now = date("Y-m-d H:i:s");
         $status = "Success";
@@ -41,20 +41,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_topup'])) {
         $payment_id = $stmt_pay->insert_id;
         $stmt_pay->close();
 
-        // C. 插入一条 Order 记录 (为了让 My_Wallet 能关联查询到)
-        // 这里的 Order Type 设为 'One-time' 即可，名字标为 'Wallet Top-up'
+        // C. 插入 Order
         $dummy_name = "Wallet Top-up"; 
-        $stmt_ord = $conn->prepare("INSERT INTO orders (Donor_ID, Payment_ID, Order_Amount, Order_Status, Order_Type, Order_TXN_Ref, Order_Created_At, Order_Name) VALUES (?, ?, ?, 'Completed', 'One-time', ?, ?, ?)");
-        $stmt_ord->bind_param("iidsss", $current_donor_id, $payment_id, $amount, $txn_ref, $now, $dummy_name);
+        // C. 插入 Order 记录 (修正：加入了 Order_PaymentMethod)
+$dummy_name = "Wallet Top-up"; 
+// 在 SQL 中加入了 Order_PaymentMethod
+$stmt_ord = $conn->prepare("INSERT INTO orders (Donor_ID, Payment_ID, Order_Amount, Order_Status, Order_Type, Order_TXN_Ref, Order_Created_At, Order_Name, Order_PaymentMethod) VALUES (?, ?, ?, 'Completed', 'One-time', ?, ?, ?, ?)");
+
+// 在 bind_param 中加入了 $method (注意类型字符串变成了 "iidssss")
+$stmt_ord->bind_param("iidssss", $current_donor_id, $payment_id, $amount, $txn_ref, $now, $dummy_name, $method);
         $stmt_ord->execute();
         $stmt_ord->close();
 
-        // D. 成功提示并跳转回 My Wallet
-        echo "<script>
-            alert('Top-up Successful! RM $amount has been added to your wallet.'); 
-            window.location.href='E_Wallet.php';
-        </script>";
-        exit();
+        // [修改点] 设置成功标记，而不是直接 alert & exit
+        $topup_successful = true;
+        $success_amount = $amount;
     }
 }
 
@@ -236,6 +237,27 @@ include 'header_UI.php';
             Swal.fire('Error', 'Please select Amount and Payment Method', 'warning');
         }
     });
+
+    // ==========================================
+    // [修改点] 成功弹窗逻辑
+    // ==========================================
+    <?php if ($topup_successful): ?>
+        // 页面加载完毕后执行 SweetAlert
+        document.addEventListener('DOMContentLoaded', function() {
+            Swal.fire({
+                title: 'Top-up Successful!',
+                text: 'RM <?php echo number_format($success_amount, 2); ?> has been added to your wallet.',
+                icon: 'success',
+                confirmButtonColor: '#28a745',
+                confirmButtonText: 'View My Wallet'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = 'My_Wallet.php';
+                }
+            });
+        });
+    <?php endif; ?>
+
 </script>
 
 <?php include 'footer.php'; ?>
