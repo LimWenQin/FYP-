@@ -318,9 +318,12 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
                             <div class="welcome-message">
                                 Welcome, <b><?php echo $donor_name; ?></b>
                             </div>
-                            <a href="point.php" class="dropdown-item">Points</a>
-                            <a href="Track_record.php" class="dropdown-item">Track Record</a>
                             <a href="Profile.php" class="dropdown-item">Profile</a>
+                            <a href="Gamification_Achievement_Panel.php" class="dropdown-item">Points</a>
+                            <a href="Redemption_Page.php" class="dropdown-item">Redemption</a>
+                            <a href="Track_Records.php" class="dropdown-item">Donation Records</a>
+                            <a href="Recurring_Donation_Management_Panel.php" class="dropdown-item">Donation Management</a>
+                            
                         </div>
                     </div>
                     
