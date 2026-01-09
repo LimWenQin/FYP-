@@ -40,6 +40,9 @@ if ($current_donor_id) {
 // -------------------------
 // 2. 处理 POST 请求
 // -------------------------
+// 定义一个变量来存储 PHP 处理后的 SweetAlert 脚本，在页面底部输出
+$alert_script = ""; 
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
     
     // --- 场景 A: 更新地址 ---
@@ -54,9 +57,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("sssssi", $addr1, $addr2, $city, $state, $zip, $current_donor_id);
         if ($stmt->execute()) {
-            echo "<script>alert('Address updated successfully!'); window.location.href='Redemption_Page.php';</script>";
+            // 使用 SweetAlert 替代原生 Alert
+            $alert_script = "
+                Swal.fire({
+                    title: 'Success!',
+                    text: 'Address updated successfully!',
+                    icon: 'success',
+                    confirmButtonColor: '#dc2626'
+                }).then(() => {
+                    window.location.href='Redemption_Page.php';
+                });
+            ";
         }
-        exit();
     }
 
     // --- 场景 B: 执行兑换 ---
@@ -70,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         $stmt->close();
 
         if (!$item || $item['Reward_Stock'] <= 0 || $donor_points < $item['Reward_RequiredPoint'] || !$donor_address_complete) {
-            echo "<script>alert('Error: Unable to redeem.');</script>";
+            $alert_script = "Swal.fire('Error', 'Unable to redeem. Please check points or stock.', 'error');";
         } else {
             $conn->begin_transaction();
             try {
@@ -91,10 +103,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
                 $insert_ord->execute();
 
                 $conn->commit();
-                echo "<script>alert('Redemption Successful!'); window.location.href='Redemption_Page.php';</script>";
+                
+                $alert_script = "
+                    Swal.fire({
+                        title: 'Redemption Successful!',
+                        text: 'Your reward is being processed.',
+                        icon: 'success',
+                        confirmButtonColor: '#dc2626'
+                    }).then(() => {
+                        window.location.href='Redemption_Page.php';
+                    });
+                ";
+
             } catch (Exception $e) {
                 $conn->rollback();
-                echo "<script>alert('Failed.');</script>";
+                $alert_script = "Swal.fire('Failed', 'Transaction failed. Please try again.', 'error');";
             }
         }
     }
@@ -103,14 +126,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
     if (isset($_POST['confirm_receive_id'])) {
         $order_id = $_POST['confirm_receive_id'];
         
-        // 只有当状态是 'Shipped' 时，用户才能改为 'Completed'
         $stmt = $conn->prepare("UPDATE redemption_order SET Redemption_Status = 'Completed', Redemption_Updated_At = NOW() WHERE Redemption_ID = ? AND Donor_ID = ? AND Redemption_Status = 'Shipped'");
         $stmt->bind_param("ii", $order_id, $current_donor_id);
         
         if ($stmt->execute() && $stmt->affected_rows > 0) {
-            echo "<script>alert('Thank you! Order marked as Completed.'); window.location.href='Redemption_Page.php';</script>";
+            $alert_script = "
+                Swal.fire({
+                    title: 'Completed!',
+                    text: 'Thank you! Order marked as received.',
+                    icon: 'success',
+                    confirmButtonColor: '#10b981'
+                }).then(() => {
+                    window.location.href='Redemption_Page.php';
+                });
+            ";
         } else {
-            echo "<script>alert('Error: Status could not be updated.');</script>";
+            $alert_script = "Swal.fire('Error', 'Status could not be updated.', 'error');";
         }
     }
 }
@@ -122,6 +153,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
     <meta charset="UTF-8">
     <title>Rewards Redemption - Love Bridge</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         :root {
             --primary-red: #dc2626;
@@ -254,7 +288,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
                 </thead>
                 <tbody>
                     <?php
-                    // 联合查询订单和物品表
                     $h_sql = "SELECT ro.*, ri.Reward_ItemName, ri.Reward_PhotoPath 
                               FROM redemption_order ro 
                               JOIN reward_item ri ON ro.Reward_ID = ri.Reward_ID 
@@ -267,7 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
 
                     if ($h_res->num_rows > 0):
                         while ($hist = $h_res->fetch_assoc()):
-                            $status = $hist['Redemption_Status']; // Processing, Shipped, Completed
+                            $status = $hist['Redemption_Status']; 
                             ?>
                             <tr>
                                 <td>
@@ -287,12 +320,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
                                 </td>
                                 <td>
                                     <?php if ($status == 'Shipped'): ?>
-                                        <form method="POST" onsubmit="return confirm('Confirm that you have received this item?');">
-                                            <input type="hidden" name="confirm_receive_id" value="<?php echo $hist['Redemption_ID']; ?>">
-                                            <button type="submit" class="btn-receive">
-                                                <i class="fas fa-check-circle"></i> Receive
-                                            </button>
-                                        </form>
+                                        <button type="button" class="btn-receive" onclick="confirmReceive(<?php echo $hist['Redemption_ID']; ?>)">
+                                            <i class="fas fa-check-circle"></i> Receive
+                                        </button>
                                     <?php elseif ($status == 'Completed'): ?>
                                         <span style="color:green; font-size:0.9rem;"><i class="fas fa-check"></i> Received</span>
                                     <?php else: ?>
@@ -316,6 +346,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
     <div class="modal-box">
         <button onclick="document.getElementById('addressModal').style.display='none'" style="position:absolute; right:20px; top:15px; border:none; background:none; font-size:1.5rem; cursor:pointer;">&times;</button>
         <h3>Shipping Address Required</h3>
+        <p style="color:#666; font-size:0.9rem; margin-bottom:15px;">Please verify your address for delivery.</p>
         <form method="POST">
             <input type="hidden" name="update_address" value="1">
             <div class="form-group"><label>Address Line 1</label><input type="text" name="addr1" class="form-control" required value="<?php echo $donor_data['Donor_Address1']??''; ?>"></div>
@@ -332,6 +363,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
 
 <form id="redeemForm" method="POST" style="display:none;"><input type="hidden" name="redeem_item_id" id="hidden_redeem_id"></form>
 
+<form id="receiveForm" method="POST" style="display:none;"><input type="hidden" name="confirm_receive_id" id="hidden_receive_id"></form>
+
 <script>
     const isLoggedIn = <?php echo $current_donor_id ? 'true' : 'false'; ?>;
     const isAddressComplete = <?php echo $donor_address_complete ? 'true' : 'false'; ?>;
@@ -345,22 +378,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
 
         if (tabName === 'redeem') {
             document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
-            document.getElementById('redeem-tab').style.display = 'grid'; // grid for items
+            document.getElementById('redeem-tab').style.display = 'grid'; 
         } else {
             document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
-            document.getElementById('history-tab').style.display = 'block'; // block for table
+            document.getElementById('history-tab').style.display = 'block'; 
         }
     }
 
+    // 核心逻辑：使用 SweetAlert 替代 confirm/alert
     function handleRedeem(itemId, reqPoints, name) {
-        if (!isLoggedIn) { alert("Please login."); window.location.href='donor_login.php'; return; }
-        if (currentPoints < reqPoints) { alert("Insufficient points!"); return; }
-        if (!isAddressComplete) { document.getElementById('addressModal').style.display = 'flex'; return; }
-        if (confirm("Redeem '" + name + "'?")) {
-            document.getElementById('hidden_redeem_id').value = itemId;
-            document.getElementById('redeemForm').submit();
+        if (!isLoggedIn) { 
+            Swal.fire({
+                icon: 'warning',
+                title: 'Please Login',
+                text: 'You need to login to redeem items.',
+                confirmButtonColor: '#dc2626'
+            }).then(() => {
+                window.location.href='donor_login.php';
+            });
+            return; 
         }
+
+        if (currentPoints < reqPoints) { 
+            Swal.fire({
+                icon: 'error',
+                title: 'Insufficient Points',
+                text: 'You need ' + reqPoints + ' points, but you have ' + currentPoints + '.',
+                confirmButtonColor: '#dc2626'
+            });
+            return; 
+        }
+
+        if (!isAddressComplete) { 
+            // 提示用户需要填写地址
+            Swal.fire({
+                icon: 'info',
+                title: 'Address Required',
+                text: 'We need your shipping address to send the reward.',
+                confirmButtonColor: '#3b82f6'
+            }).then(() => {
+                document.getElementById('addressModal').style.display = 'flex'; 
+            });
+            return; 
+        }
+
+        // 漂亮的确认弹窗
+        Swal.fire({
+            title: 'Confirm Redemption',
+            text: "Are you sure you want to redeem '" + name + "' for " + reqPoints + " points?",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#aaa',
+            confirmButtonText: 'Yes, redeem it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('hidden_redeem_id').value = itemId;
+                document.getElementById('redeemForm').submit();
+            }
+        });
     }
+
+    // 确认收货的逻辑
+    function confirmReceive(orderId) {
+        Swal.fire({
+            title: 'Item Received?',
+            text: "Confirm that you have received this reward package?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981',
+            cancelButtonColor: '#aaa',
+            confirmButtonText: 'Yes, I received it'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('hidden_receive_id').value = orderId;
+                document.getElementById('receiveForm').submit();
+            }
+        });
+    }
+
+    // 处理 PHP 返回的 Alert 消息 (如果有)
+    document.addEventListener('DOMContentLoaded', function() {
+        <?php if (!empty($alert_script)) echo $alert_script; ?>
+    });
 </script>
 
 <?php include 'footer.php'; ?>

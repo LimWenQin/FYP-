@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
         'branch_id' => 0,
         'activity_id' => 0,
         'tax_receipt' => $tax_receipt,
-        'source' => 'special_case' // 关键标记
+        'source' => 'special_case' // 关键标记：告诉后续页面这是 Special Case
     ];
 }
 
@@ -44,13 +44,13 @@ if (empty($_SESSION['donation_data']) || $_SESSION['donation_data']['source'] !=
     exit();
 }
 
-// 提取数据
+// 提取数据用于显示
 $amount = $_SESSION['donation_data']['amount'];
 $donation_type = $_SESSION['donation_data']['type'];
 $case_id = $_SESSION['donation_data']['case_id'];
 $tax_status = $_SESSION['donation_data']['tax_receipt'];
 
-// 3. 获取钱包余额 (用于 JS 检查)
+// 3. 获取钱包余额 (用于 JS 检查) - 这一步是新加的，为了 E-Wallet 功能
 $wallet_sql = "SELECT Donor_Wallet FROM donor WHERE Donor_ID = ?";
 $w_stmt = $conn->prepare($wallet_sql);
 $w_stmt->bind_param("i", $current_donor_id);
@@ -82,7 +82,7 @@ include 'header_UI.php';
     /* 复用 Payment_Ways_Page.php 的样式 */
     .hero-wrap {
         height: 350px; position: relative;
-        background-image: url('images/hero_6.jpg'); /* 保持 Special Case 的背景图 */
+        background-image: url('images/hero_6.jpg'); 
         background-size: cover; background-position: center;
         display: flex; align-items: center; justify-content: center; text-align: center;
     }
@@ -93,7 +93,7 @@ include 'header_UI.php';
 
     .summary-card {
         background: #fff; padding: 30px; border-radius: 8px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 5px solid #dc2626; /* Special Case 用红色 */
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 5px solid #dc2626;
     }
     .summary-item { display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px dashed #eee; padding-bottom: 15px; }
     .summary-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
@@ -232,6 +232,7 @@ include 'header_UI.php';
 </div>
 
 <script>
+    // 将 PHP 变量传给 JS
     const currentBalance = <?php echo $current_balance; ?>;
     const donationAmount = <?php echo $amount; ?>;
 

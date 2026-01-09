@@ -97,9 +97,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in) {
         $address2 = $_POST['address2'];
         $address3 = $_POST['address3'];
         $city = $_POST['city'];
-        $state = $_POST['state'];
+        $state = $_POST['state']; // 现在可能由 JS 自动填充
         $postalcode = $_POST['postalcode'];
-        $country = $_POST['country'];
+        $country = "Malaysia"; // 强制固定
         $description = $_POST['description'];
         
         // 更新 Query
@@ -276,7 +276,9 @@ include 'header_UI.php';
             border-radius: 6px; font-size: 16px; transition: all 0.3s ease;
         }
         .form-group input:focus { border-color: var(--primary-red); outline: none; }
-        .form-group input[readonly] { background-color: #f0f0f0; cursor: pointer; color: #555; }
+        
+        /* 针对 readonly 的样式，颜色变灰，提示不可改 */
+        .form-group input[readonly] { background-color: #e9e9e9; cursor: not-allowed; color: #555; }
         
         .form-row { display: flex; gap: 15px; }
         .form-row .form-group { flex: 1; }
@@ -387,7 +389,7 @@ include 'header_UI.php';
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="icnumber">IC Number </label>
+                            <label for="icnumber">IC Number (Optional)</label>
                             <input type="text" id="icnumber" name="icnumber" class="track-field" 
                                    value="<?php echo htmlspecialchars($donor['Donor_ICNumber']); ?>" 
                                    placeholder="Example: 000101-01-1234" 
@@ -419,23 +421,27 @@ include 'header_UI.php';
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="city">City</label>
-                            <input type="text" id="city" name="city" class="track-field" value="<?php echo htmlspecialchars($donor['Donor_City']); ?>">
+                            <label for="postalcode">Postal Code</label>
+                            <input type="text" id="postalcode" name="postalcode" class="track-field" 
+                                   value="<?php echo htmlspecialchars($donor['Donor_PostalCode']); ?>" 
+                                   oninput="handlePostcodeInput(this.value)" placeholder="Enter Postcode">
                         </div>
                         <div class="form-group">
-                            <label for="state">State</label>
-                            <input type="text" id="state" name="state" class="track-field" value="<?php echo htmlspecialchars($donor['Donor_State']); ?>">
+                            <label for="state">State (Auto-filled)</label>
+                            <input type="text" id="state" name="state" class="track-field" 
+                                   value="<?php echo htmlspecialchars($donor['Donor_State']); ?>" readonly>
                         </div>
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="postalcode">Postal Code</label>
-                            <input type="text" id="postalcode" name="postalcode" class="track-field" value="<?php echo htmlspecialchars($donor['Donor_PostalCode']); ?>">
+                            <label for="city">City</label>
+                            <input type="text" id="city" name="city" class="track-field" value="<?php echo htmlspecialchars($donor['Donor_City']); ?>">
                         </div>
                         <div class="form-group">
                             <label for="country">Country</label>
-                            <input type="text" id="country" name="country" class="track-field" value="<?php echo htmlspecialchars($donor['Donor_Country']); ?>">
+                            <input type="text" id="country" name="country" class="track-field" 
+                                   value="Malaysia" readonly>
                         </div>
                     </div>
                 </div>
@@ -462,8 +468,9 @@ include 'header_UI.php';
         function handleICInput(ic) {
             // Remove non-digit characters
             const cleanIC = ic.replace(/[^0-9]/g, '');
+            const dobInput = document.getElementById('dob');
             
-            // Need at least 6 digits to determine date (YYMMDD)
+            // Logic: 如果有填写有效的 IC，强制锁定 DOB 并自动填充
             if (cleanIC.length >= 6) {
                 const yearShort = cleanIC.substring(0, 2);
                 const month = cleanIC.substring(2, 4);
@@ -482,13 +489,57 @@ include 'header_UI.php';
                     
                     // Auto-fill the DOB field
                     const dateString = `${fullYear}-${month}-${day}`;
-                    document.getElementById('dob').value = dateString;
+                    dobInput.value = dateString;
+                    
+                    // 强制锁定，不让用户修改，确保一致性
+                    dobInput.setAttribute('readonly', true);
                 }
+            } else {
+                // 如果 IC 被清空或无效，允许用户手动选择 DOB
+                dobInput.removeAttribute('readonly');
             }
             updateProgress();
         }
 
-        // --- 2. Image Preview Logic ---
+        // --- 2. Auto Detect State from Postcode Logic ---
+        function handlePostcodeInput(postcode) {
+            const stateInput = document.getElementById('state');
+            const pc = parseInt(postcode, 10); // 确保它是数字
+
+            if (postcode.length >= 2 && !isNaN(pc)) {
+                let state = "";
+
+                // 马来西亚邮编范围规则 (简略版，涵盖主要范围)
+                if (pc >= 1000 && pc <= 2999) { state = "Perlis"; }
+                else if (pc >= 5000 && pc <= 9999) { state = "Kedah"; }
+                else if (pc >= 10000 && pc <= 14999) { state = "Penang"; }
+                else if (pc >= 30000 && pc <= 36999) { state = "Perak"; }
+                else if (pc >= 39000 && pc <= 39999) { state = "Cameron Highlands (Pahang)"; } 
+                else if (pc >= 40000 && pc <= 48999) { state = "Selangor"; }
+                else if (pc >= 60000 && pc <= 68999) { state = "Selangor"; } // Ampang/KL fringe
+                else if (pc >= 50000 && pc <= 60000) { state = "Kuala Lumpur"; }
+                else if (pc >= 62000 && pc <= 62999) { state = "Putrajaya"; }
+                else if (pc >= 70000 && pc <= 73999) { state = "Negeri Sembilan"; }
+                else if (pc >= 75000 && pc <= 78999) { state = "Melaka"; }
+                else if (pc >= 80000 && pc <= 86999) { state = "Johor"; }
+                else if (pc >= 25000 && pc <= 28999) { state = "Pahang"; }
+                else if (pc >= 20000 && pc <= 24999) { state = "Terengganu"; }
+                else if (pc >= 15000 && pc <= 19999) { state = "Kelantan"; }
+                else if (pc >= 87000 && pc <= 87999) { state = "Labuan"; }
+                else if (pc >= 88000 && pc <= 91999) { state = "Sabah"; }
+                else if (pc >= 93000 && pc <= 98999) { state = "Sarawak"; }
+                
+                if (state !== "") {
+                    stateInput.value = state;
+                }
+            } else if (postcode.length === 0) {
+                stateInput.value = ""; // 清空
+            }
+            
+            updateProgress();
+        }
+
+        // --- 3. Image Preview Logic ---
         function previewImage(event) {
             const input = event.target;
             const avatarDisplay = document.getElementById('avatar-display');
@@ -503,7 +554,7 @@ include 'header_UI.php';
             }
         }
 
-        // --- 3. Real-time Progress Bar Logic ---
+        // --- 4. Real-time Progress Bar Logic ---
         function updateProgress() {
             const fields = [
                 'name', 'email', 'contact', 'icnumber', 'dob',
@@ -541,6 +592,13 @@ include 'header_UI.php';
                 input.addEventListener('input', updateProgress);
                 input.addEventListener('change', updateProgress);
             });
+            
+            // 初始化检查：如果已有 IC，需要锁定 DOB
+            const icInput = document.getElementById('icnumber');
+            if (icInput.value.trim() !== '') {
+                handleICInput(icInput.value);
+            }
+            
             updateProgress();
         });
     </script>
