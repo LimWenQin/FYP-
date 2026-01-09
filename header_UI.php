@@ -22,11 +22,7 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
 
         /* --- 颜色变量 --- */
         :root {
-<<<<<<< HEAD
             --primary-color: #e16161ff;
-=======
-            --primary-color: #e16161ff; /* Colorlib 绿色 */
->>>>>>> 26b09c4993dc508854ff014f276f0ef0676e7cc8
             --dark-bg: #333;
             --light-text: #fff;
             --hover-color: #8b1a00ff;
@@ -274,11 +270,7 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             box-shadow: 0 4px 10px rgba(209, 47, 2, 0.3);
         }
         .header-donate-btn:hover {
-<<<<<<< HEAD
             background-color: #f79c34ff ;
-=======
-            background-color: #f79c34ff;
->>>>>>> 26b09c4993dc508854ff014f276f0ef0676e7cc8
             transform: translateY(-2px);
         }
 
@@ -326,9 +318,12 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
                             <div class="welcome-message">
                                 Welcome, <b><?php echo $donor_name; ?></b>
                             </div>
-                            <a href="point.php" class="dropdown-item">Points</a>
-                            <a href="Track_record.php" class="dropdown-item">Track Record</a>
                             <a href="Profile.php" class="dropdown-item">Profile</a>
+                            <a href="Gamification_Achievement_Panel.php" class="dropdown-item">Points</a>
+                            <a href="Redemption_Page.php" class="dropdown-item">Redemption</a>
+                            <a href="Track_Records.php" class="dropdown-item">Donation Records</a>
+                            <a href="Recurring_Donation_Management_Panel.php" class="dropdown-item">Donation Management</a>
+                            
                         </div>
                     </div>
                     
