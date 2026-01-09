@@ -136,10 +136,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
     <title>Love Bridge - Login</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* 保持你原本的 CSS 不变 */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; transition: background-color 0.8s ease, color 0.5s ease, border-color 0.5s ease; }
-        :root { --bg-color: #FFF6E8; --accent-color: #D97706; --text-color: #5D4037; }
-        body.theme-stray { --bg-color: #FFF6E8; --accent-color: #D97706; }    
+        
+        /* Updated Default Root Variables (Removed Stray Theme) */
+        :root { --bg-color: #EFF6FF; --accent-color: #2563EB; --text-color: #5D4037; }
+        
+        /* Theme Classes */
         body.theme-disabled { --bg-color: #EFF6FF; --accent-color: #2563EB; } 
         body.theme-orphan { --bg-color: #FFF1F2; --accent-color: #E11D48; }   
         body.theme-senior { --bg-color: #F0FDF4; --accent-color: #16A34A; }   
@@ -205,9 +207,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
     </style>
 </head>
-<body class="theme-stray">
-    
-    <ul class="bg-circles">
+<body class="theme-disabled"> <ul class="bg-circles">
         <li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li>
     </ul>
 
@@ -218,24 +218,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
                 LOVE BRIDGE
             </div>
 
-            <div class="slide active" data-theme="theme-stray">
-                <div class="logo-circle"><i class="fas fa-dog"></i></div>
-                <h2>Sheltering Strays</h2>
-                <p class="subtitle">A warm bed and a loving heart for every animal.</p>
-                <div class="quote-box">"Welcome to Love Bridge! Your dedication is a beacon of kindness..."<span class="quote-author">— LOVE BRIDGE</span></div>
-            </div>
-            <div class="slide" data-theme="theme-disabled">
+            <div class="slide active" data-theme="theme-disabled">
                 <div class="logo-circle"><i class="fas fa-wheelchair"></i></div>
                 <h2>Supporting Abilities</h2>
                 <p class="subtitle">Dignity, accessibility, and endless potential.</p>
                 <div class="quote-box">"We believe in a world where everyone has the opportunity to shine..."<span class="quote-author">— LOVE BRIDGE</span></div>
             </div>
+
             <div class="slide" data-theme="theme-orphan">
                 <div class="logo-circle"><i class="fas fa-child-reaching"></i></div>
                 <h2>Nurturing Orphans</h2>
                 <p class="subtitle">Building bright futures with love and hope.</p>
                 <div class="quote-box">"Every child deserves a home, a family, and a future..."<span class="quote-author">— LOVE BRIDGE</span></div>
             </div>
+
             <div class="slide" data-theme="theme-senior">
                 <div class="logo-circle"><i class="fas fa-hands-holding-circle"></i></div>
                 <h2>Honoring Seniors</h2>
@@ -247,8 +243,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
                 <span class="dot active" onclick="manualSlide(0)"></span>
                 <span class="dot" onclick="manualSlide(1)"></span>
                 <span class="dot" onclick="manualSlide(2)"></span>
-                <span class="dot" onclick="manualSlide(3)"></span>
-            </div>
+                </div>
         </div>
 
         <div class="form-section">

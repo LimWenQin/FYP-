@@ -11,17 +11,15 @@ if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
 include 'dataconnection.php';
 
 // --- 动态获取当前登录者的信息 (用于 Dashboard 欢迎语) ---
-// 虽然 admin_header.php 也会获取，但在 dashboard body 中显示 "Welcome back" 需要这个变量
 $currentUserId = 0;
 $currentUserRole = "";
 $currentUserName = "User";
 $currentUserPic = null;
-$isFirstLogin = 0; // 【新增】默认不是首次登录
+$isFirstLogin = 0; // 默认不是首次登录
 
 if (isset($_SESSION['admin_id'])) {
     // 如果是 Admin
     $currentUserId = $_SESSION['admin_id'];
-    // 【修改】多查询 Admin_IsFirstLogin
     $stmt = $conn->prepare("SELECT Admin_Name, Admin_ProfilePicture, Admin_Role, Admin_IsFirstLogin FROM admin WHERE Admin_ID = ?");
     $stmt->bind_param("i", $currentUserId);
     $stmt->execute();
@@ -30,13 +28,12 @@ if (isset($_SESSION['admin_id'])) {
         $currentUserName = $row['Admin_Name'];
         $currentUserPic = $row['Admin_ProfilePicture'];
         $currentUserRole = $row['Admin_Role'];
-        $isFirstLogin = $row['Admin_IsFirstLogin']; // 【新增】获取状态
+        $isFirstLogin = $row['Admin_IsFirstLogin'];
     }
     $stmt->close();
 } elseif (isset($_SESSION['staff_id'])) {
     // 如果是 Staff
     $currentUserId = $_SESSION['staff_id'];
-    // 【修改】多查询 Staff_IsFirstLogin
     $stmt = $conn->prepare("SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role, Staff_IsFirstLogin FROM staff WHERE Staff_ID = ?");
     $stmt->bind_param("i", $currentUserId);
     $stmt->execute();
@@ -45,23 +42,26 @@ if (isset($_SESSION['admin_id'])) {
         $currentUserName = $row['Staff_FullName'];
         $currentUserPic = $row['Staff_ProfilePicture'];
         $currentUserRole = $row['Staff_Role'];
-        $isFirstLogin = $row['Staff_IsFirstLogin']; // 【新增】获取状态
+        $isFirstLogin = $row['Staff_IsFirstLogin'];
     }
     $stmt->close();
 }
 
 // ==========================================
-// 【新增】处理强制修改密码逻辑
+// 处理强制修改密码逻辑
 // ==========================================
 $passwordMessage = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['force_update_password'])) {
     $newPass = $_POST['new_password'];
     $confirmPass = $_POST['confirm_password'];
 
+    // 后端再次验证正则，防止绕过前端
+    $pattern = '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>])[A-Za-z\d!@#$%^&*()\-_=+{};:,<.>]{8,15}$/';
+
     if ($newPass !== $confirmPass) {
         $passwordMessage = "Passwords do not match.";
-    } elseif (strlen($newPass) < 8) {
-        $passwordMessage = "Password must be at least 8 characters.";
+    } elseif (!preg_match($pattern, $newPass)) {
+        $passwordMessage = "Password does not meet the security requirements.";
     } else {
         $newHash = password_hash($newPass, PASSWORD_DEFAULT);
         
@@ -86,88 +86,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['force_update_password
 }
 
 // ==========================================
-// 1. HANDLE ADD DONATION LOGIC (From Payment Management)
+// 1. HANDLE ADD DONATION LOGIC
 // ==========================================
 $msg = "";
 $msgType = "";
 
-// --- Helper: File Upload Function (Reused) ---
-function handleFileUpload($file, $targetDir) {
-    if (isset($file) && $file['error'] == 0) {
-        $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-        if (in_array($file['type'], $allowedTypes)) {
-            if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
-            $fileExtension = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $fileName = time() . '_' . uniqid() . '.' . $fileExtension;
-            $uploadPath = $targetDir . $fileName;
-            if (move_uploaded_file($file['tmp_name'], $uploadPath)) return $uploadPath;
-        }
-    }
-    return null;
-}
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_donation_submit'])) {
+    $donor_id = $_POST['donor_id'];
+    $amount = $_POST['amount'];
+    $payment_method = $_POST['payment_method']; 
+    $donation_frequency = $_POST['donation_frequency']; 
+    
+    $target_category = $_POST['target_category']; 
+    $branch_id = ($target_category == 'branch') ? $_POST['target_branch_id'] : null;
+    $activity_id = ($target_category == 'activity') ? $_POST['target_activity_id'] : null;
+    $case_id = ($target_category == 'case') ? $_POST['target_case_id'] : null;
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-
-    // --- A. ADD DONATION ---
-    if (isset($_POST['add_donation_submit'])) {
-        $donor_id = $_POST['donor_id'];
-        $amount = $_POST['amount'];
-        $payment_method = $_POST['payment_method']; 
-        $donation_frequency = $_POST['donation_frequency']; 
+    $conn->begin_transaction();
+    try {
+        $donorQ = $conn->query("SELECT * FROM donor WHERE Donor_ID = '$donor_id'");
+        if ($donorQ->num_rows == 0) throw new Exception("Selected donor not found.");
+        $donorData = $donorQ->fetch_assoc();
         
-        $target_category = $_POST['target_category']; 
-        $branch_id = ($target_category == 'branch') ? $_POST['target_branch_id'] : null;
-        $activity_id = ($target_category == 'activity') ? $_POST['target_activity_id'] : null;
-        $case_id = ($target_category == 'case') ? $_POST['target_case_id'] : null;
+        $d_name = $donorData['Donor_Name'];
+        $d_email = $donorData['Donor_Email'];
+        $d_phone = $donorData['Donor_ContactNumber'];
+        $d_ic = $donorData['Donor_ICNumber'];
 
-        $conn->begin_transaction();
-        try {
-            $donorQ = $conn->query("SELECT * FROM donor WHERE Donor_ID = '$donor_id'");
-            if ($donorQ->num_rows == 0) throw new Exception("Selected donor not found.");
-            $donorData = $donorQ->fetch_assoc();
-            
-            $d_name = $donorData['Donor_Name'];
-            $d_email = $donorData['Donor_Email'];
-            $d_phone = $donorData['Donor_ContactNumber'];
-            $d_ic = $donorData['Donor_ICNumber'];
+        $txn_ref = "MAN-IN-" . date('YmdHis') . "-" . rand(100, 999); 
+        $paySql = "INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At) 
+                    VALUES (?, 'Success', ?, ?, NOW(), 'Manual Entry', 'N/A', NOW())";
+        $stmtPay = $conn->prepare($paySql);
+        $stmtPay->bind_param("ssd", $payment_method, $txn_ref, $amount);
+        $stmtPay->execute();
+        $payment_insert_id = $conn->insert_id;
+        $stmtPay->close();
 
-            $txn_ref = "MAN-IN-" . date('YmdHis') . "-" . rand(100, 999); 
-            $paySql = "INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At) 
-                        VALUES (?, 'Success', ?, ?, NOW(), 'Manual Entry', 'N/A', NOW())";
-            $stmtPay = $conn->prepare($paySql);
-            $stmtPay->bind_param("ssd", $payment_method, $txn_ref, $amount);
-            $stmtPay->execute();
-            $payment_insert_id = $conn->insert_id;
-            $stmtPay->close();
+        $points_earned = floor($amount / 10);
+        $orderSql = "INSERT INTO orders (Order_Name, Order_ContactNumber, Order_ICNumber, Order_Email, Order_Amount, Order_Points_Earned, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, Order_Admin_Status, Order_TXN_Ref, Order_Type, Order_Status, Is_Deleted, Order_Created_At, Order_Updated_At, Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID) 
+                      VALUES (?, ?, ?, ?, ?, ?, 'MYR', ?, 'Success', 'Completed', ?, ?, 'Completed', 0, NOW(), NOW(), ?, ?, ?, ?, ?)";
+        
+        $stmtOrder = $conn->prepare($orderSql);
+        $stmtOrder->bind_param("ssssdissiiiii", 
+            $d_name, $d_phone, $d_ic, $d_email, 
+            $amount, $points_earned, $payment_method, $txn_ref, $donation_frequency,
+            $donor_id, $payment_insert_id, $branch_id, $activity_id, $case_id
+        );
+        $stmtOrder->execute();
+        $stmtOrder->close();
 
-            $points_earned = floor($amount / 10);
-            $orderSql = "INSERT INTO orders (Order_Name, Order_ContactNumber, Order_ICNumber, Order_Email, Order_Amount, Order_Points_Earned, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, Order_Admin_Status, Order_TXN_Ref, Order_Type, Order_Status, Is_Deleted, Order_Created_At, Order_Updated_At, Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID) 
-                          VALUES (?, ?, ?, ?, ?, ?, 'MYR', ?, 'Success', 'Completed', ?, ?, 'Completed', 0, NOW(), NOW(), ?, ?, ?, ?, ?)";
-            
-            $stmtOrder = $conn->prepare($orderSql);
-            $stmtOrder->bind_param("ssssdissiiiii", 
-                $d_name, $d_phone, $d_ic, $d_email, 
-                $amount, $points_earned, $payment_method, $txn_ref, $donation_frequency,
-                $donor_id, $payment_insert_id, $branch_id, $activity_id, $case_id
-            );
-            $stmtOrder->execute();
-            $stmtOrder->close();
-
-            if ($points_earned > 0) {
-                $ptCheck = $conn->query("SELECT * FROM point WHERE Donor_ID = '$donor_id'");
-                if ($ptCheck->num_rows > 0) {
-                    $conn->query("UPDATE point SET Points_Total = Points_Total + $points_earned, Points_Earned = Points_Earned + $points_earned, Points_Updated_At = NOW() WHERE Donor_ID = '$donor_id'");
-                } else {
-                    $conn->query("INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES ($points_earned, $points_earned, NOW(), '$donor_id')");
-                }
+        if ($points_earned > 0) {
+            $ptCheck = $conn->query("SELECT * FROM point WHERE Donor_ID = '$donor_id'");
+            if ($ptCheck->num_rows > 0) {
+                $conn->query("UPDATE point SET Points_Total = Points_Total + $points_earned, Points_Earned = Points_Earned + $points_earned, Points_Updated_At = NOW() WHERE Donor_ID = '$donor_id'");
+            } else {
+                $conn->query("INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES ($points_earned, $points_earned, NOW(), '$donor_id')");
             }
-
-            $conn->commit();
-            $msg = "Donation successfully recorded!"; $msgType = "success";
-        } catch (Exception $e) {
-            $conn->rollback();
-            $msg = "Error: " . $e->getMessage(); $msgType = "error";
         }
+
+        $conn->commit();
+        $msg = "Donation successfully recorded!"; $msgType = "success";
+    } catch (Exception $e) {
+        $conn->rollback();
+        $msg = "Error: " . $e->getMessage(); $msgType = "error";
     }
 }
 
@@ -232,7 +213,6 @@ function getGrowthRate($conn, $table, $dateColumn, $sumColumn = null, $extraCond
 // 6. Format Growth HTML
 function formatGrowthHtml($percent) {
     $percent = round($percent, 2);
-    
     if ($percent >= 0) {
         return '<p style="color: #28a745; display: flex; align-items: center;"><i class="fas fa-arrow-up" style="margin-right:5px;"></i> +' . $percent . '% from last month</p>';
     } else {
@@ -298,11 +278,11 @@ $donorsList = $conn->query("SELECT Donor_ID, Donor_Name, Donor_Email FROM donor 
 $branchesList = $conn->query("SELECT Branch_ID, Branch_Name FROM branch WHERE Branch_OperationalStatus = 'Open'");
 $activitiesList = $conn->query("SELECT Activity_ID, Activity_Name FROM activity WHERE Activity_Status != 'Cancelled' AND Activity_Status != 'Completed' ORDER BY Activity_StartDate DESC");
 $casesList = $conn->query("SELECT Case_ID, Case_Title FROM special_case WHERE Case_Status = 'Active'");
-$allBranches = $conn->query("SELECT Branch_ID, Branch_Name FROM branch ORDER BY Branch_Name ASC"); // For activity branch select
+$allBranches = $conn->query("SELECT Branch_ID, Branch_Name FROM branch ORDER BY Branch_Name ASC");
 
 $malaysiaStates = [ 'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu' ];
 $branches = []; 
-while($bRow = $allBranches->fetch_assoc()) $branches[] = $bRow; // Cache for Activity Modal
+while($bRow = $allBranches->fetch_assoc()) $branches[] = $bRow; 
 
 // Fetch Statistics
 $totalDonors = getTotalDonors($conn);
@@ -371,7 +351,6 @@ $chartData = getDynamicDonationTrends($conn);
         }
         th { font-weight: 600; color: #888; text-transform: uppercase; font-size: 12px; }
         
-        /* 1. DATE FORMAT STYLING (3 LINES) */
         .date-box {
             display: flex;
             flex-direction: column;
@@ -386,12 +365,8 @@ $chartData = getDynamicDonationTrends($conn);
         .d-month { font-size: 11px; text-transform: uppercase; margin: 2px 0; }
         .d-day { font-size: 14px; font-weight: bold; color: #333; }
         
-        /* 2. AMOUNT ALIGN RIGHT */
         .amount-right { text-align: right; }
-
-        /* 3. REDEMPTION TABLE ALIGN CENTRE */
-        .redemption-table th, 
-        .redemption-table td { text-align: center !important; }
+        .redemption-table th, .redemption-table td { text-align: center !important; }
 
         .info-cell { display: flex; align-items: center; text-align: left;}
         .avatar-circle { width: 32px; height: 32px; border-radius: 50%; background: #eee; color: #555; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 10px; font-size: 12px; flex-shrink: 0; overflow: hidden; }
@@ -436,17 +411,6 @@ $chartData = getDynamicDonationTrends($conn);
         .row-group .form-group, .form-row .form-group { flex: 1; }
         .form-guide { font-size: 12px; color: #666; margin-top: 5px; display: block; background: #f9f9f9; padding: 8px; border-radius: 4px; border-left: 3px solid #ccc; line-height: 1.4; }
         .required { color: red; }
-
-        /* Styles from Donor/Activity/Case Management for correct display */
-        .profile-picture-preview { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #f8f9fa; margin: 0 auto 15px; background: #eee; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
-        .case-preview-box { width: 200px; height: 150px; border-radius: 10px; } 
-        .profile-picture-preview img { width: 100%; height: 100%; object-fit: cover; }
-        .file-upload { text-align: center; margin-bottom: 20px; }
-        .file-upload-label { display: inline-block; padding: 8px 15px; background: #f8f9fa; border: 1px dashed #ccc; border-radius: 5px; cursor: pointer; font-size: 13px; transition: all 0.3s; }
-        .file-upload-label:hover { border-color: var(--primary); background: #fff5f5; color: var(--primary); }
-        .file-upload input[type="file"] { display: none; }
-        .file-info { display: none; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; background: #f1f1f1; padding: 5px 10px; border-radius: 5px; }
-        .file-remove { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 14px; padding: 0 5px; }
         
         /* Floating Alert */
         .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1300; display: flex; align-items: center; gap: 10px; animation: slideIn 0.5s ease-out; }
@@ -458,7 +422,7 @@ $chartData = getDynamicDonationTrends($conn);
         .select2-container .select2-selection--single { height: 42px !important; border: 1px solid #ddd !important; border-radius: 5px !important; display: flex; align-items: center; }
         .select2-container--default .select2-selection--single .select2-selection__arrow { height: 40px !important; }
         
-        /* --- Force Password Change Modal Styles (Added) --- */
+        /* --- Enhanced Force Password Change Modal Styles --- */
         .force-modal { 
             display: <?php echo ($isFirstLogin == 1) ? 'flex' : 'none'; ?>; 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
@@ -472,16 +436,89 @@ $chartData = getDynamicDonationTrends($conn);
         }
         .force-modal h2 { color: #333; margin-bottom: 10px; font-size: 22px; }
         .force-modal p { color: #666; margin-bottom: 25px; font-size: 14px; line-height: 1.5; }
-        .force-input { 
-            width: 100%; padding: 12px; margin-bottom: 15px; 
-            border: 1px solid #ddd; border-radius: 6px; 
-            font-size: 14px; box-sizing: border-box; 
+        
+        /* New Password Input Group with Toggle */
+        .fp-input-group {
+            position: relative;
+            display: flex;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            margin-bottom: 10px;
         }
+        .fp-input-group input {
+            flex: 1;
+            border-radius: 8px 0 0 8px;
+            border: 1px solid #ddd;
+            border-right: none;
+            padding: 12px 15px;
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+        .fp-input-group input:focus {
+            border-color: #F28585;
+            box-shadow: 0 0 0 3px rgba(242, 133, 133, 0.1);
+            z-index: 2;
+        }
+        .fp-input-group .toggle-btn {
+            border: 1px solid #ddd;
+            border-left: none;
+            border-radius: 0 8px 8px 0;
+            background: #f9f9f9;
+            cursor: pointer;
+            padding: 0 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            transition: background 0.2s;
+        }
+        .fp-input-group .toggle-btn:hover {
+            background-color: #eee;
+        }
+
+        /* Requirements List */
+        .fp-requirements {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: left;
+            margin-bottom: 20px;
+            font-size: 12px;
+            border: 1px solid #eee;
+        }
+        .fp-req-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            color: #dc3545; /* Default Red */
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        .fp-req-item i {
+            width: 20px;
+            text-align: center;
+            margin-right: 5px;
+        }
+        /* Green state for valid items */
+        .fp-req-item.valid {
+            color: #28a745;
+        }
+
+        /* Match Message */
+        .match-message {
+            font-size: 12px;
+            text-align: left;
+            margin-top: 5px;
+            display: block;
+            min-height: 18px;
+        }
+        .match-success { color: #28a745; }
+        .match-error { color: #dc3545; }
+
         .force-btn { 
             width: 100%; padding: 12px; background: #F28585; 
             color: white; border: none; border-radius: 6px; 
             font-size: 16px; font-weight: 600; cursor: pointer; 
-            transition: 0.3s; 
+            transition: 0.3s; margin-top: 15px;
         }
         .force-btn:hover { background: #e07474; }
         .alert-message { 
@@ -706,11 +743,33 @@ $chartData = getDynamicDonationTrends($conn);
                 <?php endif; ?>
             <?php endif; ?>
 
-            <form method="POST" action="admin_dashboard.php">
+            <form method="POST" action="admin_dashboard.php" onsubmit="return validateForceForm()">
                 <input type="hidden" name="force_update_password" value="1">
-                <input type="password" name="new_password" class="force-input" placeholder="New Password (Min 8 chars)" required minlength="8">
-                <input type="password" name="confirm_password" class="force-input" placeholder="Confirm New Password" required minlength="8">
-                <button type="submit" class="force-btn">Update Password</button>
+                
+                <div class="fp-input-group">
+                    <input type="password" name="new_password" id="fp_new_password" placeholder="New Password (Min 8 chars)" oninput="validateForceRequirements()">
+                    <button type="button" class="toggle-btn" onclick="toggleForceVisibility('fp_new_password', this)">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+
+                <div class="fp-requirements">
+                    <div id="fp_lengthReq" class="fp-req-item"><i class="fas fa-times"></i> Min 8-15 characters</div>
+                    <div id="fp_uppercaseReq" class="fp-req-item"><i class="fas fa-times"></i> At least 1 Uppercase (A-Z)</div>
+                    <div id="fp_lowercaseReq" class="fp-req-item"><i class="fas fa-times"></i> At least 1 Lowercase (a-z)</div>
+                    <div id="fp_numberReq" class="fp-req-item"><i class="fas fa-times"></i> At least 1 Number (0-9)</div>
+                    <div id="fp_specialReq" class="fp-req-item"><i class="fas fa-times"></i> At least 1 Symbol (!@#...)</div>
+                </div>
+
+                <div class="fp-input-group">
+                    <input type="password" name="confirm_password" id="fp_confirm_password" placeholder="Confirm New Password" oninput="validateForceMatch()">
+                    <button type="button" class="toggle-btn" onclick="toggleForceVisibility('fp_confirm_password', this)">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <span id="fp_match_msg" class="match-message"></span>
+
+                <button type="submit" class="force-btn" id="fp_submit_btn">Update Password</button>
             </form>
         </div>
     </div>
@@ -866,18 +925,6 @@ $chartData = getDynamicDonationTrends($conn);
             document.body.removeChild(link);
         }
 
-        // --- SHARED MODAL FUNCTIONS ---
-        function previewImage(input, containerId, infoId, nameId) {
-            const container = document.getElementById(containerId); const info = document.getElementById(infoId); const nameSpan = document.getElementById(nameId);
-            if (input.files && input.files[0]) { const reader = new FileReader(); reader.onload = function(e) { container.innerHTML = `<img src="${e.target.result}" alt="Preview">`; if(info) { info.style.display = 'inline-flex'; nameSpan.textContent = input.files[0].name; } }; reader.readAsDataURL(input.files[0]); }
-        }
-        function removeImage(inputId, containerId, infoId, originalSrc = null) {
-            document.getElementById(inputId).value = ''; if(infoId) document.getElementById(infoId).style.display = 'none'; 
-            const container = document.getElementById(containerId); 
-            if (originalSrc) { container.innerHTML = `<img src="${originalSrc}" alt="Preview">`; } 
-            else { container.innerHTML = '<div style="font-size:48px; color:#ccc;"><i class="fas fa-user"></i></div>'; } 
-        }
-
         // --- MODAL CONTROLS ---
         function openActivitySelectionModal() { document.getElementById('activitySelectionModal').style.display = 'flex'; }
         function closeActivitySelectionModal() { document.getElementById('activitySelectionModal').style.display = 'none'; }
@@ -888,7 +935,7 @@ $chartData = getDynamicDonationTrends($conn);
         function openDonationModal() { document.getElementById('addDonationModal').style.display = 'flex'; }
         function closeDonationModal() { document.getElementById('addDonationModal').style.display = 'none'; }
 
-        function openAddDonorModal() { window.location.href='admin_donor_page.php?open_add=1'; } // Redirect to actual page for cleaner logic
+        function openAddDonorModal() { window.location.href='admin_donor_page.php?open_add=1'; } 
 
         window.onclick = function(event) {
             if (event.target == document.getElementById('activitySelectionModal')) closeActivitySelectionModal();
@@ -911,6 +958,81 @@ $chartData = getDynamicDonationTrends($conn);
             else if(cat==='branch') br.style.display='block';
             else if(cat==='activity') act.style.display='block';
             else if(cat==='case') cs.style.display='block';
+        }
+
+        // ==========================================
+        // Force Password Change Logic (JS)
+        // ==========================================
+        function toggleForceVisibility(id, btn) {
+            const input = document.getElementById(id);
+            const icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fas fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fas fa-eye';
+            }
+        }
+
+        function validateForceRequirements() {
+            const pw = document.getElementById('fp_new_password').value;
+            const items = {
+                lengthReq: pw.length >= 8 && pw.length <= 15,
+                uppercaseReq: /[A-Z]/.test(pw),
+                lowercaseReq: /[a-z]/.test(pw),
+                numberReq: /\d/.test(pw),
+                specialReq: /[!@#$%^&*()\-=_+{}[\]:;"'<>,.?/|\\]/.test(pw)
+            };
+
+            let allValid = true;
+            for (const [key, isValid] of Object.entries(items)) {
+                const el = document.getElementById('fp_' + key);
+                const icon = el.querySelector('i');
+                if (isValid) {
+                    el.classList.add('valid');
+                    icon.className = 'fas fa-check';
+                } else {
+                    el.classList.remove('valid');
+                    icon.className = 'fas fa-times';
+                    allValid = false;
+                }
+            }
+            // Trigger match check as well
+            if(document.getElementById('fp_confirm_password').value) validateForceMatch();
+            
+            return allValid;
+        }
+
+        function validateForceMatch() {
+            const p1 = document.getElementById('fp_new_password').value;
+            const p2 = document.getElementById('fp_confirm_password').value;
+            const msg = document.getElementById('fp_match_msg');
+
+            if (!p2) {
+                msg.textContent = "";
+                return false;
+            }
+
+            if (p1 === p2) {
+                msg.textContent = "Passwords match!";
+                msg.className = "match-message match-success";
+                return true;
+            } else {
+                msg.textContent = "Passwords do not match.";
+                msg.className = "match-message match-error";
+                return false;
+            }
+        }
+
+        function validateForceForm() {
+            const reqValid = validateForceRequirements();
+            const matchValid = validateForceMatch();
+            if (!reqValid || !matchValid) {
+                alert("Please ensure all requirements are met and passwords match.");
+                return false;
+            }
+            return true;
         }
     </script>
 </body>
