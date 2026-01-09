@@ -2,6 +2,7 @@
 // admin_branch_details.php
 session_start();
 
+// 检查权限
 if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     die("Access Denied.");
 }
@@ -14,13 +15,13 @@ if (!isset($_GET['id'])) {
 
 $id = intval($_GET['id']);
 
-// Fetch Branch Data
+// 获取 Branch Data
 $sql = "SELECT * FROM branch WHERE Branch_ID = $id";
 $result = $conn->query($sql);
 if ($result->num_rows == 0) die("Branch not found.");
 $branch = $result->fetch_assoc();
 
-// Calculate Total Donated
+// 获取统计数据 (Total Donated & Count)
 $statsSql = "SELECT COUNT(*) as donorCount, SUM(Order_Amount) as totalRaised 
              FROM orders 
              WHERE Branch_ID = $id AND (Order_Status = 'Success' OR Order_Status = 'Completed')";
@@ -29,11 +30,10 @@ $stats = $statsRes->fetch_assoc();
 $totalRaised = $stats['totalRaised'] ?? 0;
 $donorCount = $stats['donorCount'] ?? 0;
 
-// Images
+// 处理图片 JSON
 $images = json_decode($branch['Branch_Images'], true);
 $hasImages = ($images && !empty($images));
 if (!$hasImages) {
-    // If no images, we will render a placeholder block instead of a carousel
     $images = []; 
 }
 ?>
@@ -55,6 +55,7 @@ if (!$hasImages) {
             display: inline-flex; align-items: center; gap: 8px; 
             padding: 8px 16px; background: white; border-radius: 50px; 
             box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.2s;
+            cursor: pointer; /* 确保鼠标变成手型 */
         }
         .back-link:hover { background: #F28585; color: white; transform: translateY(-2px); }
 
@@ -70,11 +71,13 @@ if (!$hasImages) {
         .status-open { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
         .status-closed { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
 
-        /* GALLERY SECTION */
-        .gallery-container { height: 320px; position: relative; background: #f8f9fa; border-bottom: 1px solid #eee; }
-        .gallery-img { width: 100%; height: 100%; object-fit: cover; display: none; }
+        /* GALLERY SECTION (PREVIEW) */
+        .gallery-container { height: 320px; position: relative; background: #f8f9fa; border-bottom: 1px solid #eee; overflow: hidden; }
+        .gallery-img { width: 100%; height: 100%; object-fit: cover; display: none; cursor: zoom-in; transition: opacity 0.3s; }
+        .gallery-img:hover { opacity: 0.95; }
         .gallery-img.active { display: block; }
         
+        /* Preview Navigation Buttons */
         .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.8); color: #333; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 18px; transition: 0.2s; display: flex; align-items: center; justify-content: center; z-index: 10; }
         .nav-btn:hover { background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
         .prev { left: 20px; } .next { right: 20px; }
@@ -104,9 +107,80 @@ if (!$hasImages) {
         .ir-data h5 { margin: 0 0 3px 0; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
         .ir-data p { margin: 0; font-size: 14px; font-weight: 600; color: #333; line-height: 1.4; }
 
+        /* --- LIGHTBOX MODAL STYLES (FULL SCREEN GALLERY) --- */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 10000; /* 确保在最顶层 */
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: hidden; 
+            background-color: rgba(0, 0, 0, 0.95); /* 深黑背景 */
+            align-items: center;
+            justify-content: center;
+            /* Flexbox 确保图片完美居中 */
+        }
+
+        .modal.show {
+            display: flex; /* 只在打开时设为 Flex */
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90vh;
+            border-radius: 4px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            animation: zoom 0.3s;
+            object-fit: contain;
+        }
+
+        @keyframes zoom {
+            from {transform:scale(0.9); opacity: 0} 
+            to {transform:scale(1); opacity: 1}
+        }
+
+        /* Modal Close Button (Top Right) */
+        .close-modal {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+            z-index: 10002;
+            line-height: 1;
+        }
+
+        .close-modal:hover { color: #F28585; }
+
+        /* Modal Navigation Arrows (Left & Right) */
+        .modal-nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 20px;
+            user-select: none;
+            z-index: 10001;
+            transition: 0.3s;
+            text-decoration: none;
+        }
+        .modal-nav-btn:hover { color: #fff; background: rgba(0,0,0,0.2); border-radius: 5px; }
+        .modal-prev { left: 20px; }
+        .modal-next { right: 20px; }
+
         @media (max-width: 768px) {
             .content-body { grid-template-columns: 1fr; }
             .gallery-container { height: 220px; }
+            .modal-nav-btn { font-size: 30px; padding: 10px; }
+            .close-modal { top: 10px; right: 15px; font-size: 35px; }
         }
     </style>
 </head>
@@ -114,8 +188,8 @@ if (!$hasImages) {
 
     <div class="detail-wrapper">
         <div class="top-bar">
-            <a href="#" onclick="window.close(); return false;" class="back-link">
-                <i class="fas fa-arrow-left"></i> Close Page
+            <a href="javascript:void(0);" onclick="goBackAndClose()" class="back-link">
+                <i class="fas fa-arrow-left"></i> Back to Branch Management
             </a>
             <div style="font-size:12px; color:#999;">ID: #<?php echo str_pad($branch['Branch_ID'], 4, '0', STR_PAD_LEFT); ?></div>
         </div>
@@ -125,11 +199,15 @@ if (!$hasImages) {
             <div class="gallery-container">
                 <?php if ($hasImages): ?>
                     <?php foreach($images as $idx => $img): ?>
-                        <img src="<?php echo htmlspecialchars($img); ?>" class="gallery-img <?php echo $idx===0?'active':''; ?>">
+                        <img src="<?php echo htmlspecialchars($img); ?>" 
+                             class="gallery-img <?php echo $idx===0?'active':''; ?>"
+                             onclick="openLightbox(<?php echo $idx; ?>)"
+                             alt="Branch Image">
                     <?php endforeach; ?>
+                    
                     <?php if(count($images) > 1): ?>
-                        <button class="nav-btn prev" onclick="changeSlide(-1)"><i class="fas fa-chevron-left"></i></button>
-                        <button class="nav-btn next" onclick="changeSlide(1)"><i class="fas fa-chevron-right"></i></button>
+                        <button class="nav-btn prev" onclick="changeSlide(-1); event.stopPropagation();"><i class="fas fa-chevron-left"></i></button>
+                        <button class="nav-btn next" onclick="changeSlide(1); event.stopPropagation();"><i class="fas fa-chevron-right"></i></button>
                     <?php endif; ?>
                 <?php else: ?>
                     <div class="no-image-box">
@@ -238,7 +316,32 @@ if (!$hasImages) {
         </div>
     </div>
 
+    <div id="lightboxModal" class="modal">
+        <span class="close-modal" onclick="closeLightbox()">&times;</span>
+        
+        <?php if(count($images) > 1): ?>
+            <a class="modal-nav-btn modal-prev" onclick="changeLightboxSlide(-1)">&#10094;</a>
+            <a class="modal-nav-btn modal-next" onclick="changeLightboxSlide(1)">&#10095;</a>
+        <?php endif; ?>
+
+        <img class="modal-content" id="lightboxImage" src="">
+    </div>
+
     <script>
+        // --- 新增: 处理返回和关闭页面的逻辑 ---
+        function goBackAndClose() {
+            // 1. 尝试关闭当前窗口 (如果是 window.open 打开的)
+            window.close();
+            
+            // 2. 如果 window.close() 没反应 (比如是在同一页打开的)，则稍微延迟后执行跳转作为后备方案
+            setTimeout(function() {
+                if (!window.closed) {
+                    window.location.href = 'admin_branch.php';
+                }
+            }, 100);
+        }
+
+        // --- 1. Preview Slider Logic (预览小图逻辑) ---
         let slideIndex = 0;
         const slides = document.querySelectorAll('.gallery-img');
         
@@ -250,6 +353,65 @@ if (!$hasImages) {
             if (slideIndex < 0) slideIndex = slides.length - 1;
             slides[slideIndex].classList.add('active');
         }
+
+        // --- 2. Lightbox / Modal Logic (全屏大图逻辑) ---
+        
+        // 把 PHP 图片数组传给 JS
+        const imageList = <?php echo json_encode($images); ?>;
+        let lightboxIndex = 0;
+        const modal = document.getElementById('lightboxModal');
+        const modalImg = document.getElementById('lightboxImage');
+
+        // 打开 Lightbox
+        function openLightbox(index) {
+            if(imageList.length === 0) return;
+            lightboxIndex = index;
+            
+            modal.classList.add('show'); // 添加 class 显示
+            updateLightboxImage();
+            
+            // 监听键盘事件 (Esc, Left, Right)
+            document.addEventListener('keydown', handleKeydown);
+            
+            // 禁止背景滚动
+            document.body.style.overflow = 'hidden';
+        }
+
+        // 关闭 Lightbox
+        function closeLightbox() {
+            modal.classList.remove('show');
+            document.removeEventListener('keydown', handleKeydown);
+            document.body.style.overflow = 'auto'; // 恢复滚动
+        }
+
+        // 切换 Lightbox 图片
+        function changeLightboxSlide(n) {
+            lightboxIndex += n;
+            if (lightboxIndex >= imageList.length) lightboxIndex = 0;
+            if (lightboxIndex < 0) lightboxIndex = imageList.length - 1;
+            updateLightboxImage();
+        }
+
+        // 更新图片的 src
+        function updateLightboxImage() {
+            modalImg.src = imageList[lightboxIndex];
+        }
+
+        // 键盘控制
+        function handleKeydown(e) {
+            if (modal.classList.contains('show')) {
+                if (e.key === "ArrowLeft") changeLightboxSlide(-1);
+                if (e.key === "ArrowRight") changeLightboxSlide(1);
+                if (e.key === "Escape") closeLightbox();
+            }
+        }
+
+        // 点击背景区域也可以关闭 (可选功能)
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeLightbox();
+            }
+        });
     </script>
 </body>
 </html>

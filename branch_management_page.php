@@ -151,7 +151,6 @@ function handleMultiUpload($files) {
     $fileCount = count($files['name']);
     for ($i = 0; $i < $fileCount; $i++) {
         if ($files['error'][$i] == 0 && in_array($files['type'][$i], $allowed)) {
-            // No strict break here to allow adding more, but limit usage responsibly
             $ext = pathinfo($files['name'][$i], PATHINFO_EXTENSION);
             $name = 'br_' . time() . '_' . uniqid() . '_' . $i . '.' . $ext;
             if (move_uploaded_file($files['tmp_name'][$i], $dir . $name)) {
@@ -167,6 +166,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
 
 // --- ADD BRANCH ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_branch'])) {
+    // Basic Sanitization
     $branchName = mysqli_real_escape_string($conn, $_POST['branch_name']);
     $branchType = mysqli_real_escape_string($conn, $_POST['branch_type']);
     $capacity = intval($_POST['capacity']);
@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_branch'])) {
     $headContact = (strpos($headContactRaw, '+60') === 0) ? $headContactRaw : "+60" . $headContactRaw;
     $headContact = mysqli_real_escape_string($conn, $headContact);
     
-    // Address
+    // Address & Description
     $address1 = mysqli_real_escape_string($conn, $_POST['address1']);
     $address2 = mysqli_real_escape_string($conn, $_POST['address2']);
     $address3 = mysqli_real_escape_string($conn, $_POST['address3']);
@@ -196,17 +196,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_branch'])) {
     $country = mysqli_real_escape_string($conn, $_POST['country']);
     $description = mysqli_real_escape_string($conn, $_POST['description']);
     
+    // Image Handling
     $imageJson = "[]";
     if (isset($_FILES['branch_images'])) {
         $uploaded = handleMultiUpload($_FILES['branch_images']);
         if (!empty($uploaded)) $imageJson = json_encode($uploaded);
     }
     
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    // VALIDATION: Strict checks as requested
+    if (empty($branchName) || empty($branchType) || empty($capacity) || empty($estDate) || 
+        empty($email) || empty($contactNumber) || 
+        empty($branchHead) || empty($headEmail) || empty($headContact) || 
+        empty($address1) || empty($city) || empty($state) || empty($postalCode) || empty($description)) {
+        $errorMessage = "All fields are mandatory. Please fill in all details.";
+    }
+    // Specific format checks
+    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errorMessage = "Invalid Branch email format.";
-    } elseif (!empty($headEmail) && !filter_var($headEmail, FILTER_VALIDATE_EMAIL)) {
+    } 
+    elseif (!filter_var($headEmail, FILTER_VALIDATE_EMAIL)) {
         $errorMessage = "Invalid PIC email format.";
-    } else {
+    } 
+    else {
+        // SQL Insert
         $sql = "INSERT INTO branch (Branch_Name, Branch_Type, Branch_Capacity, Branch_EstablishedDate,
                 Branch_OperationalStatus, Branch_ContactNumber, Branch_Email,
                 Branch_Head, Branch_Head_Contact, Branch_Head_Email,
@@ -221,6 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_branch'])) {
         if ($conn->query($sql)) $successMessage = "Branch added successfully!";
         else $errorMessage = "Error adding branch: " . $conn->error;
     }
+    
     if (!empty($successMessage)) { header("Location: branch_management_page.php?success=" . urlencode($successMessage)); exit(); }
     elseif (!empty($errorMessage)) { header("Location: branch_management_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
@@ -228,6 +241,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_branch'])) {
 // --- UPDATE BRANCH ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_branch'])) {
     $branchId = mysqli_real_escape_string($conn, $_POST['branch_id']);
+    
+    // Basic Sanitization
     $branchName = mysqli_real_escape_string($conn, $_POST['branch_name']);
     $branchType = mysqli_real_escape_string($conn, $_POST['branch_type']);
     $capacity = intval($_POST['capacity']);
@@ -247,7 +262,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_branch'])) {
     $headContact = (strpos($headContactRaw, '+60') === 0) ? $headContactRaw : "+60" . $headContactRaw;
     $headContact = mysqli_real_escape_string($conn, $headContact);
 
-    // Address
+    // Address & Description
     $address1 = mysqli_real_escape_string($conn, $_POST['address1']);
     $address2 = mysqli_real_escape_string($conn, $_POST['address2']);
     $address3 = mysqli_real_escape_string($conn, $_POST['address3']);
@@ -258,27 +273,36 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_branch'])) {
     $description = mysqli_real_escape_string($conn, $_POST['description']);
     
     // Handle Images
-    // 1. Get existing images that user KEPT (sent as JSON string from hidden input)
     $remainingExistingImagesJson = $_POST['existing_images_json'];
     $remainingExistingImages = json_decode($remainingExistingImagesJson, true) ?? [];
 
-    // 2. Handle NEW uploads
     $newImages = [];
     if (isset($_FILES['branch_images'])) {
         $newImages = handleMultiUpload($_FILES['branch_images']);
     }
 
-    // 3. Merge Remaining + New
     $finalImages = array_merge($remainingExistingImages, $newImages);
-    
-    // Limit to 10 for safety
     if(count($finalImages) > 10) $finalImages = array_slice($finalImages, 0, 10);
     $finalJson = json_encode($finalImages);
     
-    if (empty($branchName) || empty($branchType)) $errorMessage = "Name and Category are required.";
-    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errorMessage = "Invalid Branch email format.";
-    elseif (!empty($headEmail) && !filter_var($headEmail, FILTER_VALIDATE_EMAIL)) $errorMessage = "Invalid PIC email format.";
+    // VALIDATION: Strict checks
+    if (empty($branchName) || empty($branchType) || empty($capacity) || empty($estDate) || 
+        empty($email) || empty($contactNumber) || 
+        empty($branchHead) || empty($headEmail) || empty($headContact) || 
+        empty($address1) || empty($city) || empty($state) || empty($postalCode) || empty($description)) {
+        $errorMessage = "All fields are mandatory. Please fill in all details.";
+    }
+    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errorMessage = "Invalid Branch email format.";
+    }
+    elseif (!filter_var($headEmail, FILTER_VALIDATE_EMAIL)) {
+        $errorMessage = "Invalid PIC email format.";
+    }
+    elseif (empty($finalImages)) {
+        $errorMessage = "At least one branch image is required.";
+    }
     else {
+        // SQL Update
         $sql = "UPDATE branch SET 
                 Branch_Name = '$branchName', Branch_Type = '$branchType', 
                 Branch_Capacity = $capacity, Branch_EstablishedDate = '$estDate', Branch_OperationalStatus = '$operationalStatus',
@@ -292,6 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_branch'])) {
         if ($conn->query($sql)) $successMessage = "Branch updated successfully!";
         else $errorMessage = "Error updating branch: " . $conn->error;
     }
+    
     if (!empty($successMessage)) { header("Location: branch_management_page.php?success=" . urlencode($successMessage)); exit(); }
     elseif (!empty($errorMessage)) { header("Location: branch_management_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
@@ -340,6 +365,9 @@ $result = $conn->query($sql);
 $branches = [];
 if ($result) { while($row = $result->fetch_assoc()) $branches[] = $row; }
 
+// --- COLLECT IMAGES FOR LIGHTBOX JS ---
+$allBranchImagesMap = [];
+
 $exportParams = $_GET; $exportParams['action'] = 'export_excel'; unset($exportParams['page']);
 $exportUrl = "?" . http_build_query($exportParams);
 ?>
@@ -386,7 +414,8 @@ $exportUrl = "?" . http_build_query($exportParams);
         .branch-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
         
         .card-image-container { position: relative; height: 200px; background: #f0f0f0; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px; }
-        .card-img { width: 100%; height: 100%; object-fit: cover; display: none; transition: opacity 0.3s; }
+        /* Modified card-img to show clickability */
+        .card-img { width: 100%; height: 100%; object-fit: cover; display: none; transition: opacity 0.3s; cursor: zoom-in; }
         .card-img.active { display: block; }
         
         .no-image-placeholder { width: 100%; height: 100%; background: #e9ecef; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #adb5bd; }
@@ -397,7 +426,7 @@ $exportUrl = "?" . http_build_query($exportParams);
         .prev-btn { left: 10px; } .next-btn { right: 10px; }
         .img-counter { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
 
-        .status-badge { position: absolute; top: 15px; left: 15px; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 5; }
+        .status-badge { position: absolute; top: 15px; left: 15px; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 5; pointer-events: none; }
         .status-open { background: #d4edda; color: #155724; } .status-closed { background: #f8d7da; color: #721c24; }
         
         .card-content { padding: 20px; flex: 1; display: flex; flex-direction: column; position: relative; }
@@ -416,7 +445,7 @@ $exportUrl = "?" . http_build_query($exportParams);
         .info-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
         .info-item { display: flex; align-items: flex-start; gap: 12px; font-size: 13px; color: #555; }
         .info-icon { width: 18px; min-width: 18px; text-align: center; color: var(--primary); margin-top: 2px; }
-        .info-text { word-break: break-word; }
+        .info-text { word-break: break-all; }
         .info-label { font-weight: 600; font-size: 11px; color: #999; text-transform: uppercase; display: block; margin-bottom: 1px; }
 
         .card-stats { border-top: 1px solid #eee; padding-top: 15px; margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
@@ -424,7 +453,7 @@ $exportUrl = "?" . http_build_query($exportParams);
         .raised-label { font-size: 11px; color: #888; display: block; }
 
         /* Modal & Form Guides */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; border-radius: 10px; width: 90%; max-width: 650px; max-height: 90vh; overflow-y: auto; padding: 0; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
         .modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fff; position: sticky; top: 0; z-index: 5; }
         .modal-body { padding: 25px; }
@@ -453,8 +482,17 @@ $exportUrl = "?" . http_build_query($exportParams);
         .upload-box:hover { background: #fff5f5; border-color: var(--primary); }
         .upload-box i { font-size: 32px; color: #aaa; margin-bottom: 10px; display: block; }
         .upload-box p { margin: 0; font-size: 13px; color: #666; font-weight: 500; }
+        
+        /* FIX FOR CLICKING ISSUE: input covers the whole box */
         .upload-box input[type="file"] {
-            position: absolute; width: 100%; height: 100%; top: 0; left: 0; opacity: 0; cursor: pointer;
+            position: absolute; 
+            width: 100%; 
+            height: 100%; 
+            top: 0; 
+            left: 0; 
+            opacity: 0; 
+            cursor: pointer;
+            z-index: 10; /* Ensures input is on top of text */
         }
         
         .preview-grid {
@@ -514,6 +552,77 @@ $exportUrl = "?" . http_build_query($exportParams);
         .h-right { font-weight: bold; color: #28a745; font-size: 14px; }
         .close-btn { font-size: 24px; cursor: pointer; border:none; background:none; }
 
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s; }
+        .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
+        .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* --- LIGHTBOX (GALLERY) CSS --- */
+        .lightbox-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            padding-top: 50px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: rgba(0, 0, 0, 0.9);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .lightbox-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 80vh;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+            object-fit: contain;
+            animation: zoomIn 0.3s;
+        }
+        @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
+        
+        .close-lightbox {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+            z-index: 2002;
+        }
+        .close-lightbox:hover, .close-lightbox:focus {
+            color: #bbb;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        
+        .lightbox-nav {
+            cursor: pointer;
+            position: absolute;
+            top: 50%;
+            width: auto;
+            padding: 16px;
+            margin-top: -50px;
+            color: white;
+            font-weight: bold;
+            font-size: 30px;
+            transition: 0.6s ease;
+            border-radius: 0 3px 3px 0;
+            user-select: none;
+            z-index: 2001;
+            background-color: rgba(0,0,0,0.3);
+        }
+        .lightbox-nav:hover { background-color: rgba(255,255,255,0.2); }
+        .lightbox-prev { left: 0; border-radius: 0 3px 3px 0; }
+        .lightbox-next { right: 0; border-radius: 3px 0 0 3px; }
+        /* ---------------------------------- */
+
         @media (max-width: 768px) {
             .stats-cards { grid-template-columns: 1fr; }
             .form-row { flex-direction: column; gap: 0; }
@@ -528,16 +637,15 @@ $exportUrl = "?" . http_build_query($exportParams);
         <?php include 'admin_header.php'; ?>
 
         <div class="dashboard-content">
-            <?php if (isset($_GET['success'])): ?>
-                <div style="background:#d4edda; color:#155724; padding:15px; margin-bottom:20px; border-radius:5px; border-left:4px solid #28a745;">
-                    <i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($_GET['success']); ?>
-                </div>
-            <?php endif; ?>
-            <?php if (isset($_GET['error'])): ?>
-                <div style="background:#f8d7da; color:#721c24; padding:15px; margin-bottom:20px; border-radius:5px; border-left:4px solid #dc3545;">
-                    <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($_GET['error']); ?>
-                </div>
-            <?php endif; ?>
+            <div class="floating-alert floating-alert-success" id="floatingSuccess" style="display: <?php echo isset($_GET['success']) ? 'flex' : 'none'; ?>">
+                <i class="fas fa-check-circle"></i>
+                <span id="floatingSuccessText"><?php echo isset($_GET['success']) ? htmlspecialchars($_GET['success']) : ''; ?></span>
+            </div>
+
+            <div class="floating-alert floating-alert-danger" id="floatingError" style="display: <?php echo isset($_GET['error']) ? 'flex' : 'none'; ?>">
+                <i class="fas fa-exclamation-circle"></i>
+                <span id="floatingErrorText"><?php echo isset($_GET['error']) ? htmlspecialchars($_GET['error']) : ''; ?></span>
+            </div>
 
             <div class="welcome-section"><h1>Branch Management</h1><p>Manage shelter branches, view status, and track donations.</p></div>
 
@@ -605,6 +713,10 @@ $exportUrl = "?" . http_build_query($exportParams);
                                 $statusClass = ($b['Branch_OperationalStatus'] == 'Open') ? 'status-open' : 'status-closed';
                                 $images = json_decode($b['Branch_Images'], true);
                                 $hasImages = ($images && !empty($images));
+                                // Collect images for JS Map
+                                if($hasImages) {
+                                    $allBranchImagesMap[$b['Branch_ID']] = $images;
+                                }
                             ?>
                             <div class="branch-card" id="card-<?php echo $b['Branch_ID']; ?>">
                                 <div class="card-actions">
@@ -622,7 +734,9 @@ $exportUrl = "?" . http_build_query($exportParams);
                                 <div class="card-image-container">
                                     <?php if($hasImages): ?>
                                         <?php foreach($images as $idx => $img): ?>
-                                            <img src="<?php echo htmlspecialchars($img); ?>" class="card-img <?php echo $idx===0?'active':''; ?>">
+                                            <img src="<?php echo htmlspecialchars($img); ?>" 
+                                                 class="card-img <?php echo $idx===0?'active':''; ?>"
+                                                 onclick="openLightbox(<?php echo $b['Branch_ID']; ?>, <?php echo $idx; ?>)">
                                         <?php endforeach; ?>
                                         <?php if(count($images) > 1): ?>
                                             <button class="carousel-btn prev-btn" onclick="moveCarousel(<?php echo $b['Branch_ID']; ?>, -1)">&#10094;</button>
@@ -644,16 +758,23 @@ $exportUrl = "?" . http_build_query($exportParams);
                                     
                                     <div class="info-grid">
                                         <div class="info-item">
+                                            <div class="info-icon"><i class="fas fa-envelope"></i></div>
+                                            <div class="info-text">
+                                                <span class="info-label">Email</span>
+                                                <?php echo htmlspecialchars($b['Branch_Email']); ?>
+                                            </div>
+                                        </div>
+                                        <div class="info-item">
                                             <div class="info-icon"><i class="fas fa-phone"></i></div>
                                             <div class="info-text">
-                                                <span class="info-label">Branch Phone</span>
+                                                <span class="info-label">Contact</span>
                                                 <?php echo htmlspecialchars($b['Branch_ContactNumber']); ?>
                                             </div>
                                         </div>
                                         <div class="info-item">
                                             <div class="info-icon"><i class="fas fa-users"></i></div>
                                             <div class="info-text">
-                                                <span class="info-label">Current Capacity</span>
+                                                <span class="info-label">Capacity</span>
                                                 <?php echo htmlspecialchars($b['Branch_Capacity']); ?> Pax
                                             </div>
                                         </div>
@@ -698,21 +819,22 @@ $exportUrl = "?" . http_build_query($exportParams);
                     <input type="hidden" name="add_branch" value="1">
                     
                     <div class="form-group">
-                        <label class="form-label">Branch Images</label>
+                        <label class="form-label">Branch Images <span class="required">*</span></label>
                         <div class="upload-container">
-                            <div class="upload-box" onclick="document.getElementById('add_branch_images').click()">
+                            <div class="upload-box">
                                 <i class="fas fa-cloud-upload-alt"></i>
                                 <p>Click or Drag images here to upload</p>
-                                <input type="file" id="add_branch_images" name="branch_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'add')">
+                                <input type="file" id="add_branch_images" name="branch_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'add')" required>
                             </div>
                             <div class="preview-grid" id="add_preview_container"></div>
                         </div>
-                        <span class="form-guide">Accepted formats: JPG, PNG. You can select multiple files.</span>
+                        <span class="form-guide">Accepted formats: JPG, PNG. Multiple files allowed. Max 10 images.</span>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Branch Name <span class="required">*</span></label>
                         <input type="text" name="branch_name" class="form-input" required placeholder="e.g. Sunny Shelter">
+                        <span class="form-guide">Enter the official registered name of the branch.</span>
                     </div>
 
                     <div class="form-row">
@@ -722,6 +844,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                                 <option value="">Select Category...</option>
                                 <?php foreach($branchTypes as $t) echo "<option value='$t'>$t</option>"; ?>
                             </select>
+                            <span class="form-guide">Select the category that best describes this shelter.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Status <span class="required">*</span></label>
@@ -729,6 +852,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                                 <option value="Open">Open</option>
                                 <option value="Closed">Closed</option>
                             </select>
+                            <span class="form-guide">Current operational status of the branch.</span>
                         </div>
                     </div>
                     
@@ -738,6 +862,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                         <div class="form-group">
                             <label class="form-label">Branch Email <span class="required">*</span></label>
                             <input type="email" name="email" id="add_email" class="form-input" required placeholder="e.g. branch@lovebridge.org.my">
+                            <span class="form-guide">Official email address (e.g., .com, .my, .net).</span>
                             <div id="addEmailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
@@ -746,6 +871,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                                 <span class="phone-prefix">+60</span>
                                 <input type="text" name="contact_number" id="add_contact" class="form-input phone-input" placeholder="11-12345678" required maxlength="11">
                             </div>
+                            <span class="form-guide">Format: 12-3456789 or 11-12345678 (No need for +60).</span>
                         </div>
                     </div>
 
@@ -754,20 +880,23 @@ $exportUrl = "?" . http_build_query($exportParams);
                     <div class="form-group">
                         <label class="form-label">PIC Name <span class="required">*</span></label>
                         <input type="text" name="branch_head" class="form-input" required placeholder="Full Name">
+                        <span class="form-guide">Full name of the Person In Charge / Branch Manager.</span>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">PIC Email</label>
-                            <input type="email" name="branch_head_email" id="add_head_email" class="form-input" placeholder="person@example.com">
+                            <label class="form-label">PIC Email <span class="required">*</span></label>
+                            <input type="email" name="branch_head_email" id="add_head_email" class="form-input" required placeholder="person@example.com">
+                            <span class="form-guide">Direct email address of the manager.</span>
                             <div id="addHeadEmailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">PIC Contact Number</label>
+                            <label class="form-label">PIC Contact Number <span class="required">*</span></label>
                             <div class="phone-format">
                                 <span class="phone-prefix">+60</span>
-                                <input type="text" name="branch_head_contact" id="add_head_contact" class="form-input phone-input" placeholder="12-3456789" maxlength="11">
+                                <input type="text" name="branch_head_contact" id="add_head_contact" class="form-input phone-input" placeholder="12-3456789" required maxlength="11">
                             </div>
+                            <span class="form-guide">Direct mobile number of the manager (No need for +60).</span>
                         </div>
                     </div>
 
@@ -777,25 +906,42 @@ $exportUrl = "?" . http_build_query($exportParams);
                         <div class="form-group">
                             <label class="form-label">Capacity (Pax) <span class="required">*</span></label>
                             <input type="number" name="capacity" class="form-input" required>
+                            <span class="form-guide">Maximum number of residents/pax the branch can accommodate.</span>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Est. Date</label>
+                            <label class="form-label">Est. Date <span class="required">*</span></label>
                             <input type="date" name="est_date" class="form-input" required>
+                            <span class="form-guide">The official opening date of this branch.</span>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Address Line 1 <span class="required">*</span></label>
                         <input type="text" name="address1" class="form-input" required placeholder="House No, Street Name">
+                        <span class="form-guide">Unit number, building name, street address.</span>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Address Line 2</label>
-                        <input type="text" name="address2" class="form-input" placeholder="Apartment / Unit (Optional)">
+                        <label class="form-label">Address Line 2 <span class="required">*</span></label>
+                        <input type="text" name="address2" class="form-input" required placeholder="Apartment / Unit">
+                        <span class="form-guide">Residential area, Taman, or Section.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Address Line 3 <span class="required">*</span></label>
+                        <input type="text" name="address3" class="form-input" required placeholder="Additional Address Info">
+                        <span class="form-guide">Additional address details.</span>
                     </div>
                     
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" name="postal_code" id="add_postal_code" class="form-input" required placeholder="e.g. 50450"></div>
-                        <div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" name="city" class="form-input" required></div>
+                        <div class="form-group">
+                            <label class="form-label">Postcode <span class="required">*</span></label>
+                            <input type="text" name="postal_code" id="add_postal_code" class="form-input" required placeholder="e.g. 50450">
+                            <span class="form-guide">5-digit postal code (e.g., 50450).</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">City <span class="required">*</span></label>
+                            <input type="text" name="city" class="form-input" required>
+                            <span class="form-guide">City or District name.</span>
+                        </div>
                     </div>
 
                     <div class="form-row">
@@ -805,6 +951,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                                 <option value="">Select State...</option>
                                 <?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?>
                             </select>
+                            <span class="form-guide">Select the state.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Country</label>
@@ -813,8 +960,9 @@ $exportUrl = "?" . http_build_query($exportParams);
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Description (Full Details)</label>
-                        <textarea name="description" class="form-textarea" placeholder="Describe the mission and needs of this branch..."></textarea>
+                        <label class="form-label">Description (Full Details) <span class="required">*</span></label>
+                        <textarea name="description" class="form-textarea" required placeholder="Describe the mission and needs of this branch..."></textarea>
+                        <span class="form-guide">Detailed mission statement, history, or specific needs.</span>
                     </div>
 
                     <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px;">Save Branch</button>
@@ -833,30 +981,34 @@ $exportUrl = "?" . http_build_query($exportParams);
                     <input type="hidden" name="existing_images_json" id="edit_existing_images_input">
                     
                     <div class="form-group">
-                        <label class="form-label">Branch Images</label>
+                        <label class="form-label">Branch Images <span class="required">*</span></label>
                         <div class="upload-container">
-                            <div class="upload-box" onclick="document.getElementById('edit_branch_images').click()">
+                            <div class="upload-box">
                                 <i class="fas fa-cloud-upload-alt"></i>
                                 <p>Add more images</p>
                                 <input type="file" id="edit_branch_images" name="branch_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'edit')">
                             </div>
                             <div class="preview-grid" id="edit_preview_container"></div>
                         </div>
+                        <span class="form-guide">Accepted formats: JPG, PNG. At least one image is required.</span>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Branch Name <span class="required">*</span></label>
                         <input type="text" name="branch_name" id="edit_branch_name" class="form-input" required>
+                        <span class="form-guide">Enter the official registered name of the branch.</span>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Category <span class="required">*</span></label>
                             <select name="branch_type" id="edit_branch_type" class="form-select" required><?php foreach($branchTypes as $t) echo "<option value='$t'>$t</option>"; ?></select>
+                            <span class="form-guide">Select the category that best describes this shelter.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Status <span class="required">*</span></label>
                             <select name="operational_status" id="edit_operational_status" class="form-select" required><option value="Open">Open</option><option value="Closed">Closed</option></select>
+                            <span class="form-guide">Current operational status of the branch.</span>
                         </div>
                     </div>
 
@@ -866,6 +1018,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                         <div class="form-group">
                             <label class="form-label">Branch Email <span class="required">*</span></label>
                             <input type="email" name="email" id="edit_email" class="form-input" required>
+                            <span class="form-guide">Official email address (e.g., .com, .my, .net).</span>
                             <div id="editEmailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
@@ -874,54 +1027,94 @@ $exportUrl = "?" . http_build_query($exportParams);
                                 <span class="phone-prefix">+60</span>
                                 <input type="text" name="contact_number" id="edit_contact_number" class="form-input phone-input" required maxlength="11">
                             </div>
+                            <span class="form-guide">Format: 12-3456789 or 11-12345678 (No need for +60).</span>
                         </div>
                     </div>
 
                     <div class="section-separator"><span>Person In Charge Info</span></div>
 
                     <div class="form-group">
-                        <label class="form-label">PIC Name</label>
+                        <label class="form-label">PIC Name <span class="required">*</span></label>
                         <input type="text" name="branch_head" id="edit_branch_head" class="form-input" required>
+                        <span class="form-guide">Full name of the Person In Charge / Branch Manager.</span>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">PIC Email</label>
-                            <input type="email" name="branch_head_email" id="edit_head_email" class="form-input">
+                            <label class="form-label">PIC Email <span class="required">*</span></label>
+                            <input type="email" name="branch_head_email" id="edit_head_email" class="form-input" required>
+                            <span class="form-guide">Direct email address of the manager.</span>
                             <div id="editHeadEmailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">PIC Contact Number</label>
+                            <label class="form-label">PIC Contact Number <span class="required">*</span></label>
                             <div class="phone-format">
                                 <span class="phone-prefix">+60</span>
-                                <input type="text" name="branch_head_contact" id="edit_head_contact" class="form-input phone-input" maxlength="11">
+                                <input type="text" name="branch_head_contact" id="edit_head_contact" class="form-input phone-input" required maxlength="11">
                             </div>
+                            <span class="form-guide">Direct mobile number of the manager (No need for +60).</span>
                         </div>
                     </div>
 
                     <div class="section-separator"><span>Details</span></div>
 
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Capacity</label><input type="number" name="capacity" id="edit_capacity" class="form-input" required></div>
-                        <div class="form-group"><label class="form-label">Est. Date</label><input type="date" name="est_date" id="edit_est_date" class="form-input" required></div>
-                    </div>
-                    
-                    <div class="form-group"><label class="form-label">Address 1</label><input type="text" name="address1" id="edit_address1" class="form-input" required></div>
-                    <div class="form-group"><label class="form-label">Address 2</label><input type="text" name="address2" id="edit_address2" class="form-input"></div>
-                    <div class="form-group"><label class="form-label">Address 3</label><input type="text" name="address3" id="edit_address3" class="form-input"></div>
-                    
-                    <div class="form-row">
-                        <div class="form-group"><label class="form-label">Postcode</label><input type="text" name="postal_code" id="edit_postal_code" class="form-input" required></div>
-                        <div class="form-group"><label class="form-label">City</label><input type="text" name="city" id="edit_city" class="form-input" required></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group"><label class="form-label">State</label><select name="state" id="edit_state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div>
-                        <div class="form-group"><label class="form-label">Country</label><input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly></div>
+                        <div class="form-group">
+                            <label class="form-label">Capacity <span class="required">*</span></label>
+                            <input type="number" name="capacity" id="edit_capacity" class="form-input" required>
+                            <span class="form-guide">Maximum number of residents/pax the branch can accommodate.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Est. Date <span class="required">*</span></label>
+                            <input type="date" name="est_date" id="edit_est_date" class="form-input" required>
+                            <span class="form-guide">The official opening date of this branch.</span>
+                        </div>
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label">Description</label>
-                        <textarea name="description" id="edit_description" class="form-textarea"></textarea>
+                        <label class="form-label">Address 1 <span class="required">*</span></label>
+                        <input type="text" name="address1" id="edit_address1" class="form-input" required>
+                        <span class="form-guide">Unit number, building name, street address.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Address 2 <span class="required">*</span></label>
+                        <input type="text" name="address2" id="edit_address2" class="form-input" required>
+                        <span class="form-guide">Residential area, Taman, or Section.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Address 3 <span class="required">*</span></label>
+                        <input type="text" name="address3" id="edit_address3" class="form-input" required>
+                        <span class="form-guide">Additional address details.</span>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Postcode <span class="required">*</span></label>
+                            <input type="text" name="postal_code" id="edit_postal_code" class="form-input" required>
+                            <span class="form-guide">5-digit postal code (e.g., 81300).</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">City <span class="required">*</span></label>
+                            <input type="text" name="city" id="edit_city" class="form-input" required>
+                            <span class="form-guide">City or District name.</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">State <span class="required">*</span></label>
+                            <select name="state" id="edit_state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
+                            <span class="form-guide">Select the state.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Country</label>
+                            <input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Description <span class="required">*</span></label>
+                        <textarea name="description" id="edit_description" class="form-textarea" required></textarea>
+                        <span class="form-guide">Detailed mission statement, history, or specific needs.</span>
                     </div>
 
                     <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px;">Update Branch</button>
@@ -937,7 +1130,59 @@ $exportUrl = "?" . http_build_query($exportParams);
         </div>
     </div>
 
+    <div id="imageLightbox" class="lightbox-modal">
+        <span class="close-lightbox" onclick="closeLightbox()">&times;</span>
+        <a class="lightbox-nav lightbox-prev" onclick="changeLightboxImage(-1)">&#10094;</a>
+        <img class="lightbox-content" id="lightboxImage">
+        <a class="lightbox-nav lightbox-next" onclick="changeLightboxImage(1)">&#10095;</a>
+    </div>
+
+    <div class="modal" id="deleteModal">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <div class="modal-header" style="background-color: #dc3545; color: white; justify-content:center;">
+                <h2 style="color:white; margin:0; font-size:18px;"><i class="fas fa-exclamation-triangle"></i> Delete Branch</h2>
+            </div>
+            <div class="modal-body">
+                <p style="color:#555; margin-bottom:20px;">Are you sure you want to delete this branch?<br>This action cannot be undone.</p>
+                <div style="display: flex; justify-content: center; gap: 10px;">
+                    <button class="btn" style="background:#eee; color:#333;" onclick="closeModal('deleteModal')">Cancel</button>
+                    <a id="confirmDeleteBtn" href="#" class="btn btn-danger">Yes, Delete</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // --- NEW: SYSTEM ALERT FUNCTION ---
+        function showSystemError(message) {
+            const errorBox = document.getElementById('floatingError');
+            const errorText = document.getElementById('floatingErrorText');
+            if(errorBox && errorText) {
+                errorText.innerText = message;
+                errorBox.style.display = 'flex';
+                // Auto hide after 5 seconds
+                setTimeout(() => { 
+                    errorBox.style.display = 'none'; 
+                }, 5000);
+            }
+        }
+
+        // --- AUTO HIDE FLASH MESSAGES (5 Seconds) ---
+        document.addEventListener('DOMContentLoaded', function() {
+            // New logic for floating alerts
+            const successAlert = document.getElementById('floatingSuccess');
+            const errorAlert = document.getElementById('floatingError');
+            
+            if (successAlert && successAlert.style.display === 'flex') {
+                setTimeout(() => { successAlert.style.display = 'none'; }, 5000);
+            }
+            if (errorAlert && errorAlert.style.display === 'flex') {
+                setTimeout(() => { errorAlert.style.display = 'none'; }, 5000);
+            }
+
+            toggleFilters();
+        });
+
         // --- MULTI-UPLOAD & PREVIEW LOGIC ---
         let addFiles = []; // Stores File objects for Add Modal
         let editNewFiles = []; // Stores File objects for Edit Modal
@@ -1022,7 +1267,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                 reader.onload = function(e) {
                     const item = document.createElement('div');
                     item.className = 'preview-item';
-                    // Offset index for removeFile not needed because split arrays, but UI looks combined
                     item.innerHTML = `
                         <img src="${e.target.result}">
                         <button type="button" class="remove-img-btn" onclick="removeFile(${index}, 'edit')"><i class="fas fa-times"></i></button>
@@ -1042,7 +1286,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                 if(el) { el.classList.add('active'); el.querySelector('select').disabled = false; }
             }
         }
-        document.addEventListener('DOMContentLoaded', toggleFilters);
 
         function toggleCardMenu(event, id) {
             event.stopPropagation();
@@ -1053,7 +1296,10 @@ $exportUrl = "?" . http_build_query($exportParams);
 
         window.onclick = function(event) {
             if (!event.target.matches('.menu-btn') && !event.target.matches('.menu-btn *')) document.querySelectorAll('.action-dropdown').forEach(d => d.classList.remove('show'));
+            // Close regular modals if clicked outside
             if (event.target.classList.contains('modal')) event.target.style.display = 'none';
+            // Close lightbox if clicked outside the image
+            if (event.target.id == 'imageLightbox') closeLightbox();
         }
 
         function openAddModal() { 
@@ -1122,6 +1368,67 @@ $exportUrl = "?" . http_build_query($exportParams);
             if(counter) counter.innerText = (newIndex + 1) + '/' + images.length;
         }
 
+        // --- LIGHTBOX LOGIC ---
+        const allBranchImages = <?php echo json_encode($allBranchImagesMap); ?>;
+        let currentLightboxBranchId = null;
+        let currentLightboxIndex = 0;
+
+        function openLightbox(branchId, index) {
+            if (!allBranchImages[branchId] || allBranchImages[branchId].length === 0) return;
+            
+            currentLightboxBranchId = branchId;
+            currentLightboxIndex = index;
+            
+            updateLightboxImage();
+            document.getElementById('imageLightbox').style.display = "flex";
+        }
+
+        function closeLightbox() {
+            document.getElementById('imageLightbox').style.display = "none";
+        }
+
+        function changeLightboxImage(n) {
+            if (currentLightboxBranchId === null) return;
+            
+            const images = allBranchImages[currentLightboxBranchId];
+            currentLightboxIndex += n;
+            
+            if (currentLightboxIndex >= images.length) {
+                currentLightboxIndex = 0;
+            } else if (currentLightboxIndex < 0) {
+                currentLightboxIndex = images.length - 1;
+            }
+            
+            updateLightboxImage();
+        }
+
+        function updateLightboxImage() {
+            const images = allBranchImages[currentLightboxBranchId];
+            const imgElement = document.getElementById('lightboxImage');
+            imgElement.src = images[currentLightboxIndex];
+            
+            // Hide arrows if only 1 image
+            const prevBtn = document.querySelector('.lightbox-prev');
+            const nextBtn = document.querySelector('.lightbox-next');
+            if (images.length <= 1) {
+                prevBtn.style.display = 'none';
+                nextBtn.style.display = 'none';
+            } else {
+                prevBtn.style.display = 'block';
+                nextBtn.style.display = 'block';
+            }
+        }
+        
+        // Keyboard support for Lightbox
+        document.addEventListener('keydown', function(event) {
+            if (document.getElementById('imageLightbox').style.display === "flex") {
+                if (event.key === "Escape") closeLightbox();
+                if (event.key === "ArrowLeft") changeLightboxImage(-1);
+                if (event.key === "ArrowRight") changeLightboxImage(1);
+            }
+        });
+
+        // --- PAYMENT & OTHER LOGIC ---
         function openPaymentHistory(branchId) {
             document.querySelectorAll('.action-dropdown').forEach(d => d.classList.remove('show')); 
             document.getElementById('paymentModal').style.display = 'flex';
@@ -1140,7 +1447,12 @@ $exportUrl = "?" . http_build_query($exportParams);
                 });
         }
 
-        function confirmDelete(id) { if(confirm("Delete this branch?")) { window.location.href = `branch_management_page.php?delete_id=${id}`; } }
+        // [MODIFIED] Replaced native confirm() with Custom Modal
+        function confirmDelete(id) { 
+            const link = document.getElementById('confirmDeleteBtn');
+            link.href = `branch_management_page.php?delete_id=${id}`;
+            document.getElementById('deleteModal').style.display = 'flex';
+        }
 
         function setupPhoneInput(inputId) {
             const input = document.getElementById(inputId); if(!input) return;
@@ -1154,12 +1466,17 @@ $exportUrl = "?" . http_build_query($exportParams);
             return /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val);
         }
 
+        // [MODIFIED] Added showSystemError for validation
         function validateForm(mode) {
             let isValid = true;
+            let errors = [];
+            
             const emailId = mode + '_email';
             const emailErr = mode + 'EmailError';
             if(!checkEmail(document.getElementById(emailId).value)) {
-                document.getElementById(emailErr).style.display = 'block'; isValid = false;
+                document.getElementById(emailErr).style.display = 'block'; 
+                isValid = false;
+                errors.push("Invalid Branch Email format.");
             } else {
                 document.getElementById(emailErr).style.display = 'none';
             }
@@ -1167,10 +1484,16 @@ $exportUrl = "?" . http_build_query($exportParams);
             const headEmailId = mode + '_head_email';
             const headEmailErr = mode + 'HeadEmailError';
             const headVal = document.getElementById(headEmailId).value;
-            if(headVal && !checkEmail(headVal)) {
-                document.getElementById(headEmailErr).style.display = 'block'; isValid = false;
+            if(!checkEmail(headVal)) {
+                document.getElementById(headEmailErr).style.display = 'block'; 
+                isValid = false;
+                errors.push("Invalid PIC Email format.");
             } else {
                 document.getElementById(headEmailErr).style.display = 'none';
+            }
+
+            if (!isValid) {
+                showSystemError("Please fix the validation errors: " + errors.join(" "));
             }
 
             return isValid;
