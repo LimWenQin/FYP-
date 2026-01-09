@@ -304,7 +304,8 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             box-shadow: 0 4px 10px rgba(209, 47, 2, 0.3);
         }
         .header-donate-btn:hover {
-            background-color: #f79c34ff ;
+
+            background-color: #f79c34ff;
             transform: translateY(-2px);
         }
 
