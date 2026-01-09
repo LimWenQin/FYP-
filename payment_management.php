@@ -31,17 +31,16 @@ if ($adminResult && $adminResult->num_rows > 0) {
 // ==========================================
 if (isset($_GET['export'])) {
     $type = $_GET['export'];
-    $filename = "report_" . $type . "_" . date('Ymd') . ".xls";
-    
-    header("Content-Type: application/vnd.ms-excel");
-    header("Content-Disposition: attachment; filename=\"$filename\"");
-    header("Pragma: no-cache");
-    header("Expires: 0");
-
-    echo '<table border="1">';
-    
+    // 只保留 income 的导出逻辑
     if ($type == 'income') {
-        // Export Income
+        $filename = "report_income_" . date('Ymd') . ".xls";
+        
+        header("Content-Type: application/vnd.ms-excel");
+        header("Content-Disposition: attachment; filename=\"$filename\"");
+        header("Pragma: no-cache");
+        header("Expires: 0");
+
+        echo '<table border="1">';
         echo '<tr><th>Ref ID</th><th>Date</th><th>Donor Name</th><th>Donor Email</th><th>Target</th><th>Amount</th><th>Method</th><th>Status</th></tr>';
         $sql = "SELECT o.Order_TXN_Ref, o.Order_Created_At, d.Donor_Name, d.Donor_Email, o.Order_Amount, o.Order_PaymentMethod, o.Order_PaymentStatus,
                 b.Branch_Name, a.Activity_Name, s.Case_Title
@@ -69,56 +68,9 @@ if (isset($_GET['export'])) {
                 <td>{$row['Order_PaymentStatus']}</td>
             </tr>";
         }
-    } elseif ($type == 'expense') {
-        // Export Expense
-        echo '<tr><th>Date</th><th>Title</th><th>Category</th><th>Amount</th><th>Claimant Type</th><th>Claimant ID</th><th>Status</th><th>Description</th></tr>';
-        $sql = "SELECT * FROM expenses ORDER BY Expense_Date DESC";
-        $res = $conn->query($sql);
-        while($row = $res->fetch_assoc()) {
-            echo "<tr>
-                <td>{$row['Expense_Date']}</td>
-                <td>{$row['Expense_Title']}</td>
-                <td>{$row['Expense_Category']}</td>
-                <td>{$row['Expense_Amount']}</td>
-                <td>{$row['Claimant_Type']}</td>
-                <td>{$row['Claimant_ID']}</td>
-                <td>{$row['Expense_Status']}</td>
-                <td>{$row['Expense_Description']}</td>
-            </tr>";
-        }
+        echo '</table>';
+        exit();
     }
-    echo '</table>';
-    exit();
-}
-
-// --- FILE UPLOAD HELPER FUNCTION ---
-function handleProofUpload($files) {
-    if (!isset($files['name']) || empty($files['name'][0])) {
-        return null;
-    }
-
-    $uploadedPaths = [];
-    $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
-    $uploadDir = 'uploads/expenses/';
-    if (!is_dir($uploadDir)) { mkdir($uploadDir, 0777, true); }
-
-    $count = count($files['name']);
-    
-    for ($i = 0; $i < $count; $i++) {
-        if ($files['error'][$i] == 0) {
-            if (in_array($files['type'][$i], $allowedTypes)) {
-                $fileExtension = pathinfo($files['name'][$i], PATHINFO_EXTENSION);
-                $fileName = 'receipt_' . time() . '_' . uniqid() . '_' . $i . '.' . $fileExtension;
-                $uploadPath = $uploadDir . $fileName;
-                
-                if (move_uploaded_file($files['tmp_name'][$i], $uploadPath)) {
-                    $uploadedPaths[] = $uploadPath;
-                }
-            }
-        }
-    }
-
-    return (!empty($uploadedPaths)) ? json_encode($uploadedPaths) : null;
 }
 
 // ==========================================
@@ -204,38 +156,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_donation_submit'])
     }
 }
 
-// ==========================================
-// 2. HANDLE RECORD TRANSACTION (Expense)
-// ==========================================
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_expense_submit'])) {
-    $ex_title = $_POST['ex_title'];
-    $ex_category = $_POST['ex_category'];
-    $ex_amount = $_POST['ex_amount'];
-    // $ex_claimed_by name from form is not stored because DB uses Claimant_ID
-    $ex_desc = $_POST['ex_desc'];
-    
-    $ex_status = ($adminPosition === 'Super Admin') ? 'Approved' : 'Pending';
-
-    $proofPathJson = null;
-    if (isset($_FILES['expense_proof'])) {
-        $proofPathJson = handleProofUpload($_FILES['expense_proof']); 
-    }
-
-    $stmtEx = $conn->prepare("INSERT INTO expenses (Expense_Title, Expense_Category, Expense_Amount, Claimant_Type, Claimant_ID, Expense_Date, Expense_Status, Expense_Description, Expense_Proof, Recorded_By_Admin_ID) VALUES (?, ?, ?, 'Admin', ?, NOW(), ?, ?, ?, ?)");
-    
-    // Bind: title(s), cat(s), amount(d), claimant_id(i), status(s), desc(s), proof(s), recorded_by(i)
-    $stmtEx->bind_param("ssdisssi", $ex_title, $ex_category, $ex_amount, $currentAdminId, $ex_status, $ex_desc, $proofPathJson, $currentAdminId);
-    
-    if ($stmtEx->execute()) {
-        $msg = "Expense recorded successfully! Status: " . $ex_status;
-        $msgType = "success";
-    } else {
-        $msg = "Error recording transaction: " . $conn->error;
-        $msgType = "error";
-    }
-    $stmtEx->close();
-}
-
 // --- Fetch Data for Dropdowns ---
 // Donors List for Select Box
 $donorsList = $conn->query("SELECT Donor_ID, Donor_Name, Donor_Email, Donor_ICNumber FROM donor ORDER BY Donor_Name ASC");
@@ -251,11 +171,11 @@ $totalPoints = floor($totalRevenue / 10);
 $pendingCount = $conn->query("SELECT COUNT(*) as count FROM orders WHERE Order_PaymentStatus = 'Pending'")->fetch_assoc()['count'];
 
 // ==========================================
-// PAGINATION LOGIC (DUAL)
+// PAGINATION LOGIC (INCOME ONLY)
 // ==========================================
-$limit = 5;
+$limit = 6; // Income per page
 
-// 1. Income Pagination
+// Income Pagination
 $page_inc = isset($_GET['page_inc']) && is_numeric($_GET['page_inc']) ? (int)$_GET['page_inc'] : 1;
 if ($page_inc < 1) $page_inc = 1;
 $offset_inc = ($page_inc - 1) * $limit;
@@ -264,7 +184,6 @@ $sql_inc_count = "SELECT COUNT(*) as total FROM orders";
 $total_inc_recs = $conn->query($sql_inc_count)->fetch_assoc()['total'];
 $total_pages_inc = ceil($total_inc_recs / $limit);
 
-// *** 修改这里：在查询中增加 o.Order_ID ***
 $sql_inc = "SELECT o.Order_ID, o.Order_TXN_Ref, o.Order_Type, d.Donor_Name, d.Donor_Email, o.Order_Amount, o.Order_Created_At, o.Order_PaymentMethod, o.Order_PaymentStatus,
             b.Branch_Name, a.Activity_Name, s.Case_Title
             FROM orders o
@@ -277,21 +196,6 @@ $recentTransactions = $conn->query($sql_inc);
 
 $start_inc = ($total_inc_recs > 0) ? $offset_inc + 1 : 0;
 $end_inc = min($offset_inc + $limit, $total_inc_recs);
-
-// 2. Expense Pagination
-$page_exp = isset($_GET['page_exp']) && is_numeric($_GET['page_exp']) ? (int)$_GET['page_exp'] : 1;
-if ($page_exp < 1) $page_exp = 1;
-$offset_exp = ($page_exp - 1) * $limit;
-
-$sql_exp_count = "SELECT COUNT(*) as total FROM expenses";
-$total_exp_recs = $conn->query($sql_exp_count)->fetch_assoc()['total'];
-$total_pages_exp = ceil($total_exp_recs / $limit);
-
-$sql_exp = "SELECT * FROM expenses ORDER BY Expense_Date DESC LIMIT $offset_exp, $limit";
-$recentExpenses = $conn->query($sql_exp);
-
-$start_exp = ($total_exp_recs > 0) ? $offset_exp + 1 : 0;
-$end_exp = min($offset_exp + $limit, $total_exp_recs);
 
 // 3. Top Donors (Limit 10)
 $topDonors = $conn->query("SELECT d.Donor_Name, d.Donor_ProfilePicture, SUM(o.Order_Amount) as total_donated
@@ -314,6 +218,9 @@ function getMonthlyRevenueChartData($conn) {
 }
 $chartData = getMonthlyRevenueChartData($conn);
 
+// ---------------------------------------------------------
+// ⚠️ 重要：删除了 $conn->close(); 以修复 sidebar 报错的问题
+// ---------------------------------------------------------
 ?>
 
 <!DOCTYPE html>
@@ -523,67 +430,6 @@ $chartData = getMonthlyRevenueChartData($conn);
         }
         .register-hint a:hover { color: #d65f5f; }
 
-        /* MULTI IMAGE PREVIEW STYLE */
-        .upload-center { text-align: center; }
-        .file-upload-label { display: inline-block; padding: 8px 15px; background: #f8f9fa; border: 1px dashed #ccc; border-radius: 5px; cursor: pointer; font-size: 13px; }
-        input[type="file"] { display: none; }
-
-        /* Container for multiple previews */
-        .multi-preview-container { 
-            display: flex; 
-            flex-wrap: wrap; 
-            gap: 10px; 
-            justify-content: center; 
-            align-items: center; 
-            margin-bottom: 10px; 
-            min-height: 120px; 
-            border: 2px dashed #ddd;
-            border-radius: 10px;
-            padding: 10px;
-            background: #fafafa;
-        }
-        
-        .preview-item {
-            position: relative;
-            width: 80px;
-            height: 80px;
-            border-radius: 8px;
-            overflow: hidden;
-            border: 1px solid #ddd;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .preview-item img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .remove-btn {
-            position: absolute;
-            top: 0;
-            right: 0;
-            background: rgba(220, 53, 69, 0.8);
-            color: white;
-            border: none;
-            width: 20px;
-            height: 20px;
-            font-size: 12px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-bottom-left-radius: 5px;
-        }
-        .remove-btn:hover { background: #dc3545; }
-        
-        .placeholder-icon {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            width: 100%;
-            color: #ccc;
-        }
-
         /* Top Donors */
         .rank-box { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; border-radius: 50%; color: white; }
         .rank-1 { background: #FFD700; } .rank-2 { background: #C0C0C0; } .rank-3 { background: #CD7F32; } .rank-other { background: #e9ecef; color: #8898aa; }
@@ -627,16 +473,13 @@ $chartData = getMonthlyRevenueChartData($conn);
             <div class="page-header-flex">
                 <div class="welcome-text">
                     <h1>Payment Management</h1>
-                    <p>Monitor revenue, record offline transactions and manage expenses.</p>
+                    <p>Monitor revenue and record donations.</p>
                 </div>
                 <div class="header-btn-group">
                     <button class="btn-custom" onclick="openDonationModal()">
                         <i class="fas fa-plus-circle"></i> Add Donation
                     </button>
-                    <button class="btn-custom" onclick="openExpenseModal()">
-                        <i class="fas fa-file-invoice-dollar"></i> Record Transaction
-                    </button>
-                </div>
+                    </div>
             </div>
 
             <div class="stats-cards">
@@ -726,17 +569,17 @@ $chartData = getMonthlyRevenueChartData($conn);
                                 <div class="pagination-info">Showing <?php echo $start_inc; ?> - <?php echo $end_inc; ?> of <?php echo $total_inc_recs; ?></div>
                                 <div class="pagination-controls">
                                     <?php if ($page_inc > 1): ?>
-                                        <a href="?page_inc=<?php echo $page_inc-1; ?>&page_exp=<?php echo $page_exp; ?>" class="pagination-btn">Previous</a>
+                                        <a href="?page_inc=<?php echo $page_inc-1; ?>" class="pagination-btn">Previous</a>
                                     <?php else: ?>
                                         <span class="pagination-btn disabled">Previous</span>
                                     <?php endif; ?>
 
                                     <?php for($i=1; $i<=$total_pages_inc; $i++): ?>
-                                        <a href="?page_inc=<?php echo $i; ?>&page_exp=<?php echo $page_exp; ?>" class="pagination-btn <?php echo ($i==$page_inc)?'active':''; ?>"><?php echo $i; ?></a>
+                                        <a href="?page_inc=<?php echo $i; ?>" class="pagination-btn <?php echo ($i==$page_inc)?'active':''; ?>"><?php echo $i; ?></a>
                                     <?php endfor; ?>
 
                                     <?php if ($page_inc < $total_pages_inc): ?>
-                                        <a href="?page_inc=<?php echo $page_inc+1; ?>&page_exp=<?php echo $page_exp; ?>" class="pagination-btn">Next</a>
+                                        <a href="?page_inc=<?php echo $page_inc+1; ?>" class="pagination-btn">Next</a>
                                     <?php else: ?>
                                         <span class="pagination-btn disabled">Next</span>
                                     <?php endif; ?>
@@ -745,60 +588,7 @@ $chartData = getMonthlyRevenueChartData($conn);
                         </div>
                     </div>
 
-                    <div class="content-card">
-                        <div class="section-header">
-                            <h2>Expense / Reimbursement History</h2>
-                            <a href="?export=expense" class="btn-custom btn-export"><i class="fas fa-download"></i> Export Data</a>
-                        </div>
-                        
-                        <div class="table-responsive">
-                            <div style="overflow-x: auto;">
-                                <table class="custom-table">
-                                    <thead><tr><th>Date</th><th>Title / Desc</th><th>Category</th><th>Claimed By</th><th>Amount</th></tr></thead>
-                                    <tbody>
-                                        <?php if($recentExpenses->num_rows > 0): ?>
-                                            <?php while($exp = $recentExpenses->fetch_assoc()): ?>
-                                            <tr>
-                                                <td><?php echo date('M d, Y', strtotime($exp['Expense_Date'])); ?></td>
-                                                <td>
-                                                    <div style="font-weight:600; color:#333;"><?php echo htmlspecialchars($exp['Expense_Title']); ?></div>
-                                                    <div style="font-size:11px; color:#888;"><?php echo htmlspecialchars(substr($exp['Expense_Description'],0,30)); ?></div>
-                                                </td>
-                                                <td><span style="background:#f0f0f0; padding:3px 8px; border-radius:4px; font-size:11px;"><?php echo $exp['Expense_Category']; ?></span></td>
-                                                <td><?php echo $exp['Claimant_Type'] . ' #' . $exp['Claimant_ID']; ?> <br> <small style="color:<?php echo $exp['Expense_Status']=='Approved'?'green':'orange'; ?>">(<?php echo $exp['Expense_Status']; ?>)</small></td>
-                                                <td style="font-weight:700; color:#dc3545;">- RM <?php echo number_format($exp['Expense_Amount'], 2); ?></td>
-                                            </tr>
-                                            <?php endwhile; ?>
-                                        <?php else: ?>
-                                            <tr><td colspan="5" style="text-align:center; padding:30px; color:#999;">No expense records found.</td></tr>
-                                        <?php endif; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div class="pagination-container">
-                                <div class="pagination-info">Showing <?php echo $start_exp; ?> - <?php echo $end_exp; ?> of <?php echo $total_exp_recs; ?></div>
-                                <div class="pagination-controls">
-                                    <?php if ($page_exp > 1): ?>
-                                        <a href="?page_exp=<?php echo $page_exp-1; ?>&page_inc=<?php echo $page_inc; ?>" class="pagination-btn">Previous</a>
-                                    <?php else: ?>
-                                        <span class="pagination-btn disabled">Previous</span>
-                                    <?php endif; ?>
-
-                                    <?php for($i=1; $i<=$total_pages_exp; $i++): ?>
-                                        <a href="?page_exp=<?php echo $i; ?>&page_inc=<?php echo $page_inc; ?>" class="pagination-btn <?php echo ($i==$page_exp)?'active':''; ?>"><?php echo $i; ?></a>
-                                    <?php endfor; ?>
-
-                                    <?php if ($page_exp < $total_pages_exp): ?>
-                                        <a href="?page_exp=<?php echo $page_exp+1; ?>&page_inc=<?php echo $page_inc; ?>" class="pagination-btn">Next</a>
-                                    <?php else: ?>
-                                        <span class="pagination-btn disabled">Next</span>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
                     </div>
-                </div>
 
                 <div class="right-column content-card">
                     <div class="section-header">
@@ -932,72 +722,6 @@ $chartData = getMonthlyRevenueChartData($conn);
         </div>
     </div>
 
-    <div id="addExpenseModal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal" onclick="closeExpenseModal()">&times;</span>
-            <h2 style="color: black; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">Record Transaction (Expense)</h2>
-            <form method="POST" action="" enctype="multipart/form-data">
-                
-                <div class="form-group upload-center">
-                    <label>Upload Receipt / Proof (Max 5 files)</label>
-                    
-                    <div class="multi-preview-container" id="expense-multi-preview">
-                        <div class="placeholder-icon">
-                            <i class="fas fa-receipt" style="font-size:60px;"></i>
-                        </div>
-                    </div>
-
-                    <label for="expense_proof" class="file-upload-label">
-                        <i class="fas fa-upload"></i> Choose File
-                    </label>
-                    <input type="file" id="expense_proof" name="expense_proof[]" accept="image/*,application/pdf" multiple onchange="updateExpenseImages()">
-                    
-                    <span class="form-guide" style="text-align:center;">
-                        Supported formats: JPG, PNG, PDF. Max size 2MB. You can select multiple files.
-                    </span>
-                </div>
-
-                <div class="form-group">
-                    <label>Title <span style="color:red">*</span></label>
-                    <input type="text" name="ex_title" class="form-control" required placeholder="e.g. Office Supplies">
-                    <span class="form-guide">Short summary of the expense.</span>
-                </div>
-
-                <div class="row-group">
-                    <div class="form-group">
-                        <label>Category</label>
-                        <select name="ex_category" class="form-control">
-                            <option value="Reimbursement">Staff Reimbursement</option>
-                            <option value="Supplies">Office Supplies</option>
-                            <option value="Transport">Transportation</option>
-                            <option value="Utility">Utility</option>
-                            <option value="Event">Event Cost</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Amount (RM) <span style="color:red">*</span></label>
-                        <input type="number" name="ex_amount" class="form-control" step="0.01" required>
-                        <span class="form-guide">Exact amount in MYR.</span>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Claimed By</label>
-                    <input type="text" name="ex_claimed_by_display" class="form-control" value="<?php echo htmlspecialchars($adminName); ?> (You)" readonly>
-                    <span class="form-guide">Automatically recorded as Admin claim.</span>
-                </div>
-
-                <div class="form-group">
-                    <label>Description</label>
-                    <textarea name="ex_desc" class="form-control" rows="2"></textarea>
-                    <span class="form-guide">Detailed explanation of the expense item.</span>
-                </div>
-
-                <button type="submit" name="add_expense_submit" class="btn-custom" style="width:100%; justify-content:center;">Record Expense</button>
-            </form>
-        </div>
-    </div>
-
     <script>
         // Initialize Select2 when document is ready
         $(document).ready(function() {
@@ -1036,18 +760,8 @@ $chartData = getMonthlyRevenueChartData($conn);
         function openDonationModal() { document.getElementById('addDonationModal').style.display = 'block'; }
         function closeDonationModal() { document.getElementById('addDonationModal').style.display = 'none'; }
         
-        function openExpenseModal() { 
-            document.getElementById('addExpenseModal').style.display = 'block'; 
-            // Reset file input on open
-            expenseFiles = new DataTransfer();
-            document.getElementById('expense_proof').files = expenseFiles.files;
-            document.getElementById('expense-multi-preview').innerHTML = '<div class="placeholder-icon"><i class="fas fa-receipt" style="font-size:60px;"></i></div>';
-        }
-        function closeExpenseModal() { document.getElementById('addExpenseModal').style.display = 'none'; }
-        
         window.onclick = function(e) {
             if(e.target == document.getElementById('addDonationModal')) closeDonationModal();
-            if(e.target == document.getElementById('addExpenseModal')) closeExpenseModal();
         }
 
         // Dynamic Dropdowns for Donation
@@ -1066,78 +780,7 @@ $chartData = getMonthlyRevenueChartData($conn);
             else if(cat==='case') cs.style.display='block';
         }
 
-        // --- NEW: Multiple Image Preview with Delete ---
-        let expenseFiles = new DataTransfer(); // Holds the files
-
-        function updateExpenseImages() {
-            const input = document.getElementById('expense_proof');
-            const container = document.getElementById('expense-multi-preview');
-            const maxFiles = 5;
-
-            // Add new selected files to our DataTransfer object
-            for (let i = 0; i < input.files.length; i++) {
-                // Prevent adding if limit reached
-                if(expenseFiles.items.length >= maxFiles) {
-                    alert("Maximum 5 files allowed.");
-                    break;
-                }
-                expenseFiles.items.add(input.files[i]);
-            }
-
-            // Sync input with DataTransfer
-            input.files = expenseFiles.files;
-
-            renderPreviews();
-        }
-
-        function renderPreviews() {
-            const container = document.getElementById('expense-multi-preview');
-            container.innerHTML = ''; // Clear current
-
-            if (expenseFiles.files.length === 0) {
-                container.innerHTML = '<div class="placeholder-icon"><i class="fas fa-receipt" style="font-size:60px;"></i></div>';
-                return;
-            }
-
-            Array.from(expenseFiles.files).forEach((file, index) => {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const div = document.createElement('div');
-                    div.className = 'preview-item';
-                    
-                    // Logic to display PDF icon vs Image
-                    let content = '';
-                    if(file.type === 'application/pdf') {
-                        content = '<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#eee;color:#d32f2f;font-weight:bold;font-size:12px;">PDF</div>';
-                    } else {
-                        content = `<img src="${e.target.result}">`;
-                    }
-
-                    div.innerHTML = `
-                        ${content}
-                        <button type="button" class="remove-btn" onclick="removeExpenseFile(${index})">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    `;
-                    container.appendChild(div);
-                }
-                reader.readAsDataURL(file);
-            });
-        }
-
-        function removeExpenseFile(index) {
-            const dt = new DataTransfer();
-            const input = document.getElementById('expense_proof');
-            const { files } = input;
-
-            for (let i = 0; i < files.length; i++) {
-                if (index !== i) dt.items.add(files[i]);
-            }
-
-            expenseFiles = dt; // Update global
-            input.files = dt.files; // Sync input
-            renderPreviews(); // Re-render
-        }
+        // Expense Related JS Removed
     </script>
 </body>
 </html>
