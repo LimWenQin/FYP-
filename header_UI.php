@@ -144,6 +144,10 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         .icon-svg {
             width: 18px;
             height: 18px;
+            /* 关键修改：防止图标被挤压变形 */
+            min-width: 18px; 
+            flex-shrink: 0;
+            
             fill: none;
             stroke: currentColor;
             stroke-width: 2;
@@ -321,11 +325,11 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
     <div class="header-top-bar">
         <div class="header-container">
             <div class="header-info">
-                <a href="tel:+60123456789">
+                <a href="https://wa.me/601111190233" target="_blank">
                     <svg class="icon-svg" viewBox="0 0 24 24">
-                        <path d="M22 16.92v3a2 2 0 0 1-2-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                     </svg>
-                    +60 12-345 6789
+                    +60 11-1119 0233
                 </a>
                 
                 <a href="mailto:info@lovebridge.org">
@@ -333,7 +337,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                         <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
                         <polyline points="22,6 12,13 2,6"></polyline>
                     </svg>
-                    info@lovebridge.org
+                    lovebridge1201@gmail.com
                 </a>
             </div>
             
@@ -361,9 +365,12 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                             <div class="welcome-message">
                                 Welcome, <b><?php echo $donor_name; ?></b>
                             </div>
-                            <a href="Gamification_Achievement_Panel.php" class="dropdown-item">Points</a>
-                            <a href="Track_Records.php" class="dropdown-item">Track Record</a>
                             <a href="Profile.php" class="dropdown-item">Profile</a>
+                            <a href="Gamification_Achievement_Panel.php" class="dropdown-item">Points</a>
+                            <a href="Redemption_Page.php" class="dropdown-item">Redemption</a>
+                            <a href="Track_Records.php" class="dropdown-item">Donation Records</a>
+                            <a href="Recurring_Donation_Management_Panel.php" class="dropdown-item">Donation Management</a>
+                            
                         </div>
                     </div>
                     
@@ -401,9 +408,6 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                     <li><a href="Campaign_Page.php">Campaign</a></li>
                     <li><a href="New&Story.php">News & Story</a></li>
                     <li><a href="Special_case Page.php">Special Case</a></li>
-                    <?php if ($logged_in): ?>
-                        <li><a href="Profile.php">Profile</a></li>
-                    <?php endif; ?>
                 </ul>
             </nav>
 

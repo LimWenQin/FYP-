@@ -12,9 +12,10 @@ if (!isset($_SESSION['donor_id'])) {
 
 $current_donor_id = $_SESSION['donor_id']; 
 
-// 3. [NEW] 检查 Session 数据 (确保是从正常流程进来的)
+// 3. 检查 Session 数据 (确保是从正常流程进来的)
 if (empty($_SESSION['donation_data'])) {
-    header("Location: Donate_Page.php");
+    // 如果 Session 空了，尝试根据 Referrer 决定跳回哪里，或者直接回首页
+    header("Location: Homepage.php");
     exit();
 }
 
@@ -22,9 +23,11 @@ if (empty($_SESSION['donation_data'])) {
 $sess_data = $_SESSION['donation_data'];
 $amount = $sess_data['amount'];
 $donation_type = $sess_data['type'];
-$branch_id = $sess_data['branch_id'] ?: null; // 转为 null 以防 SQL 报错
-$case_id = $sess_data['case_id'] ?: null;
-$activity_id = $sess_data['activity_id'] ?: null;
+// 使用 null 合并运算符防止警告
+$branch_id = $sess_data['branch_id'] ?? null;
+$case_id = $sess_data['case_id'] ?? null;
+$activity_id = $sess_data['activity_id'] ?? null;
+$source = $sess_data['source'] ?? 'standard'; // 来源标记
 
 // 4. 获取用户信息 (用于填入 Order 表)
 $user_sql = "SELECT Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
@@ -46,13 +49,14 @@ if (!$user_data) {
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
 
     // 获取表单提交的数据 (Hidden Inputs)
-    $p_amount = $_POST['amount'];
-    $p_type = $_POST['donation_type'];
+    // 即使表单被篡改，我们也优先使用 Session 里的金额，更安全
+    $p_amount = $amount; 
+    $p_type = $donation_type;
     $bank_name = $_POST['bank_display']; 
     $card_number = str_replace(' ', '', $_POST['card']); 
     
     // 生成交易信息
-    $txn_ref = "TXN-" . date("YmdHis");
+    $txn_ref = "TXN-" . date("YmdHis") . "-" . rand(100, 999);
     $now = date("Y-m-d H:i:s");
     $status = "Success";
     $payment_method = "Credit/Debit Card";
@@ -70,7 +74,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
     $order_status = "Completed";
     
     // 决定报税状态
-    $tax_status = ($sess_data['tax_receipt'] == '1') ? 'Requested' : 'Not_Requested';
+    $tax_status = (isset($sess_data['tax_receipt']) && $sess_data['tax_receipt'] == 1) ? 'Requested' : 'Not_Requested';
 
     $full_name = $user_data['Donor_Name']; 
 
@@ -81,7 +85,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
          Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID)
         VALUES (?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    // 注意：增加了 Tax_Receipt_Status 参数绑定
     $stmt->bind_param("ssssdssssssssiiiii", 
         $full_name, 
         $user_data['Donor_ContactNumber'], 
@@ -96,13 +99,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
     // 3️⃣ 插入 recurring_donation 表 (如果是月捐)
     if ($p_type == "monthly") {
         $deduction_date = date("Y-m-d", strtotime("+1 month"));
-        $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("dssssiiii", $p_amount, $payment_method, $deduction_date, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
+        $rec_status = 'Active';
+        $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("dssssiiii", $p_amount, $payment_method, $deduction_date, $rec_status, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
         $stmt->execute();
         $stmt->close();
     }
 
-    // 4️⃣ [新增] 更新筹款进度
+    // 4️⃣ 更新筹款进度
     if ($case_id != null) {
         $conn->query("UPDATE special_case SET Raised_Amount = Raised_Amount + $p_amount WHERE Case_ID = $case_id");
     }
@@ -110,8 +114,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
         $conn->query("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + $p_amount WHERE Activity_ID = $activity_id");
     }
 
-    // 5️⃣ [重要] 清除 Session，防止重复提交
-    // unset($_SESSION['donation_data']); // 可以选择在这里清空，或者在 Settlement 页面清空
+    // 5️⃣ 清除 Session (可选，或者留给 Settlement 页面清除)
+    // unset($_SESSION['donation_data']); 
 
     // 跳转
     header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
@@ -186,13 +190,17 @@ include 'header_UI.php';
 
 <?php 
     // 判断显示哪个 Step
-    $flow_type = ($case_id || $activity_id) ? 'special' : 'standard';
-    $current_step = ($case_id || $activity_id) ? 2 : 4; // 如果是 Standard，这是第 4 步 (Donate->Branch->Way->Card)
-    // 注意：根据你之前的逻辑，Donate->Branch->Way->Card 应该是 Step 4。
-    // 如果你之前的 Payment_Ways 是 Step 3，那这里就是 Step 4。
-    // 为了保险起见，这里我设置为 4 (Standard)
+    if ($source == 'special_case') {
+        $flow_type = 'special';
+        $current_step = 3; // Special 流程的第3步 (Details -> Method -> Payment)
+    } else {
+        $flow_type = 'standard';
+        $current_step = 4; // Standard 流程的第4步
+    }
     
-    include 'stepper.php'; 
+    if (file_exists('stepper.php')) {
+        include 'stepper.php';
+    }
 ?>
 
 <div class="site-section" style="padding: 5em 0;">
@@ -217,9 +225,6 @@ include 'header_UI.php';
                         
                         <input type="hidden" name="donation_type" value="<?php echo htmlspecialchars($donation_type); ?>">
                         <input type="hidden" name="amount" value="<?php echo htmlspecialchars($amount); ?>">
-                        <input type="hidden" name="branch_id" value="<?php echo htmlspecialchars($branch_id); ?>">
-                        <input type="hidden" name="case_id" value="<?php echo htmlspecialchars($case_id); ?>">
-                        <input type="hidden" name="activity_id" value="<?php echo htmlspecialchars($activity_id); ?>">
 
                         <div class="form-group mb-3 input-wrapper">
                             <label for="card">Card Number</label>
@@ -244,7 +249,14 @@ include 'header_UI.php';
                         </div>
 
                         <div class="nav-buttons">
-                            <a href="Payment_Ways_Page.php" class="btn-nav btn-prev">
+                            <?php
+                                // 动态生成返回链接
+                                $back_url = "Payment_Ways_Page.php"; // 默认
+                                if ($source == 'special_case') {
+                                    $back_url = "S_C_Payment_Ways_Page.php";
+                                }
+                            ?>
+                            <a href="<?php echo $back_url; ?>" class="btn-nav btn-prev">
                                 <i class="fas fa-arrow-left"></i> Previous
                             </a>
 

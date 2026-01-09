@@ -12,9 +12,9 @@ if (!isset($_SESSION['donor_id'])) {
 
 $current_donor_id = $_SESSION['donor_id']; 
 
-// 3. [NEW] 检查 Session 数据 (确保流程连续性)
+// 3. 检查 Session 数据
 if (empty($_SESSION['donation_data'])) {
-    header("Location: Donate_Page.php");
+    header("Location: Homepage.php");
     exit();
 }
 
@@ -22,9 +22,11 @@ if (empty($_SESSION['donation_data'])) {
 $sess_data = $_SESSION['donation_data'];
 $amount = $sess_data['amount'];
 $donation_type = $sess_data['type'];
-$branch_id = $sess_data['branch_id'] ?: null;
-$case_id = $sess_data['case_id'] ?: null;
-$activity_id = $sess_data['activity_id'] ?: null;
+// 防止 null 报错
+$branch_id = $sess_data['branch_id'] ?? null;
+$case_id = $sess_data['case_id'] ?? null;
+$activity_id = $sess_data['activity_id'] ?? null;
+$source = $sess_data['source'] ?? 'standard'; // 来源标记
 
 // 4. 获取用户资料
 $user_sql = "SELECT Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
@@ -62,7 +64,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 
     // 生成交易信息
     $payment_method = "TNG eWallet";
-    $txn_ref = "TXN-" . date("YmdHis");
+    $txn_ref = "TXN-" . date("YmdHis") . "-" . rand(100, 999);
     $now = date("Y-m-d H:i:s");
     $status = "Success"; // TNG 模拟成功
     $bank_name = "TNG eWallet";
@@ -80,9 +82,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     $order_status = "Completed";
     
     // 决定报税状态
-    $tax_status = ($sess_data['tax_receipt'] == '1') ? 'Requested' : 'Not_Requested';
+    $tax_status = (isset($sess_data['tax_receipt']) && $sess_data['tax_receipt'] == 1) ? 'Requested' : 'Not_Requested';
 
-    $stmt = $conn->prepare("INSERT INTO `orders` 
+    $stmt = $conn->prepare("INSERT INTO orders 
         (Order_Name, Order_ContactNumber, Order_ICNumber, Order_Email, 
          Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, Order_TXN_Ref, 
          Order_Type, Order_Status, Tax_Receipt_Status, Order_Created_At, Order_Updated_At, 
@@ -103,8 +105,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     // 3️⃣ 插入 recurring_donation 表
     if ($donation_type == "monthly") {
         $deduction_date = date("Y-m-d", strtotime("+1 month"));
-        $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("dssssiiii", $amount, $payment_method, $deduction_date, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
+        $rec_status = 'Active';
+        $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("dssssiiii", $amount, $payment_method, $deduction_date, $rec_status, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
         $stmt->execute();
         $stmt->close();
     }
@@ -117,10 +120,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         $conn->query("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + $amount WHERE Activity_ID = $activity_id");
     }
 
-    // 5️⃣ 清空 Session (可选，或者保留到最后)
-    // unset($_SESSION['donation_data']);
-
-    // 跳转
+    // 跳转到结算页
     header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
     exit();
 }
@@ -162,7 +162,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         text-decoration: none;
     }
     .btn-prev { background: #e5e7eb; color: #374151; border: 1px solid #d1d5db; }
-    .btn-prev:hover { background: #d1d5db; color: #111; }
+    .btn-prev:hover { background: #d1d5db; color: #111; text-decoration: none; }
     
     .btn-confirm { background-color: #0057B7; color: white; }
     .btn-confirm:hover { background-color: #004494; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0, 87, 183, 0.3); }
@@ -177,10 +177,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     </div>
 
     <?php 
-        $flow_type = ($case_id || $activity_id) ? 'special' : 'standard';
-        $current_step = ($case_id || $activity_id) ? 2 : 4; 
+        // 动态 Stepper
+        if ($source == 'special_case') {
+            $flow_type = 'special';
+            $current_step = 3; // Special 流程的第3步 (Details -> Method -> Payment)
+        } else {
+            $flow_type = 'standard';
+            $current_step = 4; // Standard 流程的第4步
+        }
         
-        include 'stepper.php'; 
+        if (file_exists('stepper.php')) {
+            include 'stepper.php';
+        }
     ?>
 
     <div class="container">
@@ -191,7 +199,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
             <form method="POST" action="">
                 
                 <div class="qr-box">
-                    <img src="images/tng_qr.png" alt="QR Code">
+                    <img src="images/tng_qr.png" alt="QR Code" onerror="this.src='https://via.placeholder.com/180?text=QR+Code'">
                     <div class="amount">RM <?php echo number_format($amount, 2); ?></div>
                     <p style="color:red; font-size:0.9rem;">QR Code expires in <b>60s</b></p>
                 </div>
@@ -206,7 +214,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
                 </div>
 
                 <div class="nav-buttons">
-                    <a href="Payment_Ways_Page.php" class="btn-nav btn-prev">
+                    <?php
+                        // 动态生成返回链接
+                        $back_url = "Payment_Ways_Page.php"; // 默认
+                        if ($source == 'special_case') {
+                            $back_url = "S_C_Payment_Ways_Page.php";
+                        }
+                    ?>
+                    <a href="<?php echo $back_url; ?>" class="btn-nav btn-prev">
                         <i class="fas fa-arrow-left"></i> Previous
                     </a>
 

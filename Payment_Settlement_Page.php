@@ -1,261 +1,316 @@
 <?php
-// 1. 引入数据库连接
-include 'dataconnection.php';
-// 引入邮件发送脚本
-require_once 'mail_receipt.php'; 
-
-// 2. 开启 Session
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-// 3. 设置时区
+// ==========================================
+// 1. 初始化配置与连接
+// ==========================================
+session_start();
+include 'dataconnection.php'; // 确保数据库连接正常
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
-// 4. 获取交易编号
-$txn_ref = $_GET['txn_ref'] ?? '';
+// 引入发送邮件的辅助文件 (如果文件不存在，不会报错)
+if (file_exists('mail_receipt.php')) {
+    require_once 'mail_receipt.php';
+}
 
-if ($txn_ref == '') {
-    echo "<script>alert('Invalid transaction reference.'); window.location.href='Homepage.php';</script>";
+// ==========================================
+// 2. 获取并验证交易编号
+// ==========================================
+if (!isset($_GET['txn_ref']) || empty($_GET['txn_ref'])) {
+    echo "<script>alert('No transaction reference found.'); window.location.href='Homepage.php';</script>";
     exit();
 }
 
-// 5. 查询付款详情
-$sql = "SELECT p.*, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Case_ID, o.Order_Created_At, o.Donor_ID,
-               d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber, d.Donor_Address1, d.Donor_Address2, d.Donor_City, d.Donor_State, d.Donor_PostalCode
+$txn_ref = $_GET['txn_ref'];
+
+// ==========================================
+// 3. 核心查询 (关联 Payment, Orders, Donor 表)
+// ==========================================
+// 注意：这里明确 SELECT 了 o.Order_Type
+$sql = "SELECT 
+            p.Payment_TXN_Ref, p.Payment_Status, p.Payment_Paid_At, p.Payment_Method,
+            o.Order_ID, o.Order_Amount, o.Order_Type, o.Order_Status, 
+            o.Branch_ID, o.Case_ID, o.Activity_ID, o.Order_Created_At, o.Order_TXN_Ref,
+            d.Donor_ID, d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber
         FROM payment p 
         JOIN orders o ON p.Payment_ID = o.Payment_ID 
         JOIN donor d ON o.Donor_ID = d.Donor_ID
-        WHERE p.Payment_TXN_Ref = ?";
+        WHERE p.Payment_TXN_Ref = ? OR o.Order_TXN_Ref = ?";
+
 $stmt = $conn->prepare($sql);
-$stmt->bind_param("s", $txn_ref);
+$stmt->bind_param("ss", $txn_ref, $txn_ref);
 $stmt->execute();
 $result = $stmt->get_result();
 
 if ($result->num_rows == 0) {
-    echo "<script>alert('Transaction not found.'); window.location.href='Homepage.php';</script>";
+    echo "<script>alert('Transaction record not found.'); window.location.href='Homepage.php';</script>";
     exit();
 }
 
 $row = $result->fetch_assoc();
 $stmt->close();
 
-// ---------------------------------------------------------
-// 获取项目名称
-// ---------------------------------------------------------
-$project_label = "General Donation"; 
-$project_name = "Love Bridge Fund"; 
+// ==========================================
+// 4. 数据预处理 (防止 Undefined Array Key 报错)
+// ==========================================
+// 使用 ?? 运算符，如果数据库字段不存在或为 NULL，使用默认值
+$donor_name     = $row['Donor_Name'] ?? "Guest";
+$donor_email    = $row['Donor_Email'] ?? "N/A";
+$donor_contact  = $row['Donor_ContactNumber'] ?? "N/A";
+$order_type     = $row['Order_Type'] ?? 'One-time'; // 修复你刚才的报错
+$txn_ref_display= $row['Payment_TXN_Ref'] ?? $txn_ref;
+
+$amount_val     = $row['Order_Amount'] ?? 0;
+$amount_fmt     = "RM " . number_format($amount_val, 2);
+
+// 处理日期：优先用支付时间，没有则用创建时间
+$raw_date       = $row['Payment_Paid_At'] ?? $row['Order_Created_At'];
+$payment_date   = date("d M Y, h:i A", strtotime($raw_date));
+
+$payment_method = $row['Payment_Method'] ?? 'Unknown';
+$payment_status = $row['Payment_Status'] ?? 'Completed'; 
+
+// 确定项目名称 (Project Name)
+$project_type = "General Donation";
+$project_name = "Love Bridge Fund"; // 默认
 
 if (!empty($row['Case_ID'])) {
-    $c_sql = "SELECT Case_Title FROM special_case WHERE Case_ID = ?";
-    if ($c_stmt = $conn->prepare($c_sql)) {
-        $c_stmt->bind_param("i", $row['Case_ID']);
-        $c_stmt->execute();
-        $c_res = $c_stmt->get_result();
-        if ($c_row = $c_res->fetch_assoc()) {
-            $project_label = "Special Case";
-            $project_name = $c_row['Case_Title'];
-        }
-        $c_stmt->close();
+    $res = $conn->query("SELECT Case_Title FROM special_case WHERE Case_ID = " . $row['Case_ID']);
+    if ($r = $res->fetch_assoc()) {
+        $project_type = "Special Case";
+        $project_name = $r['Case_Title'];
     }
-} else if (!empty($row['Branch_ID'])) {
-    $b_sql = "SELECT Branch_Name FROM branch WHERE Branch_ID = ?";
-    if ($b_stmt = $conn->prepare($b_sql)) {
-        $b_stmt->bind_param("i", $row['Branch_ID']);
-        $b_stmt->execute();
-        $b_res = $b_stmt->get_result();
-        if ($b_row = $b_res->fetch_assoc()) {
-            $project_label = "Branch";
-            $project_name = $b_row['Branch_Name'];
-        }
-        $b_stmt->close();
+} elseif (!empty($row['Activity_ID'])) {
+    $res = $conn->query("SELECT Activity_Name FROM activity WHERE Activity_ID = " . $row['Activity_ID']);
+    if ($r = $res->fetch_assoc()) {
+        $project_type = "Activity";
+        $project_name = $r['Activity_Name'];
+    }
+} elseif (!empty($row['Branch_ID'])) {
+    $res = $conn->query("SELECT Branch_Name FROM branch WHERE Branch_ID = " . $row['Branch_ID']);
+    if ($r = $res->fetch_assoc()) {
+        $project_type = "Branch Fund";
+        $project_name = $r['Branch_Name'];
     }
 }
 
-// ---------------------------------------------------------
-// ⭐ 自动发送邮件 (并在 Session 中标记，防止刷新重复发)
-// ---------------------------------------------------------
+// ==========================================
+// 5. 邮件发送逻辑 (防止重复发送)
+// ==========================================
 $email_msg = "Processing receipt...";
+$sess_key_mail = 'email_sent_' . $txn_ref;
 
-if (!isset($_SESSION['email_sent_' . $txn_ref])) {
-    // 调用函数
-    $isSent = sendReceiptEmail($row, $project_name);
-    
-    if ($isSent) {
-        $_SESSION['email_sent_' . $txn_ref] = true;
-        $email_msg = "An official receipt (PDF) has been sent to your email.";
+if (!isset($_SESSION[$sess_key_mail])) {
+    // 检查是否有引入 mail_receipt.php 里的函数
+    if (function_exists('sendReceiptEmail')) {
+        $isSent = sendReceiptEmail($row, $project_name); 
+        if ($isSent) {
+            $_SESSION[$sess_key_mail] = true;
+            $email_msg = "An official receipt (PDF) has been sent to your email.";
+        } else {
+            $email_msg = "Receipt generated, but email sending failed.";
+        }
     } else {
-        $email_msg = "Receipt generated, but email sending failed. Please check your inbox later.";
+        // 如果没有邮件功能，就显示简单成功信息
+        $email_msg = "Donation processed successfully.";
     }
 } else {
     $email_msg = "An official receipt (PDF) has been sent to your email.";
 }
 
-// ---------------------------------------------------------
-// 积分逻辑
-// ---------------------------------------------------------
-$calc_amount = $row['Order_Amount'];
-$calc_donor_id = $row['Donor_ID'];
-$calc_status = $row['Payment_Status']; 
-$points_to_add = floor($calc_amount / 10);
-$is_success = (stripos($calc_status, 'Success') !== false); 
+// ==========================================
+// 6. 积分逻辑 (Love Points)
+// ==========================================
+$points_to_add = floor($amount_val / 10); // RM10 = 1 Point
+$sess_key_points = 'points_awarded_' . $txn_ref;
+$is_success_status = (stripos($payment_status, 'Success') !== false || stripos($payment_status, 'Completed') !== false);
 
-if ($points_to_add > 0 && $is_success && !isset($_SESSION['points_awarded_' . $txn_ref])) {
-    $chk_sql = "SELECT Points_ID FROM point WHERE Donor_ID = ?";
-    $stmt_chk = $conn->prepare($chk_sql);
-    $stmt_chk->bind_param("i", $calc_donor_id);
-    $stmt_chk->execute();
-    $res_chk = $stmt_chk->get_result();
-    $stmt_chk->close();
-
-    if ($res_chk->num_rows > 0) {
-        $upd_sql = "UPDATE point SET Points_Total = Points_Total + ?, Points_Earned = Points_Earned + ?, Points_Updated_At = NOW() WHERE Donor_ID = ?";
-        $stmt_upd = $conn->prepare($upd_sql);
-        $stmt_upd->bind_param("iii", $points_to_add, $points_to_add, $calc_donor_id);
-        $stmt_upd->execute();
-        $stmt_upd->close();
+if ($points_to_add > 0 && $is_success_status && !isset($_SESSION[$sess_key_points])) {
+    $donor_id = $row['Donor_ID'];
+    
+    // 检查该用户是否已有积分记录
+    $chk = $conn->query("SELECT Points_ID FROM point WHERE Donor_ID = $donor_id");
+    
+    if ($chk && $chk->num_rows > 0) {
+        // 更新现有记录
+        $upd = $conn->prepare("UPDATE point SET Points_Total = Points_Total + ?, Points_Earned = Points_Earned + ?, Points_Updated_At = NOW() WHERE Donor_ID = ?");
+        $upd->bind_param("iii", $points_to_add, $points_to_add, $donor_id);
+        $upd->execute();
+        $upd->close();
     } else {
-        $ins_sql = "INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES (?, ?, NOW(), ?)";
-        $stmt_ins = $conn->prepare($ins_sql);
-        $stmt_ins->bind_param("iii", $points_to_add, $points_to_add, $calc_donor_id);
-        $stmt_ins->execute();
-        $stmt_ins->close();
+        // 插入新记录
+        $ins = $conn->prepare("INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES (?, ?, NOW(), ?)");
+        $ins->bind_param("iii", $points_to_add, $points_to_add, $donor_id);
+        $ins->execute();
+        $ins->close();
     }
-    $_SESSION['points_awarded_' . $txn_ref] = true;
+    
+    // 标记 Session 防止刷新重复加分
+    $_SESSION[$sess_key_points] = true;
 }
-
-// ✅ 补回缺失的变量定义
-$paymentDate = date("d M Y, h:i A", strtotime($row['Payment_Paid_At']));
-$amountFormatted = "RM " . number_format($row['Order_Amount'], 2);
 
 include 'header_UI.php'; 
 ?>
 
 <style>
-    /* ...原有 CSS 保持不变... */
-    .hero-wrap { height: 350px; background-image: url('images/hero_1.jpg'); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; text-align: center; position: relative; }
+    /* 页面专用样式 */
+    .hero-wrap { 
+        height: 350px; 
+        background-image: url('images/hero_1.jpg'); 
+        background-size: cover; 
+        background-position: center; 
+        display: flex; align-items: center; justify-content: center; 
+        text-align: center; position: relative; 
+    }
     .hero-wrap .overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); }
     .hero-content { position: relative; z-index: 2; max-width: 800px; }
-    .hero-content h1 { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #fff; font-size: 3.5rem; margin-bottom: 10px; }
+    .hero-content h1 { font-family: 'Segoe UI', sans-serif; color: #fff; font-size: 3.5rem; margin-bottom: 10px; }
+    .hero-content p { color: rgba(255,255,255,0.9); font-size: 1.2rem; }
 
+    /* 成功消息区域 */
     .success-box { text-align: center; padding: 40px 20px; }
     .icon-success { font-size: 80px; color: #dc2626; margin-bottom: 20px; }
-    .thank-you-msg { font-size: 2rem; font-weight: bold; color: #333; margin-bottom: 15px; }
-    .points-badge { background-color: #FFF5E4; color: #F28585; border: 2px solid #F28585; padding: 10px 25px; border-radius: 50px; font-weight: bold; font-size: 1.2rem; display: inline-block; margin-top: 20px; }
-
-    .receipt-card { background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-top: 5px solid #dc2626; }
-    .receipt-title { text-align: center; font-weight: bold; color: #333; margin-bottom: 30px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 1.8rem; }
+    .thank-you-msg { font-size: 2.2rem; font-weight: 800; color: #333; margin-bottom: 15px; }
     
-    .info-group { margin-bottom: 25px; }
-    .group-title { font-size: 0.9rem; text-transform: uppercase; color: #999; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-    .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
-    .label { color: #555; font-weight: 500; }
-    .value { color: #000; font-weight: bold; text-align: right; }
-    .total-row { display: flex; justify-content: space-between; margin-top: 20px; padding-top: 15px; border-top: 2px dashed #ddd; font-size: 1.2rem; }
-    .total-label { font-weight: bold; color: #dc2626; }
-    .total-value { font-weight: 900; color: #dc2626; }
+    /* 积分徽章 */
+    .points-badge { 
+        background-color: #fff5f5; color: #dc2626; 
+        border: 2px solid #dc2626; padding: 10px 25px; 
+        border-radius: 50px; font-weight: bold; font-size: 1.1rem; 
+        display: inline-block; margin-top: 20px; 
+        box-shadow: 0 4px 10px rgba(220, 38, 38, 0.1);
+    }
 
-    .btn-home { background-color: #333; color: #fff; padding: 12px 30px; border-radius: 30px; text-decoration: none; font-weight: bold; transition: 0.3s; display: inline-block; margin-top: 30px; }
-    .btn-home:hover { background-color: #dc2626; color: #fff; }
+    /* 收据卡片 */
+    .receipt-card { 
+        background: #fff; padding: 40px; border-radius: 12px; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08); 
+        border-top: 6px solid #dc2626; 
+    }
+    .receipt-title { 
+        text-align: center; font-weight: 800; color: #333; 
+        margin-bottom: 30px; font-size: 1.5rem; letter-spacing: 1px;
+    }
+    
+    .info-group { margin-bottom: 30px; }
+    .group-title { 
+        font-size: 0.85rem; text-transform: uppercase; color: #999; 
+        font-weight: 700; margin-bottom: 15px; 
+        border-bottom: 1px solid #f0f0f0; padding-bottom: 8px; 
+    }
+    .info-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1rem; }
+    .label { color: #666; font-weight: 500; }
+    .value { color: #111; font-weight: 700; text-align: right; max-width: 65%; }
+    
+    .total-row { 
+        display: flex; justify-content: space-between; align-items: center;
+        margin-top: 25px; padding-top: 20px; 
+        border-top: 2px dashed #e5e5e5; font-size: 1.3rem; 
+    }
+    .total-label { font-weight: 800; color: #dc2626; }
+    .total-value { font-weight: 900; color: #dc2626; font-size: 1.5rem; }
+
+    .btn-home { 
+        background-color: #1f2937; color: #fff; padding: 15px 40px; 
+        border-radius: 50px; text-decoration: none; font-weight: bold; 
+        transition: 0.3s; display: inline-block; margin-top: 30px; 
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    .btn-home:hover { background-color: #dc2626; color: #fff; transform: translateY(-3px); text-decoration: none;}
 </style>
 
 <div class="hero-wrap">
     <div class="overlay"></div>
     <div class="hero-content">
-        <h1>Donation Successful</h1>
-        <p class="text-white">Your generosity helps us build a better world.</p>
+        <h1>Payment Successful</h1>
+        <p>Thank you for your generous contribution.</p>
     </div>
 </div>
 
 <?php 
-    // 进度条逻辑
-    if (isset($project_label) && $project_label == "Special Case") {
-        $flow_type = 'special';
-        $current_step = 3; 
-    } else {
-        $flow_type = 'standard';
-        $current_step = 4; 
+    $current_step = 4; // 假设结算页是第4步
+    $flow_type = ($project_type == 'Special Case') ? 'special' : 'standard';
+    // 确保你的目录下有 stepper.php
+    if (file_exists('stepper.php')) {
+        include 'stepper.php';
     }
-    include 'stepper.php'; 
 ?>
 
-<div class="site-section" style="padding: 5em 0;">
+<div class="site-section" style="padding: 5em 0; background-color: #f9fafb;">
     <div class="container">
-        <div class="row align-items-center">
+        <div class="row align-items-start">
             
             <div class="col-lg-5 mb-5">
                 <div class="success-box">
                     <div class="icon-success">
-                        <span class="icon-check-circle"></span> ✅
+                        <i class="fas fa-check-circle"></i>
                     </div>
                     <h2 class="thank-you-msg">Thank You!</h2>
                     
-                    <p class="text-muted" style="font-size: 1.1rem;">
-                        Your payment has been successfully processed.<br>
-                        <strong style="color: #dc2626;"><?php echo $email_msg; ?></strong>
+                    <p class="text-muted" style="font-size: 1.1rem; line-height: 1.6;">
+                        Your donation has been successfully received.<br>
+                        <span style="color: #dc2626; font-weight: 600;"><?php echo $email_msg; ?></span>
                     </p>
 
                     <?php if($points_to_add > 0): ?>
                         <div class="points-badge">
-                            🎉 +<?php echo $points_to_add; ?> Love Points
+                            <i class="fas fa-gift"></i> &nbsp; You earned +<?php echo $points_to_add; ?> Points!
                         </div>
                     <?php endif; ?>
                     
-                    <div class="mt-4">
-                        <a href="Homepage.php" class="btn-home">Back to Home</a>
+                    <div class="mt-5">
+                        <a href="Homepage.php" class="btn-home">Return to Home</a>
                     </div>
                 </div>
             </div>
 
             <div class="col-lg-7">
                 <div class="receipt-card">
-                    <h3 class="receipt-title">Order Summary</h3>
+                    <h3 class="receipt-title">OFFICIAL RECEIPT</h3>
 
                     <div class="info-group">
-                        <div class="group-title">Donor Details</div>
+                        <div class="group-title">Donor Information</div>
                         <div class="info-row">
                             <span class="label">Name</span>
-                            <span class="value"><?php echo htmlspecialchars($row['Donor_Name']); ?></span>
+                            <span class="value"><?php echo htmlspecialchars($donor_name); ?></span>
                         </div>
                         <div class="info-row">
                             <span class="label">Email</span>
-                            <span class="value"><?php echo htmlspecialchars($row['Donor_Email']); ?></span>
+                            <span class="value"><?php echo htmlspecialchars($donor_email); ?></span>
                         </div>
                         <div class="info-row">
                             <span class="label">Contact</span>
-                            <span class="value"><?php echo htmlspecialchars($row['Donor_ContactNumber']); ?></span>
+                            <span class="value"><?php echo htmlspecialchars($donor_contact); ?></span>
                         </div>
                     </div>
 
                     <div class="info-group">
                         <div class="group-title">Transaction Details</div>
                         <div class="info-row">
-                            <span class="label">Transaction Ref</span>
-                            <span class="value"><?php echo htmlspecialchars($row['Payment_TXN_Ref']); ?></span>
+                            <span class="label">Reference No.</span>
+                            <span class="value"><?php echo htmlspecialchars($txn_ref_display); ?></span>
                         </div>
                         <div class="info-row">
                             <span class="label">Date & Time</span>
-                            <span class="value"><?php echo $paymentDate; ?></span>
+                            <span class="value"><?php echo $payment_date; ?></span>
                         </div>
                         <div class="info-row">
                             <span class="label">Payment Method</span>
-                            <span class="value"><?php echo htmlspecialchars($row['Payment_Method']); ?></span>
+                            <span class="value"><?php echo htmlspecialchars($payment_method); ?></span>
                         </div>
                         <div class="info-row">
                             <span class="label">Status</span>
-                            <span class="value text-success"><?php echo htmlspecialchars($row['Payment_Status']); ?></span>
+                            <span class="value" style="color:#16a34a;"><?php echo htmlspecialchars($payment_status); ?></span>
                         </div>
                     </div>
 
                     <div class="info-group">
-                        <div class="group-title">Donation Info</div>
+                        <div class="group-title">Donation Destination</div>
                         <div class="info-row">
-                            <span class="label">Type</span>
-                            <span class="value text-uppercase"><?php echo htmlspecialchars($row['Order_Type']); ?></span>
+                            <span class="label">Donation Type</span>
+                            <span class="value text-uppercase"><?php echo htmlspecialchars($order_type); ?></span>
                         </div>
                         <div class="info-row">
-                            <span class="label">Project Type</span>
-                            <span class="value"><?php echo htmlspecialchars($project_label); ?></span>
+                            <span class="label">Category</span>
+                            <span class="value"><?php echo htmlspecialchars($project_type); ?></span>
                         </div>
                         <div class="info-row">
                             <span class="label">Project Name</span>
@@ -265,7 +320,7 @@ include 'header_UI.php';
 
                     <div class="total-row">
                         <span class="total-label">Total Amount</span>
-                        <span class="total-value"><?php echo $amountFormatted; ?></span>
+                        <span class="total-value"><?php echo $amount_fmt; ?></span>
                     </div>
 
                 </div>
@@ -276,3 +331,4 @@ include 'header_UI.php';
 </div>
 
 <?php include 'footer.php'; ?>
+<?php $conn->close(); ?>
