@@ -1,10 +1,27 @@
 <?php
-// 1. PHP 逻辑部分：检查登录状态
+// 1. PHP 逻辑部分
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+// 引入数据库连接 (确保路径正确)
+include_once 'dataconnection.php'; 
+
 $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
 $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor_name']) : "Guest";
+$wallet_balance = 0.00;
+
+// [新增] 如果已登录，从数据库获取最新余额
+if ($logged_in && isset($_SESSION['donor_id'])) {
+    $stmt = $conn->prepare("SELECT Donor_Wallet FROM donor WHERE Donor_ID = ?");
+    $stmt->bind_param("i", $_SESSION['donor_id']);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
+        $wallet_balance = $row['Donor_Wallet'];
+    }
+    $stmt->close();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -49,18 +66,14 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
         .header-info {
             display: flex;
             align-items: center;
-            /* gap: 20px;  <-- 移除这个，改用 a 标签的 margin 控制间距，更灵活 */
         }
         
-        /* --- 修改重点：顶部左侧联系方式样式 --- */
         .header-info a {
             color: var(--light-text);
-            margin-right: 25px; /* 两个联系方式之间的距离 */
-            
-            /* 新增：让图标和文字对齐 */
+            margin-right: 25px;
             display: flex;
             align-items: center;
-            gap: 8px; /* 图标和文字的间距 */
+            gap: 8px;
         }
         
         .header-info a:hover {
@@ -86,6 +99,27 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             font-weight: bold;
         }
 
+        /* --- [新增] 钱包样式 --- */
+        .wallet-display {
+            display: flex;
+            align-items: center;
+            color: var(--light-text);
+            background: rgba(0, 0, 0, 0.1); /* 轻微背景区分 */
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            gap: 8px;
+            transition: 0.3s;
+            margin-right: 10px; /* 与 Account 分开一点 */
+        }
+        .wallet-display:hover {
+            background: rgba(0, 0, 0, 0.2);
+            transform: translateY(-1px);
+        }
+        .wallet-amount {
+            font-family: 'Segoe UI', sans-serif; /* 数字显示更好看 */
+        }
+
         /* --- 用户 Account 区域 --- */
         .user-profile-container {
             position: relative;
@@ -106,9 +140,9 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             background-color: rgba(255, 255, 255, 0.1);
         }
 
-        /* --- 通用 SVG 图标样式 (Phone, Email, Account, Logout 共用) --- */
+        /* --- 通用 SVG 图标样式 --- */
         .icon-svg {
-            width: 18px; /*稍微调小一点，适配顶部文字大小*/
+            width: 18px;
             height: 18px;
             fill: none;
             stroke: currentColor;
@@ -289,7 +323,7 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             <div class="header-info">
                 <a href="tel:+60123456789">
                     <svg class="icon-svg" viewBox="0 0 24 24">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        <path d="M22 16.92v3a2 2 0 0 1-2-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                     </svg>
                     +60 12-345 6789
                 </a>
@@ -305,6 +339,15 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
             
             <div class="header-user-auth">
                 <?php if ($logged_in): ?>
+                    <a href="E_Wallet.php" class="wallet-display" title="View Wallet">
+                        <svg class="icon-svg" viewBox="0 0 24 24">
+                            <path d="M21 12V7H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16"></path>
+                            <path d="M3 6v13a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5"></path>
+                            <rect x="16" y="10" width="6" height="6" rx="1"></rect>
+                        </svg>
+                        <span class="wallet-amount">RM <?php echo number_format($wallet_balance, 2); ?></span>
+                    </a>
+
                     <div class="user-profile-container">
                         <div class="profile-trigger" onclick="toggleDropdown()">
                             <svg class="icon-svg" viewBox="0 0 24 24">
@@ -318,12 +361,9 @@ $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor
                             <div class="welcome-message">
                                 Welcome, <b><?php echo $donor_name; ?></b>
                             </div>
-                            <a href="Profile.php" class="dropdown-item">Profile</a>
                             <a href="Gamification_Achievement_Panel.php" class="dropdown-item">Points</a>
-                            <a href="Redemption_Page.php" class="dropdown-item">Redemption</a>
-                            <a href="Track_Records.php" class="dropdown-item">Donation Records</a>
-                            <a href="Recurring_Donation_Management_Panel.php" class="dropdown-item">Donation Management</a>
-                            
+                            <a href="Track_Records.php" class="dropdown-item">Track Record</a>
+                            <a href="Profile.php" class="dropdown-item">Profile</a>
                         </div>
                     </div>
                     
