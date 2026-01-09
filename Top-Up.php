@@ -53,10 +53,51 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_topup'])) {
         $payment_id = $stmt_pay->insert_id;
         $stmt_pay->close();
 
-        // C. 插入 Order 记录
-        $dummy_name = "Wallet Top-up"; 
-        $stmt_ord = $conn->prepare("INSERT INTO orders (Donor_ID, Payment_ID, Order_Amount, Order_Status, Order_Type, Order_TXN_Ref, Order_Created_At, Order_Name, Order_PaymentMethod) VALUES (?, ?, ?, 'Completed', 'One-time', ?, ?, ?, ?)");
-        $stmt_ord->bind_param("iidssss", $current_donor_id, $payment_id, $amount, $txn_ref, $now, $dummy_name, $method);
+        // ==========================================
+        // C. 插入 Order 记录 (已修改：存入真实 Donor 资料)
+        // ==========================================
+
+        // 1. 获取 Donor 完整资料
+        $stmt_info = $conn->prepare("SELECT Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?");
+        $stmt_info->bind_param("i", $current_donor_id);
+        $stmt_info->execute();
+        $res_info = $stmt_info->get_result();
+        $d_row = $res_info->fetch_assoc();
+        $stmt_info->close();
+
+        // 准备变量
+        $d_name    = $d_row['Donor_Name'];
+        $d_contact = $d_row['Donor_ContactNumber'];
+        $d_ic      = $d_row['Donor_ICNumber'];
+        $d_email   = $d_row['Donor_Email'];
+        
+        // 保持 One-time 类型
+        $order_type_val = "One-time"; 
+
+        // 2. 插入数据库 (包含所有字段)
+        $sql_insert = "INSERT INTO orders (
+            Donor_ID, Payment_ID, Order_Amount, Order_Status, Order_Type, 
+            Order_TXN_Ref, Order_Created_At, Order_Name, Order_PaymentMethod,
+            Order_ContactNumber, Order_ICNumber, Order_Email
+        ) VALUES (?, ?, ?, 'Completed', ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        $stmt_ord = $conn->prepare($sql_insert);
+        
+        // 绑定参数
+        $stmt_ord->bind_param("iidssssssss", 
+            $current_donor_id, 
+            $payment_id, 
+            $amount, 
+            $order_type_val, 
+            $txn_ref, 
+            $now, 
+            $d_name, 
+            $method,
+            $d_contact,
+            $d_ic,
+            $d_email
+        );
+        
         $stmt_ord->execute();
         $stmt_ord->close();
 
