@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- 主机： 127.0.0.1
--- 生成日期： 2026-01-06 06:19:37
+-- 生成日期： 2026-01-09 05:22:44
 -- 服务器版本： 10.4.32-MariaDB
 -- PHP 版本： 8.2.12
 
@@ -103,7 +103,7 @@ CREATE TABLE `admin` (
   `Admin_ContactNumber` varchar(20) NOT NULL,
   `Admin_ICNUMBER` varchar(20) NOT NULL,
   `Admin_Email` varchar(100) NOT NULL,
-  `Admin_Password` varchar(255) NOT NULL,
+  `Admin_Password` varchar(255) DEFAULT NULL,
   `Admin_DOB` date NOT NULL,
   `Admin_Address1` varchar(255) NOT NULL,
   `Admin_Address2` varchar(255) DEFAULT NULL,
@@ -121,17 +121,18 @@ CREATE TABLE `admin` (
   `Admin_Comment` text NOT NULL,
   `Admin_LoginAttempts` int(11) DEFAULT 0,
   `Admin_LastFailedLogin` datetime DEFAULT NULL,
-  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted'
+  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted',
+  `Admin_IsFirstLogin` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- 转存表中的数据 `admin`
 --
 
-INSERT INTO `admin` (`Admin_ID`, `Admin_Name`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address1`, `Admin_Address2`, `Admin_Address3`, `Admin_City`, `Admin_State`, `Admin_PostalCode`, `Admin_Country`, `Admin_ProfilePicture`, `Admin_Role`, `Admin_Status`, `Admin_LastLogin`, `Admin_CreatedAt`, `Admin_UpdatedAt`, `Admin_Comment`, `Admin_LoginAttempts`, `Admin_LastFailedLogin`, `Is_Deleted`) VALUES
-(1, 'Super Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Level 12', 'Menara Love Bridge', 'Jalan Charity', 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', '2025-12-06 20:35:49', '2025-11-28 12:00:00', '2025-12-10 21:15:44', 'System Super Administrator', 5, '2025-12-10 21:15:44', 0),
-(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$bL3GDvE//gV.k149JNo6rejq/rwqubykoY3eMULa9vrndOYWFMjq.', '2003-05-17', '11， jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', 'uploads/admins/admin_1765013470_6933f7de52098.jpg', 'Super Admin', 'Active', '2026-01-05 21:44:14', '2025-12-06 17:31:10', '2026-01-05 21:44:14', 'Added via admin management system', 0, '2026-01-05 19:43:25', 0),
-(3, 'Tan Choo Yee', '+6019-9878299', '010203-05-1234', 'ujintan218@gmail.com', '$2y$10$5zA9gCym9VbjQDdR0XcxK.de.K7M8mtKAh92m7r2IgOsJ..2Z2MVa', '2001-02-03', 'Blk 914Jurong West Street 91', 'taman bukit beruang utama', '', 'Melaka', 'Melaka', '75450', 'Malaysia', NULL, 'Admin', 'Active', '2025-12-10 21:17:38', '2025-12-07 20:35:18', '2025-12-10 21:17:38', 'Added via admin management system', 0, NULL, 0);
+INSERT INTO `admin` (`Admin_ID`, `Admin_Name`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address1`, `Admin_Address2`, `Admin_Address3`, `Admin_City`, `Admin_State`, `Admin_PostalCode`, `Admin_Country`, `Admin_ProfilePicture`, `Admin_Role`, `Admin_Status`, `Admin_LastLogin`, `Admin_CreatedAt`, `Admin_UpdatedAt`, `Admin_Comment`, `Admin_LoginAttempts`, `Admin_LastFailedLogin`, `Is_Deleted`, `Admin_IsFirstLogin`) VALUES
+(1, 'Super Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Level 12', 'Menara Love Bridge', 'Jalan Charity', 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', '2025-12-06 20:35:49', '2025-11-28 12:00:00', '2025-12-10 21:15:44', 'System Super Administrator', 5, '2025-12-10 21:15:44', 0, 1),
+(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$yRnaaAeLqift7YsGSVjF8.70L7.tQMHtDFrLkD7gbeapVr4KLfHR2', '2003-05-17', '11， jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', 'uploads/profiles/admin_2_1767838052.jpg', 'Super Admin', 'Active', '2026-01-09 12:17:13', '2025-12-06 17:31:10', '2026-01-09 12:17:13', 'Added via admin management system', 0, '2026-01-09 12:17:06', 0, 0),
+(5, 'ujin', '+6019-9878299', '050218-05-1234', 'ujintan218@gmail.com', '$2y$10$1BvJVRIgBpkgfPOpeiXBOulnxttZFxJKfHEOtMyImfaLzjSUvkJhO', '2005-02-18', '', '', '', '', '', '', 'Malaysia', NULL, 'Admin', 'Active', '2026-01-08 22:00:05', '2026-01-08 21:55:12', '2026-01-08 23:33:10', '', 0, NULL, 0, 0);
 
 -- --------------------------------------------------------
 
@@ -154,9 +155,15 @@ CREATE TABLE `admin_notifications` (
 --
 
 INSERT INTO `admin_notifications` (`AdminNotification_ID`, `Message`, `Contact_ID`, `Type`, `Is_Read`, `Is_Deleted`, `Created_At`) VALUES
-(7, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 1, 0, '2026-01-06 00:46:27'),
-(8, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 1, 0, '2026-01-06 00:46:27'),
-(9, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 1, 0, '2026-01-06 00:46:27');
+(7, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 1, 1, '2026-01-06 00:46:27'),
+(8, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 1, 1, '2026-01-06 00:46:27'),
+(9, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 1, 1, '2026-01-06 00:46:27'),
+(10, 'New Staff Member Added: john', NULL, 'User', 1, 1, '2026-01-08 10:17:06'),
+(11, 'New Donor Registered: johndoe', NULL, 'User', 1, 1, '2026-01-08 10:17:29'),
+(12, 'New Staff Member Added: john', NULL, 'User', 1, 1, '2026-01-08 11:39:50'),
+(13, 'New Staff Member Added: steve', NULL, 'User', 1, 1, '2026-01-08 15:12:17'),
+(14, 'New Staff Member Added: ujin', NULL, 'User', 1, 1, '2026-01-08 15:16:40'),
+(15, 'New Staff Member Added: john', NULL, 'User', 1, 0, '2026-01-08 21:57:06');
 
 -- --------------------------------------------------------
 
@@ -259,7 +266,7 @@ CREATE TABLE `donor` (
   `Donor_ContactNumber` varchar(20) NOT NULL,
   `Donor_ICNumber` varchar(20) NOT NULL,
   `Donor_Email` varchar(100) NOT NULL,
-  `Donor_Password` varchar(255) NOT NULL,
+  `Donor_Password` varchar(255) DEFAULT NULL,
   `Donor_Address1` varchar(255) NOT NULL,
   `Donor_Address2` varchar(255) DEFAULT NULL,
   `Donor_Address3` varchar(255) DEFAULT NULL,
@@ -281,7 +288,8 @@ CREATE TABLE `donor` (
 
 INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_ContactNumber`, `Donor_ICNumber`, `Donor_Email`, `Donor_Password`, `Donor_Address1`, `Donor_Address2`, `Donor_Address3`, `Donor_City`, `Donor_State`, `Donor_PostalCode`, `Donor_Country`, `Donor_DOB`, `Donor_Description`, `Donor_RegisteredAt`, `Donor_LastLogin`, `Donor_ProfilePicture`, `Is_Deleted`) VALUES
 (2, 'RONALD TAN BIN HONG', '012-7212535', '030404011183', 'abc@gmail.com', '$2y$10$3hsuDLLcdM4mr9bqhvJekOZqH80/6aF.7GR2vLxXHbcgWT.RjOe.O', 'No19.jalan melawati 19, taman melawati', '', '', 'Johor Bahru', 'Johor', '81300', 'Malaysia', '2003-04-04', '', '2025-12-15 22:27:40', NULL, NULL, 0),
-(3, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$PNOaF1e8KP0y9i404VCz9OWhn3XVyLHx8roawWiJjvPR0hyRunfeW', 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '2003-05-17', '', '2026-01-03 21:43:26', NULL, 'uploads/donors/donor_1767447806_69591cfe10e76.jpg', 0);
+(3, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$PNOaF1e8KP0y9i404VCz9OWhn3XVyLHx8roawWiJjvPR0hyRunfeW', 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '2003-05-17', '', '2026-01-03 21:43:26', NULL, 'uploads/donors/donor_1767879100_695fb1bc6d8e7.png', 0),
+(4, 'johndoe', '+6011-11190233', '', 'admin@donationsystem.com', NULL, '', '', '', '', '', '', 'Malaysia', '0000-00-00', '', '2026-01-08 10:17:29', NULL, NULL, 0);
 
 --
 -- 触发器 `donor`
@@ -630,7 +638,8 @@ CREATE TABLE `point` (
 
 INSERT INTO `point` (`Points_ID`, `Points_Earned`, `Points_Total`, `Points_Updated_At`, `Donor_ID`) VALUES
 (1, 10, 10, '2025-12-15 22:28:06', 2),
-(2, 100, 65, '2026-01-04 23:11:46', 3);
+(2, 100, 65, '2026-01-04 23:11:46', 3),
+(3, 0, 0, '2026-01-08 10:17:29', 4);
 
 -- --------------------------------------------------------
 
@@ -906,7 +915,7 @@ CREATE TABLE `staff` (
   `Staff_ContactNumber` varchar(20) NOT NULL,
   `Staff_ICNumber` varchar(20) NOT NULL,
   `Staff_Email` varchar(100) NOT NULL,
-  `Staff_Password` varchar(15) NOT NULL,
+  `Staff_Password` varchar(255) DEFAULT NULL,
   `Staff_DOB` date NOT NULL,
   `Staff_Address1` varchar(255) NOT NULL,
   `Staff_Address2` varchar(255) DEFAULT NULL,
@@ -922,15 +931,18 @@ CREATE TABLE `staff` (
   `Staff_JoinDate` date DEFAULT current_timestamp(),
   `Staff_ProfilePicture` varchar(255) DEFAULT NULL,
   `Admin_ID` int(11) NOT NULL,
-  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted'
+  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted',
+  `Staff_IsFirstLogin` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- 转存表中的数据 `staff`
 --
 
-INSERT INTO `staff` (`Staff_ID`, `Staff_FullName`, `Staff_ContactNumber`, `Staff_ICNumber`, `Staff_Email`, `Staff_Password`, `Staff_DOB`, `Staff_Address1`, `Staff_Address2`, `Staff_Address3`, `Staff_City`, `Staff_State`, `Staff_PostalCode`, `Staff_Country`, `Staff_Comment`, `Staff_Role`, `Staff_Status`, `Branch_ID`, `Staff_JoinDate`, `Staff_ProfilePicture`, `Admin_ID`, `Is_Deleted`) VALUES
-(1, 'Lim Wen Qin', '+6011-11190233', '030303-01-0303', 'lim.wen.qin@student.mmu.edu.my', '$2y$10$wI3ynrr3', '2003-03-03', '19, jalan bukit beruang utama 6', 'taman buklit beruang utama', '', 'melaka', 'Melaka', '75450', 'Malaysia', '', 'Staff', 'Active', NULL, '2025-12-07', 'uploads/staff_profiles/staff_1765123541_6935a5d520873.png', 2, 0);
+INSERT INTO `staff` (`Staff_ID`, `Staff_FullName`, `Staff_ContactNumber`, `Staff_ICNumber`, `Staff_Email`, `Staff_Password`, `Staff_DOB`, `Staff_Address1`, `Staff_Address2`, `Staff_Address3`, `Staff_City`, `Staff_State`, `Staff_PostalCode`, `Staff_Country`, `Staff_Comment`, `Staff_Role`, `Staff_Status`, `Branch_ID`, `Staff_JoinDate`, `Staff_ProfilePicture`, `Admin_ID`, `Is_Deleted`, `Staff_IsFirstLogin`) VALUES
+(1, 'Lim Wen Qin', '+6011-11190233', '030303-01-0303', 'lim.wen.qin@student.mmu.edu.my', '$2y$10$wI3ynrr3', '2003-03-03', '19, jalan bukit beruang utama 6', 'taman buklit beruang utama', '', 'melaka', 'Melaka', '75450', 'Malaysia', '', 'Staff', 'Active', NULL, '2025-12-07', 'uploads/staff_profiles/staff_1765123541_6935a5d520873.png', 2, 0, 1),
+(4, 'steve', '+6012-34567898', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$s4PtchL9.Lhy9dcKmrf0.eCM1qrxynsrSq4cLqR.c2XypF7q7F7w2', '2003-05-17', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-08', NULL, 2, 0, 1),
+(6, 'john', '+6012-3456789', '010203-04-0506', 'johndoe123@gmail.com', '$2y$10$FAwwBFD1hIOcrWPKJlvJbOLod5Za.bTjk1l5YsaTUbaRAAWs74tDy', '2001-02-03', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-08', NULL, 2, 0, 1);
 
 --
 -- 触发器 `staff`
@@ -1288,13 +1300,13 @@ ALTER TABLE `activity`
 -- 使用表AUTO_INCREMENT `admin`
 --
 ALTER TABLE `admin`
-  MODIFY `Admin_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `Admin_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- 使用表AUTO_INCREMENT `admin_notifications`
 --
 ALTER TABLE `admin_notifications`
-  MODIFY `AdminNotification_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `AdminNotification_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- 使用表AUTO_INCREMENT `branch`
@@ -1318,7 +1330,7 @@ ALTER TABLE `donations`
 -- 使用表AUTO_INCREMENT `donor`
 --
 ALTER TABLE `donor`
-  MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- 使用表AUTO_INCREMENT `donor_achievement`
@@ -1384,7 +1396,7 @@ ALTER TABLE `payment`
 -- 使用表AUTO_INCREMENT `point`
 --
 ALTER TABLE `point`
-  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- 使用表AUTO_INCREMENT `policy_acceptances`
@@ -1438,7 +1450,7 @@ ALTER TABLE `special_case`
 -- 使用表AUTO_INCREMENT `staff`
 --
 ALTER TABLE `staff`
-  MODIFY `Staff_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `Staff_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- 使用表AUTO_INCREMENT `staff_activity`
