@@ -5,11 +5,13 @@ include 'header_function.php';
 $error_message = "";
 $success_message = "";
 
+// Initialize variables to empty to avoid "undefined variable" warnings on first load
+$name = $contact = $email = $dob = "";
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Get form data
     $name = trim($_POST['name']);
     $contact = trim($_POST['contact']);
-    $icnumber = trim($_POST['icnumber']);
     $email = trim($_POST['email']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
@@ -17,7 +19,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
 
     // Validation
-    $required_fields = ['name', 'contact', 'icnumber', 'email', 'password', 'confirm_password', 'dob'];
+    $required_fields = ['name', 'contact', 'email', 'password', 'confirm_password', 'dob'];
     
     $missing_fields = [];
     foreach ($required_fields as $field) {
@@ -32,38 +34,41 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $error_message = "Passwords do not match.";
     } elseif (strlen($password) < 8) {
         $error_message = "Password must be at least 8 characters long.";
-    } elseif (!preg_match('/^\d{12}$/', $icnumber)) {
-        $error_message = "IC Number must be exactly 12 digits.";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_message = "Please enter a valid email address.";
     } else {
-        // Check if email or IC number already exists
-        $check_query = "SELECT Donor_ID FROM donor WHERE Donor_Email = ? OR Donor_ICNumber = ?";
+        // Check if email already exists
+        $check_query = "SELECT Donor_ID FROM donor WHERE Donor_Email = ?";
         $stmt = $conn->prepare($check_query);
-        $stmt->bind_param("ss", $email, $icnumber);
+        $stmt->bind_param("s", $email);
         $stmt->execute();
         $result = $stmt->get_result();
         
         if ($result->num_rows > 0) {
-            $error_message = "Email or IC Number already exists.";
+            $error_message = "Email already exists.";
         } else {
-            // Hash password using bcrypt (secure algorithm)
+            // Hash password using bcrypt
             $hashed_password = password_hash($password, PASSWORD_BCRYPT);
             
             // Insert into database
-            $insert_query = "INSERT INTO donor (Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email, 
+            $insert_query = "INSERT INTO donor (Donor_Name, Donor_ContactNumber, Donor_Email, 
                             Donor_Password, Donor_DOB) 
-                            VALUES (?, ?, ?, ?, ?, ?)";
+                            VALUES (?, ?, ?, ?, ?)";
             
             $stmt = $conn->prepare($insert_query);
-            $stmt->bind_param("ssssss", 
-                $name, $contact, $icnumber, $email, $hashed_password, $dob
+            $stmt->bind_param("sssss", 
+                $name, $contact, $email, $hashed_password, $dob
             );
             
             if ($stmt->execute()) {
-                $success_message = "Registration successful! You can now login.";
-                header("Location: donor_login.php");
-                exit();
+                // --- 修改开始：成功后不跳转，显示消息和链接 ---
+                $success_message = "Registration successful! <a href='donor_login.php' class='login-link'>Click here to Login Now <i class='fas fa-arrow-right'></i></a>";
+                
+                // Clear form data so inputs are empty
+                $name = $contact = $email = $dob = "";
+                $_POST = array(); 
+                // --- 修改结束 ---
+                
             } else {
                 $error_message = "Error: " . $stmt->error;
             }
@@ -232,7 +237,6 @@ include 'header_UI.php';
             padding: 15px;
             border-radius: 6px;
             margin-bottom: 25px;
-            border-left: 4px solid var(--primary-red);
             font-weight: 500;
         }
 
@@ -242,8 +246,34 @@ include 'header_UI.php';
             padding: 15px;
             border-radius: 6px;
             margin-bottom: 25px;
-            border-left: 4px solid var(--success-green);
             font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .success-message span {
+            width: 100%;
+            display: flex;
+            justify-content: space-between; /* 关键：文字在左，按钮在右 */
+            align-items: center;
+        }
+
+        /* Style specifically for the Login Link inside the success message */
+        .success-message .login-link {
+            background-color: #059669;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: background-color 0.3s;
+            margin-left: 15px;
+        }
+
+        .success-message .login-link:hover {
+            background-color: #047857;
         }
 
         /* Button Container */
@@ -334,6 +364,19 @@ include 'header_UI.php';
             .btn {
                 width: 100%;
             }
+            
+            .success-message {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+            }
+            
+            .success-message .login-link {
+                margin-left: 0;
+                width: 100%;
+                text-align: center;
+                box-sizing: border-box;
+            }
         }
 
         @media (max-width: 480px) {
@@ -408,7 +451,9 @@ include 'header_UI.php';
             <?php endif; ?>
             
             <?php if (!empty($success_message)): ?>
-                <div class="success-message"><?php echo $success_message; ?></div>
+                <div class="success-message">
+                    <span><?php echo $success_message; ?></span>
+                </div>
             <?php endif; ?>
             
             <form method="POST" action="donor_register.php" id="registerForm">
@@ -417,19 +462,9 @@ include 'header_UI.php';
                         <label for="name" class="required">Full Name</label>
                         <input type="text" class="form-control" id="name" name="name" 
                                pattern="[A-Za-z\s]+" title="Only alphabets and spaces allowed"
-                               value="<?php echo isset($_POST['name']) ? htmlspecialchars($_POST['name']) : ''; ?>" 
+                               value="<?php echo htmlspecialchars($name); ?>" 
                                required>
                         <span class="form-help">Enter your full name (letters and spaces only)</span>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="icnumber" class="required">IC Number</label>
-                        <input type="text" class="form-control" id="icnumber" name="icnumber"
-                               pattern="\d{12}" title="IC must be exactly 12 digits" 
-                               placeholder="990101015678"
-                               value="<?php echo isset($_POST['icnumber']) ? htmlspecialchars($_POST['icnumber']) : ''; ?>" 
-                               required>
-                        <span class="form-help">12 digits only (e.g., 990101015678)</span>
                     </div>
                 </div>
 
@@ -438,7 +473,7 @@ include 'header_UI.php';
                         <label for="dob" class="required">Date of Birth</label>
                         <input type="date" class="form-control" id="dob" name="dob" 
                                max="<?php echo date('Y-m-d'); ?>"
-                               value="<?php echo isset($_POST['dob']) ? $_POST['dob'] : ''; ?>" 
+                               value="<?php echo htmlspecialchars($dob); ?>" 
                                required>
                     </div>
                     
@@ -447,7 +482,7 @@ include 'header_UI.php';
                         <input type="tel" class="form-control" id="contact" name="contact" 
                                pattern="01[0-9]-[0-9]{7,8}" title="Format: 01X-XXXXXXX or 01X-XXXXXXXX"
                                placeholder="012-3456789"
-                               value="<?php echo isset($_POST['contact']) ? htmlspecialchars($_POST['contact']) : ''; ?>" 
+                               value="<?php echo htmlspecialchars($contact); ?>" 
                                required>
                         <span class="form-help">Format: 01X-XXXXXXX</span>
                     </div>
@@ -458,12 +493,11 @@ include 'header_UI.php';
                         <label for="email" class="required">Email Address</label>
                         <input type="email" class="form-control" id="email" name="email" 
                                placeholder="example@example.com"
-                               value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" 
+                               value="<?php echo htmlspecialchars($email); ?>" 
                                required>
                     </div>
                 </div>
 
-                <!-- Password Section -->
                 <div class="form-row">
                     <div class="form-group">
                         <label for="password" class="required">Password</label>
@@ -472,7 +506,6 @@ include 'header_UI.php';
                         <div class="password-strength">
                             <div class="password-strength-bar" id="passwordStrengthBar"></div>
                         </div>
-                        <!-- Password Requirements -->
                         <div class="password-requirements">
                             <div class="requirement-item invalid" id="lengthReq"><i class="fas fa-times"></i> Must be 8-15 characters long</div>
                             <div class="requirement-item invalid" id="uppercaseReq"><i class="fas fa-times"></i> Must contain at least one Uppercase letter</div>
@@ -489,7 +522,6 @@ include 'header_UI.php';
                     </div>
                 </div>
 
-                <!-- Terms and Conditions -->
                 <div class="form-group">
                     <div style="display: flex; align-items: flex-start; gap: 10px;">
                         <input type="checkbox" id="terms" name="terms" required style="margin-top: 5px;">
@@ -522,7 +554,6 @@ include 'header_UI.php';
             const confirmPassword = document.getElementById('confirm_password');
             const email = document.getElementById('email');
             const passwordStrengthBar = document.getElementById('passwordStrengthBar');
-            const icNumber = document.getElementById('icnumber');
             const dobInput = document.getElementById('dob');
             const submitBtn = document.getElementById('submitBtn');
             
@@ -624,17 +655,6 @@ include 'header_UI.php';
                 }
             }
             
-            function validateICNumber() {
-                const icRegex = /^\d{12}$/;
-                if (icNumber.value && !icRegex.test(icNumber.value)) {
-                    icNumber.classList.add('error');
-                    return false;
-                } else {
-                    icNumber.classList.remove('error');
-                    return true;
-                }
-            }
-            
             // Validate all fields
             function validateForm() {
                 let isValid = true;
@@ -654,7 +674,6 @@ include 'header_UI.php';
                 if (!validateEmail()) isValid = false;
                 if (!validatePassword()) isValid = false;
                 if (!validateConfirmPassword()) isValid = false;
-                if (!validateICNumber()) isValid = false;
                 
                 // Validate terms agreement
                 const terms = document.getElementById('terms');
@@ -670,7 +689,6 @@ include 'header_UI.php';
             email.addEventListener('blur', validateEmail);
             password.addEventListener('blur', validatePassword);
             confirmPassword.addEventListener('blur', validateConfirmPassword);
-            icNumber.addEventListener('blur', validateICNumber);
             
             // Form submission validation
             form.addEventListener('submit', function(e) {
@@ -705,17 +723,6 @@ include 'header_UI.php';
                 if (value.length > 3) {
                     value = value.substring(0, 3) + '-' + value.substring(3);
                 }
-                if (value.length > 12) {
-                    value = value.substring(0, 12);
-                }
-                
-                e.target.value = value;
-            });
-            
-            // Auto-format IC number
-            icNumber.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, '');
-                
                 if (value.length > 12) {
                     value = value.substring(0, 12);
                 }

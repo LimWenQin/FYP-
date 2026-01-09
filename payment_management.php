@@ -264,7 +264,8 @@ $sql_inc_count = "SELECT COUNT(*) as total FROM orders";
 $total_inc_recs = $conn->query($sql_inc_count)->fetch_assoc()['total'];
 $total_pages_inc = ceil($total_inc_recs / $limit);
 
-$sql_inc = "SELECT o.Order_TXN_Ref, o.Order_Type, d.Donor_Name, d.Donor_Email, o.Order_Amount, o.Order_Created_At, o.Order_PaymentMethod, o.Order_PaymentStatus,
+// *** 修改这里：在查询中增加 o.Order_ID ***
+$sql_inc = "SELECT o.Order_ID, o.Order_TXN_Ref, o.Order_Type, d.Donor_Name, d.Donor_Email, o.Order_Amount, o.Order_Created_At, o.Order_PaymentMethod, o.Order_PaymentStatus,
             b.Branch_Name, a.Activity_Name, s.Case_Title
             FROM orders o
             JOIN donor d ON o.Donor_ID = d.Donor_ID
@@ -313,7 +314,6 @@ function getMonthlyRevenueChartData($conn) {
 }
 $chartData = getMonthlyRevenueChartData($conn);
 
-// ⚠️ Removed $conn->close(); to prevent sidebar error
 ?>
 
 <!DOCTYPE html>
@@ -460,6 +460,27 @@ $chartData = getMonthlyRevenueChartData($conn);
         .badge-pending { background: #fff8e1; color: #ffca28; }
         .badge-failed { background: #fee2e2; color: #f5365c; }
         
+        /* New Action Button Style */
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background-color: #e3f2fd;
+            color: #1976d2;
+            border-radius: 50%;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: 1px solid #bbdefb;
+        }
+        .btn-action:hover {
+            background-color: #1976d2;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
         /* Pagination Controls */
         .pagination-container { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid #eee; margin-top: auto; }
         .pagination-info { font-size: 13px; color: #8898aa; }
@@ -666,7 +687,7 @@ $chartData = getMonthlyRevenueChartData($conn);
                         <div class="table-responsive">
                             <div style="overflow-x: auto;">
                                 <table class="custom-table">
-                                    <thead><tr><th>Ref / Date</th><th>Donor</th><th>Target</th><th>Amount</th><th>Status</th></tr></thead>
+                                    <thead><tr><th>Ref / Date</th><th>Donor</th><th>Target</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
                                     <tbody>
                                         <?php if($recentTransactions->num_rows > 0): ?>
                                             <?php while($txn = $recentTransactions->fetch_assoc()): 
@@ -687,10 +708,15 @@ $chartData = getMonthlyRevenueChartData($conn);
                                                 <td><span style="font-size:11px; display:block; max-width:120px;"><?php echo htmlspecialchars($targetName); ?></span></td>
                                                 <td style="font-weight:700; color:#28a745;">RM <?php echo number_format($txn['Order_Amount'], 2); ?></td>
                                                 <td><span class="badge <?php echo ($txn['Order_PaymentStatus']=='Success')?'badge-success':'badge-pending'; ?>"><?php echo $txn['Order_PaymentStatus']; ?></span></td>
+                                                <td>
+                                                    <a href="admin_payment_details.php?id=<?php echo $txn['Order_ID']; ?>" class="btn-action" target="_blank" title="View Details">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                </td>
                                             </tr>
                                             <?php endwhile; ?>
                                         <?php else: ?>
-                                            <tr><td colspan="5" style="text-align:center; padding:30px; color:#999;">No transaction records found.</td></tr>
+                                            <tr><td colspan="6" style="text-align:center; padding:30px; color:#999;">No transaction records found.</td></tr>
                                         <?php endif; ?>
                                     </tbody>
                                 </table>
