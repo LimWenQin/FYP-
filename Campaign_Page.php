@@ -48,7 +48,12 @@ include 'header_UI.php';
         
         /* Header Styles */
         .campaign-header {
-            background: linear-gradient(135deg, var(--primary-red) 0%, var(--dark-red) 100%);
+            /* 修改部分：背景图片 + 红色遮罩 */
+            background: linear-gradient(rgba(228, 168, 167, 0.85), rgba(123, 110, 110, 0.85)), url('https://images.unsplash.com/photo-1559027615-cd4628902d4a?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            
             color: white;
             padding: 60px 0;
             text-align: center;
@@ -73,14 +78,16 @@ include 'header_UI.php';
             font-weight: 700;
             margin-bottom: 15px;
             position: relative;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3); /* 增加文字阴影提高可读性 */
         }
         
         .page-description {
             font-size: 20px;
             max-width: 700px;
             margin: 0 auto 30px;
-            opacity: 0.9;
+            opacity: 0.95;
             position: relative;
+            font-weight: 500; /*稍微加粗*/
         }
         
         /* Campaign Stats */
@@ -94,13 +101,14 @@ include 'header_UI.php';
         }
         
         .stat-box {
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.2); /* 稍微增加不透明度 */
             backdrop-filter: blur(10px);
             padding: 20px 30px;
             border-radius: 15px;
             min-width: 180px;
             text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
         
         .stat-number {
@@ -114,7 +122,7 @@ include 'header_UI.php';
             font-size: 14px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            opacity: 0.8;
+            opacity: 0.9;
         }
         
         /* Main Container */
@@ -508,12 +516,10 @@ include 'header_UI.php';
             }
         }
     </style>
-    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
-    <!-- Campaign Header -->
     <div class="campaign-header">
         <h1 class="page-title">Our Campaigns</h1>
         <p class="page-description">Join us in making a difference through our various community engagement programs and fundraising events.</p>
@@ -534,9 +540,7 @@ include 'header_UI.php';
         </div>
     </div>
 
-    <!-- Main Content -->
     <div class="campaign-container">
-        <!-- Filters -->
         <div class="filters-container">
             <h2 class="filters-title">
                 <i class="fas fa-filter"></i> Filter Campaigns
@@ -557,7 +561,6 @@ include 'header_UI.php';
             </div>
         </div>
 
-        <!-- Campaign Grid -->
         <div class="campaign-grid" id="campaignGrid">
             <?php 
             if ($result->num_rows > 0): 
@@ -607,7 +610,6 @@ include 'header_UI.php';
     ?>
                     
                         <div class="campaign-card" data-status="<?php echo $campaignStatus; ?>">
-                            <!-- Campaign Image -->
                             <div style="position: relative;">
                                 <?php 
                                 $imagePath = !empty($campaign['Activity_Picture']) ? $campaign['Activity_Picture'] : 'images/campaign-default.jpg';
@@ -615,18 +617,12 @@ include 'header_UI.php';
                                     $imagePath = 'images/campaign-default.jpg';
                                 }
                                 ?>
-                                <!--<img src="<?php echo $imagePath; ?>" 
-                                     alt="<?php echo htmlspecialchars($campaign['Activity_Name']); ?>" 
-                                     class="campaign-image"
-                                     onerror="this.src='images/campaign-default.jpg'">-->
                                 <span class="campaign-badge <?php echo $badgeClass; ?>">
                                     <?php echo $badgeText; ?>
                                 </span>
                             </div>
                             
-                            <!-- Campaign Content -->
                             <div class="campaign-content">
-                                <!-- Dates -->
                                 <div class="campaign-dates">
                                     <i class="far fa-calendar"></i>
                                     <?php 
@@ -636,13 +632,10 @@ include 'header_UI.php';
                                     ?>
                                 </div>
                                 
-                                <!-- Title -->
                                 <h3 class="campaign-title"><?php echo htmlspecialchars($campaign['Activity_Name']); ?></h3>
                                 
-                                <!-- Details -->
                                 <p class="campaign-details"><?php echo htmlspecialchars($campaign['Activity_Details']); ?></p>
                                 
-                                <!-- Location -->
                                 <div class="campaign-location">
                                     <i class="fas fa-map-marker-alt"></i>
                                     <?php 
@@ -652,7 +645,6 @@ include 'header_UI.php';
                                     ?>
                                 </div>
                                 
-                                <!-- Progress Bar -->
                                 <div class="progress-container">
                                     <div class="progress-label">
                                         <span>Raised: RM <?php echo number_format($raisedAmount, 2); ?></span>
@@ -663,7 +655,6 @@ include 'header_UI.php';
                                     </div>
                                 </div>
                                 
-                                <!-- Stats Row -->
                                 <div class="campaign-stats-row">
                                     <div class="stat-item">
                                         <span class="stat-value"><?php echo number_format($progress, 0); ?>%</span>
@@ -671,7 +662,6 @@ include 'header_UI.php';
                                     </div>
                                 </div>
                                 
-                                <!-- Actions -->
                                 <div class="campaign-actions">
                                     <a href="donate.php?activity_id=<?php echo $campaign['Activity_ID']; ?>" class="btn-donate">
                                         <i class="fas fa-heart"></i> Donate Now

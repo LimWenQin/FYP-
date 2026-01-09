@@ -53,9 +53,16 @@ include 'header_UI.php';
         
         /* Header Styles */
         .stories-header {
-            background: linear-gradient(135deg, var(--primary-red) 0%, var(--dark-red) 100%);
+            /* 修改部分：更换为 AI 生成的温馨图片背景 */
+            background: url('https://images.unsplash.com/photo-1529156069898-49953e39b3ac?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80'); 
+            /* 注意：如果 AI 图片无法直接链接，建议下载后上传到你的 images 文件夹并替换路径，例如 'images/news-header-bg.jpg' */
+            
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            
             color: white;
-            padding: 80px 0 60px;
+            padding: 180px 0 60px;
             text-align: center;
             position: relative;
             overflow: hidden;
@@ -69,9 +76,10 @@ include 'header_UI.php';
             left: 0;
             right: 0;
             bottom: 0;
+            /* 黑色遮罩，确保文字在复杂背景上清晰可见 */
+            background-color: rgba(0, 0, 0, 0.5); 
             background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><path d="M50,0 C77.6,0 100,22.4 100,50 C100,77.6 77.6,100 50,100 C22.4,100 0,77.6 0,50 C0,22.4 22.4,0 50,0 Z" fill="white" fill-opacity="0.05"/></svg>');
             background-size: 120px;
-            opacity: 0.1;
         }
         
         .page-title {
@@ -79,16 +87,18 @@ include 'header_UI.php';
             font-weight: 800;
             margin-bottom: 20px;
             position: relative;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
         
         .page-description {
             font-size: 22px;
             max-width: 800px;
             margin: 0 auto;
-            opacity: 0.9;
+            opacity: 0.95;
             position: relative;
             line-height: 1.6;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+            font-weight: 500;
         }
         
         /* Main Container */
@@ -397,18 +407,15 @@ include 'header_UI.php';
             }
         }
     </style>
-    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="stories-fullpage">
-        <!-- Stories Header -->
         <div class="stories-header">
             <h1 class="page-title">News & Stories</h1>
             <p class="page-description">Discover inspiring stories of hope, resilience, and transformation from our community. Each story represents a life touched by generosity.</p>
         </div>
 
-        <!-- Main Content -->
         <div class="stories-container">
             <div class="stories-grid">
                 <?php if ($totalStories > 0): 
@@ -425,7 +432,6 @@ include 'header_UI.php';
                         $hasLongDescription = $descriptionLength > 200;
                 ?>
                     <div class="story-card">
-                        <!-- Story Image -->
                         <div class="story-image-container">
                             <img src="<?php echo $imagePath; ?>" 
                                  alt="<?php echo htmlspecialchars($title); ?>" 
@@ -434,9 +440,7 @@ include 'header_UI.php';
                             <span class="story-badge"><?php echo htmlspecialchars($category); ?></span>
                         </div>
                         
-                        <!-- Story Content -->
                         <div class="story-content">
-                            <!-- Story Header -->
                             <div class="story-header">
                                 <div class="story-meta">
                                     <span><i class="far fa-calendar"></i> <?php echo $storyDate; ?></span>
@@ -448,7 +452,6 @@ include 'header_UI.php';
                                 </div>
                             </div>
                             
-                            <!-- Story Description -->
                             <div class="story-description-container">
                                 <p class="story-description" id="story-desc-<?php echo $story['Story_ID']; ?>">
                                     <?php echo nl2br(htmlspecialchars($description)); ?>
@@ -460,7 +463,6 @@ include 'header_UI.php';
                                 <?php endif; ?>
                             </div>
                             
-                            <!-- Story Footer -->
                             <div class="story-footer">
                                 <span class="story-category"><?php echo htmlspecialchars($category); ?></span>
                             </div>

@@ -29,11 +29,11 @@ $result = $conn->query($query);
 
 // 定义案例类别
 $categories = [
-    'medical' => ['name' => 'Medical Treatment', 'icon' => 'fas fa-heartbeat', 'color' => '#4CAF50'],
+    'medical' => ['name' => 'Medical Assistant', 'icon' => 'fas fa-heartbeat', 'color' => '#4CAF50'],
     'disability' => ['name' => 'Disability Support', 'icon' => 'fas fa-wheelchair', 'color' => '#2196F3'],
     'emergency' => ['name' => 'Emergency Relief', 'icon' => 'fas fa-first-aid', 'color' => '#FF5722'],
     'elderly' => ['name' => 'Elderly Care', 'icon' => 'fas fa-user-friends', 'color' => '#795548'],
-    'children' => ['name' => 'Children Support', 'icon' => 'fas fa-child', 'color' => '#FF9800'],
+    'children' => ['name' => 'Orphan Care', 'icon' => 'fas fa-child', 'color' => '#FF9800'],
     'other' => ['name' => 'Other Cases', 'icon' => 'fas fa-hand-holding-heart', 'color' => '#9C27B0'],
     
 ];
@@ -74,29 +74,50 @@ include 'header_UI.php';
             background-color: var(--light-bg);
             color: var(--text);
             line-height: 1.6;
+            overflow-x: hidden; /* 防止水平滚动条 */
         }
         
-        /* Main Container */
-        .case-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 40px 20px;
-        }
-        
-        /* Page Header */
+        /* Full Width Page Header */
         .page-header {
+            width: 100%; /* 宽度占满整个页面 */
+            background: url('https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
             text-align: center;
-            margin-bottom: 50px;
             position: relative;
+            padding: 120px 20px; /* 增加上下内边距 */
+            color: white;
+            border-radius: 0; /* 移除圆角 */
+            margin-bottom: 0; /* 移除底部外边距，让统计数据紧贴 */
+        }
+        
+        .page-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6); 
+            z-index: 1;
+        }
+        
+        .page-header-content {
+            position: relative;
+            z-index: 2;
+            max-width: 1400px; /* 内容区域保持最大宽度 */
+            margin: 0 auto;
         }
         
         .page-title {
             font-size: 48px;
             font-weight: 700;
             margin-bottom: 20px;
-            color: var(--dark-red);
+            color: white;
             position: relative;
             display: inline-block;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
         
         .page-title::after {
@@ -107,7 +128,7 @@ include 'header_UI.php';
             transform: translateX(-50%);
             width: 100px;
             height: 4px;
-            background: linear-gradient(90deg, var(--primary-red) 0%, var(--light-red) 100%);
+            background: var(--primary-red);
             border-radius: 2px;
         }
         
@@ -115,7 +136,17 @@ include 'header_UI.php';
             font-size: 20px;
             max-width: 800px;
             margin: 0 auto 30px;
-            color: #8a8686;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            font-weight: 500;
+        }
+        
+        /* Main Container (for content below header) */
+        .case-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative; /* 为了让统计数据可以定位 */
         }
         
         /* Stats */
@@ -124,6 +155,10 @@ include 'header_UI.php';
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 40px;
+            margin-top: -60px; /* 向上移动，覆盖在 Header 上 */
+            position: relative;
+            z-index: 3;
+            padding: 0 20px;
         }
         
         .stat-box {
@@ -131,7 +166,7 @@ include 'header_UI.php';
             padding: 25px;
             border-radius: 15px;
             text-align: center;
-            box-shadow: 0 5px 20px var(--shadow);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             border: 1px solid var(--lighter-red);
             transition: transform 0.3s ease;
         }
@@ -612,10 +647,6 @@ include 'header_UI.php';
         
         /* Responsive Design */
         @media (max-width: 1200px) {
-            .case-container {
-                padding: 30px 20px;
-            }
-            
             .page-title {
                 font-size: 42px;
             }
@@ -646,9 +677,14 @@ include 'header_UI.php';
         }
         
         @media (max-width: 768px) {
+            .page-header {
+                padding: 80px 20px;
+            }
+            
             .stats-container {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 15px;
+                margin-top: -40px; /* 调整小屏幕的重叠 */
             }
             
             .stat-box {
@@ -678,10 +714,6 @@ include 'header_UI.php';
         }
         
         @media (max-width: 576px) {
-            .page-header {
-                margin-bottom: 30px;
-            }
-            
             .page-title {
                 font-size: 32px;
             }
@@ -742,19 +774,18 @@ include 'header_UI.php';
             }
         }
     </style>
-    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
-    <div class="case-container">
-        <!-- Page Header -->
-        <div class="page-header">
+    <div class="page-header">
+        <div class="page-header-content">
             <h1 class="page-title">Special Cases</h1>
             <p class="page-description">These are urgent cases that need immediate support. Your donation can make a significant difference in someone's life today.</p>
         </div>
-        
-        <!-- Stats Section -->
+    </div>
+
+    <div class="case-container">
         <div class="stats-container">
             <?php 
             // 获取统计数据
@@ -789,7 +820,6 @@ include 'header_UI.php';
             </div>
         </div>
         
-        <!-- Categories Grid -->
         <div class="categories-container">
             <h2 class="categories-title">
                 <i class="fas fa-list-alt"></i> Case Categories
@@ -808,7 +838,6 @@ include 'header_UI.php';
             </div>
         </div>
         
-        <!-- Cases Grid -->
         <div class="cases-grid">
             <?php if ($result->num_rows > 0): ?>
                 <?php while($case = $result->fetch_assoc()): 
@@ -841,14 +870,12 @@ include 'header_UI.php';
                     }
                 ?>
                     <div class="case-card">
-                        <!-- Case Image -->
                         <div class="case-image-container">
-                            <!--<img src="<?php echo htmlspecialchars($image_path); ?>" 
+                            <img src="<?php echo htmlspecialchars($image_path); ?>" 
                                  alt="<?php echo htmlspecialchars($case['Case_Title']); ?>" 
                                  class="case-image"
-                                 onerror="this.src='<?php echo $default_image; ?>'">-->
+                                 onerror="this.src='<?php echo $default_image; ?>'">
                             
-                            <!-- Badges -->
                             <div class="case-badges">
                                 <span class="case-badge" style="background: <?php echo $category_color; ?>">
                                     <?php echo $category_name; ?>
@@ -859,9 +886,7 @@ include 'header_UI.php';
                             </div>
                         </div>
                         
-                        <!-- Case Content -->
                         <div class="case-content">
-                            <!-- Header -->
                             <div class="case-header">
                                 <h3 class="case-title"><?php echo htmlspecialchars($case['Case_Title']); ?></h3>
                                 <div class="case-meta">
@@ -870,7 +895,6 @@ include 'header_UI.php';
                                 </div>
                             </div>
                             
-                            <!-- Description -->
                             <div class="case-description-container">
                                 <p class="case-description" id="desc-<?php echo $case['Case_ID']; ?>">
                                     <?php echo htmlspecialchars($case['Case_Description']); ?>
@@ -882,7 +906,6 @@ include 'header_UI.php';
                                 <?php endif; ?>
                             </div>
                             
-                            <!-- Progress Section -->
                             <div class="progress-section">
                                 <div class="progress-info">
                                     <span>Raised: RM <?php echo number_format($raised, 2); ?></span>
@@ -896,7 +919,6 @@ include 'header_UI.php';
                                 </div>
                             </div>
                             
-                            <!-- Details -->
                             <div class="case-details">
                                 <div class="detail-item">
                                     <span class="detail-value"><?php echo $donor_count; ?></span>
@@ -908,7 +930,6 @@ include 'header_UI.php';
                                 </div>
                             </div>
                             
-                            <!-- Donate Button -->
                             <div class="case-actions">
                                 <a href="S_C_Payment_Page.php?case_id=<?php echo $case['Case_ID']; ?>" class="btn-donate">
                                     <i class="fas fa-heart"></i> Donate Now
@@ -929,7 +950,6 @@ include 'header_UI.php';
             <?php endif; ?>
         </div>
         
-        <!-- Pagination -->
         <?php if ($total_pages > 1): ?>
             <div class="pagination">
                 <?php if ($page > 1): ?>
