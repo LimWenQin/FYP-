@@ -3,12 +3,13 @@ include 'dataconnection.php';
 // Assuming header_function.php is still needed to start the session, etc.
 include 'header_function.php'; 
 
-$error_message = ""; // 通用错误信息（仅用于空字段或数据库连接错误）
+$error_message = ""; // 通用错误信息
 $email_error = ""; // 邮箱验证错误信息
 $password_error = ""; // 密码验证错误信息
 $email_value = ""; // 用于存储在表单中回填的邮箱值
+$lockout_error = ""; // 专门用于锁定账户的错误信息
 
-// Start session if not already started by header_function.php
+// Start session if not already started
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
@@ -16,30 +17,48 @@ if (session_status() == PHP_SESSION_NONE) {
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = trim($_POST['email']);
     $password = $_POST['password'];
-    $remember = isset($_POST['remember']); // 检查是否勾选了 Remember me
-    
+    $remember = isset($_POST['remember']); 
+
+    // -----------------------------------------------------------------
+    // 0. 检查是否已被锁定 (Check Lockout)
+    // -----------------------------------------------------------------
+    if (!empty($email) && isset($conn)) {
+        // 检查过去 15 分钟内的失败次数
+        $check_stmt = $conn->prepare("SELECT COUNT(*) as fail_count FROM donor_login_attempts WHERE email = ? AND attempt_time > (NOW() - INTERVAL 15 MINUTE)");
+        $check_stmt->bind_param("s", $email);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+        $row = $check_result->fetch_assoc();
+        
+        if ($row['fail_count'] >= 5) {
+            $lockout_error = "Too many failed login attempts. Please try again in 15 minutes.";
+        }
+        $check_stmt->close();
+    }
+
+    // 如果被锁定，阻止后续逻辑
+    if (!empty($lockout_error)) {
+        // 保留邮箱显示，方便用户知道是哪个账号被锁
+        $email_value = htmlspecialchars($email);
+    } 
     // -----------------------------------------------------------------
     // 1. 检查是否为空字段 (通用错误)
     // -----------------------------------------------------------------
-    if (empty($email) || empty($password)) {
-        // 确保空字段时，即使没有通用错误信息，也会触发字段级别的错误样式
+    elseif (empty($email) || empty($password)) {
         if (empty($email)) {
             $email_error = "Please enter your email address.";
         }
         if (empty($password)) {
             $password_error = "Please enter your password.";
         }
-        $error_message = "Please enter both email and password."; // 保留通用信息
+        $error_message = "Please enter both email and password.";
         
-        // 登录失败，根据 remember me 决定是否保留 email
         if ($remember && !empty($email)) {
             $email_value = htmlspecialchars($email);
-        } else {
-            $email_value = "";
         }
     } else {
         // -----------------------------------------------------------------
-        // 2. 执行登录验证 (细化错误)
+        // 2. 执行登录验证
         // -----------------------------------------------------------------
         
         if (!isset($conn)) {
@@ -48,47 +67,87 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $email_value = htmlspecialchars($email);
              }
         } else {
-            $query = "SELECT Donor_ID, Donor_Name, Donor_Password FROM donor WHERE Donor_Email = ?";
+            $query = "SELECT Donor_ID, Donor_Name, Donor_Password FROM donor WHERE Donor_Email = ? AND Is_Deleted = 0";
             $stmt = $conn->prepare($query);
             $stmt->bind_param("s", $email);
             $stmt->execute();
             $result = $stmt->get_result();
             
+            // 默认登录状态为失败
+            $login_success = false;
+            $fail_reason = ""; 
+
             if ($result->num_rows == 1) {
                 $user = $result->fetch_assoc();
                 
                 // Verify password
                 if (password_verify($password, $user['Donor_Password'])) {
-                    // 登录成功
+                    $login_success = true;
+
+                    // --- 登录成功：清除该邮箱之前的失败记录 ---
+                    $clear_stmt = $conn->prepare("DELETE FROM donor_login_attempts WHERE email = ?");
+                    $clear_stmt->bind_param("s", $email);
+                    $clear_stmt->execute();
+                    $clear_stmt->close();
+
+                    // 设置 Session
                     $_SESSION['donor_id'] = $user['Donor_ID'];
                     $_SESSION['donor_name'] = $user['Donor_Name'];
                     $_SESSION['logged_in'] = true;
                     
+                    // 更新最后登录时间 (可选，根据 donor 表结构)
+                    $update_login = $conn->prepare("UPDATE donor SET Donor_LastLogin = NOW() WHERE Donor_ID = ?");
+                    $update_login->bind_param("i", $user['Donor_ID']);
+                    $update_login->execute();
+
                     header("Location: homepage.php");
                     exit();
                 } else {
-                    // 密码错误
-                    // *** 关键修改: 明确只显示密码错误信息 ***
                     $password_error = "Incorrect password."; 
-                    
-                    // 登录失败，根据 remember me 决定是否保留 email
-                    if ($remember) {
-                        $email_value = htmlspecialchars($email);
-                    } else {
-                        $email_value = "";
-                    }
                 }
             } else {
-                // 邮箱未找到
-                // *** 关键修改: 明确只显示邮箱错误信息 ***
                 $email_error = "Email address not found.";
-                $email_value = ""; // 邮箱未找到，强制清除回填值
             }
             $stmt->close();
+
+            // -----------------------------------------------------------------
+            // 3. 记录失败尝试 (Log Failed Attempt)
+            // -----------------------------------------------------------------
+            if (!$login_success) {
+                // 只要登录没成功（密码错 或 邮箱找不到），都记录一次失败
+                // 记录 IP 地址
+                $ip_address = $_SERVER['REMOTE_ADDR'];
+                
+                $log_stmt = $conn->prepare("INSERT INTO donor_login_attempts (email, ip_address, attempt_time, status) VALUES (?, ?, NOW(), 'failed')");
+                $log_stmt->bind_param("ss", $email, $ip_address);
+                $log_stmt->execute();
+                $log_stmt->close();
+
+                // 再次检查是否刚刚达到 5 次，以便立即显示锁定信息
+                $check_stmt_after = $conn->prepare("SELECT COUNT(*) as fail_count FROM donor_login_attempts WHERE email = ? AND attempt_time > (NOW() - INTERVAL 15 MINUTE)");
+                $check_stmt_after->bind_param("s", $email);
+                $check_stmt_after->execute();
+                $res_after = $check_stmt_after->get_result();
+                $row_after = $res_after->fetch_assoc();
+                
+                if ($row_after['fail_count'] >= 5) {
+                    $lockout_error = "Too many failed login attempts. Please try again in 15 minutes.";
+                    // 清除具体的密码/邮箱错误，只显示锁定信息（为了安全）
+                    $password_error = "";
+                    $email_error = "";
+                }
+                $check_stmt_after->close();
+
+                // 登录失败，处理回填值
+                if ($remember) {
+                    $email_value = htmlspecialchars($email);
+                } else {
+                    $email_value = "";
+                }
+            }
         }
     }
 }
-// 登录成功后，header() 已经执行，否则继续显示 UI
 include 'header_UI.php';
 ?>
 
@@ -99,7 +158,7 @@ include 'header_UI.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Donor Login - Love Bridge</title>
     <style>
-        /* CSS 样式保持不变，以保持页面风格 */
+        /* CSS 样式保持不变 */
         :root {
             --primary-red: #dc2626;
             --dark-red: #b91c1c;
@@ -200,7 +259,6 @@ include 'header_UI.php';
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 25px;
-            border-left: 4px solid var(--error-red);
             font-weight: 500;
         }
 
@@ -236,6 +294,13 @@ include 'header_UI.php';
 
         .btn:active {
             transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
         .form-footer {
@@ -336,9 +401,13 @@ include 'header_UI.php';
         <h2 class="form-title">Login to Love Bridge</h2>
         <p class="form-subtitle">Welcome back! Please enter your credentials</p>
         
+        <?php if (!empty($lockout_error)): ?>
+            <div class="error-message"><?php echo $lockout_error; ?></div>
+        <?php endif; ?>
+
         <?php 
-        // 集中处理通用错误信息（仅用于“请填写所有字段”或“数据库连接错误”）
-        if (!empty($error_message) && (empty($email_error) || empty($password_error))): 
+        // 显示通用错误信息 (如果未被锁定)
+        if (empty($lockout_error) && !empty($error_message) && (empty($email_error) || empty($password_error))): 
         ?>
             <div class="error-message"><?php echo $error_message; ?></div>
         <?php endif; ?>
@@ -359,30 +428,32 @@ include 'header_UI.php';
             <div class="form-group">
                 <label for="email">Email Address</label>
                 <input type="email" class="form-control <?php echo !empty($email_error) ? 'error' : ''; ?>" 
-                        id="email" name="email" 
-                        value="<?php echo $email_value; ?>" 
-                        required placeholder="Enter your email address">
+                       id="email" name="email" 
+                       value="<?php echo $email_value; ?>" 
+                       required placeholder="Enter your email address"
+                       <?php echo !empty($lockout_error) ? 'disabled' : ''; ?>>
                 
                 <?php if (!empty($email_error)): ?>
-                    <span class="field-error"><?php echo $email_error == "Please enter your email address." ? $email_error : "Invalid email address."; ?></span>
+                    <span class="field-error"><?php echo $email_error; ?></span>
                 <?php endif; ?>
             </div>
             
             <div class="form-group" id="password-group">
                 <label for="password">Password</label>
                 <input type="password" class="form-control <?php echo !empty($password_error) ? 'error' : ''; ?>" 
-                        id="password" name="password" 
-                        required placeholder="Enter your password">
+                       id="password" name="password" 
+                       required placeholder="Enter your password"
+                       <?php echo !empty($lockout_error) ? 'disabled' : ''; ?>>
                 
                 <?php if (!empty($password_error)): ?>
-                    <span class="field-error"><?php echo $password_error == "Please enter your password." ? $password_error : "Invalid password."; ?></span>
+                    <span class="field-error"><?php echo $password_error; ?></span>
                 <?php endif; ?>
             </div>
             
             <div class="remember-forgot">
                 <div class="remember-me">
                     <input type="checkbox" id="remember" name="remember" 
-                            <?php echo (isset($_POST['remember']) && $_POST['remember']) ? 'checked' : ''; ?>>
+                           <?php echo (isset($_POST['remember']) && $_POST['remember']) ? 'checked' : ''; ?>>
                     <label for="remember">Remember me</label>
                 </div>
                 <div class="forgot-password">
@@ -390,7 +461,7 @@ include 'header_UI.php';
                 </div>
             </div>
             
-            <button type="submit" class="btn">Login to Account</button>
+            <button type="submit" class="btn" <?php echo !empty($lockout_error) ? 'disabled' : ''; ?>>Login to Account</button>
         </form>
         
         <div class="help-links">
@@ -402,14 +473,13 @@ include 'header_UI.php';
         </div>
     </div>
 </div>
- <?php include 'footer.php'; ?>
+<?php include 'footer.php'; ?>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const form = document.getElementById('loginForm');
         const emailInput = document.getElementById('email');
         const passwordInput = document.getElementById('password');
         
-        // 清除错误样式当用户开始输入时
         function clearErrorOnInput() {
             this.classList.remove('error');
             const errorSpan = this.nextElementSibling;
@@ -421,7 +491,6 @@ include 'header_UI.php';
         emailInput.addEventListener('input', clearErrorOnInput);
         passwordInput.addEventListener('input', clearErrorOnInput);
         
-        // 输入框焦点效果
         const inputs = [emailInput, passwordInput];
         inputs.forEach(input => {
             input.addEventListener('focus', function() {
@@ -441,19 +510,20 @@ include 'header_UI.php';
             });
         });
         
-        // 确保 password 字段在浏览器自动填充时不会被记住（尽管这很大程度上依赖于浏览器设置，但添加autocomplete="off"有助于防止自动回填）
         passwordInput.setAttribute('autocomplete', 'off');
 
-        // 表单提交前的客户端验证
         form.addEventListener('submit', function(e) {
+            // 如果按钮被禁用（被锁定），则不进行验证
+            if(document.querySelector('.btn').disabled) {
+                e.preventDefault();
+                return;
+            }
+
             let isValid = true;
-            
-            // 检查邮箱格式 (如果服务器端验证失败，这里将提供视觉反馈)
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             
-            // 检查邮箱是否为空或格式不正确
             if (emailInput.value.length === 0) {
-                 // 允许服务器端处理 "Please enter..." 错误
+                 // 允许服务器端处理
             } else if (!emailRegex.test(emailInput.value)) {
                 emailInput.classList.add('error');
                 let errorSpan = emailInput.nextElementSibling;
@@ -462,15 +532,9 @@ include 'header_UI.php';
                     errorSpan.className = 'field-error';
                     emailInput.parentNode.insertBefore(errorSpan, emailInput.nextSibling);
                 }
-                // 使用更通用的客户端错误信息，避免与服务器端冲突
                 errorSpan.textContent = 'Please enter a valid email format.';
                 errorSpan.style.display = 'block';
                 isValid = false;
-            }
-            
-            // 检查密码是否为空
-            if (passwordInput.value.length === 0) {
-                // 允许服务器端处理 "Please enter..." 错误
             }
             
             if (!isValid) {
