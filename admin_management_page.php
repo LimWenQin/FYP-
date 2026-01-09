@@ -56,6 +56,31 @@ function generateStrongRandomPassword($length = 12) {
     return str_shuffle($password);
 }
 
+// --- HELPER: Validate IC match DOB (Server Side) ---
+function validateIcDobMatch($ic, $dob) {
+    // 移除所有非数字字符
+    $cleanIc = preg_replace('/[^0-9]/', '', $ic);
+    
+    // 如果 IC 长度不足以提取日期，返回 false
+    if (strlen($cleanIc) < 6) return false;
+
+    $y = substr($cleanIc, 0, 2);
+    $m = substr($cleanIc, 2, 2);
+    $d = substr($cleanIc, 4, 2);
+
+    // 推测世纪 (Standard Malaysia IC logic)
+    $currentYearShort = date('y');
+    $century = ($y > $currentYearShort) ? '19' : '20';
+    $icDate = $century . $y . '-' . $m . '-' . $d;
+
+    // 检查日期是否有效
+    if (!checkdate((int)$m, (int)$d, (int)($century . $y))) {
+        return false;
+    }
+
+    return $icDate === $dob;
+}
+
 // --- 1. EXPORT TO EXCEL LOGIC ---
 if (isset($_POST['export_excel'])) {
     $filename = "admin_list_" . date('Ymd') . ".xls";
@@ -194,6 +219,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
         }
     }
 
+    // --- NEW: IC vs DOB Check ---
+    if (!isset($errorMessage)) {
+        if (!validateIcDobMatch($icNumber, $dob)) {
+            $errorMessage = "IC Number and Date of Birth do not match.";
+        }
+    }
+
     if (!isset($errorMessage)) {
         // Age Check
         if (!empty($dob)) {
@@ -322,27 +354,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
     }
 
     // --- SERVER SIDE VALIDATION ---
-    // 1. Check Empty
-    if (empty($name)) {
-        $errorMessage = "Full Name is required.";
-    } elseif (empty($email)) {
-        $errorMessage = "Email is required.";
-    } elseif (empty($contactRaw)) {
-        $errorMessage = "Contact Number is required.";
-    } elseif (empty($icNumber)) {
-        $errorMessage = "IC Number is required.";
-    } elseif (empty($dob)) {
-        $errorMessage = "Date of Birth is required.";
-    }
-    // 2. Format Check
-    elseif (!preg_match('/^[a-zA-Z\s]+$/', $name)) {
-        $errorMessage = "Name can only contain letters and spaces.";
-    } elseif (strpos($email, '@') === false) {
-        $errorMessage = "Invalid email: Missing '@' symbol.";
-    } elseif (!preg_match('/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) {
-        $errorMessage = "Invalid email: Missing valid domain extension (e.g. .com).";
-    } else {
-        // --- 电话号码严格验证 (PHP端) ---
+    if (empty($name)) { $errorMessage = "Full Name is required."; } 
+    elseif (empty($email)) { $errorMessage = "Email is required."; } 
+    elseif (empty($contactRaw)) { $errorMessage = "Contact Number is required."; } 
+    elseif (empty($icNumber)) { $errorMessage = "IC Number is required."; } 
+    elseif (empty($dob)) { $errorMessage = "Date of Birth is required."; }
+    elseif (!preg_match('/^[a-zA-Z\s]+$/', $name)) { $errorMessage = "Name can only contain letters and spaces."; } 
+    elseif (strpos($email, '@') === false) { $errorMessage = "Invalid email: Missing '@' symbol."; } 
+    elseif (!preg_match('/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) { $errorMessage = "Invalid email: Missing valid domain extension (e.g. .com)."; } 
+    else {
+        // --- 电话号码严格验证 ---
         $phoneParts = explode('-', $contactRaw);
         if (count($phoneParts) != 2) {
             $errorMessage = "Invalid phone number format. Must contain '-' (e.g., 12-3456789).";
@@ -351,6 +372,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
             if (strlen($backDigits) < 7 || strlen($backDigits) > 8) {
                 $errorMessage = "Invalid phone number: There must be 7 or 8 digits after the hyphen (-).";
             }
+        }
+    }
+
+    // --- NEW: IC vs DOB Check for Update ---
+    if (!isset($errorMessage)) {
+        if (!validateIcDobMatch($icNumber, $dob)) {
+            $errorMessage = "IC Number and Date of Birth do not match.";
         }
     }
 
@@ -511,7 +539,6 @@ $malaysiaStates = [
     'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'
 ];
 
-// ⚠️ 已删除 $conn->close(); 以修复 "mysqli object is already closed" 错误
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -596,7 +623,7 @@ $malaysiaStates = [
         
         .form-input, .form-select, .form-textarea { width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; transition: 0.3s; }
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
-        .form-input:read-only, .form-textarea:read-only { background-color: #f8f9fa; color: #555; cursor: default; }
+        .form-input:read-only, .form-textarea:read-only { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; }
 
         .file-upload { text-align: center; margin-bottom: 20px; }
         .profile-picture-preview { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #f8f9fa; margin: 0 auto 15px; background: #eee; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
@@ -1185,7 +1212,14 @@ $malaysiaStates = [
         function removeImage(inputId, containerId, infoId, originalSrc = null) { document.getElementById(inputId).value = ''; if(infoId) document.getElementById(infoId).style.display = 'none'; const container = document.getElementById(containerId); if (originalSrc) { container.innerHTML = `<img src="${originalSrc}" alt="Preview">`; } else { container.innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; } }
 
         // --- Modal Control Functions ---
-        function openAddAdminModal() { document.getElementById('addAdminModal').style.display = 'flex'; }
+        function openAddAdminModal() { 
+            const dob = document.getElementById('dob');
+            dob.readOnly = false;
+            dob.style.backgroundColor = "";
+            dob.style.color = "";
+            dob.style.cursor = "";
+            document.getElementById('addAdminModal').style.display = 'flex'; 
+        }
         function closeAddAdminModal() { 
             document.getElementById('addAdminModal').style.display = 'none'; 
             document.getElementById('addAdminForm').reset();
@@ -1203,14 +1237,17 @@ $malaysiaStates = [
             if(cleanContact.startsWith('+60')) cleanContact = cleanContact.substring(3);
             document.getElementById('edit_contact').value = cleanContact;
             
+            // Trigger IC Input to check for DOB locking
             let icInput = document.getElementById('edit_ic_number');
             icInput.value = admin.Admin_ICNUMBER;
             if (typeof icInput.dispatchEvent === "function") {
                  icInput.dispatchEvent(new Event('input'));
             }
+
+            // Set DOB explicitly if IC input logic didn't auto-fill it (e.g. old data)
+            const dobInput = document.getElementById('edit_dob');
+            if(admin.Admin_DOB) dobInput.value = new Date(admin.Admin_DOB).toISOString().split('T')[0];
             
-            const dobDate = new Date(admin.Admin_DOB);
-            document.getElementById('edit_dob').value = dobDate.toISOString().split('T')[0];
             document.getElementById('edit_address1').value = admin.Admin_Address1;
             document.getElementById('edit_address2').value = admin.Admin_Address2;
             document.getElementById('edit_address3').value = admin.Admin_Address3;
@@ -1311,18 +1348,38 @@ $malaysiaStates = [
                 if (val.length > 8) newVal += '-' + val.substring(8, 12);
                 this.value = newVal;
                 
-                if (val.length >= 6 && dobInput) {
+                // --- NEW: Logic to Auto-Fill and Lock DOB ---
+                if (val.length >= 6) {
                     const yy = parseInt(val.substring(0, 2)); 
                     const mm = val.substring(2, 4); 
                     const dd = val.substring(4, 6);
                     const prefix = (yy > (new Date().getFullYear() % 100)) ? '19' : '20';
                     const fullDate = `${prefix}${val.substring(0, 2)}-${mm}-${dd}`;
                     const dateObj = new Date(fullDate);
-                    if (!isNaN(dateObj.getTime())) { 
-                        dobInput.value = fullDate; 
+                    
+                    if (!isNaN(dateObj.getTime()) && parseInt(mm) >= 1 && parseInt(mm) <= 12 && parseInt(dd) >= 1 && parseInt(dd) <= 31) { 
+                        dobInput.value = fullDate;
+                        // Lock the field
+                        dobInput.readOnly = true;
+                        dobInput.style.backgroundColor = "#e9ecef";
+                        dobInput.style.color = "#6c757d";
+                        dobInput.style.cursor = "not-allowed";
+
                         if (inputId === 'ic_number') validateAge('dob', 'ageError');
                         if (inputId === 'edit_ic_number') validateAge('edit_dob', 'editAgeError');
+                    } else {
+                        // Invalid date, allow manual
+                        dobInput.readOnly = false;
+                        dobInput.style.backgroundColor = "";
+                        dobInput.style.color = "";
+                        dobInput.style.cursor = "";
                     }
+                } else {
+                    // IC too short, unlock
+                    dobInput.readOnly = false;
+                    dobInput.style.backgroundColor = "";
+                    dobInput.style.color = "";
+                    dobInput.style.cursor = "";
                 }
             });
         }

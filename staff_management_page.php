@@ -98,31 +98,53 @@ function handleProfileUpload($file) {
     return null;
 }
 
-// --- HELPER: Generate Strong Random Password (Updated) ---
+// --- HELPER: Generate Strong Random Password ---
 function generateStrongRandomPassword($length = 12) {
     $upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     $lower = "abcdefghijklmnopqrstuvwxyz";
     $numbers = "0123456789";
     $symbols = "!@#$%^&*()";
     
-    // 确保每种类型至少有一个
     $password = "";
     $password .= $upper[rand(0, strlen($upper) - 1)];
     $password .= $lower[rand(0, strlen($lower) - 1)];
     $password .= $numbers[rand(0, strlen($numbers) - 1)];
     $password .= $symbols[rand(0, strlen($symbols) - 1)];
     
-    // 填充剩余长度
     $allChars = $upper . $lower . $numbers . $symbols;
     for ($i = 0; $i < $length - 4; $i++) {
         $password .= $allChars[rand(0, strlen($allChars) - 1)];
     }
     
-    // 打乱顺序
     return str_shuffle($password);
 }
 
-// --- 1. Handle Add Staff (UPDATED WITH AUTO PASSWORD & EMAIL) ---
+// --- HELPER: Validate IC match DOB (Server Side) ---
+function validateIcDobMatch($ic, $dob) {
+    // 移除所有非数字字符
+    $cleanIc = preg_replace('/[^0-9]/', '', $ic);
+    
+    // 如果 IC 长度不足以提取日期，返回 true (交给其他逻辑判断格式错误) 或 false
+    if (strlen($cleanIc) < 6) return false;
+
+    $y = substr($cleanIc, 0, 2);
+    $m = substr($cleanIc, 2, 2);
+    $d = substr($cleanIc, 4, 2);
+
+    // 推测世纪 (Standard Malaysia IC logic)
+    $currentYearShort = date('y');
+    $century = ($y > $currentYearShort) ? '19' : '20';
+    $icDate = $century . $y . '-' . $m . '-' . $d;
+
+    // 检查日期是否有效 (比如 02-30 是无效的)
+    if (!checkdate((int)$m, (int)$d, (int)($century . $y))) {
+        return false;
+    }
+
+    return $icDate === $dob;
+}
+
+// --- 1. Handle Add Staff ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
     $fullName = mysqli_real_escape_string($conn, trim($_POST['full_name']));
     $email = mysqli_real_escape_string($conn, trim($_POST['email']));
@@ -145,7 +167,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
     $status = mysqli_real_escape_string($conn, $_POST['status']);
     $comment = mysqli_real_escape_string($conn, $_POST['comment']);
     
-    // Check who is adding (Admin or Staff)
     $adminId = isset($_SESSION['admin_id']) ? $_SESSION['admin_id'] : (isset($_SESSION['staff_id']) ? $_SESSION['staff_id'] : 1);
 
     $profilePicturePath = null;
@@ -166,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
     elseif (strpos($email, '@') === false) { $errorMessage = "Invalid email: Missing '@' symbol."; }
     elseif (!preg_match('/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) { $errorMessage = "Invalid email: Missing valid domain extension (e.g. .com)."; }
     else {
-        // --- Phone Validation ---
+        // Phone Validation
         $phoneParts = explode('-', $contactRaw);
         if (count($phoneParts) != 2) {
             $errorMessage = "Invalid phone number format. Must contain '-' (e.g., 12-3456789).";
@@ -174,6 +195,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
             $backDigits = $phoneParts[1];
             if (strlen($backDigits) < 7 || strlen($backDigits) > 8) {
                 $errorMessage = "Invalid phone number: There must be 7 or 8 digits after the hyphen (-).";
+            }
+        }
+
+        // --- NEW: IC vs DOB Check ---
+        if (!isset($errorMessage)) {
+            if (!validateIcDobMatch($icNumber, $dob)) {
+                $errorMessage = "IC Number and Date of Birth do not match.";
             }
         }
 
@@ -193,10 +221,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
                 if ($emailResult && $emailResult->num_rows > 0) {
                     $errorMessage = "Email already exists in the system.";
                 } else {
-                    // --- 1. GENERATE STRONG PASSWORD ---
                     $rawPassword = generateStrongRandomPassword(12);
                     $hashedPassword = password_hash($rawPassword, PASSWORD_DEFAULT);
-                    $isFirstLogin = 1; // 强制首次登录修改密码
+                    $isFirstLogin = 1;
 
                     $dbProfilePic = $profilePicturePath ? "'$profilePicturePath'" : "NULL";
 
@@ -215,23 +242,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
                     )";
                     
                     if ($conn->query($sql)) {
-                        // --- 2. SEND EMAIL VIA PHPMAILER ---
                         $mail = new PHPMailer(true);
                         try {
-                            // Server settings
                             $mail->isSMTP();
                             $mail->Host       = 'smtp.gmail.com';
                             $mail->SMTPAuth   = true;
-                            $mail->Username   = 'lovebridge1201@gmail.com'; // 你的邮箱
-                            $mail->Password   = 'odaj iwrz gfrt vven';      // 你的 App Password
+                            $mail->Username   = 'lovebridge1201@gmail.com'; 
+                            $mail->Password   = 'odaj iwrz gfrt vven';      
                             $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
                             $mail->Port       = 465;
 
-                            // Recipients
                             $mail->setFrom('lovebridge1201@gmail.com', 'Love Bridge Admin');
                             $mail->addAddress($email, $fullName);
 
-                            // Content
                             $mail->isHTML(true);
                             $mail->Subject = 'Welcome to Love Bridge - Your Login Details';
                             $mail->Body    = "
@@ -245,8 +268,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
                                     </div>
 
                                     <p><strong>Important:</strong> For security reasons, you will be required to create a new password immediately upon your first login.</p>
-                                    
-                                    <p style='margin-top: 30px; font-size: 12px; color: #888;'>If you have any issues, please contact the system administrator.</p>
                                 </div>
                             ";
 
@@ -263,13 +284,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
         }
     }
     
-    if (!empty($successMessage)) {
-        header("Location: staff_management_page.php?success=" . urlencode($successMessage));
-        exit();
-    } elseif (!empty($errorMessage)) {
-        header("Location: staff_management_page.php?error=" . urlencode($errorMessage));
-        exit();
-    }
+    if (!empty($successMessage)) { header("Location: staff_management_page.php?success=" . urlencode($successMessage)); exit(); }
+    elseif (!empty($errorMessage)) { header("Location: staff_management_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
 
 // --- 2. Handle Update Staff ---
@@ -310,46 +326,45 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_staff'])) {
         }
     }
 
-    // --- SERVER SIDE VALIDATION ---
     if (empty($fullName) || empty($email) || empty($contactRaw) || empty($icNumber) || empty($dob)) {
         $errorMessage = "All required fields must be filled.";
     } else {
-        $sql = "UPDATE staff SET 
-                Staff_FullName = '$fullName', 
-                Staff_ContactNumber = '$contact', 
-                Staff_ICNumber = '$icNumber', 
-                Staff_Email = '$email',
-                Staff_DOB = '$dob',
-                Staff_Address1 = '$address1',
-                Staff_Address2 = '$address2',
-                Staff_Address3 = '$address3',
-                Staff_City = '$city',
-                Staff_State = '$state',
-                Staff_PostalCode = '$postalCode',
-                Staff_Country = '$country',
-                Staff_Role = '$role',
-                Staff_Status = '$status',
-                Staff_Comment = '$comment'
-                $imageUpdateSQL
-                WHERE Staff_ID = $staffId";
-        
-        if ($conn->query($sql)) {
-            $successMessage = "Staff updated successfully!";
+        // --- NEW: IC vs DOB Check for Update ---
+        if (!validateIcDobMatch($icNumber, $dob)) {
+            $errorMessage = "IC Number and Date of Birth do not match.";
         } else {
-            $errorMessage = "Error updating staff: " . $conn->error;
+            $sql = "UPDATE staff SET 
+                    Staff_FullName = '$fullName', 
+                    Staff_ContactNumber = '$contact', 
+                    Staff_ICNumber = '$icNumber', 
+                    Staff_Email = '$email',
+                    Staff_DOB = '$dob',
+                    Staff_Address1 = '$address1',
+                    Staff_Address2 = '$address2',
+                    Staff_Address3 = '$address3',
+                    Staff_City = '$city',
+                    Staff_State = '$state',
+                    Staff_PostalCode = '$postalCode',
+                    Staff_Country = '$country',
+                    Staff_Role = '$role',
+                    Staff_Status = '$status',
+                    Staff_Comment = '$comment'
+                    $imageUpdateSQL
+                    WHERE Staff_ID = $staffId";
+            
+            if ($conn->query($sql)) {
+                $successMessage = "Staff updated successfully!";
+            } else {
+                $errorMessage = "Error updating staff: " . $conn->error;
+            }
         }
     }
     
-    if (!empty($successMessage)) {
-        header("Location: staff_management_page.php?success=" . urlencode($successMessage));
-        exit();
-    } elseif (!empty($errorMessage)) {
-        header("Location: staff_management_page.php?error=" . urlencode($errorMessage));
-        exit();
-    }
+    if (!empty($successMessage)) { header("Location: staff_management_page.php?success=" . urlencode($successMessage)); exit(); }
+    elseif (!empty($errorMessage)) { header("Location: staff_management_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
 
-// --- 3. Handle Change Password (Manual via Admin) ---
+// --- 3. Handle Change Password ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
     $targetStaffId = mysqli_real_escape_string($conn, $_POST['target_staff_id']);
     $authPassword = $_POST['auth_password']; 
@@ -372,35 +387,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
         } else {
             $newHashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
             $updatePassSql = "UPDATE staff SET Staff_Password = '$newHashedPassword' WHERE Staff_ID = $targetStaffId";
-            
-            if ($conn->query($updatePassSql)) {
-                $successMessage = "Staff password changed successfully!";
-            } else {
-                $errorMessage = "Error changing password: " . $conn->error;
-            }
+            if ($conn->query($updatePassSql)) { $successMessage = "Staff password changed successfully!"; } 
+            else { $errorMessage = "Error changing password: " . $conn->error; }
         }
-    } else {
-        $errorMessage = "Authorization failed: Only Admin can change passwords here.";
-    }
+    } else { $errorMessage = "Authorization failed: Only Admin can change passwords here."; }
     
     if (!empty($successMessage)) { header("Location: staff_management_page.php?success=" . urlencode($successMessage)); exit(); }
     elseif (!empty($errorMessage)) { header("Location: staff_management_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
 
-// --- 4. Handle BLOCK Staff (SOFT DELETE) ---
+// --- 4. Handle BLOCK Staff ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['block_staff'])) {
     $blockId = intval($_POST['block_staff_id']);
     $blockSql = "UPDATE staff SET Is_Deleted = 1 WHERE Staff_ID = $blockId";
-    
     if ($conn->query($blockSql)) {
-        $successMessage = "Staff blocked successfully! They have been moved to the Blocked Staff list.";
-        header("Location: staff_management_page.php?success=" . urlencode($successMessage));
-        exit();
+        header("Location: staff_management_page.php?success=" . urlencode("Staff blocked successfully!"));
     } else {
-        $errorMessage = "Error blocking staff: " . $conn->error;
-        header("Location: staff_management_page.php?error=" . urlencode($errorMessage));
-        exit();
+        header("Location: staff_management_page.php?error=" . urlencode("Error blocking staff: " . $conn->error));
     }
+    exit();
 }
 
 // --- Get Admin/User Info ---
@@ -560,7 +565,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
         .form-label { display: block; margin-bottom: 5px; font-weight: 500; color: var(--dark); font-size: 14px;}
         .form-input, .form-select, .form-textarea { width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; transition: 0.3s; }
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
-        .form-input:read-only, .form-textarea:read-only { background-color: #f8f9fa; color: #555; cursor: default; }
+        .form-input:read-only, .form-textarea:read-only { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; } /* Updated styling for readonly */
         
         .required { color: red; margin-left: 3px; font-weight: bold; }
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
@@ -1155,7 +1160,8 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                 if (val.length > 8) { newVal += '-' + val.substring(8, 12); }
                 this.value = newVal;
 
-                if (val.length >= 6 && dobInput) {
+                // --- NEW: Logic to Auto-Fill and Lock DOB ---
+                if (val.length >= 6) {
                     const yearPrefix = parseInt(val.substring(0, 2));
                     const month = val.substring(2, 4);
                     const day = val.substring(4, 6);
@@ -1165,9 +1171,28 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                     
                     if (parseInt(month) >= 1 && parseInt(month) <= 12 && parseInt(day) >= 1 && parseInt(day) <= 31) {
                         dobInput.value = `${fullYear}-${month}-${day}`;
+                        
+                        // Lock the field
+                        dobInput.readOnly = true;
+                        dobInput.style.backgroundColor = "#e9ecef";
+                        dobInput.style.color = "#6c757d";
+                        dobInput.style.cursor = "not-allowed";
+
                         if(dobInputId === 'dob') validateAge('dob', 'ageError');
                         else validateAge('edit_dob', 'editAgeError');
+                    } else {
+                        // Invalid date derived, allow manual or keep blank
+                        dobInput.readOnly = false;
+                        dobInput.style.backgroundColor = "";
+                        dobInput.style.color = "";
+                        dobInput.style.cursor = "";
                     }
+                } else {
+                    // IC too short, unlock field
+                    dobInput.readOnly = false;
+                    dobInput.style.backgroundColor = "";
+                    dobInput.style.color = "";
+                    dobInput.style.cursor = "";
                 }
             });
         }
@@ -1284,7 +1309,16 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
             document.getElementById('viewStaffModal').style.display = 'flex';
         }
 
-        function openAddStaffModal() { document.getElementById('addStaffModal').style.display = 'flex'; }
+        function openAddStaffModal() { 
+            // Ensure DOB is unlocked initially
+            const dob = document.getElementById('dob');
+            dob.readOnly = false;
+            dob.style.backgroundColor = "";
+            dob.style.color = "";
+            dob.style.cursor = "";
+
+            document.getElementById('addStaffModal').style.display = 'flex'; 
+        }
         function closeAddStaffModal() {
             document.getElementById('addStaffModal').style.display = 'none';
             document.getElementById('addStaffForm').reset();
@@ -1302,11 +1336,15 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
             pInput.value = staff.Staff_ContactNumber.replace('+60', '');
             pInput.dispatchEvent(new Event('input')); 
 
+            // Trigger IC Input Logic to potentially lock DOB
             const icInput = document.getElementById('edit_ic_number');
             icInput.value = staff.Staff_ICNumber;
             icInput.dispatchEvent(new Event('input')); 
 
-            document.getElementById('edit_dob').value = staff.Staff_DOB;
+            // Explicitly set DOB if IC didn't (e.g. invalid/old format)
+            const dobInput = document.getElementById('edit_dob');
+            if(staff.Staff_DOB) dobInput.value = staff.Staff_DOB;
+
             document.getElementById('edit_address1').value = staff.Staff_Address1;
             document.getElementById('edit_address2').value = staff.Staff_Address2;
             document.getElementById('edit_address3').value = staff.Staff_Address3;
