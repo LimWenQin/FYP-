@@ -503,7 +503,7 @@ include 'header_UI.php';
                     confirmButtonText: 'Update Profile',
                     confirmButtonColor: '#cd4e4eff',
                 }).then((result) => {
-                    if (result.isConfirmed) window.location.href = 'Track_Records.php';
+                    if (result.isConfirmed) window.location.href = 'Profile.php';
                 });
                 return;
             }
