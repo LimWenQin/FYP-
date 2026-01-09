@@ -3,99 +3,138 @@ session_start();
 include 'dataconnection.php';
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
-// 1. 安全检查：确保有登录且有 Session 数据
-if (!isset($_SESSION['donor_id']) || empty($_SESSION['donation_data'])) {
-    header("Location: Donate_Page.php");
+// 1. 检查登录
+if (!isset($_SESSION['donor_id'])) {
+    echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
     exit();
 }
 
 $current_donor_id = $_SESSION['donor_id'];
-$data = $_SESSION['donation_data']; // 获取之前步骤存下的所有数据
 
-$amount = $data['amount'];
-$branch_id = $data['branch_id'] ?: null;
-$case_id = $data['case_id'] ?: null;
-$activity_id = $data['activity_id'] ?: null;
-$tax_status = ($data['tax_receipt'] == '1') ? 'Requested' : 'Not_Requested';
-$donation_type = $data['type']; // One-time or Monthly
+// 2. 检查 Session 数据
+if (empty($_SESSION['donation_data'])) {
+    header("Location: Donate_Page.php");
+    exit();
+}
 
-// 2. 获取用户最新余额和个人资料 (用于 Order 表)
-$stmt = $conn->prepare("SELECT Donor_Wallet, Donor_Name, Donor_Email, Donor_ContactNumber, Donor_ICNumber FROM donor WHERE Donor_ID = ?");
+// 提取数据
+$sess_data = $_SESSION['donation_data'];
+$amount = $sess_data['amount'];
+$donation_type = $sess_data['type'];
+// 确保这些 ID 是 null 而不是空字符串，防止 SQL 报错
+$branch_id = !empty($sess_data['branch_id']) ? $sess_data['branch_id'] : null;
+$case_id = !empty($sess_data['case_id']) ? $sess_data['case_id'] : null;
+$activity_id = !empty($sess_data['activity_id']) ? $sess_data['activity_id'] : null;
+
+// 3. 再次检查余额
+$stmt = $conn->prepare("SELECT Donor_Wallet FROM donor WHERE Donor_ID = ?");
 $stmt->bind_param("i", $current_donor_id);
 $stmt->execute();
-$user = $stmt->get_result()->fetch_assoc();
+$res = $stmt->get_result()->fetch_assoc();
+$current_balance = $res['Donor_Wallet'];
 $stmt->close();
 
-// 3. 双重验证余额 (防止黑客绕过前端 JS)
-if ($user['Donor_Wallet'] < $amount) {
-    echo "<script>alert('Transaction Failed: Insufficient Balance.'); window.location.href='Payment_Ways_Page.php';</script>";
+if ($current_balance < $amount) {
+    echo "<script>alert('Insufficient wallet balance. Please top up.'); window.location.href='My_Wallet.php';</script>";
     exit();
 }
 
 // ==========================================
-// 开始处理交易
+// 4. 执行扣款和记录
 // ==========================================
 
-// A. 扣除钱包余额
-$new_balance = $user['Donor_Wallet'] - $amount;
-$update_wallet = $conn->prepare("UPDATE donor SET Donor_Wallet = ? WHERE Donor_ID = ?");
-$update_wallet->bind_param("di", $new_balance, $current_donor_id);
-$update_wallet->execute();
-$update_wallet->close();
+// A. 扣除余额
+$new_balance = $current_balance - $amount;
+$upd_stmt = $conn->prepare("UPDATE donor SET Donor_Wallet = ? WHERE Donor_ID = ?");
+$upd_stmt->bind_param("di", $new_balance, $current_donor_id);
+$upd_stmt->execute();
+$upd_stmt->close();
 
-// B. 生成交易详情
-$txn_ref = "TXN-EW-" . date("YmdHis"); // EW 代表 E-Wallet 支付
+// 获取用户信息
+$u_sql = "SELECT Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?";
+$u_stmt = $conn->prepare($u_sql);
+$u_stmt->bind_param("i", $current_donor_id);
+$u_stmt->execute();
+$user_data = $u_stmt->get_result()->fetch_assoc();
+$u_stmt->close();
+
+// === [关键修复] 定义所有变量，避免 bind_param 报错 ===
+$txn_ref = "TXN-EW-" . date("YmdHis");
 $now = date("Y-m-d H:i:s");
 $status = "Success";
 $payment_method = "E-Wallet";
 
-// C. 插入 Payment 表
-// 这里 Bank Name 写 "LoveBridge Wallet", Masked 写 "WALLET-BAL" 以示区分
-$stmt_pay = $conn->prepare("INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At) VALUES (?, ?, ?, ?, ?, 'LoveBridge Wallet', 'WALLET-BAL', ?)");
-$stmt_pay->bind_param("sssisss", $payment_method, $status, $txn_ref, $amount, $now, $now);
-$stmt_pay->execute();
-$payment_id = $stmt_pay->insert_id;
-$stmt_pay->close();
+// B. 插入 Payment 表
+$sql_pay = "INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Created_At) VALUES (?, ?, ?, ?, ?, ?)";
+$stmt = $conn->prepare($sql_pay);
+$stmt->bind_param("sssiss", $payment_method, $status, $txn_ref, $amount, $now, $now);
+$stmt->execute();
+$payment_id = $stmt->insert_id;
+$stmt->close();
 
-// D. 插入 Orders 表
+// C. 插入 Orders 表
+// 准备所有变量 (解决 Reference 错误的关键)
+$full_name = $user_data['Donor_Name'];
+$contact_num = $user_data['Donor_ContactNumber'];
+$ic_num = $user_data['Donor_ICNumber'];
+$email = $user_data['Donor_Email'];
 $order_type = ($donation_type == "monthly") ? "Recurring" : "One-time";
+$order_status = "Completed";
+$tax_status = ($sess_data['tax_receipt'] == '1') ? 'Requested' : 'Not_Requested';
 
-$stmt_ord = $conn->prepare("INSERT INTO orders 
+$sql_ord = "INSERT INTO orders 
     (Order_Name, Order_ContactNumber, Order_ICNumber, Order_Email, 
      Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, 
-     Order_TXN_Ref, Order_Type, Order_Status, Tax_Receipt_Status, 
-     Order_Created_At, Order_Updated_At, Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID) 
-    VALUES (?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+     Order_TXN_Ref, Order_Type, Order_Status, Tax_Receipt_Status, Order_Created_At, Order_Updated_At, 
+     Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID)
+    VALUES (?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-$stmt_ord->bind_param("ssssdssssssssiiiii", 
-    $user['Donor_Name'], $user['Donor_ContactNumber'], $user['Donor_ICNumber'], $user['Donor_Email'], 
-    $amount, $payment_method, $status, $txn_ref, $order_type, "Completed", $tax_status, 
-    $now, $now, $current_donor_id, $payment_id, $branch_id, $activity_id, $case_id
+$stmt = $conn->prepare($sql_ord);
+
+// 这里所有的参数现在都是变量了，不会再报错
+$stmt->bind_param("ssssdssssssssiiiii", 
+    $full_name, 
+    $contact_num, 
+    $ic_num, 
+    $email, 
+    $amount, 
+    $payment_method, 
+    $status, 
+    $txn_ref, 
+    $order_type, 
+    $order_status, 
+    $tax_status, 
+    $now, 
+    $now, 
+    $current_donor_id, 
+    $payment_id, 
+    $branch_id, 
+    $activity_id, 
+    $case_id
 );
-$stmt_ord->execute();
-$stmt_ord->close();
+$stmt->execute();
+$stmt->close();
 
-// E. 插入 Recurring 表 (如果是月捐)
+// D. 插入 Recurring (如果是月捐)
 if ($donation_type == "monthly") {
     $deduction_date = date("Y-m-d", strtotime("+1 month"));
-    $stmt_rec = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?)");
-    $stmt_rec->bind_param("dssssiiii", $amount, $payment_method, $deduction_date, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
-    $stmt_rec->execute();
-    $stmt_rec->close();
+    $recurring_status = 'Active'; // 定义为变量
+
+    $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("dsssssiiii", $amount, $payment_method, $deduction_date, $recurring_status, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
+    $stmt->execute();
+    $stmt->close();
 }
 
-// F. 更新项目筹款进度 (Raised Amount)
-if ($case_id) {
+// E. 更新筹款进度
+if ($case_id != null) {
     $conn->query("UPDATE special_case SET Raised_Amount = Raised_Amount + $amount WHERE Case_ID = $case_id");
 }
-if ($activity_id) {
+if ($activity_id != null) {
     $conn->query("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + $amount WHERE Activity_ID = $activity_id");
 }
 
-// 4. 完成后清空 Session 数据 (可选，防止后退重复提交)
-// unset($_SESSION['donation_data']);
-
-// 5. 跳转至成功页面
+// F. 跳转到结算页
 header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
 exit();
 ?>
