@@ -375,7 +375,7 @@ include 'header_UI.php';
                 confirmButtonText: 'View My Wallet'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    window.location.href = 'My_Wallet.php';
+                    window.location.href = 'E_Wallet.php';
                 }
             });
         });
