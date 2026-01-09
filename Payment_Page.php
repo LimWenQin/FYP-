@@ -35,7 +35,8 @@ $special_case = $case_res->fetch_assoc();
 // ==========================================
 // 2. 获取即将开始的 Activity (取1个)
 // ==========================================
-$act_sql = "SELECT * FROM activity WHERE Activity_Status = 'Active' AND Activity_Date >= CURDATE() ORDER BY Activity_Date ASC LIMIT 1";
+// 注意：根据你的数据库，有些 Activity_Date 是 NULL，这里为了保险添加了 OR Activity_StartDate 的判断
+$act_sql = "SELECT * FROM activity WHERE Activity_Status = 'Active' AND (Activity_Date >= CURDATE() OR Activity_StartDate >= CURDATE()) ORDER BY Activity_StartDate ASC LIMIT 1";
 $act_res = $conn->query($act_sql);
 $activity = $act_res->fetch_assoc();
 
@@ -106,7 +107,7 @@ include 'header_UI.php';
         border-radius: 12px;
         overflow: hidden;
         box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-        display: flex;
+        display: flex; /* Flexbox: 核心，让子元素左右排列 */
         border: 1px solid #f0f0f0;
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         margin-bottom: 50px; /* 区块间距 */
@@ -143,11 +144,12 @@ include 'header_UI.php';
     .btn-support {
         padding: 12px 25px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; transition: 0.2s;
         display: inline-flex; align-items: center; gap: 10px; width: fit-content; font-size: 1rem;
+        text-decoration: none; /* 确保a标签没下划线 */
     }
     .btn-case { background: #dc2626; color: white; box-shadow: 0 4px 10px rgba(220, 38, 38, 0.3); }
-    .btn-case:hover { background: #b91c1c; transform: translateY(-2px); }
+    .btn-case:hover { background: #b91c1c; transform: translateY(-2px); color: white; }
     .btn-act { background: #2563eb; color: white; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
-    .btn-act:hover { background: #1d4ed8; transform: translateY(-2px); }
+    .btn-act:hover { background: #1d4ed8; transform: translateY(-2px); color: white; }
 
     /* Form Styles (Small details) */
     .type-group { display: flex; margin-bottom: 20px; border: 1px solid #cd4e4eff; border-radius: 5px; overflow: hidden; }
@@ -273,12 +275,12 @@ include 'header_UI.php';
         ?>
         <div class="showcase-block">
             <div class="showcase-img-box">
-                <img src="<?php echo htmlspecialchars($special_case['Case_Image']); ?>" alt="Case" class="showcase-img">
+                <img src="<?php echo !empty($special_case['Case_Image']) ? htmlspecialchars($special_case['Case_Image']) : 'images/default_case.jpg'; ?>" alt="Case" class="showcase-img">
             </div>
             <div class="showcase-content">
                 <span class="badge-tag tag-case">Featured Case</span>
                 <h3 class="sc-title"><?php echo htmlspecialchars($special_case['Case_Title']); ?></h3>
-                <p class="sc-desc"><?php echo htmlspecialchars($special_case['Case_Description']); ?></p>
+                <p class="sc-desc"><?php echo htmlspecialchars(substr($special_case['Case_Description'], 0, 150)) . '...'; ?></p>
                 
                 <div class="progress-wrap">
                     <div class="progress-bar-bg">
@@ -290,34 +292,38 @@ include 'header_UI.php';
                     </div>
                 </div>
 
-                <button type="button" class="btn-support btn-case" 
-                    onclick="setDonationTarget('case', <?php echo $special_case['Case_ID']; ?>, '<?php echo addslashes($special_case['Case_Title']); ?>')">
-                    <i class="fas fa-hand-holding-heart"></i> Donate to this Case
-                </button>
+                <a href="Special_case Page.php?case_id=<?php echo $special_case['Case_ID']; ?>" class="btn-support btn-case">
+                    <i class="fas fa-hand-holding-heart"></i> View details for this case
+                </a>
             </div>
         </div>
         <?php endif; ?>
 
-        <?php if ($activity): ?>
+        <?php if ($activity): 
+             // Activity Date Handling
+             $eventDate = !empty($activity['Activity_Date']) ? $activity['Activity_Date'] : $activity['Activity_StartDate'];
+        ?>
         <div class="showcase-block" style="flex-direction: row-reverse;">
             <div class="showcase-img-box">
                 <img src="<?php echo !empty($activity['Activity_Picture']) ? htmlspecialchars($activity['Activity_Picture']) : 'images/activity_default.jpg'; ?>" 
                      alt="Activity" class="showcase-img">
             </div>
             <div class="showcase-content">
-                <span class="badge-tag tag-activity">Upcoming Activity</span>
+                <span class="badge-tag tag-activity">Upcoming Campaign</span>
                 <h3 class="sc-title"><?php echo htmlspecialchars($activity['Activity_Name']); ?></h3>
-                <p class="sc-desc"><?php echo htmlspecialchars($activity['Activity_Details']); ?></p>
+                <p class="sc-desc"><?php echo htmlspecialchars(substr($activity['Activity_Details'], 0, 150)) . '...'; ?></p>
                 
                 <div style="margin-bottom:25px; font-size:1rem; color:#555;">
                     <i class="far fa-calendar-alt" style="color:#2563eb; margin-right:8px;"></i> 
-                    <strong>Event Date:</strong> <?php echo date("l, d M Y", strtotime($activity['Activity_Date'])); ?>
+                    <strong>Event Date:</strong> <?php echo date("l, d M Y", strtotime($eventDate)); ?>
+                    <br>
+                    <i class="fas fa-map-marker-alt" style="color:#2563eb; margin-right:8px; margin-left:2px;"></i>
+                    <strong>Location:</strong> <?php echo htmlspecialchars($activity['Activity_City']); ?>
                 </div>
 
-                <button type="button" class="btn-support btn-act" 
-                    onclick="setDonationTarget('activity', <?php echo $activity['Activity_ID']; ?>, '<?php echo addslashes($activity['Activity_Name']); ?>')">
-                    <i class="fas fa-running"></i> Support Activity
-                </button>
+                <a href="Campaign_Page.php?activity_id=<?php echo $activity['Activity_ID']; ?>" class="btn-support btn-act">
+                    <i class="fas fa-running"></i> View details for this campaign
+                </a>
             </div>
         </div>
         <?php endif; ?>
@@ -372,6 +378,8 @@ include 'header_UI.php';
         }
 
         // 4. 尝试恢复选中的 Case / Activity (如果它们恰好是当前显示的)
+        // 注意：由于修改了跳转逻辑，这里的恢复逻辑在跳转模式下可能不再触发setDonationTarget
+        // 但保留代码以支持直接访问Payment_Page的场景
         const savedCaseId = "<?php echo $sess_case_id; ?>";
         const savedActivityId = "<?php echo $sess_activity_id; ?>";
         const currentCaseId = "<?php echo $special_case['Case_ID'] ?? ''; ?>";
@@ -412,11 +420,6 @@ include 'header_UI.php';
         const offsetPosition = elementPosition - offset;
 
         window.scrollTo({ top: offsetPosition, behavior: "smooth" });
-        
-        // 只有当不是页面自动恢复时才弹窗 (判断 title 是否为空)
-        if(name) {
-             // 简单的 Check: 如果是用户点击触发的
-        }
     }
 
     function resetForm() {
