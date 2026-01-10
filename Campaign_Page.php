@@ -49,13 +49,13 @@ include 'header_UI.php';
         /* Header Styles */
         .campaign-header {
             /* 修改部分：背景图片 + 红色遮罩 */
-            background: linear-gradient(rgba(228, 168, 167, 0.85), rgba(123, 110, 110, 0.85)), url('https://images.unsplash.com/photo-1559027615-cd4628902d4a?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80');
+            background: linear-gradient(rgb(108 99 98 / 85%), rgb(108 99 98 / 85%)), url(https://images.unsplash.com/photo-1559027615-cd4628902d4a?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80);
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
             
             color: white;
-            padding: 60px 0;
+            padding: 80px 20px;
             text-align: center;
             position: relative;
             overflow: hidden;
