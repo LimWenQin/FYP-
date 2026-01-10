@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'approve') {
         // --- APPROVE 逻辑 ---
         
-        // 1. 获取详细信息 (!!! 关键修复：加入了 o.Order_TXN_Ref !!!)
+        // 1. 获取详细信息
         $sql = "SELECT p.*, o.Order_ID, o.Order_TXN_Ref, o.Order_Amount, o.Order_Type, o.Order_Status, o.Branch_ID, o.Case_ID, o.Order_Created_At, o.Donor_ID,
                        d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber, d.Donor_Address1, d.Donor_Address2, d.Donor_City, d.Donor_State, d.Donor_PostalCode
                 FROM orders o 
@@ -97,16 +97,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // 更新 Order 状态
                 $conn->query("UPDATE orders SET Tax_Receipt_Status = 'Generated' WHERE Order_ID = $order_id");
 
-                echo "<script>alert('Receipt Approved & Sent Successfully!'); window.location.href='admin_receipts.php';</script>";
+                // 设置 Session 消息 (Success)
+                $_SESSION['alert'] = [
+                    'type' => 'success',
+                    'title' => 'Success!',
+                    'text' => 'Receipt Approved & Sent Successfully!'
+                ];
             } else {
-                echo "<script>alert('Error: Email sending failed. Please check your internet connection or SMTP settings.'); window.location.href='admin_receipts.php';</script>";
+                // 设置 Session 消息 (Error)
+                $_SESSION['alert'] = [
+                    'type' => 'error',
+                    'title' => 'Failed!',
+                    'text' => 'Error: Email sending failed. Please check your internet connection or SMTP settings.'
+                ];
             }
         }
+        // 重定向回当前页面以显示提示
+        header("Location: admin_receipts.php");
+        exit();
 
     } elseif ($action === 'reject') {
         // --- REJECT 逻辑 ---
         $conn->query("UPDATE orders SET Tax_Receipt_Status = 'Rejected' WHERE Order_ID = $order_id");
-        echo "<script>alert('Request Rejected.'); window.location.href='admin_receipts.php';</script>";
+        
+        // 设置 Session 消息 (Info)
+        $_SESSION['alert'] = [
+            'type' => 'info',
+            'title' => 'Rejected',
+            'text' => 'Tax receipt request has been rejected.'
+        ];
+        header("Location: admin_receipts.php");
+        exit();
     }
 }
 
@@ -139,6 +160,7 @@ $result_pending = $conn->query($sql_pending);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tax Receipt Requests - Love Bridge</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="admin_common.css">
     
     <style>
@@ -241,16 +263,18 @@ $result_pending = $conn->query($sql_pending);
                                             <i class="fas fa-eye"></i> View
                                         </button>
 
-                                        <form method="POST" style="display:inline-block;" onsubmit="return confirm('Approve request and send email?');">
+                                        <form method="POST" style="display:inline-block;" class="approve-form">
                                             <input type="hidden" name="order_id" value="<?php echo $row['Order_ID']; ?>">
-                                            <button type="submit" name="action" value="approve" class="btn btn-success">
+                                            <input type="hidden" name="action" value="approve">
+                                            <button type="button" class="btn btn-success" onclick="confirmApprove(this.form)">
                                                 <i class="fas fa-check"></i> Send
                                             </button>
                                         </form>
 
-                                        <form method="POST" style="display:inline-block;" onsubmit="return confirm('Reject request?');">
+                                        <form method="POST" style="display:inline-block;" class="reject-form">
                                             <input type="hidden" name="order_id" value="<?php echo $row['Order_ID']; ?>">
-                                            <button type="submit" name="action" value="reject" class="btn btn-danger">
+                                            <input type="hidden" name="action" value="reject">
+                                            <button type="button" class="btn btn-danger" onclick="confirmReject(this.form)">
                                                 <i class="fas fa-times"></i> Reject
                                             </button>
                                         </form>
@@ -345,6 +369,63 @@ $result_pending = $conn->query($sql_pending);
                 closeModal();
             }
         }
+
+        // --- 3. SweetAlert2 Confirmation Logic ---
+        
+        // 确认发送（Approve）
+        function confirmApprove(form) {
+            Swal.fire({
+                title: 'Approve & Send?',
+                text: "This will generate the PDF receipt and email it to the donor.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#28a745', // Green
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, Send it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // 显示加载动画
+                    Swal.fire({
+                        title: 'Sending...',
+                        text: 'Please wait while we generate and email the receipt.',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                    form.submit();
+                }
+            });
+        }
+
+        // 确认拒绝（Reject）
+        function confirmReject(form) {
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "This will reject the tax receipt request.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545', // Red
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, Reject it'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+        }
+
+        // --- 4. Display Alert from PHP Session (if any) ---
+        <?php if (isset($_SESSION['alert'])): ?>
+            Swal.fire({
+                icon: '<?php echo $_SESSION['alert']['type']; ?>',
+                title: '<?php echo $_SESSION['alert']['title']; ?>',
+                text: '<?php echo $_SESSION['alert']['text']; ?>',
+                confirmButtonColor: '#F28585'
+            });
+            <?php unset($_SESSION['alert']); // 销毁 Session，防止刷新再次弹出 ?>
+        <?php endif; ?>
+
     </script>
 
 </body>

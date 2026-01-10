@@ -15,7 +15,6 @@ include 'dataconnection.php';
 if (isset($_GET['action']) && $_GET['action'] == 'get_activity_donations' && isset($_GET['activity_id'])) {
     $activityId = intval($_GET['activity_id']);
     
-    // FETCH Order_ID as well for linking
     $sql = "SELECT o.Order_ID, o.Order_Created_At, o.Order_Amount, o.Order_TXN_Ref, d.Donor_Name, d.Donor_Email 
             FROM orders o 
             JOIN donor d ON o.Donor_ID = d.Donor_ID 
@@ -60,20 +59,36 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
     header("Expires: 0");
 
     echo '<table border="1">
-          <tr><th>Activity Name</th><th>Branch</th><th>Status</th><th>Start Date</th><th>End Date</th><th>Location</th><th>Target (RM)</th><th>Raised (RM)</th><th>Details</th></tr>';
+          <tr>
+            <th>ID</th><th>Name</th><th>Venue</th><th>Specific Date</th><th>Start Date</th><th>End Date</th>
+            <th>Organizer</th><th>Contact Name</th><th>Contact Phone</th><th>Contact Email</th>
+            <th>Max Participants</th><th>Status</th><th>Target (RM)</th><th>Raised (RM)</th>
+            <th>Address</th><th>City</th><th>State</th><th>Postcode</th><th>Country</th><th>Branch</th>
+          </tr>';
     
     if ($exportResult && $exportResult->num_rows > 0) {
         while($row = $exportResult->fetch_assoc()) {
             echo '<tr>';
+            echo '<td>' . $row['Activity_ID'] . '</td>';
             echo '<td>' . htmlspecialchars($row['Activity_Name']) . '</td>';
-            echo '<td>' . htmlspecialchars($row['Branch_Name']) . '</td>';
-            echo '<td>' . htmlspecialchars($row['Activity_Status']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_Venue']) . '</td>';
+            echo '<td>' . $row['Activity_Date'] . '</td>';
             echo '<td>' . $row['Activity_StartDate'] . '</td>';
             echo '<td>' . $row['Activity_EndDate'] . '</td>';
-            echo '<td>' . htmlspecialchars($row['Activity_City'] . ', ' . $row['Activity_State']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_Organizer']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_Contact_Name']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_Contact_Number']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_Contact_Email']) . '</td>';
+            echo '<td>' . $row['Activity_Max_Participants'] . '</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_Status']) . '</td>';
             echo '<td>' . $row['Activity_TargetAmount'] . '</td>';
             echo '<td>' . $row['Activity_GetAmount'] . '</td>';
-            echo '<td>' . htmlspecialchars(substr($row['Activity_Description'] ?? '', 0, 100)) . '...</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_Address1'] . ' ' . $row['Activity_Address2'] . ' ' . $row['Activity_Address3']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_City']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_State']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_PostalCode']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_Country']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Branch_Name']) . '</td>';
             echo '</tr>';
         }
     }
@@ -117,33 +132,80 @@ function handleMultiImageUpload($files) {
     return $uploadedPaths;
 }
 
-// --- DATE VALIDATION HELPER ---
-function checkDateConstraints($start, $end) {
-    $startDate = new DateTime($start);
-    $endDate = new DateTime($end);
-    $now = new DateTime();
-    $oneYearLater = (clone $now)->modify('+1 year');
+// --- SERVER-SIDE VALIDATION HELPER ---
+function validateActivityInput($post) {
+    // 1. Name Check (No numbers allowed in Name or Organizer)
+    if (preg_match('/\d/', $post['contact_name'])) return "Contact Name cannot contain numbers.";
+    if (!empty($post['organizer']) && preg_match('/\d/', $post['organizer'])) return "Organizer Name cannot contain numbers.";
 
-    if ($startDate > $oneYearLater) {
-        return "Upcoming activity start date cannot be more than 1 year from today.";
+    // 2. Email Check
+    if (!empty($post['contact_email']) && !filter_var($post['contact_email'], FILTER_VALIDATE_EMAIL)) {
+        return "Invalid Contact Email format.";
     }
+
+    // 3. Date Check
+    $startDate = new DateTime($post['start_date']);
+    $endDate = new DateTime($post['end_date']);
+    $now = new DateTime();
+    
+    // Start date cannot be more than 1 year from today
+    $oneYearLimit = (clone $now)->modify('+1 year');
+    if ($startDate > $oneYearLimit) {
+        return "Start Date cannot be more than 1 year from today.";
+    }
+
+    // Duration check
     $diff = $startDate->diff($endDate);
     if ($diff->days > 365) {
         return "Activity duration cannot exceed 1 year.";
     }
-    return true;
+    
+    if ($endDate < $startDate) {
+        return "End Date cannot be earlier than Start Date.";
+    }
+
+    return true; // Valid
 }
 
 // --- ADD ACTIVITY LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
+    
+    // Server Validation First
+    $validation = validateActivityInput($_POST);
+    if ($validation !== true) {
+        header("Location: activity_management.php?error=" . urlencode($validation));
+        exit();
+    }
+
+    // 1. Basic Info
     $activityName = mysqli_real_escape_string($conn, $_POST['activity_name']);
+    $branchId = mysqli_real_escape_string($conn, $_POST['branch_id']);
+    $activityStatus = mysqli_real_escape_string($conn, $_POST['activity_status']);
+    $description = mysqli_real_escape_string($conn, $_POST['activity_description']);
+    
+    // 2. Financial
+    $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
+    $getAmount = 0.00; 
+
+    // 3. Dates & Venue
     $startDate = mysqli_real_escape_string($conn, $_POST['start_date']);
     $endDate = mysqli_real_escape_string($conn, $_POST['end_date']);
-    $activityDescription = mysqli_real_escape_string($conn, $_POST['activity_description']);
-    $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
-    $branchId = mysqli_real_escape_string($conn, $_POST['branch_id']);
+    $specificDate = !empty($_POST['specific_date']) ? "'" . mysqli_real_escape_string($conn, $_POST['specific_date']) . "'" : "NULL";
+    $venue = !empty($_POST['venue']) ? "'" . mysqli_real_escape_string($conn, $_POST['venue']) . "'" : "NULL";
+
+    // 4. Organizer & Contact
+    $organizer = !empty($_POST['organizer']) ? "'" . mysqli_real_escape_string($conn, $_POST['organizer']) . "'" : "NULL";
+    $contactName = !empty($_POST['contact_name']) ? "'" . mysqli_real_escape_string($conn, $_POST['contact_name']) . "'" : "NULL";
     
-    // Address Fields
+    // Phone Format Logic (+60)
+    $contactRaw = $_POST['contact_number'];
+    $contactNumber = (strpos($contactRaw, '+60') === 0) ? $contactRaw : "+60" . $contactRaw;
+    $contactNumber = !empty($contactNumber) ? "'" . mysqli_real_escape_string($conn, $contactNumber) . "'" : "NULL";
+    
+    $contactEmail = !empty($_POST['contact_email']) ? "'" . mysqli_real_escape_string($conn, $_POST['contact_email']) . "'" : "NULL";
+    $maxParticipants = !empty($_POST['max_participants']) ? intval($_POST['max_participants']) : 0;
+
+    // 5. Address
     $address1 = mysqli_real_escape_string($conn, $_POST['address1']);
     $address2 = mysqli_real_escape_string($conn, $_POST['address2']);
     $address3 = mysqli_real_escape_string($conn, $_POST['address3']);
@@ -152,42 +214,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
     $postalCode = mysqli_real_escape_string($conn, $_POST['postal_code']);
     $country = mysqli_real_escape_string($conn, $_POST['country']);
     
-    $activityStatus = mysqli_real_escape_string($conn, $_POST['activity_status']);
-    
-    // Validation
-    if(empty($activityDescription)) {
-        header("Location: activity_management.php?error=" . urlencode("Description and conditions are required."));
-        exit();
-    }
-
-    $dateCheck = checkDateConstraints($startDate, $endDate);
-    if ($dateCheck !== true) {
-        header("Location: activity_management.php?error=" . urlencode($dateCheck));
-        exit();
-    }
-
     // Image Upload
     $imageJson = "[]";
     if (isset($_FILES['activity_images'])) {
         $uploaded = handleMultiImageUpload($_FILES['activity_images']);
-        // Limit to 10
         if(count($uploaded) > 10) $uploaded = array_slice($uploaded, 0, 10);
-        if (!empty($uploaded)) {
-            $imageJson = json_encode($uploaded);
-        }
+        if (!empty($uploaded)) $imageJson = json_encode($uploaded);
     }
 
-    $activityGetAmount = 0.00;
-
-    // Insert Query - Including all address fields
-    $sql = "INSERT INTO activity (Activity_Name, Activity_StartDate, Activity_EndDate, 
-            Activity_Description, Activity_TargetAmount, Activity_Status, Activity_GetAmount,
-            Activity_Address1, Activity_Address2, Activity_Address3, Activity_City, 
-            Activity_State, Activity_PostalCode, Activity_Country, Branch_ID, Activity_Images) 
-            VALUES ('$activityName', '$startDate', '$endDate', 
-            '$activityDescription', '$targetAmount', '$activityStatus', '$activityGetAmount',
-            '$address1', '$address2', '$address3', '$city', '$state', 
-            '$postalCode', '$country', '$branchId', '$imageJson')";
+    $sql = "INSERT INTO activity (
+        Activity_Name, Activity_Venue, Activity_Date, Activity_StartDate, Activity_EndDate, 
+        Activity_Description, Activity_Organizer, Activity_Contact_Name, Activity_Contact_Number, 
+        Activity_Contact_Email, Activity_Max_Participants, Activity_Images, Activity_Status, 
+        Activity_GetAmount, Activity_TargetAmount, Activity_Address1, Activity_Address2, 
+        Activity_Address3, Activity_City, Activity_State, Activity_PostalCode, Activity_Country, Branch_ID
+    ) VALUES (
+        '$activityName', $venue, $specificDate, '$startDate', '$endDate', 
+        '$description', $organizer, $contactName, $contactNumber, 
+        $contactEmail, $maxParticipants, '$imageJson', '$activityStatus', 
+        '$getAmount', '$targetAmount', '$address1', '$address2', 
+        '$address3', '$city', '$state', '$postalCode', '$country', '$branchId'
+    )";
     
     if ($conn->query($sql)) {
         header("Location: activity_management.php?success=" . urlencode("Activity added successfully!"));
@@ -199,16 +246,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
 
 // --- UPDATE ACTIVITY LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
+    
+    // Server Validation
+    $validation = validateActivityInput($_POST);
+    if ($validation !== true) {
+        header("Location: activity_management.php?error=" . urlencode($validation));
+        exit();
+    }
+
     $activityId = mysqli_real_escape_string($conn, $_POST['activity_id']);
+    
+    // 1. Basic
     $activityName = mysqli_real_escape_string($conn, $_POST['activity_name']);
-    $startDate = mysqli_real_escape_string($conn, $_POST['start_date']);
-    $endDate = mysqli_real_escape_string($conn, $_POST['end_date']);
-    $activityDescription = mysqli_real_escape_string($conn, $_POST['activity_description']);
-    $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
     $branchId = mysqli_real_escape_string($conn, $_POST['branch_id']);
     $activityStatus = mysqli_real_escape_string($conn, $_POST['activity_status']);
+    $description = mysqli_real_escape_string($conn, $_POST['activity_description']);
+    $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
+
+    // 2. Dates & Venue
+    $startDate = mysqli_real_escape_string($conn, $_POST['start_date']);
+    $endDate = mysqli_real_escape_string($conn, $_POST['end_date']);
+    $specificDate = !empty($_POST['specific_date']) ? "'" . mysqli_real_escape_string($conn, $_POST['specific_date']) . "'" : "NULL";
+    $venue = !empty($_POST['venue']) ? "'" . mysqli_real_escape_string($conn, $_POST['venue']) . "'" : "NULL";
+
+    // 3. Organizer & Contact
+    $organizer = !empty($_POST['organizer']) ? "'" . mysqli_real_escape_string($conn, $_POST['organizer']) . "'" : "NULL";
+    $contactName = !empty($_POST['contact_name']) ? "'" . mysqli_real_escape_string($conn, $_POST['contact_name']) . "'" : "NULL";
     
-    // Address Fields
+    // Phone Format
+    $contactRaw = $_POST['contact_number'];
+    $contactNumber = (strpos($contactRaw, '+60') === 0) ? $contactRaw : "+60" . $contactRaw;
+    $contactNumber = !empty($contactNumber) ? "'" . mysqli_real_escape_string($conn, $contactNumber) . "'" : "NULL";
+
+    $contactEmail = !empty($_POST['contact_email']) ? "'" . mysqli_real_escape_string($conn, $_POST['contact_email']) . "'" : "NULL";
+    $maxParticipants = !empty($_POST['max_participants']) ? intval($_POST['max_participants']) : 0;
+
+    // 4. Address
     $address1 = mysqli_real_escape_string($conn, $_POST['address1']);
     $address2 = mysqli_real_escape_string($conn, $_POST['address2']);
     $address3 = mysqli_real_escape_string($conn, $_POST['address3']);
@@ -216,18 +289,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
     $state = mysqli_real_escape_string($conn, $_POST['state']);
     $postalCode = mysqli_real_escape_string($conn, $_POST['postal_code']);
     $country = mysqli_real_escape_string($conn, $_POST['country']);
-
-    // Validation
-    if(empty($activityDescription)) {
-        header("Location: activity_management.php?error=" . urlencode("Description cannot be empty."));
-        exit();
-    }
-
-    $dateCheck = checkDateConstraints($startDate, $endDate);
-    if ($dateCheck !== true) {
-        header("Location: activity_management.php?error=" . urlencode($dateCheck));
-        exit();
-    }
 
     // Handle Image Merge
     $existingImages = json_decode($_POST['existing_images_json'] ?? "[]", true);
@@ -245,12 +306,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
     
     $finalJson = mysqli_real_escape_string($conn, json_encode($finalImages));
 
-    // Update Query - Including all address fields
     $sql = "UPDATE activity SET 
             Activity_Name = '$activityName', 
+            Activity_Venue = $venue,
+            Activity_Date = $specificDate,
             Activity_StartDate = '$startDate', 
             Activity_EndDate = '$endDate',
-            Activity_Description = '$activityDescription',
+            Activity_Description = '$description',
+            Activity_Organizer = $organizer,
+            Activity_Contact_Name = $contactName,
+            Activity_Contact_Number = $contactNumber,
+            Activity_Contact_Email = $contactEmail,
+            Activity_Max_Participants = $maxParticipants,
             Activity_TargetAmount = '$targetAmount',
             Activity_Status = '$activityStatus',
             Activity_Address1 = '$address1',
@@ -428,7 +495,7 @@ $allActivityImagesMap = [];
         .pagination-btn.disabled { color: #ccc; cursor: not-allowed; background-color: #f8f9fa; border-color: #eee; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background-color: white; border-radius: 10px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .modal-content { background-color: white; border-radius: 10px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--gray-light); }
         .modal-header h2 { font-size: 18px; font-weight: 600; margin: 0; }
         .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray); }
@@ -443,20 +510,28 @@ $allActivityImagesMap = [];
         .form-textarea { min-height: 100px; resize: vertical; }
         .form-input:read-only, .form-textarea:read-only { background-color: #f8f9fa; color: #555; cursor: default; }
 
+        /* Styles for the form guides */
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: inline-block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
         .required { color: red; margin-left: 3px; font-weight: bold; }
         .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
+
+        /* PHONE INPUT STYLING */
+        .phone-format { display: flex; align-items: center; }
+        .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid #ddd; border-right: none; border-radius: 6px 0 0 6px; color: #666; font-size: 14px; font-weight: bold; }
+        .phone-input { border-radius: 0 6px 6px 0 !important; width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); outline: none; }
+        .phone-input:focus { border-color: var(--primary); }
 
         .donation-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .donation-table th, .donation-table td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; }
         .donation-table th { background-color: #f8f9fa; font-weight: 600; color: #555; }
         .donation-row:hover { background-color: #f9f9f9; cursor: pointer; }
 
-        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; display: none; }
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; display: none; animation: slideIn 0.3s; }
         .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-        /* --- NEW: Upload Styles similar to Branch Management --- */
+        /* Upload Styles */
         .upload-container { width: 100%; }
         .upload-box { border: 2px dashed #ccc; background: #fafafa; border-radius: 8px; padding: 30px 20px; text-align: center; cursor: pointer; transition: all 0.3s; position: relative; }
         .upload-box:hover { background: #fff5f5; border-color: var(--primary); }
@@ -470,67 +545,13 @@ $allActivityImagesMap = [];
         .remove-img-btn { position: absolute; top: 4px; right: 4px; background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; }
         .remove-img-btn:hover { background: #cc0000; transform: scale(1.1); }
 
-        /* --- LIGHTBOX (GALLERY) CSS --- */
-        .lightbox-modal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            padding-top: 50px;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: rgba(0, 0, 0, 0.9);
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-        .lightbox-content {
-            margin: auto;
-            display: block;
-            max-width: 90%;
-            max-height: 80vh;
-            border-radius: 5px;
-            box-shadow: 0 0 20px rgba(255,255,255,0.1);
-            object-fit: contain;
-            animation: zoomIn 0.3s;
-        }
+        /* Lightbox */
+        .lightbox-modal { display: none; position: fixed; z-index: 2000; padding-top: 50px; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; background-color: rgba(0, 0, 0, 0.9); flex-direction: column; justify-content: center; align-items: center; }
+        .lightbox-content { margin: auto; display: block; max-width: 90%; max-height: 80vh; border-radius: 5px; box-shadow: 0 0 20px rgba(255,255,255,0.1); object-fit: contain; animation: zoomIn 0.3s; }
         @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
-        
-        .close-lightbox {
-            position: absolute;
-            top: 20px;
-            right: 35px;
-            color: #f1f1f1;
-            font-size: 40px;
-            font-weight: bold;
-            transition: 0.3s;
-            cursor: pointer;
-            z-index: 2002;
-        }
-        .close-lightbox:hover, .close-lightbox:focus {
-            color: #bbb;
-            text-decoration: none;
-            cursor: pointer;
-        }
-        
-        .lightbox-nav {
-            cursor: pointer;
-            position: absolute;
-            top: 50%;
-            width: auto;
-            padding: 16px;
-            margin-top: -50px;
-            color: white;
-            font-weight: bold;
-            font-size: 30px;
-            transition: 0.6s ease;
-            border-radius: 0 3px 3px 0;
-            user-select: none;
-            z-index: 2001;
-            background-color: rgba(0,0,0,0.3);
-        }
+        .close-lightbox { position: absolute; top: 20px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; z-index: 2002; }
+        .close-lightbox:hover, .close-lightbox:focus { color: #bbb; text-decoration: none; cursor: pointer; }
+        .lightbox-nav { cursor: pointer; position: absolute; top: 50%; width: auto; padding: 16px; margin-top: -50px; color: white; font-weight: bold; font-size: 30px; transition: 0.6s ease; border-radius: 0 3px 3px 0; user-select: none; z-index: 2001; background-color: rgba(0,0,0,0.3); }
         .lightbox-nav:hover { background-color: rgba(255,255,255,0.2); }
         .lightbox-prev { left: 0; border-radius: 0 3px 3px 0; }
         .lightbox-next { right: 0; border-radius: 3px 0 0 3px; }
@@ -603,12 +624,13 @@ $allActivityImagesMap = [];
                             if ($status == 'Upcoming') { $statusClass = 'status-upcoming'; $progressClass = 'upcoming'; }
                             
                             $jsonImgs = json_decode($activity['Activity_Images'], true);
-                            
-                            // Collect images for lightbox
                             $hasImgs = (!empty($jsonImgs) && is_array($jsonImgs));
-                            if($hasImgs) {
-                                $allActivityImagesMap[$activity['Activity_ID']] = $jsonImgs;
-                            }
+                            if($hasImgs) { $allActivityImagesMap[$activity['Activity_ID']] = $jsonImgs; }
+
+                            // Format Date Logic for the Card Footer
+                            $startDateStr = date('d M Y', strtotime($activity['Activity_StartDate']));
+                            $endDateStr = date('d M Y', strtotime($activity['Activity_EndDate']));
+                            $dateDisplay = $startDateStr . ' - ' . $endDateStr;
                         ?>
                         <div class="case-card" id="card-<?php echo $activity['Activity_ID']; ?>">
                             <div class="card-actions">
@@ -650,7 +672,7 @@ $allActivityImagesMap = [];
                                 </div>
                             </div>
                             <div class="card-footer">
-                                <span><i class="far fa-calendar-alt"></i> <?php echo date('d M', strtotime($activity['Activity_StartDate'])); ?> - <?php echo date('d M Y', strtotime($activity['Activity_EndDate'])); ?></span>
+                                <span><i class="far fa-calendar-alt"></i> <?php echo $dateDisplay; ?></span>
                                 <span><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($activity['Activity_City']); ?></span>
                             </div>
                         </div>
@@ -688,22 +710,143 @@ $allActivityImagesMap = [];
             <div class="modal-body">
                 <form id="addActivityForm" action="activity_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateActivityForm('add')">
                     <input type="hidden" name="add_activity" value="1">
+                    
                     <div class="form-group">
                         <label class="form-label">Activity Images (Max 10) <span class="required">*</span></label>
-                        <div class="upload-container"><div class="upload-box"><i class="fas fa-cloud-upload-alt"></i><p>Click or Drag images here to upload</p><input type="file" id="add_activity_images" name="activity_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'add')" required></div><div class="preview-grid" id="add_preview_container"></div></div>
-                        <span class="form-guide">Accepted formats: JPG, PNG. Multiple files allowed. Max 10 images.</span>
+                        <div class="upload-container"><div class="upload-box"><i class="fas fa-cloud-upload-alt"></i><p>Click or Drag images here</p><input type="file" id="add_activity_images" name="activity_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'add')" required></div><div class="preview-grid" id="add_preview_container"></div></div>
+                        <span class="form-guide">Accepted formats: JPG, PNG. Multiple files allowed. First image will be the cover.</span>
                     </div>
-                    <div class="form-group"><label class="form-label">Activity Name <span class="required">*</span></label><input type="text" name="activity_name" class="form-input" required placeholder="e.g. Annual Charity Run"></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Start Date <span class="required">*</span></label><input type="date" id="add_start_date" name="start_date" class="form-input" required></div><div class="form-group"><label class="form-label">End Date <span class="required">*</span></label><input type="date" id="add_end_date" name="end_date" class="form-input" required></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Branch <span class="required">*</span></label><select name="branch_id" class="form-select" required><option value="">Select Branch</option><?php foreach($branches as $b) echo "<option value='{$b['Branch_ID']}'>{$b['Branch_Name']}</option>"; ?></select></div><div class="form-group"><label class="form-label">Target Amount (RM) <span class="required">*</span></label><input type="number" id="add_target_amount" name="target_amount" class="form-input" step="0.01" min="0" required placeholder="0.00" oninput="validateAmount('add_target_amount', 'add_amount_error')"><div id="add_amount_error" class="error-message">Amount cannot be negative.</div></div></div>
-                    <div class="form-group"><label class="form-label">Status <span class="required">*</span></label><select name="activity_status" class="form-select" required><option value="Active">Active</option><option value="Upcoming">Upcoming</option><option value="Completed">Completed</option></select></div>
+
+                    <div class="form-group">
+                        <label class="form-label">Activity Name <span class="required">*</span></label>
+                        <input type="text" name="activity_name" class="form-input" required>
+                        <span class="form-guide">Enter the official name of the campaign or event (e.g., "Charity Fun Run 2026").</span>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Branch <span class="required">*</span></label>
+                            <select name="branch_id" class="form-select" required><option value="">Select Branch</option><?php foreach($branches as $b) echo "<option value='{$b['Branch_ID']}'>{$b['Branch_Name']}</option>"; ?></select>
+                            <span class="form-guide">Select the branch responsible for organizing this event.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Status <span class="required">*</span></label>
+                            <select name="activity_status" class="form-select" required><option value="Active">Active</option><option value="Upcoming">Upcoming</option><option value="Completed">Completed</option></select>
+                            <span class="form-guide">Current operational status of the activity.</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Target Amount (RM) <span class="required">*</span></label>
+                            <input type="number" id="add_target_amount" name="target_amount" class="form-input" step="0.01" min="0" required><div id="add_amount_error" class="error-message">Cannot be negative.</div>
+                            <span class="form-guide">Estimated fundraising goal for this event.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Max Participants <span class="required">*</span></label>
+                            <input type="number" name="max_participants" class="form-input" placeholder="0 for unlimited" required>
+                            <span class="form-guide">Limit the number of attendees (0 means no limit).</span>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Start Date <span class="required">*</span></label>
+                            <input type="date" id="add_start_date" name="start_date" class="form-input" required>
+                            <span class="form-guide">Date when the activity begins.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">End Date <span class="required">*</span></label>
+                            <input type="date" id="add_end_date" name="end_date" class="form-input" required>
+                            <span class="form-guide">Date when the activity concludes.</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Specific Date (One Day)</label>
+                            <input type="date" name="specific_date" class="form-input">
+                            <span class="form-guide">Fill this only if the event happens on a single specific day.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Venue Name</label>
+                            <input type="text" name="venue" class="form-input" placeholder="e.g. Community Hall A">
+                            <span class="form-guide">Name of the building or place (not the full address).</span>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Organizer Name <span class="required">*</span></label>
+                            <input type="text" id="add_organizer" name="organizer" class="form-input" required>
+                            <span class="form-guide">Name of the organizing team or partner (No Numbers).</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contact Person <span class="required">*</span></label>
+                            <input type="text" id="add_contact_name" name="contact_name" class="form-input" required>
+                            <span class="form-guide">Name of person in charge (No Numbers).</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Contact Number <span class="required">*</span></label>
+                            <div class="phone-format">
+                                <span class="phone-prefix">+60</span>
+                                <input type="text" id="add_contact_number" name="contact_number" class="form-input phone-input" maxlength="11" placeholder="12-3456789" required>
+                            </div>
+                            <span class="form-guide">Phone number for enquiries (e.g. 11-12345678).</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contact Email <span class="required">*</span></label>
+                            <input type="email" id="add_contact_email" name="contact_email" class="form-input" required>
+                            <span class="form-guide">Email address for public enquiries.</span>
+                            <div id="addEmailError" class="error-message">Invalid email format.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Address 1 <span class="required">*</span></label>
+                        <input type="text" name="address1" class="form-input" required>
+                        <span class="form-guide">House unit no., floor, building, street name.</span>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Address 2 <span class="required">*</span></label>
+                            <input type="text" name="address2" class="form-input" required>
+                            <span class="form-guide">Residential area, village, or section.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Address 3</label>
+                            <input type="text" name="address3" class="form-input">
+                            <span class="form-guide">Additional address details (Optional).</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Postcode <span class="required">*</span></label>
+                            <input type="text" id="add_postal_code" name="postal_code" class="form-input" required>
+                            <span class="form-guide">e.g. 50000</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">City <span class="required">*</span></label>
+                            <input type="text" id="add_city" name="city" class="form-input" required>
+                            <span class="form-guide">e.g. Kuala Lumpur</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">State <span class="required">*</span></label>
+                            <select id="add_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Country</label>
+                            <input type="text" name="country" class="form-input" value="Malaysia" readonly>
+                        </div>
+                    </div>
                     
-                    <div class="form-group"><label class="form-label">Address 1 <span class="required">*</span></label><input type="text" name="address1" class="form-input" required></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Address 2</label><input type="text" name="address2" class="form-input"></div><div class="form-group"><label class="form-label">Address 3</label><input type="text" name="address3" class="form-input"></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" id="add_postal_code" name="postal_code" class="form-input" required></div><div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" id="add_city" name="city" class="form-input" required></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">State <span class="required">*</span></label><select id="add_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div><div class="form-group"><label class="form-label">Country</label><input type="text" name="country" class="form-input" value="Malaysia" readonly></div></div>
-                    
-                    <div class="form-group"><label class="form-label">Description & Conditions <span class="required">*</span></label><textarea name="activity_description" class="form-textarea" required placeholder="Enter full description and conditions..."></textarea><span class="form-guide">Detailed description and any specific conditions for this activity.</span></div>
+                    <div class="form-group">
+                        <label class="form-label">Description <span class="required">*</span></label>
+                        <textarea name="activity_description" class="form-textarea" required></textarea>
+                        <span class="form-guide">Provide a detailed explanation of the activity, its purpose, and itinerary.</span>
+                    </div>
                     <div class="form-group"><button type="submit" class="btn btn-primary" style="width:100%"><i class="fas fa-save"></i> Save Activity</button></div>
                 </form>
             </div>
@@ -718,18 +861,142 @@ $allActivityImagesMap = [];
                     <input type="hidden" id="edit_activity_id" name="activity_id">
                     <input type="hidden" name="update_activity" value="1">
                     <input type="hidden" id="existing_images_json" name="existing_images_json">
-                    <div class="form-group"><label class="form-label">Activity Images</label><div class="upload-container"><div class="upload-box"><i class="fas fa-cloud-upload-alt"></i><p>Add more images</p><input type="file" id="edit_activity_images" name="activity_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'edit')"></div><div class="preview-grid" id="edit_preview_container"></div></div><span class="form-guide">Accepted formats: JPG, PNG. Max 10 images total.</span></div>
-                    <div class="form-group"><label class="form-label">Activity Name <span class="required">*</span></label><input type="text" id="edit_activity_name" name="activity_name" class="form-input" required></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Start Date <span class="required">*</span></label><input type="date" id="edit_start_date" name="start_date" class="form-input" required></div><div class="form-group"><label class="form-label">End Date <span class="required">*</span></label><input type="date" id="edit_end_date" name="end_date" class="form-input" required></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Branch <span class="required">*</span></label><select id="edit_branch_id" name="branch_id" class="form-select" required><?php foreach($branches as $b) echo "<option value='{$b['Branch_ID']}'>{$b['Branch_Name']}</option>"; ?></select></div><div class="form-group"><label class="form-label">Target (RM)</label><input type="number" id="edit_target_amount" name="target_amount" class="form-input" step="0.01" required><div id="edit_amount_error" class="error-message">Cannot be negative.</div></div></div>
-                    <div class="form-group"><label class="form-label">Status</label><select id="edit_activity_status" name="activity_status" class="form-select" required><option value="Active">Active</option><option value="Upcoming">Upcoming</option><option value="Completed">Completed</option><option value="Cancelled">Cancelled</option></select></div>
                     
-                    <div class="form-group"><label class="form-label">Address 1</label><input type="text" id="edit_address1" name="address1" class="form-input" required></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Address 2</label><input type="text" id="edit_address2" name="address2" class="form-input"></div><div class="form-group"><label class="form-label">Address 3</label><input type="text" id="edit_address3" name="address3" class="form-input"></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">Postcode</label><input type="text" id="edit_postal_code" name="postal_code" class="form-input" required></div><div class="form-group"><label class="form-label">City</label><input type="text" id="edit_city" name="city" class="form-input" required></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">State</label><select id="edit_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div><div class="form-group"><label class="form-label">Country</label><input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly></div></div>
+                    <div class="form-group">
+                        <label class="form-label">Activity Images</label>
+                        <div class="upload-container"><div class="upload-box"><i class="fas fa-cloud-upload-alt"></i><p>Add more images</p><input type="file" id="edit_activity_images" name="activity_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'edit')"></div><div class="preview-grid" id="edit_preview_container"></div></div>
+                        <span class="form-guide">Add new images or remove existing ones. Max 10 total.</span>
+                    </div>
                     
-                    <div class="form-group"><label class="form-label">Description & Conditions</label><textarea id="edit_activity_description" name="activity_description" class="form-textarea" required></textarea><span class="form-guide">Detailed description and any specific conditions for this activity.</span></div>
+                    <div class="form-group">
+                        <label class="form-label">Activity Name <span class="required">*</span></label>
+                        <input type="text" id="edit_activity_name" name="activity_name" class="form-input" required>
+                        <span class="form-guide">Update the official name of the campaign or event.</span>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Branch <span class="required">*</span></label>
+                            <select id="edit_branch_id" name="branch_id" class="form-select" required><?php foreach($branches as $b) echo "<option value='{$b['Branch_ID']}'>{$b['Branch_Name']}</option>"; ?></select>
+                            <span class="form-guide">Update the organizing branch.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Status <span class="required">*</span></label>
+                            <select id="edit_activity_status" name="activity_status" class="form-select" required><option value="Active">Active</option><option value="Upcoming">Upcoming</option><option value="Completed">Completed</option><option value="Cancelled">Cancelled</option></select>
+                            <span class="form-guide">Update the current operational status.</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Target (RM) <span class="required">*</span></label>
+                            <input type="number" id="edit_target_amount" name="target_amount" class="form-input" step="0.01" required><div id="edit_amount_error" class="error-message">Cannot be negative.</div>
+                            <span class="form-guide">Update the fundraising goal.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Max Participants <span class="required">*</span></label>
+                            <input type="number" id="edit_max_participants" name="max_participants" class="form-input" required>
+                            <span class="form-guide">Update participant limit (0 for unlimited).</span>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Start Date <span class="required">*</span></label>
+                            <input type="date" id="edit_start_date" name="start_date" class="form-input" required>
+                            <span class="form-guide">Date when the activity begins.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">End Date <span class="required">*</span></label>
+                            <input type="date" id="edit_end_date" name="end_date" class="form-input" required>
+                            <span class="form-guide">Date when the activity concludes.</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Specific Date</label>
+                            <input type="date" id="edit_specific_date" name="specific_date" class="form-input">
+                            <span class="form-guide">Single day event date (if applicable).</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Venue Name</label>
+                            <input type="text" id="edit_venue" name="venue" class="form-input">
+                            <span class="form-guide">Name of the building or place.</span>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Organizer Name <span class="required">*</span></label>
+                            <input type="text" id="edit_organizer" name="organizer" class="form-input" required>
+                            <span class="form-guide">Name of the organizing team or partner (No Numbers).</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contact Person <span class="required">*</span></label>
+                            <input type="text" id="edit_contact_name" name="contact_name" class="form-input" required>
+                            <span class="form-guide">Person in charge for enquiries (No Numbers).</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Contact Number <span class="required">*</span></label>
+                            <div class="phone-format">
+                                <span class="phone-prefix">+60</span>
+                                <input type="text" id="edit_contact_number" name="contact_number" class="form-input phone-input" maxlength="11" required>
+                            </div>
+                            <span class="form-guide">Phone number for public enquiries.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contact Email <span class="required">*</span></label>
+                            <input type="email" id="edit_contact_email" name="contact_email" class="form-input" required>
+                            <span class="form-guide">Email address for public enquiries.</span>
+                            <div id="editEmailError" class="error-message">Invalid email format.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Address 1 <span class="required">*</span></label>
+                        <input type="text" id="edit_address1" name="address1" class="form-input" required>
+                        <span class="form-guide">House unit no., floor, building, street name.</span>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Address 2 <span class="required">*</span></label>
+                            <input type="text" id="edit_address2" name="address2" class="form-input" required>
+                            <span class="form-guide">Residential area, village, or section.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Address 3</label>
+                            <input type="text" id="edit_address3" name="address3" class="form-input">
+                            <span class="form-guide">Additional address details.</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Postcode <span class="required">*</span></label>
+                            <input type="text" id="edit_postal_code" name="postal_code" class="form-input" required>
+                            <span class="form-guide">e.g. 50000</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">City <span class="required">*</span></label>
+                            <input type="text" id="edit_city" name="city" class="form-input" required>
+                            <span class="form-guide">e.g. Kuala Lumpur</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">State <span class="required">*</span></label>
+                            <select id="edit_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Country</label>
+                            <input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Description <span class="required">*</span></label>
+                        <textarea id="edit_activity_description" name="activity_description" class="form-textarea" required></textarea>
+                        <span class="form-guide">Detailed explanation of the activity.</span>
+                    </div>
                     <div class="form-group"><button type="submit" class="btn btn-primary" style="width:100%"><i class="fas fa-save"></i> Update Activity</button></div>
                 </form>
             </div>
@@ -753,7 +1020,7 @@ $allActivityImagesMap = [];
     </div>
 
     <script>
-        // --- MULTI-UPLOAD & PREVIEW LOGIC ---
+        // --- JS Logic ---
         let addFiles = []; 
         let editNewFiles = []; 
         let editExistingImages = []; 
@@ -761,7 +1028,6 @@ $allActivityImagesMap = [];
         function handleFileSelect(event, mode) {
             const input = event.target;
             const newFiles = Array.from(input.files);
-            
             if (mode === 'add') {
                 addFiles = addFiles.concat(newFiles);
                 updateFileInput('add_activity_images', addFiles);
@@ -800,16 +1066,12 @@ $allActivityImagesMap = [];
         function renderPreview(containerId, fileArray, mode) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
-            
             fileArray.forEach((file, index) => {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const item = document.createElement('div');
                     item.className = 'preview-item';
-                    item.innerHTML = `
-                        <img src="${e.target.result}">
-                        <button type="button" class="remove-img-btn" onclick="removeFile(${index}, '${mode}')"><i class="fas fa-times"></i></button>
-                    `;
+                    item.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-img-btn" onclick="removeFile(${index}, '${mode}')"><i class="fas fa-times"></i></button>`;
                     container.appendChild(item);
                 }
                 reader.readAsDataURL(file);
@@ -819,35 +1081,24 @@ $allActivityImagesMap = [];
         function renderEditPreviews() {
             const container = document.getElementById('edit_preview_container');
             container.innerHTML = '';
-
-            // Existing
             editExistingImages.forEach((src, index) => {
                 const item = document.createElement('div');
                 item.className = 'preview-item';
-                item.innerHTML = `
-                    <img src="${src}">
-                    <button type="button" class="remove-img-btn" onclick="removeExistingImage(${index})"><i class="fas fa-times"></i></button>
-                `;
+                item.innerHTML = `<img src="${src}"><button type="button" class="remove-img-btn" onclick="removeExistingImage(${index})"><i class="fas fa-times"></i></button>`;
                 container.appendChild(item);
             });
-
-            // New
             editNewFiles.forEach((file, index) => {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const item = document.createElement('div');
                     item.className = 'preview-item';
-                    item.innerHTML = `
-                        <img src="${e.target.result}">
-                        <button type="button" class="remove-img-btn" onclick="removeFile(${index}, 'edit')"><i class="fas fa-times"></i></button>
-                    `;
+                    item.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-img-btn" onclick="removeFile(${index}, 'edit')"><i class="fas fa-times"></i></button>`;
                     container.appendChild(item);
                 }
                 reader.readAsDataURL(file);
             });
         }
 
-        // --- Standard Logic ---
         function toggleFilterInputs() {
             const type = document.getElementById('filterType').value;
             document.querySelectorAll('.secondary-filter').forEach(el => { el.classList.remove('active'); el.querySelector('select').disabled = true; });
@@ -873,6 +1124,18 @@ $allActivityImagesMap = [];
                 }
             });
         }
+        
+        function setupPhoneInput(inputId) {
+            const input = document.getElementById(inputId); 
+            if(!input) return;
+            input.addEventListener('input', function(e) { 
+                let val = this.value.replace(/\D/g, ''); 
+                if (val.length > 11) val = val.substring(0, 11); 
+                let newVal = val; 
+                if (val.length > 2) newVal = val.substring(0, 2) + '-' + val.substring(2); 
+                this.value = newVal; 
+            });
+        }
 
         function showSystemError(msg) {
             const el = document.getElementById('floatingError');
@@ -888,20 +1151,89 @@ $allActivityImagesMap = [];
             errorDiv.style.display = 'none'; return true;
         }
 
+        // --- VALIDATION HELPERS ---
+        function checkEmail(val) {
+            if(!val) return true; 
+            return /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val);
+        }
+
+        function checkName(val) {
+            // Returns true if NO numbers are found
+            if (!val) return true;
+            return !/\d/.test(val);
+        }
+
         function validateActivityForm(prefix) { 
+            let isValid = true;
+            let errors = [];
+
+            // 1. Date Validation
             const start = document.getElementById(prefix + '_start_date').value;
             const end = document.getElementById(prefix + '_end_date').value;
             
             if(start && end) {
-                const sDate = new Date(start); const eDate = new Date(end);
-                const today = new Date(); const oneYearLater = new Date(); oneYearLater.setFullYear(today.getFullYear() + 1);
-                if (sDate > oneYearLater) { showSystemError("Start date cannot be more than 1 year from today."); return false; }
-                if(eDate < sDate) { showSystemError("End date must be after Start date."); return false; }
-                const diffTime = Math.abs(eDate - sDate); const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                if (diffDays > 365) { showSystemError("Activity duration cannot exceed 1 year."); return false; }
+                const sDate = new Date(start); 
+                const eDate = new Date(end);
+                const today = new Date(); 
+                const oneYearLater = new Date(); 
+                oneYearLater.setFullYear(today.getFullYear() + 1);
+                
+                if (sDate > oneYearLater) { 
+                    errors.push("Start date cannot be more than 1 year from today."); 
+                    isValid = false; 
+                }
+                
+                if(eDate < sDate) { 
+                    errors.push("End date must be after Start date."); 
+                    isValid = false; 
+                }
+                
+                const diffTime = Math.abs(eDate - sDate); 
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                if (diffDays > 365) { 
+                    errors.push("Activity duration cannot exceed 1 year."); 
+                    isValid = false; 
+                }
             }
-            const amountId = prefix + '_target_amount'; const amountErrId = prefix + '_amount_error';
-            return validateAmount(amountId, amountErrId);
+
+            // 2. Amount Validation
+            const amountId = prefix + '_target_amount'; 
+            const amountErrId = prefix + '_amount_error';
+            if(!validateAmount(amountId, amountErrId)) {
+                isValid = false;
+                // Amount error handled by validateAmount display logic
+            }
+
+            // 3. Name Validation (No Numbers)
+            const organizerName = document.getElementById(prefix + '_organizer').value;
+            const contactName = document.getElementById(prefix + '_contact_name').value;
+            
+            if(!checkName(organizerName)) {
+                errors.push("Organizer Name cannot contain numbers.");
+                isValid = false;
+            }
+            if(!checkName(contactName)) {
+                errors.push("Contact Person Name cannot contain numbers.");
+                isValid = false;
+            }
+
+            // 4. Email Validation
+            const emailId = prefix + '_contact_email';
+            const emailErrId = prefix + 'EmailError';
+            const emailVal = document.getElementById(emailId).value;
+            if(!checkEmail(emailVal)) {
+                document.getElementById(emailErrId).style.display = 'block';
+                errors.push("Invalid Email Format.");
+                isValid = false;
+            } else {
+                document.getElementById(emailErrId).style.display = 'none';
+            }
+
+            if(!isValid) {
+                showSystemError("Validation Error: " + errors.join(" "));
+            }
+
+            return isValid;
         }
 
         function moveCarousel(cardId, direction) {
@@ -940,14 +1272,28 @@ $allActivityImagesMap = [];
             
             document.getElementById('edit_activity_id').value = obj.Activity_ID;
             document.getElementById('edit_activity_name').value = obj.Activity_Name;
-            document.getElementById('edit_start_date').value = obj.Activity_StartDate;
-            document.getElementById('edit_end_date').value = obj.Activity_EndDate;
-            document.getElementById('edit_activity_description').value = obj.Activity_Description;
-            document.getElementById('edit_target_amount').value = obj.Activity_TargetAmount;
             document.getElementById('edit_branch_id').value = obj.Branch_ID;
             document.getElementById('edit_activity_status').value = obj.Activity_Status;
+            document.getElementById('edit_target_amount').value = obj.Activity_TargetAmount;
+            document.getElementById('edit_activity_description').value = obj.Activity_Description;
             
-            // Populate Address Fields
+            // New Fields Mapping
+            document.getElementById('edit_start_date').value = obj.Activity_StartDate;
+            document.getElementById('edit_end_date').value = obj.Activity_EndDate;
+            document.getElementById('edit_specific_date').value = obj.Activity_Date || '';
+            document.getElementById('edit_venue').value = obj.Activity_Venue || '';
+            document.getElementById('edit_organizer').value = obj.Activity_Organizer || '';
+            document.getElementById('edit_contact_name').value = obj.Activity_Contact_Name || '';
+            
+            // Contact Number Cleaning (Remove +60 if present for display)
+            let phone = obj.Activity_Contact_Number || '';
+            if(phone.startsWith('+60')) phone = phone.substring(3);
+            document.getElementById('edit_contact_number').value = phone;
+
+            document.getElementById('edit_contact_email').value = obj.Activity_Contact_Email || '';
+            document.getElementById('edit_max_participants').value = obj.Activity_Max_Participants || '';
+
+            // Address
             document.getElementById('edit_address1').value = obj.Activity_Address1 || '';
             document.getElementById('edit_address2').value = obj.Activity_Address2 || '';
             document.getElementById('edit_address3').value = obj.Activity_Address3 || '';
@@ -957,10 +1303,7 @@ $allActivityImagesMap = [];
             document.getElementById('edit_country').value = obj.Activity_Country || 'Malaysia';
             
             // Image Logic
-            try {
-                editExistingImages = JSON.parse(obj.Activity_Images || "[]");
-            } catch(e) { editExistingImages = []; }
-            
+            try { editExistingImages = JSON.parse(obj.Activity_Images || "[]"); } catch(e) { editExistingImages = []; }
             document.getElementById('existing_images_json').value = JSON.stringify(editExistingImages);
             renderEditPreviews();
             
@@ -975,16 +1318,14 @@ $allActivityImagesMap = [];
             fetch(`activity_management.php?action=get_activity_donations&activity_id=${activityId}`).then(r => r.json()).then(data => {
                 tbody.innerHTML = '';
                 if (data.length > 0) {
-                    data.forEach(row => { 
-                        tbody.innerHTML += `<tr class="donation-row" onclick="window.open('admin_payment_details.php?id=${row.id}', '_blank')"><td>${row.date}</td><td>${row.name}</td><td>${row.amount}</td><td style="color:#666; font-size:12px;">${row.ref}</td></tr>`; 
-                    });
+                    data.forEach(row => { tbody.innerHTML += `<tr class="donation-row" onclick="window.open('admin_payment_details.php?id=${row.id}', '_blank')"><td>${row.date}</td><td>${row.name}</td><td>${row.amount}</td><td style="color:#666; font-size:12px;">${row.ref}</td></tr>`; });
                 } else { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#888;">No donations found.</td></tr>'; }
             });
         }
 
         function confirmDeleteActivity(id) { if (confirm('Delete this activity?')) window.location.href = 'activity_management.php?delete_activity_id=' + id; }
 
-        // --- LIGHTBOX LOGIC ---
+        // Lightbox
         const allActivityImages = <?php echo json_encode($allActivityImagesMap); ?>;
         let currentLightboxActivityId = null;
         let currentLightboxIndex = 0;
@@ -997,9 +1338,7 @@ $allActivityImagesMap = [];
             document.getElementById('imageLightbox').style.display = "flex";
         }
 
-        function closeLightbox() {
-            document.getElementById('imageLightbox').style.display = "none";
-        }
+        function closeLightbox() { document.getElementById('imageLightbox').style.display = "none"; }
 
         function changeLightboxImage(n) {
             if (currentLightboxActivityId === null) return;
@@ -1022,8 +1361,14 @@ $allActivityImagesMap = [];
 
         document.addEventListener('DOMContentLoaded', function() {
             toggleFilterInputs();
+            // Setup Postal Code Listeners
             setupPostcodeState('add_postal_code', 'add_state');
             setupPostcodeState('edit_postal_code', 'edit_state');
+            
+            // Setup Phone Input Listeners
+            setupPhoneInput('add_contact_number');
+            setupPhoneInput('edit_contact_number');
+
             const s = document.getElementById('floatingSuccess'); const e = document.getElementById('floatingError');
             if (s && s.querySelector('#msgSuccess').innerText !== '') { s.style.display='flex'; setTimeout(() => s.style.display='none', 5000); }
             if (e && e.querySelector('#msgError').innerText !== '') { e.style.display='flex'; setTimeout(() => e.style.display='none', 5000); }

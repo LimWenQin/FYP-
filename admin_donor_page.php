@@ -11,6 +11,14 @@ if (!isset($_SESSION['admin_id'])) {
 // Include database connection
 include 'dataconnection.php';
 
+// --- 引入 PHPMailer ---
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
+require 'PHPMailer/Exception.php';
+require 'PHPMailer/PHPMailer.php';
+require 'PHPMailer/SMTP.php';
+
 // --- 获取当前管理员信息 ---
 $currentAdminId = $_SESSION['admin_id'];
 $adminSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $currentAdminId";
@@ -233,6 +241,27 @@ function handleProfileUpload($file) {
     return null;
 }
 
+// --- HELPER: Generate Strong Random Password ---
+function generateStrongRandomPassword($length = 12) {
+    $upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    $lower = "abcdefghijklmnopqrstuvwxyz";
+    $numbers = "0123456789";
+    $symbols = "!@#$%^&*()";
+    
+    $password = "";
+    $password .= $upper[rand(0, strlen($upper) - 1)];
+    $password .= $lower[rand(0, strlen($lower) - 1)];
+    $password .= $numbers[rand(0, strlen($numbers) - 1)];
+    $password .= $symbols[rand(0, strlen($symbols) - 1)];
+    
+    $allChars = $upper . $lower . $numbers . $symbols;
+    for ($i = 0; $i < $length - 4; $i++) {
+        $password .= $allChars[rand(0, strlen($allChars) - 1)];
+    }
+    
+    return str_shuffle($password);
+}
+
 // Handle Add Donor
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_donor'])) {
     $donorName = mysqli_real_escape_string($conn, $_POST['donor_name']);
@@ -268,15 +297,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_donor'])) {
             if ($age < 18) $errorMessage = "Donor must be 18+.";
         }
         if (!isset($errorMessage)) {
+            // Check only in donor table
             $checkEmailSql = "SELECT Donor_ID FROM donor WHERE Donor_Email = '$email'";
-            if ($conn->query($checkEmailSql)->num_rows > 0) $errorMessage = "Email exists.";
+            if ($conn->query($checkEmailSql)->num_rows > 0) $errorMessage = "Email exists in Donor records.";
             else {
+                $rawPassword = generateStrongRandomPassword(12);
+                $hashedPassword = password_hash($rawPassword, PASSWORD_DEFAULT);
+
                 $cols = "Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email, Donor_Password, 
                          Donor_Address1, Donor_Address2, Donor_Address3, Donor_City, Donor_State, Donor_PostalCode, Donor_Country, 
                          Donor_DOB, Donor_Description, Donor_RegisteredAt, Is_Deleted";
                 
-                // 默认状态: Is_Deleted = 0
-                $vals = "'$donorName', '$contact', '$icNumber', '$email', NULL, 
+                $vals = "'$donorName', '$contact', '$icNumber', '$email', '$hashedPassword', 
                          '$address1', '$address2', '$address3', '$city', '$state', '$postalCode', '$country', 
                          '$dob', '$description', NOW(), 0";
                 
@@ -286,7 +318,46 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_donor'])) {
                 if ($conn->query($sql)) {
                     $newDonorId = $conn->insert_id;
                     $conn->query("INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES (0, 0, NOW(), $newDonorId)");
-                    $successMessage = "Donor added successfully!";
+                    
+                    // Send Email
+                    $mail = new PHPMailer(true);
+                    try {
+                        $mail->isSMTP();
+                        $mail->Host       = 'smtp.gmail.com';
+                        $mail->SMTPAuth   = true;
+                        $mail->Username   = 'lovebridge1201@gmail.com'; 
+                        $mail->Password   = 'odaj iwrz gfrt vven';      
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                        $mail->Port       = 465;
+
+                        $mail->setFrom('lovebridge1201@gmail.com', 'Love Bridge Admin');
+                        $mail->addAddress($email, $donorName);
+
+                        $mail->isHTML(true);
+                        $mail->Subject = 'Welcome to Love Bridge - Your Account Details';
+                        $mail->Body    = "
+                            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;'>
+                                <h2 style='color: #F28585;'>Welcome to Love Bridge, $donorName!</h2>
+                                <p>Your donor account has been successfully created by our administrator.</p>
+                                
+                                <div style='background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;'>
+                                    <p style='margin: 5px 0;'><strong>Email:</strong> $email</p>
+                                    <p style='margin: 5px 0;'><strong>Temporary Password:</strong> <span style='font-family: monospace; background: #e2e8f0; padding: 3px 6px; border-radius: 3px; color: #d97706; font-weight: bold;'>$rawPassword</span></p>
+                                </div>
+
+                                <p>You can now log in to the donor portal. We recommend changing your password after your first login.</p>
+                                <br>
+                                <p>Thank you for supporting our cause!</p>
+                                <p>Regards,<br>Love Bridge Team</p>
+                            </div>
+                        ";
+
+                        $mail->send();
+                        $successMessage = "Donor added successfully! Login details sent via email.";
+                    } catch (Exception $e) {
+                        $successMessage = "Donor added, but email failed. Error: {$mail->ErrorInfo}. Temp Password: $rawPassword";
+                    }
+
                 } else $errorMessage = "Error: " . $conn->error;
             }
         }
@@ -332,6 +403,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_donor'])) {
     }
     elseif (!preg_match('/^[a-zA-Z\s]+$/', $donorName)) $errorMessage = "Name can only contain letters.";
     else {
+        // We do not strictly check for email existence here to allow updating own email
+        // or keeping it same. If duplicates are found in DB, it might fail if UNIQUE key exists.
+        // But logic here assumes simple update.
+        
         $sql = "UPDATE donor SET Donor_Name = '$donorName', Donor_ContactNumber = '$contact', Donor_ICNumber = '$icNumber', 
                 Donor_Email = '$email', Donor_Address1 = '$address1', Donor_Address2 = '$address2', Donor_Address3 = '$address3',
                 Donor_City = '$city', Donor_State = '$state', Donor_PostalCode = '$postalCode', Donor_Country = '$country', 
@@ -480,7 +555,6 @@ $exportUrl = "?" . http_build_query($exportParams);
         .donor-info { display: flex; align-items: center; }
         .donor-avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 15px; background: var(--primary-light); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; overflow: hidden; }
         
-        /* Modified Avatar Image to show clickability */
         .donor-avatar img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
         
         .donor-details h4 { font-size: 14px; margin-bottom: 4px; color: var(--dark); }
@@ -526,9 +600,11 @@ $exportUrl = "?" . http_build_query($exportParams);
         .phone-format { display: flex; align-items: center; }
         .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid var(--gray-light); border-right: none; border-radius: 5px 0 0 5px; color: var(--gray); font-weight: bold; }
         .phone-input { border-radius: 0 5px 5px 0 !important; }
-        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; max-width: 400px; }
+        
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; max-width: 400px; display: none; }
         .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
+        
         .pagination-container { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid #eee; margin-top: 10px; }
         .pagination-controls { display: flex; gap: 5px; align-items: center; }
         .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; }
@@ -604,12 +680,16 @@ $exportUrl = "?" . http_build_query($exportParams);
     </style>
 </head>
 <body>
-    <?php if (isset($_GET['success'])): ?>
-        <div class="floating-alert floating-alert-success" id="floatingSuccess"><i class="fas fa-check-circle"></i><div><?php echo htmlspecialchars($_GET['success']); ?></div></div>
-    <?php endif; ?>
-    <?php if (isset($_GET['error'])): ?>
-        <div class="floating-alert floating-alert-danger" id="floatingError"><i class="fas fa-exclamation-circle"></i><div><?php echo htmlspecialchars($_GET['error']); ?></div></div>
-    <?php endif; ?>
+    
+    <div class="floating-alert floating-alert-success" id="floatingSuccess" style="display: <?php echo isset($_GET['success']) ? 'flex' : 'none'; ?>">
+        <i class="fas fa-check-circle"></i>
+        <div id="floatingSuccessText"><?php echo isset($_GET['success']) ? htmlspecialchars($_GET['success']) : ''; ?></div>
+    </div>
+
+    <div class="floating-alert floating-alert-danger" id="floatingError" style="display: <?php echo isset($_GET['error']) ? 'flex' : 'none'; ?>">
+        <i class="fas fa-exclamation-circle"></i>
+        <div id="floatingErrorText"><?php echo isset($_GET['error']) ? htmlspecialchars($_GET['error']) : ''; ?></div>
+    </div>
 
     <?php include 'admin_sidebar.php'; ?>
 
@@ -738,7 +818,7 @@ $exportUrl = "?" . http_build_query($exportParams);
         <div class="modal-content">
             <div class="modal-header"><h2>Add New Donor</h2><button class="close-btn" onclick="closeAddDonorModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="addDonorForm" action="admin_donor_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm()">
+                <form id="addDonorForm" action="admin_donor_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')" novalidate>
                     <input type="hidden" name="add_donor" value="1">
                     
                     <div class="form-group">
@@ -770,9 +850,8 @@ $exportUrl = "?" . http_build_query($exportParams);
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Email <span class="required">*</span></label>
-                            <input type="email" id="email" name="email" class="form-input" required onblur="validateEmail()" oninput="validateEmail()" placeholder="e.g. user@example.com">
+                            <input type="email" id="email" name="email" class="form-input" required placeholder="e.g. user@example.com">
                             <span class="form-guide">Valid email address (e.g. .com, .my, .net, etc.).</span>
-                            <div id="emailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Contact Number <span class="required">*</span></label>
@@ -792,8 +871,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                         </div>
                         <div class="form-group">
                             <label class="form-label">Date of Birth</label>
-                            <input type="date" id="dob" name="dob" class="form-input" onchange="validateAge()">
-                            <div id="ageError" class="error-message">Must be 18+</div>
+                            <input type="date" id="dob" name="dob" class="form-input">
                         </div>
                     </div>
 
@@ -837,7 +915,7 @@ $exportUrl = "?" . http_build_query($exportParams);
         <div class="modal-content">
             <div class="modal-header"><h2>Edit Donor</h2><button class="close-btn" onclick="closeEditDonorModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="editDonorForm" action="admin_donor_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateEditForm()">
+                <form id="editDonorForm" action="admin_donor_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateEditForm()" novalidate>
                     <input type="hidden" name="update_donor" value="1"><input type="hidden" id="edit_donor_id" name="donor_id">
                     
                     <div class="form-group">
@@ -861,7 +939,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                     
                     <div class="form-group">
                         <label class="form-label">Full Name <span class="required">*</span></label>
-                        <input type="text" id="edit_donor_name" name="donor_name" class="form-input" required oninput="validateName(this)">
+                        <input type="text" id="edit_donor_name" name="donor_name" class="form-input" required oninput="validateName(this)" placeholder="e.g. John Doe">
                         <span class="form-guide">Enter full name as per IC. English letters only.</span>
                         <div id="editNameError" class="error-message">Name cannot contain numbers.</div>
                     </div>
@@ -869,37 +947,54 @@ $exportUrl = "?" . http_build_query($exportParams);
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Email <span class="required">*</span></label>
-                            <input type="email" id="edit_email" name="email" class="form-input" required onblur="validateEditEmail()" oninput="validateEditEmail()">
-                            <span class="form-guide">Valid email address (e.g. .com, .my).</span>
-                            <div id="editEmailError" class="error-message">Invalid email format.</div>
+                            <input type="email" id="edit_email" name="email" class="form-input" required placeholder="e.g. user@example.com">
+                            <span class="form-guide">Valid email address (e.g. .com, .my, .net, etc.).</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Contact Number <span class="required">*</span></label>
                             <div class="phone-format">
                                 <span class="phone-prefix">+60</span>
-                                <input type="text" id="edit_contact" name="contact" class="form-input phone-input" required maxlength="11">
+                                <input type="text" id="edit_contact" name="contact" class="form-input phone-input" required maxlength="11" placeholder="11-12345678">
                             </div>
+                            <span class="form-guide">Format: 12-3456789 or 11-12345678 (No need for +60).</span>
                         </div>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">IC Number</label>
-                            <input type="text" id="edit_ic_number" name="ic_number" class="form-input" maxlength="14">
-                            <span class="form-guide">Format: YYMMDD-PB-####.</span>
+                            <input type="text" id="edit_ic_number" name="ic_number" class="form-input" maxlength="14" placeholder="XXXXXX-XX-XXXX">
+                            <span class="form-guide">Format: YYMMDD-PB-#### (e.g. 990101-07-1234).</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">DOB</label>
-                            <input type="date" id="edit_dob" name="dob" class="form-input" onchange="validateEditAge()">
+                            <input type="date" id="edit_dob" name="dob" class="form-input">
                         </div>
                     </div>
                     
-                    <div class="form-group"><label class="form-label">Address Line 1</label><input type="text" id="edit_address1" name="address1" class="form-input"></div>
-                    <div class="form-group"><label class="form-label">Address Line 2</label><input type="text" id="edit_address2" name="address2" class="form-input"></div>
-                    <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" id="edit_address3" name="address3" class="form-input"></div>
+                    <div class="form-group">
+                        <label class="form-label">Address Line 1</label>
+                        <input type="text" id="edit_address1" name="address1" class="form-input" placeholder="e.g. No. 123, Jalan Example">
+                        <span class="form-guide">House unit no., floor, building, street name.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Address Line 2</label>
+                        <input type="text" id="edit_address2" name="address2" class="form-input" placeholder="e.g. Taman Sri">
+                        <span class="form-guide">Residential area, village, or section.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Address Line 3</label>
+                        <input type="text" id="edit_address3" name="address3" class="form-input" placeholder="Address Line 3 (Optional)">
+                    </div>
                     
-                    <div class="form-row"><div class="form-group"><label class="form-label">Postal Code</label><input type="text" id="edit_postal_code" name="postal_code" class="form-input"></div><div class="form-group"><label class="form-label">City</label><input type="text" id="edit_city" name="city" class="form-input"></div></div>
-                    <div class="form-row"><div class="form-group"><label class="form-label">State</label><select id="edit_state" name="state" class="form-select"><option value="">Select State</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div><div class="form-group"><label class="form-label">Country</label><input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly></div></div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Postal Code</label><input type="text" id="edit_postal_code" name="postal_code" class="form-input" placeholder="e.g. 50000"></div>
+                        <div class="form-group"><label class="form-label">City</label><input type="text" id="edit_city" name="city" class="form-input" placeholder="e.g. Kuala Lumpur"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">State</label><select id="edit_state" name="state" class="form-select"><option value="">Select State</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div>
+                        <div class="form-group"><label class="form-label">Country</label><input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly></div>
+                    </div>
                     
                     <div class="form-group">
                         <label class="form-label">Remarks / Description</label>
@@ -995,6 +1090,21 @@ $exportUrl = "?" . http_build_query($exportParams);
             else if (type === 'points') { document.getElementById('filter_points_container').classList.add('active'); document.getElementById('filter_points_container').querySelector('select').disabled = false; }
         }
 
+        // --- NEW: SYSTEM ALERT FUNCTION ---
+        function showSystemError(message) {
+            const errorBox = document.getElementById('floatingError');
+            const errorText = document.getElementById('floatingErrorText');
+            if(errorBox && errorText) {
+                errorText.innerText = message;
+                errorBox.style.display = 'flex';
+                
+                // Auto hide after 5 seconds
+                setTimeout(() => {
+                    errorBox.style.display = 'none';
+                }, 5000);
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             toggleFilterInputs();
             setupPhoneInput('contact'); setupPhoneInput('edit_contact');
@@ -1073,7 +1183,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                     const prefix = (yy > (new Date().getFullYear() % 100)) ? '19' : '20';
                     const fullDate = `${prefix}${val.substring(0, 2)}-${mm}-${dd}`;
                     const dateObj = new Date(fullDate);
-                    if (!isNaN(dateObj.getTime())) { dobInput.value = fullDate; if (typeof validateAge === "function") validateAge(); if (inputId.includes('edit') && typeof validateEditAge === "function") validateEditAge(); }
+                    if (!isNaN(dateObj.getTime())) { dobInput.value = fullDate; }
                 }
             });
         }
@@ -1208,7 +1318,6 @@ $exportUrl = "?" . http_build_query($exportParams);
             document.getElementById('addDonorForm').reset(); 
             document.getElementById('add-preview-container').innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; 
             document.getElementById('add-file-info').style.display = 'none'; 
-            document.getElementById('emailError').style.display = 'none';
             document.getElementById('nameError').style.display = 'none';
         }
         
@@ -1237,7 +1346,6 @@ $exportUrl = "?" . http_build_query($exportParams);
             }
             document.getElementById('edit_profile_picture').value = '';
             document.getElementById('edit-file-info').style.display = 'none';
-            document.getElementById('editEmailError').style.display = 'none';
             document.getElementById('editNameError').style.display = 'none';
             
             document.getElementById('editDonorModal').style.display = 'flex';
@@ -1246,7 +1354,7 @@ $exportUrl = "?" . http_build_query($exportParams);
         function closeEditDonorModal() { document.getElementById('editDonorModal').style.display = 'none'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
-        // Name Validation
+        // --- NAME RESTRICTION ---
         function validateName(input) { 
             const hasNumber = /\d/.test(input.value);
             const errorDiv = input.id === 'donor_name' ? document.getElementById('nameError') : document.getElementById('editNameError');
@@ -1258,53 +1366,81 @@ $exportUrl = "?" . http_build_query($exportParams);
             }
             input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); 
         }
-        
-        function validateEmail() { 
-            const val = document.getElementById('email').value;
-            const errorDiv = document.getElementById('emailError');
-            if (!val) {
-                errorDiv.style.display = 'none';
-                return false;
-            }
-            if (!val.includes('@')) {
-                 errorDiv.innerText = "Missing '@' symbol.";
-                 errorDiv.style.display = 'block';
-                 return false;
-            }
-            const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-            if (!emailPattern.test(val)) {
-                errorDiv.innerText = "Missing domain extension (e.g., .com, .my).";
-                errorDiv.style.display = 'block';
-                return false;
-            }
-            errorDiv.style.display = 'none';
-            return true; 
+
+        function isAgeValid(dobValue) {
+            if (!dobValue) return true; // Let required check handle empty
+            const age = new Date().getFullYear() - new Date(dobValue).getFullYear();
+            return age >= 18;
         }
 
-        function validateEditEmail() { 
-            const val = document.getElementById('edit_email').value;
-            const errorDiv = document.getElementById('editEmailError');
-            if (!val) return false;
-            if (!val.includes('@')) {
-                 errorDiv.innerText = "Missing '@' symbol.";
-                 errorDiv.style.display = 'block';
-                 return false;
-            }
+        function isEmailValid(email) {
             const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-            if (!emailPattern.test(val)) {
-                errorDiv.innerText = "Missing domain extension (e.g., .com, .my).";
-                errorDiv.style.display = 'block';
-                return false;
-            }
-            errorDiv.style.display = 'none';
-            return true; 
+            return emailPattern.test(email);
         }
-        
-        function validateAge() { const d = document.getElementById('dob').value; if(!d) return true; return (new Date().getFullYear() - new Date(d).getFullYear()) >= 18; }
-        function validateEditAge() { const d = document.getElementById('edit_dob').value; if(!d) return true; return (new Date().getFullYear() - new Date(d).getFullYear()) >= 18; }
-        
-        function validateForm() { return validateEmail() && validateAge(); }
-        function validateEditForm() { return validateEditEmail() && validateEditAge(); }
+
+        // --- NEW: Strict Phone Validation (Prevents PHP Errors) ---
+        function validatePhone(id) {
+            const val = document.getElementById(id).value;
+            if (!val.includes('-')) return "Format must be XX-XXXXXXX (dash is missing)";
+            const parts = val.split('-');
+            if (parts.length !== 2) return "Invalid format";
+            const back = parts[1];
+            if (back.length < 7 || back.length > 8) {
+                return "Phone number must have 7 or 8 digits after the hyphen (-)";
+            }
+            return ""; 
+        }
+
+        function validateForm(type) {
+            let errors = [];
+            let name, email, dob, contactId, contactVal;
+
+            if (type === 'add') {
+                name = document.getElementById('donor_name').value.trim();
+                email = document.getElementById('email').value.trim();
+                dob = document.getElementById('dob').value;
+                contactId = 'contact';
+            } else {
+                name = document.getElementById('edit_donor_name').value.trim();
+                email = document.getElementById('edit_email').value.trim();
+                dob = document.getElementById('edit_dob').value;
+                contactId = 'edit_contact';
+            }
+
+            // 1. Required Fields Check (Because novalidate is on)
+            if (!name) errors.push("Full Name is required.");
+            if (!email) errors.push("Email is required.");
+            contactVal = document.getElementById(contactId).value.trim();
+            if (!contactVal) errors.push("Contact Number is required.");
+
+            // 2. Name Check
+            if (/\d/.test(name)) errors.push("Name cannot contain numbers.");
+
+            // 3. Email Check
+            if (email && !isEmailValid(email)) errors.push("Invalid email format (e.g. user@example.com).");
+
+            // 4. Age Check
+            if (dob && !isAgeValid(dob)) errors.push("Donor must be at least 18 years old.");
+
+            // 5. Contact Strict Check
+            if (contactVal) {
+                 let pErr = validatePhone(contactId);
+                 if (pErr) errors.push("Contact: " + pErr);
+            }
+
+            if (errors.length > 0) {
+                // Combine errors and show system alert
+                showSystemError("Action failed: " + errors.join(" "));
+                return false; // Prevent submission
+            }
+
+            return true; // Allow submission
+        }
+
+        function validateEditForm() {
+            return validateForm('edit');
+        }
+
     </script>
 </body>
 </html>

@@ -18,7 +18,8 @@ date_default_timezone_set('Asia/Kuala_Lumpur');
 if (isset($_GET['action']) && $_GET['action'] == 'get_case_donations' && isset($_GET['case_id'])) {
     $caseId = intval($_GET['case_id']);
     
-    $sql = "SELECT o.Order_Created_At, o.Order_Amount, o.Order_TXN_Ref, d.Donor_Name, d.Donor_Email 
+    // 修改：加入了 o.Order_ID 以便点击跳转
+    $sql = "SELECT o.Order_ID, o.Order_Created_At, o.Order_Amount, o.Order_TXN_Ref, d.Donor_Name, d.Donor_Email 
             FROM orders o 
             JOIN donor d ON o.Donor_ID = d.Donor_ID 
             WHERE o.Case_ID = $caseId 
@@ -31,6 +32,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_case_donations' && isset($
     if ($result && $result->num_rows > 0) {
         while($row = $result->fetch_assoc()) {
             $donations[] = [
+                'id' => $row['Order_ID'], // 这里的 ID 用于跳转
                 'date' => date('d M Y, h:i A', strtotime($row['Order_Created_At'])),
                 'name' => $row['Donor_Name'],
                 'amount' => number_format($row['Order_Amount'], 2),
@@ -99,96 +101,215 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
     header("Expires: 0");
 
     echo '<table border="1">';
-    echo '<tr><th>Case ID</th><th>Title</th><th>Description</th><th>Target (RM)</th><th>Raised (RM)</th><th>Status</th><th>Start Date</th><th>Created Date</th></tr>';
+    echo '<tr><th>Case ID</th><th>Title</th><th>Category</th><th>Description</th><th>Start Date</th><th>End Date</th><th>Target (RM)</th><th>Raised (RM)</th><th>Status</th><th>Venue</th><th>Organizer</th><th>Contact Name</th><th>Contact Phone</th><th>Address</th><th>City</th><th>State</th><th>Postcode</th></tr>';
     if ($exportResult && $exportResult->num_rows > 0) {
         while($row = $exportResult->fetch_assoc()) {
-            echo '<tr><td>'.$row['Case_ID'].'</td><td>'.$row['Case_Title'].'</td><td>'.$row['Case_Description'].'</td><td>'.$row['Target_Amount'].'</td><td>'.$row['Raised_Amount'].'</td><td>'.$row['Case_Status'].'</td><td>'.$row['Start_Date'].'</td><td>'.$row['Created_At'].'</td></tr>';
+            echo '<tr>';
+            echo '<td>'.$row['Case_ID'].'</td>';
+            echo '<td>'.$row['Case_Title'].'</td>';
+            echo '<td>'.$row['Case_Category'].'</td>';
+            echo '<td>'.$row['Case_Description'].'</td>';
+            echo '<td>'.$row['Start_Date'].'</td>';
+            echo '<td>'.$row['End_Date'].'</td>';
+            echo '<td>'.$row['Target_Amount'].'</td>';
+            echo '<td>'.$row['Raised_Amount'].'</td>';
+            echo '<td>'.$row['Case_Status'].'</td>';
+            echo '<td>'.$row['Case_Venue'].'</td>';
+            echo '<td>'.$row['Case_Organizer'].'</td>';
+            echo '<td>'.$row['Contact_Name'].'</td>';
+            echo '<td>'.$row['Contact_Number'].'</td>';
+            echo '<td>'.$row['Case_Address1'] . ' ' . $row['Case_Address2'] . ' ' . $row['Case_Address3'].'</td>';
+            echo '<td>'.$row['Case_City'].'</td>';
+            echo '<td>'.$row['Case_State'].'</td>';
+            echo '<td>'.$row['Case_PostalCode'].'</td>';
+            echo '</tr>';
         }
     }
     echo '</table>';
     exit();
 }
 
-// --- FILE UPLOAD HELPER ---
-function handleImageUpload($file) {
-    if (isset($file) && $file['error'] == 0) {
-        $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-        if (in_array($file['type'], $allowedTypes)) {
-            $uploadDir = 'uploads/cases/';
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
-            $fileExtension = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $fileName = 'case_' . time() . '_' . uniqid() . '.' . $fileExtension;
+// --- FILE UPLOAD HELPER (UPDATED FOR MULTIPLE FILES) ---
+function handleMultipleImageUpload($files) {
+    $uploadedPaths = [];
+    $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    $uploadDir = 'uploads/cases/';
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+
+    if (!is_array($files['name'])) {
+        $files['name'] = [$files['name']];
+        $files['type'] = [$files['type']];
+        $files['tmp_name'] = [$files['tmp_name']];
+        $files['error'] = [$files['error']];
+    }
+
+    $count = count($files['name']);
+    for ($i = 0; $i < $count; $i++) {
+        if ($files['error'][$i] == 0 && in_array($files['type'][$i], $allowedTypes)) {
+            $fileExtension = pathinfo($files['name'][$i], PATHINFO_EXTENSION);
+            $fileName = 'case_' . time() . '_' . uniqid() . '_' . $i . '.' . $fileExtension;
             $uploadPath = $uploadDir . $fileName;
-            if (move_uploaded_file($file['tmp_name'], $uploadPath)) return $uploadPath;
+            if (move_uploaded_file($files['tmp_name'][$i], $uploadPath)) {
+                $uploadedPaths[] = $uploadPath;
+            }
         }
     }
-    return null;
+    return $uploadedPaths;
 }
 
-// --- ADD / UPDATE / DELETE LOGIC ---
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
-    $caseTitle = mysqli_real_escape_string($conn, $_POST['case_title']);
-    $caseDescription = mysqli_real_escape_string($conn, $_POST['case_description']);
-    $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
-    $caseStatus = mysqli_real_escape_string($conn, $_POST['case_status']); 
-    $startDate = ($caseStatus == 'Upcoming' && !empty($_POST['start_date'])) ? "'".mysqli_real_escape_string($conn, $_POST['start_date'])."'" : "NULL";
-    
-    $caseImage = null;
-    if (isset($_FILES['case_image'])) {
-        $uploadedPath = handleImageUpload($_FILES['case_image']);
-        if ($uploadedPath) $caseImage = $uploadedPath;
+// --- VALIDATION HELPER (Server Side) ---
+function validateCaseInput($post) {
+    if (preg_match('/\d/', $post['contact_name'])) return "Contact Name cannot contain numbers.";
+    if (!empty($post['case_organizer']) && preg_match('/\d/', $post['case_organizer'])) return "Organizer Name cannot contain numbers.";
+
+    if (!empty($post['contact_email']) && !filter_var($post['contact_email'], FILTER_VALIDATE_EMAIL)) {
+        return "Invalid Contact Email format.";
     }
 
-    $cols = "Case_Title, Case_Description, Target_Amount, Case_Status";
-    $vals = "'$caseTitle', '$caseDescription', '$targetAmount', '$caseStatus'";
-    $checkImg = $conn->query("SHOW COLUMNS FROM `special_case` LIKE 'Case_Image'");
-    if ($checkImg && $checkImg->num_rows > 0) { $cols .= ", Case_Image"; $vals .= ", '$caseImage'"; }
-    $checkStart = $conn->query("SHOW COLUMNS FROM `special_case` LIKE 'Start_Date'");
-    if ($checkStart && $checkStart->num_rows > 0) { $cols .= ", Start_Date"; $vals .= ", $startDate"; }
-
-    if ($conn->query("INSERT INTO special_case ($cols) VALUES ($vals)")) header("Location: special_case_management.php?success=" . urlencode("Added successfully!"));
-    else header("Location: special_case_management.php?error=" . urlencode("Error: " . $conn->error));
-    exit();
+    $startDate = new DateTime($post['start_date']);
+    $endDate = new DateTime($post['end_date']);
+    
+    if ($endDate < $startDate) {
+        return "End Date cannot be earlier than Start Date.";
+    }
+    return true;
 }
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_special_case'])) {
-    $caseId = mysqli_real_escape_string($conn, $_POST['case_id']);
+// --- ADD LOGIC ---
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
+    
+    $validation = validateCaseInput($_POST);
+    if ($validation !== true) {
+        header("Location: special_case_management.php?error=" . urlencode($validation));
+        exit();
+    }
+
     $caseTitle = mysqli_real_escape_string($conn, $_POST['case_title']);
+    $caseCategory = mysqli_real_escape_string($conn, $_POST['case_category']); // NEW: Category
     $caseDescription = mysqli_real_escape_string($conn, $_POST['case_description']);
     $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
     $caseStatus = mysqli_real_escape_string($conn, $_POST['case_status']);
     
+    $startDate = "'" . mysqli_real_escape_string($conn, $_POST['start_date']) . "'";
+    $endDate = "'" . mysqli_real_escape_string($conn, $_POST['end_date']) . "'";
+    
+    $caseVenue = mysqli_real_escape_string($conn, $_POST['case_venue']);
+    $caseOrganizer = mysqli_real_escape_string($conn, $_POST['case_organizer']);
+    $contactName = mysqli_real_escape_string($conn, $_POST['contact_name']);
+    
+    $contactRaw = $_POST['contact_number'];
+    $contactNumber = (strpos($contactRaw, '+60') === 0) ? $contactRaw : "+60" . $contactRaw;
+    $contactNumber = mysqli_real_escape_string($conn, $contactNumber);
+
+    $contactEmail = mysqli_real_escape_string($conn, $_POST['contact_email']);
+    
+    $addr1 = mysqli_real_escape_string($conn, $_POST['address1']);
+    $addr2 = mysqli_real_escape_string($conn, $_POST['address2']);
+    $addr3 = mysqli_real_escape_string($conn, $_POST['address3']);
+    $city = mysqli_real_escape_string($conn, $_POST['city']);
+    $state = mysqli_real_escape_string($conn, $_POST['state']);
+    $zip = mysqli_real_escape_string($conn, $_POST['postal_code']);
+    
+    $caseImagesJson = "[]";
+    if (isset($_FILES['case_images'])) {
+        $uploaded = handleMultipleImageUpload($_FILES['case_images']);
+        if(count($uploaded) > 10) $uploaded = array_slice($uploaded, 0, 10);
+        if(!empty($uploaded)) $caseImagesJson = json_encode($uploaded);
+    }
+
+    $sql = "INSERT INTO special_case (
+        Case_Title, Case_Category, Case_Description, Target_Amount, Case_Status, 
+        Start_Date, End_Date, Case_Venue, Case_Organizer, 
+        Contact_Name, Contact_Number, Contact_Email, 
+        Case_Address1, Case_Address2, Case_Address3, Case_City, Case_State, Case_PostalCode, 
+        Case_Images
+    ) VALUES (
+        '$caseTitle', '$caseCategory', '$caseDescription', '$targetAmount', '$caseStatus',
+        $startDate, $endDate, '$caseVenue', '$caseOrganizer',
+        '$contactName', '$contactNumber', '$contactEmail',
+        '$addr1', '$addr2', '$addr3', '$city', '$state', '$zip',
+        '$caseImagesJson'
+    )";
+
+    if ($conn->query($sql)) header("Location: special_case_management.php?success=" . urlencode("Case added successfully!"));
+    else header("Location: special_case_management.php?error=" . urlencode("Error: " . $conn->error));
+    exit();
+}
+
+// --- UPDATE LOGIC ---
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_special_case'])) {
+    
+    $validation = validateCaseInput($_POST);
+    if ($validation !== true) {
+        header("Location: special_case_management.php?error=" . urlencode($validation));
+        exit();
+    }
+
+    $caseId = mysqli_real_escape_string($conn, $_POST['case_id']);
+    $caseTitle = mysqli_real_escape_string($conn, $_POST['case_title']);
+    $caseCategory = mysqli_real_escape_string($conn, $_POST['case_category']); // NEW: Category
+    $caseDescription = mysqli_real_escape_string($conn, $_POST['case_description']);
+    $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
+    $caseStatus = mysqli_real_escape_string($conn, $_POST['case_status']);
+    
+    $startDate = "'" . mysqli_real_escape_string($conn, $_POST['start_date']) . "'";
+    $endDate = "'" . mysqli_real_escape_string($conn, $_POST['end_date']) . "'";
+    
+    $caseVenue = mysqli_real_escape_string($conn, $_POST['case_venue']);
+    $caseOrganizer = mysqli_real_escape_string($conn, $_POST['case_organizer']);
+    $contactName = mysqli_real_escape_string($conn, $_POST['contact_name']);
+    
+    $contactRaw = $_POST['contact_number'];
+    $contactNumber = (strpos($contactRaw, '+60') === 0) ? $contactRaw : "+60" . $contactRaw;
+    $contactNumber = mysqli_real_escape_string($conn, $contactNumber);
+
+    $contactEmail = mysqli_real_escape_string($conn, $_POST['contact_email']);
+    
+    $addr1 = mysqli_real_escape_string($conn, $_POST['address1']);
+    $addr2 = mysqli_real_escape_string($conn, $_POST['address2']);
+    $addr3 = mysqli_real_escape_string($conn, $_POST['address3']);
+    $city = mysqli_real_escape_string($conn, $_POST['city']);
+    $state = mysqli_real_escape_string($conn, $_POST['state']);
+    $zip = mysqli_real_escape_string($conn, $_POST['postal_code']);
+
     $extraSql = "";
-    $checkStart = $conn->query("SHOW COLUMNS FROM `special_case` LIKE 'Start_Date'");
-    if ($checkStart && $checkStart->num_rows > 0) {
-        $extraSql .= ($caseStatus == 'Upcoming' && !empty($_POST['start_date'])) ? ", Start_Date = '".mysqli_real_escape_string($conn, $_POST['start_date'])."'" : ", Start_Date = NULL";
+    if (isset($_POST['cancel_reason'])) {
+        $extraSql .= ", Cancel_Reason = '" . mysqli_real_escape_string($conn, $_POST['cancel_reason']) . "'";
     }
-    $checkCancel = $conn->query("SHOW COLUMNS FROM `special_case` LIKE 'Cancel_Reason'");
-    if ($checkCancel && $checkCancel->num_rows > 0) {
-        $extraSql .= ($caseStatus == 'Cancelled' && !empty($_POST['cancel_reason'])) ? ", Cancel_Reason = '".mysqli_real_escape_string($conn, $_POST['cancel_reason'])."'" : ", Cancel_Reason = NULL";
-    }
-    $checkComplete = $conn->query("SHOW COLUMNS FROM `special_case` LIKE 'Completed_At'");
-    if ($checkComplete && $checkComplete->num_rows > 0) {
-        $prevData = $conn->query("SELECT Case_Status FROM special_case WHERE Case_ID = $caseId")->fetch_assoc();
-        if ($caseStatus == 'Completed' && $prevData['Case_Status'] != 'Completed') $extraSql .= ", Completed_At = NOW()";
-        elseif ($caseStatus != 'Completed') $extraSql .= ", Completed_At = NULL";
+    
+    $existingImages = json_decode($_POST['existing_images_json'] ?? "[]", true);
+    if (!$existingImages) $existingImages = [];
+
+    $newImages = [];
+    if (isset($_FILES['case_images'])) {
+        $newImages = handleMultipleImageUpload($_FILES['case_images']);
     }
 
-    $imageSql = "";
-    if (isset($_FILES['case_image']) && $_FILES['case_image']['error'] == 0) {
-        $uploadedPath = handleImageUpload($_FILES['case_image']);
-        if ($uploadedPath) $imageSql = ", Case_Image = '$uploadedPath'";
+    $finalImages = array_merge($existingImages, $newImages);
+    if(count($finalImages) > 10) {
+        $finalImages = array_slice($finalImages, 0, 10);
     }
+    
+    $finalJson = mysqli_real_escape_string($conn, json_encode($finalImages));
 
-    $sql = "UPDATE special_case SET Case_Title='$caseTitle', Case_Description='$caseDescription', Target_Amount='$targetAmount', Case_Status='$caseStatus' $extraSql $imageSql WHERE Case_ID=$caseId";
-    if ($conn->query($sql)) header("Location: special_case_management.php?success=" . urlencode("Updated successfully!"));
+    $sql = "UPDATE special_case SET 
+        Case_Title='$caseTitle', Case_Category='$caseCategory', Case_Description='$caseDescription', Target_Amount='$targetAmount', Case_Status='$caseStatus',
+        Start_Date=$startDate, End_Date=$endDate, Case_Venue='$caseVenue', Case_Organizer='$caseOrganizer',
+        Contact_Name='$contactName', Contact_Number='$contactNumber', Contact_Email='$contactEmail',
+        Case_Address1='$addr1', Case_Address2='$addr2', Case_Address3='$addr3', Case_City='$city', Case_State='$state', Case_PostalCode='$zip',
+        Case_Images='$finalJson'
+        $extraSql
+        WHERE Case_ID=$caseId";
+
+    if ($conn->query($sql)) header("Location: special_case_management.php?success=" . urlencode("Case updated successfully!"));
     else header("Location: special_case_management.php?error=" . urlencode("Error: " . $conn->error));
     exit();
 }
 
 if (isset($_GET['delete_case_id'])) {
     $deleteId = $_GET['delete_case_id'];
-    if ($conn->query("DELETE FROM special_case WHERE Case_ID = $deleteId")) header("Location: special_case_management.php?success=" . urlencode("Deleted successfully!"));
+    $deleteSql = "DELETE FROM special_case WHERE Case_ID = $deleteId";
+    if ($conn->query($deleteSql)) header("Location: special_case_management.php?success=" . urlencode("Deleted successfully!"));
     else header("Location: special_case_management.php?error=" . urlencode("Error: " . $conn->error));
     exit();
 }
@@ -219,19 +340,23 @@ if ($result && $result->num_rows > 0) {
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
 $end_record = min($page * $results_per_page, $total_records);
 
-// --- STATS LOGIC (UPDATED FOR 4 GRID SYSTEM) ---
+// --- STATS LOGIC ---
 $totalCases = $conn->query("SELECT COUNT(*) as c FROM special_case")->fetch_assoc()['c'];
 $activeCases = $conn->query("SELECT COUNT(*) as c FROM special_case WHERE Case_Status = 'Active'")->fetch_assoc()['c'];
 $completedCases = $conn->query("SELECT COUNT(*) as c FROM special_case WHERE Case_Status = 'Completed'")->fetch_assoc()['c'];
 $totalRaisedLifetime = $conn->query("SELECT SUM(Raised_Amount) as s FROM special_case")->fetch_assoc()['s'] ?: 0;
 
 $years = range(date('Y'), 2023); 
+$malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'];
+$categories = ['Medical','Disability Support','Emergency Relief','Elderly Care','Children Support','Other Cases']; // Categories Array
+
 $exportParams = $_GET;
 $exportParams['action'] = 'export_excel';
 if(isset($exportParams['page'])) unset($exportParams['page']);
 $exportUrl = "?" . http_build_query($exportParams);
 
-// ⚠️ Removed $conn->close(); to allow sidebar to use connection
+// --- COLLECT IMAGES FOR LIGHTBOX JS ---
+$allCaseImagesMap = [];
 ?>
 
 <!DOCTYPE html>
@@ -244,23 +369,21 @@ $exportUrl = "?" . http_build_query($exportParams);
     <link rel="stylesheet" href="admin_common.css">
     
     <style>
-        /* --- STATS CARDS (COPIED FROM ACTIVITY MANAGEMENT) --- */
+        /* Stats & UI */
         .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-5px); }
         .stat-info h3 { font-size: 14px; color: var(--gray); margin-bottom: 5px; }
         .stat-info h2 { font-size: 24px; font-weight: 600; margin-bottom: 5px; }
         .stat-info p { font-size: 12px; display: flex; align-items: center; gap: 5px; margin: 0; }
-        .text-success { color: var(--success); } .text-danger { color: var(--danger); }
+        .text-success { color: var(--success); }
         .stat-icon { width: 60px; height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
-        
-        /* Specific Colors matching Activity Page */
         .stat-card:nth-child(1) .stat-icon { background: rgba(242, 133, 133, 0.2); color: var(--primary); }
         .stat-card:nth-child(2) .stat-icon { background: rgba(23, 162, 184, 0.2); color: var(--info); }
         .stat-card:nth-child(3) .stat-icon { background: rgba(40, 167, 69, 0.2); color: var(--success); }
         .stat-card:nth-child(4) .stat-icon { background: rgba(255, 193, 7, 0.2); color: var(--warning); }
 
-        /* General UI Styles */
+        /* General UI */
         .management-content { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); margin-bottom: 30px; }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .section-header h2 { font-size: 18px; font-weight: 600; }
@@ -270,7 +393,6 @@ $exportUrl = "?" . http_build_query($exportParams);
         .btn-success { background: var(--success); }
         .btn-danger { background: var(--danger); }
         
-        /* Filter Styles */
         .filter-search-bar { margin-bottom: 25px; display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
         .filter-group { display: flex; align-items: center; gap: 8px; }
         .filter-select, .search-input { padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; background: white; }
@@ -278,14 +400,20 @@ $exportUrl = "?" . http_build_query($exportParams);
         .secondary-filter { display: none; }
         .secondary-filter.active { display: block; }
 
-        /* Case Card Styles */
+        /* Grid & Cards (Updated for Carousel) */
         .case-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; margin-top: 10px; margin-bottom: 30px; }
-        .case-card { background: white; border-radius: 12px; position: relative; display: flex; flex-direction: column; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border: 1px solid #f0f0f0; transition: transform 0.3s, box-shadow 0.3s; }
-        .case-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        .card-image { height: 160px; background-color: #eee; position: relative; border-top-left-radius: 12px; border-top-right-radius: 12px; overflow: hidden; }
-        .card-image img { width: 100%; height: 100%; object-fit: cover; }
-        .card-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: #f9f9f9; color: #ccc; font-size: 40px; }
-        .card-status { position: absolute; top: 15px; left: 15px; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; z-index: 10; }
+        .case-card { background: white; border-radius: 12px; position: relative; display: flex; flex-direction: column; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border: 1px solid #f0f0f0; transition: transform 0.3s; }
+        .case-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-color: #eee; }
+        
+        .card-image { height: 160px; background-color: #f9f9f9; position: relative; border-radius: 12px 12px 0 0; overflow: hidden; }
+        .card-img { width: 100%; height: 100%; object-fit: cover; display: none; cursor: zoom-in; }
+        .card-img.active { display: block; }
+        .card-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f9f9f9; color: #ccc; }
+        .carousel-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.5); color: white; border: none; padding: 8px; cursor: pointer; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; z-index: 5; }
+        .prev-btn { left: 10px; } .next-btn { right: 10px; }
+        .img-counter { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; z-index: 5; }
+
+        .card-status { position: absolute; top: 15px; left: 15px; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .status-active { background-color: #cff4fc; color: #055160; }
         .status-completed { background-color: #d1e7dd; color: #0f5132; }
         .status-cancelled { background-color: #f8d7da; color: #842029; }
@@ -295,95 +423,90 @@ $exportUrl = "?" . http_build_query($exportParams);
         .menu-btn { background-color: rgba(255, 255, 255, 0.95); border: none; cursor: pointer; width: 32px; height: 32px; border-radius: 50%; color: #555; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.15); transition: all 0.2s; }
         .menu-btn:hover { background-color: white; color: var(--primary); transform: scale(1.1); }
         .dropdown-content { display: none; position: absolute; right: 0; top: 40px; background-color: white; min-width: 180px; box-shadow: 0 5px 25px rgba(0,0,0,0.2); z-index: 100; border-radius: 8px; overflow: hidden; border: 1px solid #eee; }
-        .dropdown-content div, .dropdown-content a { color: #333; padding: 12px 16px; text-decoration: none; display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; }
+        .dropdown-content div, .dropdown-content a { color: #333; padding: 12px 16px; text-decoration: none; display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; transition: background 0.2s; }
         .dropdown-content div:hover, .dropdown-content a:hover { background-color: #f8f9fa; color: var(--primary); }
         .text-delete { color: var(--danger) !important; border-top: 1px solid #eee; }
 
         .card-body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
-        .card-title { font-size: 16px; font-weight: 700; color: #333; margin-bottom: 10px; }
+        .card-title { font-size: 16px; font-weight: 700; color: #333; margin-bottom: 2px; }
+        .card-category { font-size: 11px; color: #777; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
         .card-desc { font-size: 13px; color: #666; margin-bottom: 20px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 38px; }
         .progress-container { margin-top: auto; }
         .progress-labels { display: flex; justify-content: space-between; font-size: 12px; color: #555; margin-bottom: 5px; font-weight: 600; }
         .progress-bar { width: 100%; height: 8px; background: #e9ecef; border-radius: 10px; overflow: hidden; }
-        .progress-fill { height: 100%; border-radius: 10px; transition: width 0.5s ease; }
-        .progress-fill.active { background: #007bff; }
-        .progress-fill.completed { background: #28a745; }
-        .progress-fill.cancelled { background: #dc3545; }
-        .progress-fill.upcoming { background: #ffc107; }
-        .card-footer { padding: 15px 20px; border-top: 1px solid #f0f0f0; background: #fafafa; font-size: 12px; color: #888; display: flex; justify-content: space-between; align-items: center; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
+        .progress-fill { height: 100%; border-radius: 10px; }
+        .progress-fill.active { background: #17a2b8; } .progress-fill.completed { background: #28a745; } .progress-fill.upcoming { background: #ffc107; } .progress-fill.cancelled { background: #dc3545; }
+        .card-footer { padding: 15px 20px; border-top: 1px solid #f0f0f0; background: #fafafa; font-size: 12px; color: #888; display: flex; justify-content: space-between; align-items: center; border-radius: 0 0 12px 12px; }
 
-        /* Pagination Styles */
+        /* Pagination */
         .pagination-container { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding: 15px 0; border-top: 1px solid var(--gray-light); }
-        .pagination-info { font-size: 14px; color: #666; }
-        .pagination-controls { display: flex; gap: 5px; }
-        .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; transition: all 0.3s; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .pagination-btn:hover { background-color: #e2e6ea; }
-        .pagination-btn.active { background-color: #F28585; color: white; border-color: #F28585; cursor: default; }
-        .pagination-btn.disabled { color: #ccc; cursor: not-allowed; background-color: #f8f9fa; }
-
-        /* Modal & Forms */
+        .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; transition: all 0.3s; cursor: pointer; }
+        .pagination-btn:hover { background-color: #e2e6ea; border-color: #dae0e5; }
+        .pagination-btn.active { background-color: #F28585; color: white; border-color: #F28585; }
+        .pagination-btn.disabled { color: #ccc; cursor: not-allowed; background-color: #f8f9fa; border-color: #eee; }
+        
+        /* Modal */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background-color: white; border-radius: 10px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .modal-content { background-color: white; border-radius: 10px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--gray-light); }
-        .modal-header h2 { font-size: 18px; margin: 0; }
+        .modal-header h2 { font-size: 18px; margin: 0; font-weight: 600; }
         .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray); }
-        .modal-body { padding: 20px; }
-        .donation-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .donation-table th, .donation-table td { text-align: left; padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; }
-        .donation-table th { background-color: #f8f9fa; font-weight: 600; }
+        .modal-body { padding: 20px; background-color: #fdfdfd; }
+        
+        /* Form Styles */
         .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
         .form-group { flex: 1; margin-bottom: 15px; }
-        .form-label { display: block; margin-bottom: 5px; font-weight: 500; }
-        .form-input, .form-select, .form-textarea { width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; }
-        .form-textarea { min-height: 120px; resize: vertical; }
-        .hidden-field { display: none; }
-        .file-upload { text-align: center; margin-bottom: 20px; }
-        .profile-picture-preview { width: 200px; height: 150px; border-radius: 10px; border: 2px solid #eee; margin: 0 auto 15px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
-        .profile-picture-preview img { width: 100%; height: 100%; object-fit: cover; }
-        .file-upload-label { display: inline-block; padding: 8px 15px; background: #f8f9fa; border: 1px dashed #ccc; border-radius: 5px; cursor: pointer; font-size: 13px; }
-        .file-upload input[type="file"] { display: none; }
-        .file-info { display: none; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; background: #f1f1f1; padding: 5px 10px; border-radius: 5px; }
+        .form-label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 13px; color: var(--dark); }
+        .form-input, .form-select, .form-textarea { width: 100%; padding: 10px; border: 1px solid var(--gray-light); border-radius: 5px; font-size: 13px; outline: none; transition: 0.3s; }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
+        .form-textarea { min-height: 100px; resize: vertical; }
         .required { color: red; margin-left: 3px; font-weight: bold; }
-        
-        .form-guide { 
-            font-size: 12px; 
-            color: #6c757d; 
-            margin-top: 5px; 
-            display: inline-block;
-            font-style: italic; 
-            background: #fbfbfb; 
-            padding: 4px 8px; 
-            border-radius: 4px; 
-            border-left: 3px solid #ddd;
-            max-width: 100%; 
-        }
-
         .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
         
-        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; }
+        /* PHONE INPUT STYLING */
+        .phone-format { display: flex; align-items: center; }
+        .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid #ddd; border-right: none; border-radius: 6px 0 0 6px; color: #666; font-size: 14px; font-weight: bold; }
+        .phone-input { border-radius: 0 6px 6px 0 !important; width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); outline: none; }
+        .phone-input:focus { border-color: var(--primary); }
+
+        .form-section-title { font-size: 14px; font-weight: 700; color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px; margin: 20px 0 15px 0; }
+        .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: inline-block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
+
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; display: none; }
         .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
+        
+        /* File Upload */
+        .upload-container { width: 100%; }
+        .upload-box { border: 2px dashed #ccc; background: #fafafa; border-radius: 8px; padding: 30px 20px; text-align: center; cursor: pointer; transition: all 0.3s; position: relative; }
+        .upload-box:hover { background: #fff5f5; border-color: var(--primary); }
+        .upload-box i { font-size: 32px; color: #aaa; margin-bottom: 10px; display: block; }
+        .upload-box p { margin: 0; font-size: 13px; color: #666; font-weight: 500; }
+        .upload-box input[type="file"] { position: absolute; width: 100%; height: 100%; top: 0; left: 0; opacity: 0; cursor: pointer; z-index: 10; }
+        
+        .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 12px; margin-top: 15px; }
+        .preview-item { position: relative; height: 80px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border: 1px solid #eee; }
+        .preview-item img { width: 100%; height: 100%; object-fit: cover; }
+        .remove-img-btn { position: absolute; top: 4px; right: 4px; background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; }
+        .remove-img-btn:hover { background: #cc0000; transform: scale(1.1); }
+        
+        .donation-row:hover { background-color: #f9f9f9; cursor: pointer; }
 
-        @media (max-width: 768px) {
-            .stats-cards { grid-template-columns: repeat(2, 1fr); }
-            .case-grid { grid-template-columns: 1fr; }
-            .filter-search-bar { flex-direction: column; align-items: stretch; }
-            .form-row { flex-direction: column; gap: 0; }
-            .pagination-container { flex-direction: column; gap: 15px; }
-        }
+        /* Lightbox CSS */
+        .lightbox-modal { display: none; position: fixed; z-index: 2000; padding-top: 50px; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; background-color: rgba(0, 0, 0, 0.9); flex-direction: column; justify-content: center; align-items: center; }
+        .lightbox-content { margin: auto; display: block; max-width: 90%; max-height: 80vh; border-radius: 5px; box-shadow: 0 0 20px rgba(255,255,255,0.1); object-fit: contain; animation: zoomIn 0.3s; }
+        @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
+        .close-lightbox { position: absolute; top: 20px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; z-index: 2002; }
+        .close-lightbox:hover, .close-lightbox:focus { color: #bbb; text-decoration: none; cursor: pointer; }
+        .lightbox-nav { cursor: pointer; position: absolute; top: 50%; width: auto; padding: 16px; margin-top: -50px; color: white; font-weight: bold; font-size: 30px; transition: 0.6s ease; border-radius: 0 3px 3px 0; user-select: none; z-index: 2001; background-color: rgba(0,0,0,0.3); }
+        .lightbox-nav:hover { background-color: rgba(255,255,255,0.2); }
+        .lightbox-prev { left: 0; border-radius: 0 3px 3px 0; }
+        .lightbox-next { right: 0; border-radius: 3px 0 0 3px; }
     </style>
 </head>
 <body>
-    <?php if (isset($_GET['success'])): ?>
-        <div class="floating-alert floating-alert-success" id="floatingSuccess">
-            <i class="fas fa-check-circle"></i> <div><?php echo htmlspecialchars($_GET['success']); ?></div>
-        </div>
-    <?php endif; ?>
-    <?php if (isset($_GET['error'])): ?>
-        <div class="floating-alert floating-alert-danger" id="floatingError">
-            <i class="fas fa-exclamation-circle"></i> <div><?php echo htmlspecialchars($_GET['error']); ?></div>
-        </div>
-    <?php endif; ?>
+    <div class="floating-alert floating-alert-success" id="floatingSuccess"><i class="fas fa-check-circle"></i><div id="msgSuccess"><?php echo isset($_GET['success']) ? htmlspecialchars($_GET['success']) : ''; ?></div></div>
+    <div class="floating-alert floating-alert-danger" id="floatingError"><i class="fas fa-exclamation-circle"></i><div id="msgError"><?php echo isset($_GET['error']) ? htmlspecialchars($_GET['error']) : ''; ?></div></div>
 
     <?php include 'admin_sidebar.php'; ?>
 
@@ -393,7 +516,7 @@ $exportUrl = "?" . http_build_query($exportParams);
         <div class="dashboard-content">
             <div class="welcome-section">
                 <h1>Special Case Management</h1>
-                <p>Manage urgent fundraising cases and track real-time donations.</p>
+                <p>Manage fundraising cases with full details like venue, organizer, and multiple photos.</p>
             </div>
 
             <div class="stats-cards">
@@ -469,33 +592,59 @@ $exportUrl = "?" . http_build_query($exportParams);
                         <?php foreach($specialCases as $case): 
                             $percent = ($case['Target_Amount'] > 0) ? ($case['Raised_Amount'] / $case['Target_Amount']) * 100 : 0;
                             $percent = min(100, $percent);
+                            
                             $statusClass = 'status-active'; $progressClass = 'active';
                             if ($case['Case_Status'] == 'Completed') { $statusClass = 'status-completed'; $progressClass = 'completed'; }
                             elseif ($case['Case_Status'] == 'Cancelled') { $statusClass = 'status-cancelled'; $progressClass = 'cancelled'; }
                             elseif ($case['Case_Status'] == 'Upcoming') { $statusClass = 'status-upcoming'; $progressClass = 'upcoming'; }
+                            
+                            // Image Carousel Logic
+                            $jsonImgs = json_decode($case['Case_Images'], true);
+                            if (!is_array($jsonImgs) && !empty($case['Case_Images'])) $jsonImgs = [$case['Case_Images']];
+                            $hasImgs = (!empty($jsonImgs) && is_array($jsonImgs));
+                            // Store images for lightbox JS
+                            if($hasImgs) { $allCaseImagesMap[$case['Case_ID']] = $jsonImgs; }
+
+                            // Date Display Logic
+                            $startDateStr = date('d M Y', strtotime($case['Start_Date']));
+                            $endDateStr = date('d M Y', strtotime($case['End_Date']));
+                            $dateDisplay = $startDateStr . ' - ' . $endDateStr;
                         ?>
-                        <div class="case-card">
+                        <div class="case-card" id="card-<?php echo $case['Case_ID']; ?>">
                             <div class="card-actions">
                                 <div class="action-menu">
                                     <button class="menu-btn" onclick="toggleMenu(event, <?php echo $case['Case_ID']; ?>)"><i class="fas fa-ellipsis-v"></i></button>
                                     <div id="menu-<?php echo $case['Case_ID']; ?>" class="dropdown-content">
-                                        <div onclick="openViewDonors(<?php echo $case['Case_ID']; ?>)"><i class="fas fa-hand-holding-heart"></i> View Donors</div>
-                                        <div onclick="openViewDetails(<?php echo htmlspecialchars(json_encode($case)); ?>)"><i class="fas fa-eye"></i> View Details</div>
-                                        <div onclick="editSpecialCase(<?php echo htmlspecialchars(json_encode($case)); ?>)"><i class="fas fa-edit"></i> Edit Details</div>
+                                        <div onclick="openViewDonors(<?php echo $case['Case_ID']; ?>)"><i class="fas fa-file-invoice-dollar"></i> View Donor Payment History</div>
+                                        <div onclick="goToDetailsPage(<?php echo $case['Case_ID']; ?>)"><i class="fas fa-eye"></i> View Full Details</div>
+                                        <div onclick='editSpecialCase(<?php echo htmlspecialchars(json_encode($case, JSON_HEX_APOS | JSON_HEX_QUOT)); ?>)'><i class="fas fa-edit"></i> Edit Details</div>
                                         <a href="javascript:confirmDeleteSpecialCase(<?php echo $case['Case_ID']; ?>)" class="text-delete"><i class="fas fa-trash"></i> Delete</a>
                                     </div>
                                 </div>
                             </div>
                             <div class="card-image">
                                 <span class="card-status <?php echo $statusClass; ?>"><?php echo $case['Case_Status']; ?></span>
-                                <?php if (!empty($case['Case_Image']) && file_exists($case['Case_Image'])): ?>
-                                    <img src="<?php echo $case['Case_Image']; ?>" alt="Case Image">
+                                <?php if ($hasImgs): ?>
+                                    <?php foreach($jsonImgs as $k => $path): ?>
+                                        <img src="<?php echo htmlspecialchars($path); ?>" 
+                                             class="card-img <?php echo $k==0?'active':''; ?>" 
+                                             onclick="openLightbox(<?php echo $case['Case_ID']; ?>, <?php echo $k; ?>)"
+                                             style="cursor: zoom-in;">
+                                    <?php endforeach; ?>
+                                    <?php if(count($jsonImgs) > 1): ?>
+                                        <button class="carousel-btn prev-btn" onclick="moveCarousel(<?php echo $case['Case_ID']; ?>, -1)">&#10094;</button>
+                                        <button class="carousel-btn next-btn" onclick="moveCarousel(<?php echo $case['Case_ID']; ?>, 1)">&#10095;</button>
+                                        <span class="img-counter">1/<?php echo count($jsonImgs); ?></span>
+                                    <?php endif; ?>
                                 <?php else: ?>
-                                    <div class="card-placeholder"><i class="fas fa-image"></i></div>
+                                    <div class="card-placeholder"><i class="fas fa-image fa-3x" style="font-size: 30px;"></i></div>
                                 <?php endif; ?>
                             </div>
                             <div class="card-body">
                                 <div class="card-title"><?php echo htmlspecialchars($case['Case_Title']); ?></div>
+                                <div class="card-category">
+                                    <i class="fas fa-tags" style="margin-right:4px;"></i><?php echo htmlspecialchars($case['Case_Category']); ?>
+                                </div>
                                 <div class="card-desc"><?php echo htmlspecialchars($case['Case_Description']); ?></div>
                                 <div class="progress-container">
                                     <div class="progress-labels">
@@ -509,11 +658,8 @@ $exportUrl = "?" . http_build_query($exportParams);
                                 </div>
                             </div>
                             <div class="card-footer">
-                                <?php if($case['Case_Status'] == 'Completed'): ?>
-                                    <span><i class="fas fa-check-circle"></i> Done: <?php echo $case['Completed_At'] ? date('d M Y', strtotime($case['Completed_At'])) : '-'; ?></span>
-                                <?php else: ?>
-                                    <span><i class="far fa-calendar-alt"></i> Created: <?php echo date('d M Y', strtotime($case['Created_At'])); ?></span>
-                                <?php endif; ?>
+                                <span><i class="far fa-calendar-alt"></i> <?php echo $dateDisplay; ?></span>
+                                <span><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($case['Case_City']); ?></span>
                             </div>
                         </div>
                         <?php endforeach; ?>
@@ -538,26 +684,9 @@ $exportUrl = "?" . http_build_query($exportParams);
                         }
                         $search_query = !empty($queryParams) ? '&' . http_build_query($queryParams) : '';
                         
-                        if ($page > 1): 
+                        if ($page > 1) echo "<a href='?page=".($page-1).$search_query."' class='pagination-btn'>Previous</a>"; else echo "<span class='pagination-btn disabled'>Previous</span>";
+                        if ($page < $total_pages) echo "<a href='?page=".($page+1).$search_query."' class='pagination-btn'>Next</a>"; else echo "<span class='pagination-btn disabled'>Next</span>";
                         ?>
-                            <a href="?page=<?php echo $page - 1 . $search_query; ?>" class="pagination-btn">Previous</a>
-                        <?php else: ?>
-                            <span class="pagination-btn disabled">Previous</span>
-                        <?php endif; ?>
-                        
-                        <?php for ($i = 1; $i <= $total_pages; $i++): 
-                            if ($i == $page): ?>
-                                <span class="pagination-btn active"><?php echo $i; ?></span>
-                            <?php else: ?>
-                                <a href="?page=<?php echo $i . $search_query; ?>" class="pagination-btn"><?php echo $i; ?></a>
-                            <?php endif; 
-                        endfor; ?>
-                        
-                        <?php if ($page < $total_pages): ?>
-                            <a href="?page=<?php echo $page + 1 . $search_query; ?>" class="pagination-btn">Next</a>
-                        <?php else: ?>
-                            <span class="pagination-btn disabled">Next</span>
-                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -568,67 +697,137 @@ $exportUrl = "?" . http_build_query($exportParams);
         <div class="modal-content">
             <div class="modal-header"><h2>Donation History</h2><button class="close-btn" onclick="document.getElementById('viewDonorsModal').style.display='none'">&times;</button></div>
             <div class="modal-body">
-                <table class="donation-table"><thead><tr><th>Date</th><th>Donor Name</th><th>Amount (RM)</th><th>Reference</th></tr></thead><tbody id="donorsTableBody"></tbody></table>
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead style="background:#f8f9fa;"><tr><th style="padding:10px; text-align:left;">Date</th><th style="padding:10px; text-align:left;">Donor</th><th style="padding:10px; text-align:left;">Amount</th></tr></thead>
+                    <tbody id="donorsTableBody"></tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <div class="modal" id="addSpecialCaseModal">
         <div class="modal-content">
-            <div class="modal-header"><h2>Add Special Case</h2><button class="close-btn" onclick="closeAddSpecialCaseModal()">&times;</button></div>
+            <div class="modal-header"><h2>Add New Special Case</h2><button class="close-btn" onclick="closeAddSpecialCaseModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="addSpecialCaseForm" action="special_case_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateCaseForm('addSpecialCaseForm')">
+                <form id="addSpecialCaseForm" action="special_case_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateSpecialCaseForm('add')">
                     <input type="hidden" name="add_special_case" value="1">
                     
                     <div class="form-group">
-                        <label class="form-label">Case Image (Banner) <span class="required">*</span></label>
-                        <div class="profile-picture-preview" id="add-preview-container"><div style="color:#ccc; font-size:40px;"><i class="fas fa-image"></i></div></div>
-                        <div class="file-upload">
-                            <label for="add_case_image" class="file-upload-label"><i class="fas fa-upload"></i> Choose File</label>
-                            <input type="file" id="add_case_image" name="case_image" accept="image/jpeg,image/png,image/jpg" required onchange="previewImage(this, 'add-preview-container', 'add-file-info', 'add-file-name')">
-                            <div id="add-file-info" class="file-info"><span id="add-file-name" class="file-name"></span><button type="button" class="file-remove" onclick="removeImage('add_case_image', 'add-preview-container', 'add-file-info')"><i class="fas fa-times"></i></button></div>
+                        <label class="form-label">Case Images (Max 10) <span class="required">*</span></label>
+                        <div class="upload-container">
+                            <div class="upload-box"><i class="fas fa-cloud-upload-alt"></i><p>Click or Drag images here</p><input type="file" id="add_case_images" name="case_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'add')" required></div>
+                            <div class="preview-grid" id="add_preview_container"></div>
                         </div>
-                        <div style="text-align: center;">
-                            <span class="form-guide" style="font-size: 11px;">Only JPG or PNG files allowed. Max size 2MB recommended.</span>
-                        </div>
+                        <span class="form-guide">Upload high-quality images to represent the case. Accepted formats: JPG, PNG.</span>
                     </div>
 
+                    <div class="form-section-title">Basic Information</div>
                     <div class="form-group">
                         <label class="form-label">Case Title <span class="required">*</span></label>
-                        <input type="text" name="case_title" class="form-input" required maxlength="100" placeholder="e.g., Emergency Heart Surgery Fund">
-                        <span class="form-guide">Keep it short and catchy. Max 100 characters.</span>
+                        <input type="text" id="add_case_title" name="case_title" class="form-input" required placeholder="e.g. Urgent Flood Relief 2026">
+                        <span class="form-guide">A clear, urgent title that describes the need.</span>
                     </div>
-
+                    <div class="form-group">
+                        <label class="form-label">Category <span class="required">*</span></label>
+                        <select name="case_category" id="add_case_category" class="form-select" required>
+                            <?php foreach($categories as $cat) echo "<option value='$cat'>$cat</option>"; ?>
+                        </select>
+                        <span class="form-guide">Select the category that best fits this case.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description <span class="required">*</span></label>
+                        <textarea id="add_case_description" name="case_description" class="form-textarea" required placeholder="Full story and details..."></textarea>
+                        <span class="form-guide">Detailed explanation of the situation, why funds are needed, and how they will be used.</span>
+                    </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Target Amount (RM) <span class="required">*</span></label>
-                            <input type="number" id="add_target_amount" name="target_amount" class="form-input" step="0.01" min="1000" required oninput="validateAmount('add_target_amount', 'addAmountError')">
-                            <div id="addAmountError" class="error-message">Target amount must be at least RM 1,000.00.</div>
-                            <span class="form-guide">Minimum target amount is RM 1,000.00.</span>
+                            <input type="number" id="add_target_amount" name="target_amount" class="form-input" step="0.01" min="1" required placeholder="e.g. 50000">
+                            <span class="form-guide">Total funds required for this case.</span>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Initial Status</label>
-                            <select name="case_status" id="add_case_status" class="form-select" onchange="toggleAddDate()">
+                            <label class="form-label">Status <span class="required">*</span></label>
+                            <select name="case_status" class="form-select" required>
                                 <option value="Active">Active</option>
                                 <option value="Upcoming">Upcoming</option>
                             </select>
+                            <span class="form-guide">Current state of the fundraising campaign.</span>
+                        </div>
+                    </div>
+
+                    <div class="form-section-title">Logistics & Location</div>
+                    <div class="form-row">
+                         <div class="form-group">
+                            <label class="form-label">Start Date <span class="required">*</span></label>
+                            <input type="date" id="add_start_date" name="start_date" class="form-input" required>
+                            <span class="form-guide">When the campaign or assistance starts.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">End Date <span class="required">*</span></label>
+                            <input type="date" id="add_end_date" name="end_date" class="form-input" required>
+                            <span class="form-guide">When the campaign is expected to end.</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Venue Name <span class="required">*</span></label>
+                        <input type="text" id="add_case_venue" name="case_venue" class="form-input" required placeholder="e.g. Community Hall / Victim's House">
+                        <span class="form-guide">The specific location name where the event or case is centered.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Address Line 1 <span class="required">*</span></label>
+                        <input type="text" id="add_address1" name="address1" class="form-input" required placeholder="e.g. No 15, Jalan Bahagia">
+                        <span class="form-guide">House no, street, etc.</span>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" name="address2" class="form-input" required placeholder="e.g. Taman Melati"><span class="form-guide">Area/Taman.</span></div>
+                        <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" name="address3" class="form-input" placeholder="e.g. Section 12"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" id="add_postal_code" name="postal_code" class="form-input" required placeholder="e.g. 50000"><span class="form-guide">Valid postal code.</span></div>
+                        <div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" id="add_city" name="city" class="form-input" required placeholder="e.g. Kuala Lumpur"><span class="form-guide">City name.</span></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">State <span class="required">*</span></label>
+                            <select id="add_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Country</label>
+                            <input type="text" name="country" class="form-input" value="Malaysia" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-section-title">Organizer & Contact</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Organizer Name <span class="required">*</span></label>
+                            <input type="text" id="add_case_organizer" name="case_organizer" class="form-input" required placeholder="e.g. Hope Foundation">
+                            <span class="form-guide">Person or group managing this case (No Numbers).</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contact Person <span class="required">*</span></label>
+                            <input type="text" id="add_contact_name" name="contact_name" class="form-input" required placeholder="e.g. Ali Bin Abu">
+                            <span class="form-guide">Primary point of contact (No Numbers).</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Contact Phone <span class="required">*</span></label>
+                            <div class="phone-format">
+                                <span class="phone-prefix">+60</span>
+                                <input type="text" id="add_contact_number" name="contact_number" class="form-input phone-input" maxlength="11" required placeholder="12-3456789">
+                            </div>
+                            <span class="form-guide">Mobile or office number.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contact Email <span class="required">*</span></label>
+                            <input type="email" id="add_contact_email" name="contact_email" class="form-input" required placeholder="e.g. contact@example.com">
+                            <span class="form-guide">Official contact email.</span>
+                            <div id="addEmailError" class="error-message">Invalid email format.</div>
                         </div>
                     </div>
                     
-                    <div class="form-group hidden-field" id="add_date_container">
-                        <label class="form-label">Start Date <span class="required">*</span></label>
-                        <input type="date" name="start_date" id="add_start_date" class="form-input">
-                        <span class="form-guide">When will this campaign effectively start?</span>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Description / Story <span class="required">*</span></label>
-                        <textarea name="case_description" id="add_case_description" class="form-textarea" required minlength="20" placeholder="Explain the background story, the need, and how funds will be used..." oninput="validateDescription('add_case_description', 'addDescError')"></textarea>
-                        <div id="addDescError" class="error-message">Description must be at least 20 characters long.</div>
-                        <span class="form-guide">Detailed explanation helps donors trust the cause (Min 20 chars).</span>
-                    </div>
-                    
-                    <div class="form-group">
+                    <div class="form-group" style="margin-top:20px;">
                         <button type="submit" class="btn btn-primary" style="width:100%"><i class="fas fa-save"></i> Save Case</button>
                     </div>
                 </form>
@@ -640,63 +839,133 @@ $exportUrl = "?" . http_build_query($exportParams);
         <div class="modal-content">
             <div class="modal-header"><h2>Edit Special Case</h2><button class="close-btn" onclick="closeEditSpecialCaseModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="editSpecialCaseForm" action="special_case_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateCaseForm('editSpecialCaseForm')">
+                <form id="editSpecialCaseForm" action="special_case_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateSpecialCaseForm('edit')">
                     <input type="hidden" id="edit_case_id" name="case_id"><input type="hidden" name="update_special_case" value="1">
+                    <input type="hidden" id="existing_images_json" name="existing_images_json">
                     
                     <div class="form-group">
-                        <label class="form-label">Case Image</label>
-                        <div class="profile-picture-preview" id="edit-preview-container"><div style="color:#ccc; font-size:40px;"><i class="fas fa-image"></i></div></div>
-                        <div class="file-upload">
-                            <label for="edit_case_image" class="file-upload-label"><i class="fas fa-upload"></i> Change Image</label>
-                            <input type="file" id="edit_case_image" name="case_image" accept="image/jpeg,image/png,image/jpg" onchange="previewImage(this, 'edit-preview-container', 'edit-file-info', 'edit-file-name')">
-                            <div id="edit-file-info" class="file-info"><span id="edit-file-name" class="file-name"></span><button type="button" class="file-remove" id="edit-file-remove-btn"><i class="fas fa-times"></i></button></div>
+                        <label class="form-label">Case Images <span class="required">*</span></label>
+                        <div class="upload-container">
+                            <div class="upload-box"><i class="fas fa-cloud-upload-alt"></i><p>Add more images</p><input type="file" id="edit_case_images" name="case_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'edit')"></div>
+                            <div class="preview-grid" id="edit_preview_container"></div>
                         </div>
-                        <div style="text-align: center;">
-                            <span class="form-guide" style="font-size: 11px;">Leave empty to keep current image. JPG/PNG only.</span>
-                        </div>
+                        <span class="form-guide">Manage images for this case. You can add new ones or remove existing ones.</span>
                     </div>
 
+                    <div class="form-section-title">Basic Information</div>
                     <div class="form-group">
                         <label class="form-label">Case Title <span class="required">*</span></label>
-                        <input type="text" id="edit_case_title" name="case_title" class="form-input" required maxlength="100">
-                        <span class="form-guide">Max 100 characters.</span>
+                        <input type="text" id="edit_case_title" name="case_title" class="form-input" required>
+                        <span class="form-guide">Title of the case.</span>
                     </div>
-
+                    <div class="form-group">
+                        <label class="form-label">Category <span class="required">*</span></label>
+                        <select name="case_category" id="edit_case_category" class="form-select" required>
+                            <?php foreach($categories as $cat) echo "<option value='$cat'>$cat</option>"; ?>
+                        </select>
+                        <span class="form-guide">Update the category if needed.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description <span class="required">*</span></label>
+                        <textarea id="edit_case_description" name="case_description" class="form-textarea" required></textarea>
+                        <span class="form-guide">Full details describing the case.</span>
+                    </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Target Amount (RM) <span class="required">*</span></label>
-                            <input type="number" id="edit_special_target_amount" name="target_amount" class="form-input" step="0.01" min="1000" required oninput="validateAmount('edit_special_target_amount', 'editAmountError')">
-                            <div id="editAmountError" class="error-message">Target amount must be at least RM 1,000.00.</div>
+                            <input type="number" id="edit_target_amount" name="target_amount" class="form-input" step="0.01" required>
+                            <span class="form-guide">Fundraising goal.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Status <span class="required">*</span></label>
-                            <select id="edit_case_status" name="case_status" class="form-select" required onchange="toggleEditFields()">
+                            <select id="edit_case_status" name="case_status" class="form-select" onchange="toggleCancelReason()" required>
                                 <option value="Active">Active</option>
                                 <option value="Upcoming">Upcoming</option>
                                 <option value="Completed">Completed</option>
                                 <option value="Cancelled">Cancelled</option>
                             </select>
+                            <span class="form-guide">Update current status.</span>
+                        </div>
+                    </div>
+                    <div class="form-group" id="edit_cancel_div" style="display:none;">
+                        <label class="form-label" style="color:red">Cancellation Reason</label>
+                        <input type="text" id="edit_cancel_reason" name="cancel_reason" class="form-input">
+                        <span class="form-guide">Why was this case cancelled?</span>
+                    </div>
+
+                    <div class="form-section-title">Logistics & Location</div>
+                    <div class="form-row">
+                         <div class="form-group">
+                            <label class="form-label">Start Date <span class="required">*</span></label>
+                            <input type="date" id="edit_start_date" name="start_date" class="form-input" required>
+                             <span class="form-guide">When the campaign or assistance starts.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">End Date <span class="required">*</span></label>
+                            <input type="date" id="edit_end_date" name="end_date" class="form-input" required>
+                             <span class="form-guide">When the campaign is expected to end.</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Venue Name <span class="required">*</span></label>
+                        <input type="text" id="edit_case_venue" name="case_venue" class="form-input" required>
+                        <span class="form-guide">The specific location name where the event or case is centered.</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Address Line 1 <span class="required">*</span></label>
+                        <input type="text" id="edit_address1" name="address1" class="form-input" required>
+                         <span class="form-guide">House no, street, etc.</span>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" id="edit_address2" name="address2" class="form-input" required><span class="form-guide">Area/Taman.</span></div>
+                        <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" id="edit_address3" name="address3" class="form-input"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" id="edit_postal_code" name="postal_code" class="form-input" required><span class="form-guide">Valid postal code.</span></div>
+                        <div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" id="edit_city" name="city" class="form-input" required><span class="form-guide">City name.</span></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">State <span class="required">*</span></label>
+                            <select id="edit_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Country</label>
+                            <input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly>
                         </div>
                     </div>
 
-                    <div class="form-group hidden-field" id="edit_date_container">
-                        <label class="form-label">Start Date <span class="required">*</span></label>
-                        <input type="date" name="start_date" id="edit_start_date" class="form-input">
+                    <div class="form-section-title">Organizer & Contact</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Organizer Name <span class="required">*</span></label>
+                            <input type="text" id="edit_case_organizer" name="case_organizer" class="form-input" required>
+                            <span class="form-guide">Person or group managing this case (No Numbers).</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contact Person <span class="required">*</span></label>
+                            <input type="text" id="edit_contact_name" name="contact_name" class="form-input" required>
+                            <span class="form-guide">Primary point of contact (No Numbers).</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Contact Phone <span class="required">*</span></label>
+                            <div class="phone-format">
+                                <span class="phone-prefix">+60</span>
+                                <input type="text" id="edit_contact_number" name="contact_number" class="form-input phone-input" maxlength="11" required>
+                            </div>
+                            <span class="form-guide">Mobile or office number.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contact Email <span class="required">*</span></label>
+                            <input type="email" id="edit_contact_email" name="contact_email" class="form-input" required>
+                            <span class="form-guide">Official contact email.</span>
+                            <div id="editEmailError" class="error-message">Invalid email format.</div>
+                        </div>
                     </div>
 
-                    <div class="form-group hidden-field" id="edit_reason_container">
-                        <label class="form-label">Cancellation Reason <span class="required">*</span></label>
-                        <textarea name="cancel_reason" id="edit_cancel_reason" class="form-textarea" placeholder="Why is this case being cancelled?"></textarea>
-                        <span class="form-guide">This reason will be visible to admins.</span>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Description <span class="required">*</span></label>
-                        <textarea id="edit_case_description" name="case_description" class="form-textarea" required minlength="20" oninput="validateDescription('edit_case_description', 'editDescError')"></textarea>
-                        <div id="editDescError" class="error-message">Description must be at least 20 characters long.</div>
-                    </div>
-
-                    <div class="form-group">
+                    <div class="form-group" style="margin-top:20px;">
                         <button type="submit" class="btn btn-primary" style="width:100%"><i class="fas fa-save"></i> Update Case</button>
                     </div>
                 </form>
@@ -704,109 +973,114 @@ $exportUrl = "?" . http_build_query($exportParams);
         </div>
     </div>
 
-    <div class="modal" id="viewDetailsModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Case Details</h2><button class="close-btn" onclick="document.getElementById('viewDetailsModal').style.display='none'">&times;</button></div>
-            <div class="modal-body">
-                <div class="profile-picture-preview" id="view-preview-container" style="width:100%; height:200px; margin-bottom:20px;"></div>
-                <div class="form-group"><label class="form-label">Case Title</label><input type="text" id="view_case_title" class="form-input" readonly></div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Status</label><input type="text" id="view_status" class="form-input" readonly></div>
-                    <div class="form-group"><label class="form-label" id="view_date_label">Created Date</label><input type="text" id="view_date" class="form-input" readonly></div>
-                </div>
-                <div class="form-group hidden-field" id="view_reason_container"><label class="form-label" style="color:var(--danger)">Cancellation Reason</label><textarea id="view_cancel_reason" class="form-textarea" readonly style="border-color:var(--danger); background:#fff5f5;"></textarea></div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Target Amount (RM)</label><input type="text" id="view_target" class="form-input" readonly></div>
-                    <div class="form-group"><label class="form-label">Raised Amount (RM)</label><input type="text" id="view_raised" class="form-input" readonly></div>
-                </div>
-                <div class="form-group"><label class="form-label">Description</label><textarea id="view_description" class="form-textarea" readonly></textarea></div>
-            </div>
-        </div>
+    <div id="imageLightbox" class="lightbox-modal">
+        <span class="close-lightbox" onclick="closeLightbox()">&times;</span>
+        <a class="lightbox-nav lightbox-prev" onclick="changeLightboxImage(-1)">&#10094;</a>
+        <img class="lightbox-content" id="lightboxImage">
+        <a class="lightbox-nav lightbox-next" onclick="changeLightboxImage(1)">&#10095;</a>
     </div>
 
     <script>
+        // Go to new details page
+        function goToDetailsPage(id) {
+            window.open('admin_special_case_details.php?id=' + id, '_blank');
+        }
+
         function toggleFilterInputs() {
             const type = document.getElementById('filterType').value;
-            document.querySelectorAll('.secondary-filter').forEach(el => { el.classList.remove('active'); el.querySelector('select').disabled = true; });
-            if (type === 'status') { document.getElementById('filter_status_container').classList.add('active'); document.querySelector('#filter_status_container select').disabled = false; }
-            else if (type === 'year') { document.getElementById('filter_year_container').classList.add('active'); document.querySelector('#filter_year_container select').disabled = false; }
+            document.querySelectorAll('.secondary-filter').forEach(el => el.classList.remove('active'));
+            if (type === 'status') document.getElementById('filter_status_container').classList.add('active');
+            else if (type === 'year') document.getElementById('filter_year_container').classList.add('active');
         }
 
-        function toggleAddDate() {
-            const status = document.getElementById('add_case_status').value;
-            const container = document.getElementById('add_date_container');
-            const input = document.getElementById('add_start_date');
-            if (status === 'Upcoming') { container.style.display = 'block'; input.required = true; } 
-            else { container.style.display = 'none'; input.required = false; }
+        function setupPostcodeState(postcodeId, stateSelectId) {
+            const pcInput = document.getElementById(postcodeId); const stateSelect = document.getElementById(stateSelectId);
+            if (!pcInput || !stateSelect) return;
+            pcInput.addEventListener('input', function() {
+                const val = this.value.replace(/\D/g, '');
+                if (val.length >= 2) {
+                    const prefix = parseInt(val.substring(0, 2)); let state = "";
+                    if (prefix >= 1 && prefix <= 2) state = "Perlis"; else if (prefix >= 5 && prefix <= 9) state = "Kedah"; else if (prefix >= 10 && prefix <= 14) state = "Penang";
+                    else if (prefix >= 15 && prefix <= 18) state = "Kelantan"; else if (prefix >= 20 && prefix <= 24) state = "Terengganu"; else if (prefix >= 25 && prefix <= 28) state = "Pahang";
+                    else if (prefix >= 30 && prefix <= 36) state = "Perak"; else if (prefix >= 40 && prefix <= 48) state = "Selangor"; else if (prefix >= 50 && prefix <= 60) state = "Kuala Lumpur";
+                    else if (prefix >= 62 && prefix <= 62) state = "Putrajaya"; else if (prefix >= 63 && prefix <= 68) state = "Selangor"; else if (prefix >= 70 && prefix <= 73) state = "Negeri Sembilan";
+                    else if (prefix >= 75 && prefix <= 78) state = "Melaka"; else if (prefix >= 79 && prefix <= 86) state = "Johor"; else if (prefix == 87) state = "Labuan";
+                    else if (prefix >= 88 && prefix <= 91) state = "Sabah"; else if (prefix >= 93 && prefix <= 98) state = "Sarawak";
+                    if (state) stateSelect.value = state;
+                }
+            });
+        }
+        
+        function setupPhoneInput(inputId) {
+            const input = document.getElementById(inputId); 
+            if(!input) return;
+            input.addEventListener('input', function(e) { 
+                let val = this.value.replace(/\D/g, ''); 
+                if (val.length > 11) val = val.substring(0, 11); 
+                let newVal = val; 
+                if (val.length > 2) newVal = val.substring(0, 2) + '-' + val.substring(2); 
+                this.value = newVal; 
+            });
         }
 
-        function toggleEditFields() {
-            const status = document.getElementById('edit_case_status').value;
-            const dateContainer = document.getElementById('edit_date_container');
-            const dateInput = document.getElementById('edit_start_date');
-            if (status === 'Upcoming') { dateContainer.style.display = 'block'; dateInput.required = true; } 
-            else { dateContainer.style.display = 'none'; dateInput.required = false; }
-
-            const reasonContainer = document.getElementById('edit_reason_container');
-            const reasonInput = document.getElementById('edit_cancel_reason');
-            if (status === 'Cancelled') { reasonContainer.style.display = 'block'; reasonInput.required = true; } 
-            else { reasonContainer.style.display = 'none'; reasonInput.required = false; }
+        // --- CAROUSEL LOGIC ---
+        function moveCarousel(cardId, direction) {
+            const card = document.getElementById('card-' + cardId);
+            const images = card.querySelectorAll('.card-img');
+            const counter = card.querySelector('.img-counter');
+            let activeIndex = 0;
+            images.forEach((img, index) => { if (img.classList.contains('active')) activeIndex = index; img.classList.remove('active'); });
+            let newIndex = activeIndex + direction;
+            if (newIndex >= images.length) newIndex = 0; if (newIndex < 0) newIndex = images.length - 1;
+            images[newIndex].classList.add('active');
+            if(counter) counter.innerText = (newIndex + 1) + '/' + images.length;
         }
 
         document.addEventListener('DOMContentLoaded', function() {
             toggleFilterInputs();
+            
+            // Setup Listeners
+            setupPostcodeState('add_postal_code', 'add_state');
+            setupPostcodeState('edit_postal_code', 'edit_state');
+            setupPhoneInput('add_contact_number');
+            setupPhoneInput('edit_contact_number');
+
             const s = document.getElementById('floatingSuccess');
             const e = document.getElementById('floatingError');
-            if (s) setTimeout(() => { s.style.opacity = '0'; setTimeout(() => s.style.display='none', 300); }, 5000);
-            if (e) setTimeout(() => { e.style.opacity = '0'; setTimeout(() => e.style.display='none', 300); }, 8000);
-            window.addEventListener('click', function(event) {
-                if (!event.target.matches('.menu-btn') && !event.target.matches('.menu-btn *')) document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
-                if (event.target.classList.contains('modal')) event.target.style.display = 'none';
+            
+            if (s && s.querySelector('#msgSuccess').innerText.trim() !== '') { 
+                s.style.display='flex'; setTimeout(() => s.style.display='none', 5000); 
+            }
+            if (e && e.querySelector('#msgError').innerText.trim() !== '') { 
+                e.style.display='flex'; setTimeout(() => e.style.display='none', 8000); 
+            }
+
+            window.onclick = function(event) {
+                if (!event.target.matches('.menu-btn') && !event.target.matches('.menu-btn *')) {
+                    document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
+                }
+                // Close modal if clicked outside
+                if (event.target.classList.contains('modal')) {
+                    event.target.style.display = 'none';
+                }
+                // Close Lightbox if clicked outside
+                if (event.target.id == 'imageLightbox') closeLightbox();
+            }
+            
+            document.addEventListener('keydown', function(event) {
+                if (document.getElementById('imageLightbox').style.display === "flex") {
+                    if (event.key === "Escape") closeLightbox();
+                    if (event.key === "ArrowLeft") changeLightboxImage(-1);
+                    if (event.key === "ArrowRight") changeLightboxImage(1);
+                }
             });
         });
 
-        // --- NEW VALIDATION FUNCTIONS ---
-        function validateAmount(inputId, errorId) {
-            const val = parseFloat(document.getElementById(inputId).value);
-            const errorEl = document.getElementById(errorId);
-            if (isNaN(val) || val < 1000) { 
-                errorEl.style.display = 'block';
-                return false;
-            } else {
-                errorEl.style.display = 'none';
-                return true;
-            }
-        }
-
-        function validateDescription(inputId, errorId) {
-            const val = document.getElementById(inputId).value;
-            const errorEl = document.getElementById(errorId);
-            if (val.length < 20) {
-                errorEl.style.display = 'block';
-                return false;
-            } else {
-                errorEl.style.display = 'none';
-                return true;
-            }
-        }
-
-        function validateCaseForm(formId) {
-            let isValid = true;
-            
-            // Map IDs based on form
-            let amountId, amountError, descId, descError;
-            if (formId === 'addSpecialCaseForm') {
-                amountId = 'add_target_amount'; amountError = 'addAmountError';
-                descId = 'add_case_description'; descError = 'addDescError';
-            } else {
-                amountId = 'edit_special_target_amount'; amountError = 'editAmountError';
-                descId = 'edit_case_description'; descError = 'editDescError';
-            }
-
-            if (!validateAmount(amountId, amountError)) isValid = false;
-            if (!validateDescription(descId, descError)) isValid = false;
-
-            return isValid;
+        function showSystemError(msg) {
+            const el = document.getElementById('floatingError');
+            document.getElementById('msgError').innerText = msg;
+            el.style.display = 'flex';
+            setTimeout(() => el.style.display='none', 5000);
         }
 
         function toggleMenu(e, id) {
@@ -816,113 +1090,292 @@ $exportUrl = "?" . http_build_query($exportParams);
             if (menu) menu.style.display = 'block';
         }
 
-        function openViewDonors(caseId) {
-            const modal = document.getElementById('viewDonorsModal');
-            const tbody = document.getElementById('donorsTableBody');
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">Loading donation history...</td></tr>';
-            modal.style.display = 'flex';
-            fetch(`special_case_management.php?action=get_case_donations&case_id=${caseId}`)
-                .then(response => response.json())
-                .then(data => {
-                    tbody.innerHTML = '';
-                    if (data.length > 0) {
-                        data.forEach(row => {
-                            tbody.innerHTML += `<tr><td>${row.date}</td><td>${row.name}</td><td>${row.amount}</td><td style="color:#666; font-size:12px;">${row.ref}</td></tr>`;
-                        });
-                    } else { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#888;">No donations found for this case yet.</td></tr>'; }
-                })
-                .catch(err => { console.error(err); tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:red;">Failed to load data.</td></tr>'; });
-        }
+        // --- IMAGE HANDLING LOGIC ---
+        let addFiles = []; 
+        let editNewFiles = []; 
+        let editExistingImages = []; 
 
-        function previewImage(input, containerId, infoId, nameId) {
-            const container = document.getElementById(containerId);
-            const info = document.getElementById(infoId);
-            const nameSpan = document.getElementById(nameId);
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) { container.innerHTML = `<img src="${e.target.result}" alt="Preview">`; if(info) { info.style.display = 'inline-flex'; nameSpan.textContent = input.files[0].name; } }
-                reader.readAsDataURL(input.files[0]);
+        function handleFileSelect(event, mode) {
+            const input = event.target;
+            const newFiles = Array.from(input.files);
+            if (mode === 'add') {
+                addFiles = addFiles.concat(newFiles);
+                updateFileInput('add_case_images', addFiles);
+                renderPreview('add_preview_container', addFiles, 'add');
+            } else if (mode === 'edit') {
+                editNewFiles = editNewFiles.concat(newFiles);
+                updateFileInput('edit_case_images', editNewFiles);
+                renderEditPreviews();
             }
         }
 
-        function removeImage(inputId, containerId, infoId, originalSrc = null) {
-            const input = document.getElementById(inputId);
+        function removeFile(index, mode) {
+            if (mode === 'add') {
+                addFiles.splice(index, 1);
+                updateFileInput('add_case_images', addFiles);
+                renderPreview('add_preview_container', addFiles, 'add');
+            } else if (mode === 'edit') {
+                editNewFiles.splice(index, 1);
+                updateFileInput('edit_case_images', editNewFiles);
+                renderEditPreviews();
+            }
+        }
+
+        function removeExistingImage(index) {
+            editExistingImages.splice(index, 1);
+            document.getElementById('existing_images_json').value = JSON.stringify(editExistingImages);
+            renderEditPreviews();
+        }
+
+        function updateFileInput(inputId, fileArray) {
+            const dataTransfer = new DataTransfer();
+            fileArray.forEach(file => dataTransfer.items.add(file));
+            document.getElementById(inputId).files = dataTransfer.files;
+        }
+
+        function renderPreview(containerId, fileArray, mode) {
             const container = document.getElementById(containerId);
-            const info = document.getElementById(infoId);
-            input.value = '';
-            if(info) info.style.display = 'none';
-            if (originalSrc) container.innerHTML = `<img src="${originalSrc}" alt="Preview">`;
-            else container.innerHTML = '<div style="color:#ccc; font-size:40px;"><i class="fas fa-image"></i></div>';
+            container.innerHTML = '';
+            fileArray.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const item = document.createElement('div');
+                    item.className = 'preview-item';
+                    item.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-img-btn" onclick="removeFile(${index}, '${mode}')"><i class="fas fa-times"></i></button>`;
+                    container.appendChild(item);
+                }
+                reader.readAsDataURL(file);
+            });
         }
 
-        function openAddSpecialCaseModal() { document.getElementById('addSpecialCaseModal').style.display = 'flex'; toggleAddDate(); }
-        function closeAddSpecialCaseModal() { 
-            document.getElementById('addSpecialCaseModal').style.display = 'none'; 
+        function renderEditPreviews() {
+            const container = document.getElementById('edit_preview_container');
+            container.innerHTML = '';
+            editExistingImages.forEach((src, index) => {
+                const item = document.createElement('div');
+                item.className = 'preview-item';
+                item.innerHTML = `<img src="${src}"><button type="button" class="remove-img-btn" onclick="removeExistingImage(${index})"><i class="fas fa-times"></i></button>`;
+                container.appendChild(item);
+            });
+            editNewFiles.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const item = document.createElement('div');
+                    item.className = 'preview-item';
+                    item.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-img-btn" onclick="removeFile(${index}, 'edit')"><i class="fas fa-times"></i></button>`;
+                    container.appendChild(item);
+                }
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function openAddSpecialCaseModal() {
+            addFiles = []; 
+            updateFileInput('add_case_images', []);
+            document.getElementById('add_preview_container').innerHTML = '';
+            document.getElementById('addSpecialCaseModal').style.display = 'flex';
+        }
+
+        function closeAddSpecialCaseModal() {
+            document.getElementById('addSpecialCaseModal').style.display = 'none';
             document.getElementById('addSpecialCaseForm').reset();
-            document.getElementById('add-preview-container').innerHTML = '<div style="color:#ccc; font-size:40px;"><i class="fas fa-image"></i></div>';
-            document.getElementById('add-file-info').style.display = 'none';
-            // Hide errors
-            document.getElementById('addAmountError').style.display = 'none';
-            document.getElementById('addDescError').style.display = 'none';
-            toggleAddDate();
+            addFiles = [];
+            document.getElementById('add_preview_container').innerHTML = '';
         }
 
-        function openEditSpecialCaseModal() { document.getElementById('editSpecialCaseModal').style.display = 'flex'; }
-        function closeEditSpecialCaseModal() { document.getElementById('editSpecialCaseModal').style.display = 'none'; }
-
-        function editSpecialCase(caseObj) {
-            document.getElementById('edit_case_id').value = caseObj.Case_ID;
-            document.getElementById('edit_case_title').value = caseObj.Case_Title;
-            document.getElementById('edit_case_description').value = caseObj.Case_Description;
-            document.getElementById('edit_special_target_amount').value = caseObj.Target_Amount;
-            document.getElementById('edit_case_status').value = caseObj.Case_Status;
-            
-            if(caseObj.Start_Date) document.getElementById('edit_start_date').value = caseObj.Start_Date;
-            if(caseObj.Cancel_Reason) document.getElementById('edit_cancel_reason').value = caseObj.Cancel_Reason;
-
-            const previewContainer = document.getElementById('edit-preview-container');
-            let originalSrc = null;
-            if (caseObj.Case_Image) { originalSrc = caseObj.Case_Image; previewContainer.innerHTML = `<img src="${caseObj.Case_Image}" alt="Preview">`; } 
-            else { previewContainer.innerHTML = '<div style="color:#ccc; font-size:40px;"><i class="fas fa-image"></i></div>'; }
-
-            document.getElementById('edit_case_image').value = '';
-            document.getElementById('edit-file-info').style.display = 'none';
-            document.getElementById('edit-file-remove-btn').onclick = function() { removeImage('edit_case_image', 'edit-preview-container', 'edit-file-info', originalSrc); };
-
-            // Hide errors initially
-            document.getElementById('editAmountError').style.display = 'none';
-            document.getElementById('editDescError').style.display = 'none';
-
-            toggleEditFields();
-            openEditSpecialCaseModal();
+        function closeEditSpecialCaseModal() {
+            document.getElementById('editSpecialCaseModal').style.display = 'none';
         }
 
-        function openViewDetails(caseObj) {
-            document.getElementById('view_case_title').value = caseObj.Case_Title;
-            document.getElementById('view_status').value = caseObj.Case_Status;
-            const dateLabel = document.getElementById('view_date_label');
-            const dateInput = document.getElementById('view_date');
-            if (caseObj.Case_Status === 'Completed' && caseObj.Completed_At) { dateLabel.innerText = "Completion Date"; dateInput.value = caseObj.Completed_At; } 
-            else if (caseObj.Case_Status === 'Upcoming' && caseObj.Start_Date) { dateLabel.innerText = "Start Date"; dateInput.value = caseObj.Start_Date; } 
-            else { dateLabel.innerText = "Created Date"; dateInput.value = caseObj.Created_At; }
+        function editSpecialCase(data) {
+            editNewFiles = []; 
+            updateFileInput('edit_case_images', []);
 
-            const reasonContainer = document.getElementById('view_reason_container');
-            if (caseObj.Case_Status === 'Cancelled' && caseObj.Cancel_Reason) { reasonContainer.style.display = 'block'; document.getElementById('view_cancel_reason').value = caseObj.Cancel_Reason; } 
-            else { reasonContainer.style.display = 'none'; }
+            document.getElementById('edit_case_id').value = data.Case_ID;
+            document.getElementById('edit_case_title').value = data.Case_Title;
+            // Pre-select category
+            document.getElementById('edit_case_category').value = data.Case_Category || 'Medical';
+            
+            document.getElementById('edit_case_description').value = data.Case_Description;
+            document.getElementById('edit_target_amount').value = data.Target_Amount;
+            document.getElementById('edit_case_status').value = data.Case_Status;
+            
+            document.getElementById('edit_start_date').value = data.Start_Date || '';
+            document.getElementById('edit_end_date').value = data.End_Date || '';
+            
+            document.getElementById('edit_case_venue').value = data.Case_Venue || '';
+            document.getElementById('edit_case_organizer').value = data.Case_Organizer || '';
+            document.getElementById('edit_contact_name').value = data.Contact_Name || '';
+            
+            // Handle Phone (+60 remove for display)
+            let phone = data.Contact_Number || '';
+            if(phone.startsWith('+60')) phone = phone.substring(3);
+            document.getElementById('edit_contact_number').value = phone;
 
-            document.getElementById('view_target').value = parseFloat(caseObj.Target_Amount).toLocaleString('en-MY', { minimumFractionDigits: 2 });
-            document.getElementById('view_raised').value = parseFloat(caseObj.Raised_Amount).toLocaleString('en-MY', { minimumFractionDigits: 2 });
-            document.getElementById('view_description').value = caseObj.Case_Description;
+            document.getElementById('edit_contact_email').value = data.Contact_Email || '';
             
-            const previewContainer = document.getElementById('view-preview-container');
-            if (caseObj.Case_Image) previewContainer.innerHTML = `<img src="${caseObj.Case_Image}" alt="Preview" style="object-fit:cover; width:100%; height:100%; border-radius:10px;">`;
-            else previewContainer.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; height:100%; background:#f8f9fa; color:#ccc; font-size:40px;"><i class="fas fa-image"></i></div>';
+            document.getElementById('edit_address1').value = data.Case_Address1 || '';
+            document.getElementById('edit_address2').value = data.Case_Address2 || '';
+            document.getElementById('edit_address3').value = data.Case_Address3 || '';
+            document.getElementById('edit_city').value = data.Case_City || '';
+            document.getElementById('edit_postal_code').value = data.Case_PostalCode || '';
+            document.getElementById('edit_state').value = data.Case_State || '';
+            document.getElementById('edit_country').value = data.Case_Country || 'Malaysia';
             
-            document.getElementById('viewDetailsModal').style.display = 'flex';
+            if(data.Cancel_Reason) document.getElementById('edit_cancel_reason').value = data.Cancel_Reason;
+            
+            try { 
+                if (data.Case_Images && data.Case_Images.startsWith('[')) {
+                    editExistingImages = JSON.parse(data.Case_Images); 
+                } else if (data.Case_Images) {
+                    editExistingImages = [data.Case_Images];
+                } else {
+                    editExistingImages = [];
+                }
+            } catch(e) { editExistingImages = []; }
+            
+            document.getElementById('existing_images_json').value = JSON.stringify(editExistingImages);
+            renderEditPreviews();
+
+            toggleCancelReason();
+            document.getElementById('editSpecialCaseModal').style.display = 'flex';
+        }
+        
+        function toggleCancelReason() {
+            const val = document.getElementById('edit_case_status').value;
+            document.getElementById('edit_cancel_div').style.display = (val === 'Cancelled') ? 'block' : 'none';
+        }
+
+        // --- VALIDATION ---
+        function checkEmail(val) {
+            if(!val) return true; 
+            return /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val);
+        }
+
+        function checkName(val) {
+            // Returns true if NO numbers are found
+            if (!val) return true;
+            return !/\d/.test(val);
+        }
+
+        function validateSpecialCaseForm(type) {
+            let isValid = true;
+            let errors = [];
+            const prefix = (type === 'add') ? 'add' : 'edit';
+            
+            // 1. Mandatory Fields (Basic check, browser handles 'required' mostly)
+            const title = document.getElementById(prefix + '_case_title').value;
+            const start = document.getElementById(prefix + '_start_date').value;
+            const end = document.getElementById(prefix + '_end_date').value;
+            
+            if(!title || !start || !end) {
+                errors.push("Please fill in all mandatory fields (*).");
+                isValid = false;
+            }
+
+            // 2. Date Logic
+            if(start && end) {
+                if(new Date(end) < new Date(start)) {
+                    errors.push("End Date cannot be earlier than Start Date.");
+                    isValid = false;
+                }
+            }
+
+            // 3. Name Validation (No Numbers)
+            const organizerName = document.getElementById(prefix + '_case_organizer').value;
+            const contactName = document.getElementById(prefix + '_contact_name').value;
+            
+            if(!checkName(organizerName)) {
+                errors.push("Organizer Name cannot contain numbers.");
+                isValid = false;
+            }
+            if(!checkName(contactName)) {
+                errors.push("Contact Person Name cannot contain numbers.");
+                isValid = false;
+            }
+
+            // 4. Email Validation
+            const emailId = prefix + '_contact_email';
+            const emailErrId = prefix + 'EmailError';
+            const emailVal = document.getElementById(emailId).value;
+            if(!checkEmail(emailVal)) {
+                if(document.getElementById(emailErrId)) document.getElementById(emailErrId).style.display = 'block';
+                errors.push("Invalid Email Format.");
+                isValid = false;
+            } else {
+                if(document.getElementById(emailErrId)) document.getElementById(emailErrId).style.display = 'none';
+            }
+
+            if(!isValid) {
+                showSystemError("Validation Error: " + errors.join(" "));
+            }
+            return isValid;
+        }
+
+        function openViewDonors(caseId) {
+            const modal = document.getElementById('viewDonorsModal');
+            const tbody = document.getElementById('donorsTableBody');
+            tbody.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
+            modal.style.display = 'flex';
+            
+            fetch(`special_case_management.php?action=get_case_donations&case_id=${caseId}`)
+            .then(res => res.json())
+            .then(data => {
+                tbody.innerHTML = '';
+                if(data.length > 0) {
+                    data.forEach(d => {
+                        // 修改：添加 onclick 事件以跳转
+                        tbody.innerHTML += `<tr class="donation-row" onclick="window.open('admin_payment_details.php?id=${d.id}', '_blank')"><td style="padding:10px; border-bottom:1px solid #eee;">${d.date}</td><td style="padding:10px; border-bottom:1px solid #eee;">${d.name}</td><td style="padding:10px; border-bottom:1px solid #eee;">RM ${d.amount}</td></tr>`;
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="3" style="padding:15px; text-align:center;">No donations yet.</td></tr>';
+                }
+            });
         }
 
         function confirmDeleteSpecialCase(id) {
-            if (confirm('Are you sure you want to delete this case? This action cannot be undone.')) window.location.href = 'special_case_management.php?delete_case_id=' + id;
+            if(confirm("Delete this case?")) window.location.href = `special_case_management.php?delete_case_id=${id}`;
+        }
+
+        // --- LIGHTBOX JS LOGIC (ADDED) ---
+        const allCaseImages = <?php echo json_encode($allCaseImagesMap); ?>;
+        let currentLightboxCaseId = null;
+        let currentLightboxIndex = 0;
+
+        function openLightbox(caseId, index) {
+            if (!allCaseImages[caseId] || allCaseImages[caseId].length === 0) return;
+            currentLightboxCaseId = caseId;
+            currentLightboxIndex = index;
+            updateLightboxImage();
+            document.getElementById('imageLightbox').style.display = "flex";
+        }
+
+        function closeLightbox() { 
+            document.getElementById('imageLightbox').style.display = "none"; 
+        }
+
+        function changeLightboxImage(n) {
+            if (currentLightboxCaseId === null) return;
+            const images = allCaseImages[currentLightboxCaseId];
+            currentLightboxIndex += n;
+            if (currentLightboxIndex >= images.length) currentLightboxIndex = 0;
+            else if (currentLightboxIndex < 0) currentLightboxIndex = images.length - 1;
+            updateLightboxImage();
+        }
+
+        function updateLightboxImage() {
+            const images = allCaseImages[currentLightboxCaseId];
+            const imgElement = document.getElementById('lightboxImage');
+            imgElement.src = images[currentLightboxIndex];
+            const prevBtn = document.querySelector('.lightbox-prev');
+            const nextBtn = document.querySelector('.lightbox-next');
+            if (images.length <= 1) { 
+                prevBtn.style.display = 'none'; 
+                nextBtn.style.display = 'none'; 
+            } else { 
+                prevBtn.style.display = 'block'; 
+                nextBtn.style.display = 'block'; 
+            }
         }
     </script>
 </body>

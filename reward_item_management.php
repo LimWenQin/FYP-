@@ -406,6 +406,7 @@ $categories = array_keys($categoryPrefixes);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reward Items - DonationMS</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="admin_common.css">
     <style>
         /* Shared Styles */
@@ -492,10 +493,50 @@ $categories = array_keys($categoryPrefixes);
         .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #6c757d; }
         .modal-body { padding: 20px; max-height: 80vh; overflow-y: auto; }
         
-        /* Image Preview Modal Specifics */
-        .image-modal-content { max-width: 500px; background: transparent; box-shadow: none; border: none; text-align: center; }
-        .image-modal-img { max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .image-close-btn { position: absolute; top: -40px; right: 0; color: white; font-size: 30px; cursor: pointer; background: none; border: none; }
+        /* --- LIGHTBOX (IMAGE VIEWER) CSS [FROM DONOR PAGE] --- */
+        .lightbox-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            padding-top: 50px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: rgba(0, 0, 0, 0.9);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .lightbox-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 80vh;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+            object-fit: contain;
+            animation: zoomIn 0.3s;
+        }
+        @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
+        
+        .close-lightbox {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+            z-index: 2002;
+        }
+        .close-lightbox:hover, .close-lightbox:focus {
+            color: #bbb;
+            text-decoration: none;
+            cursor: pointer;
+        }
 
         .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
         .form-row .form-group { flex: 1; margin-bottom: 0; }
@@ -695,7 +736,7 @@ $categories = array_keys($categoryPrefixes);
                                 <tr>
                                     <td>
                                         <div class="item-info">
-                                            <div class="item-thumb" onclick="viewImage('<?php echo $hasImage ? $imagePath : ''; ?>')">
+                                            <div class="item-thumb" onclick="openLightbox('<?php echo $hasImage ? $imagePath : ''; ?>')">
                                                 <?php if($hasImage): ?>
                                                     <img src="<?php echo $imagePath; ?>" alt="Img">
                                                 <?php else: ?>
@@ -792,11 +833,9 @@ $categories = array_keys($categoryPrefixes);
         </div>
     </div>
 
-    <div id="imageModal" class="modal">
-        <div class="modal-content image-modal-content">
-            <button class="image-close-btn" onclick="closeModal('imageModal')">&times;</button>
-            <img id="fullImage" class="image-modal-img" src="" alt="Full View">
-        </div>
+    <div id="imageLightbox" class="lightbox-modal">
+        <span class="close-lightbox" onclick="closeLightbox()">&times;</span>
+        <img class="lightbox-content" id="lightboxImage">
     </div>
 
     <div id="addModal" class="modal">
@@ -1064,10 +1103,15 @@ $categories = array_keys($categoryPrefixes);
         }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
-        function viewImage(src) {
+        // --- NEW LIGHTBOX FUNCTIONS ---
+        function openLightbox(src) {
             if(!src) return;
-            document.getElementById('fullImage').src = src;
-            document.getElementById('imageModal').style.display = 'flex';
+            document.getElementById('lightboxImage').src = src;
+            document.getElementById('imageLightbox').style.display = 'flex';
+        }
+
+        function closeLightbox() {
+            document.getElementById('imageLightbox').style.display = 'none';
         }
 
         function switchHistoryTab(tabName) {
@@ -1171,13 +1215,33 @@ $categories = array_keys($categoryPrefixes);
         window.addEventListener('click', function(e) { 
             if (!e.target.matches('.menu-btn') && !e.target.matches('.menu-btn *')) { document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); } 
             if (e.target.classList.contains('modal')) { e.target.style.display = 'none'; } 
+            
+            // Close lightbox on outside click
+            if (e.target.id == 'imageLightbox') closeLightbox();
         });
         
-        // [MODIFIED] confirm() is standard but alert() is removed.
+        // Keyboard Support for Lightbox
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape" && document.getElementById('imageLightbox').style.display === "flex") {
+                closeLightbox();
+            }
+        });
+        
+        // [MODIFIED] Replaced standard confirm() with SweetAlert2
         function confirmDelete(id, name) { 
-            if (confirm("Are you sure you want to delete '" + name + "'? This action is logged.")) { 
-                window.location.href = `reward_item_management.php?delete_id=${id}&name=${encodeURIComponent(name)}`; 
-            } 
+            Swal.fire({
+                title: 'Delete Item?',
+                text: "Are you sure you want to delete '" + name + "'? This action is logged.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, delete it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = `reward_item_management.php?delete_id=${id}&name=${encodeURIComponent(name)}`; 
+                }
+            });
         }
 
         function toggleFilterInputs() { 
@@ -1269,7 +1333,7 @@ $categories = array_keys($categoryPrefixes);
                         if(row.status === 'Delete') actionColor = 'red';
                         if(row.status === 'Stock Update') actionColor = 'green';
                         
-                        bodyLog.innerHTML += `<tr><td>${row.date}</td><td>${row.user}</td><td style="color:${actionColor};font-weight:600">${row.status}</td><td style="font-size:11px;">${row.info}</td></tr>`;
+                        bodyLog.innerHTML += `<tr><td>${row.date}</td><td>${row.user}</td><td style="color:${actionColor};font-weight:600">${row.status}</td><td style=\"font-size:11px;\">${row.info}</td></tr>`;
                     });
                 }
             });

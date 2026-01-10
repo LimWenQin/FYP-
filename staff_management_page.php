@@ -364,38 +364,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_staff'])) {
     elseif (!empty($errorMessage)) { header("Location: staff_management_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
 
-// --- 3. Handle Change Password ---
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
-    $targetStaffId = mysqli_real_escape_string($conn, $_POST['target_staff_id']);
-    $authPassword = $_POST['auth_password']; 
-    $newPassword = $_POST['new_password'];
-    $confirmPassword = $_POST['confirm_new_password'];
-    
-    $loggedInAdminId = isset($_SESSION['admin_id']) ? $_SESSION['admin_id'] : 0;
-    
-    if ($loggedInAdminId) {
-        $authSql = "SELECT Admin_Password FROM admin WHERE Admin_ID = $loggedInAdminId";
-        $authResult = $conn->query($authSql);
-        $currentUser = $authResult->fetch_assoc();
-        
-        if (!$currentUser || !password_verify($authPassword, $currentUser['Admin_Password'])) {
-            $errorMessage = "Authorization failed: Your current admin password is incorrect.";
-        } elseif ($newPassword !== $confirmPassword) {
-            $errorMessage = "New passwords do not match.";
-        } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>])[A-Za-z\d!@#$%^&*()\-_=+{};:,<.>]{8,15}$/', $newPassword)) {
-            $errorMessage = "New password does not meet security requirements.";
-        } else {
-            $newHashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
-            $updatePassSql = "UPDATE staff SET Staff_Password = '$newHashedPassword' WHERE Staff_ID = $targetStaffId";
-            if ($conn->query($updatePassSql)) { $successMessage = "Staff password changed successfully!"; } 
-            else { $errorMessage = "Error changing password: " . $conn->error; }
-        }
-    } else { $errorMessage = "Authorization failed: Only Admin can change passwords here."; }
-    
-    if (!empty($successMessage)) { header("Location: staff_management_page.php?success=" . urlencode($successMessage)); exit(); }
-    elseif (!empty($errorMessage)) { header("Location: staff_management_page.php?error=" . urlencode($errorMessage)); exit(); }
-}
-
 // --- 4. Handle BLOCK Staff ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['block_staff'])) {
     $blockId = intval($_POST['block_staff_id']);
@@ -570,27 +538,12 @@ $galleryData = [];
         .form-label { display: block; margin-bottom: 5px; font-weight: 500; color: var(--dark); font-size: 14px;}
         .form-input, .form-select, .form-textarea { width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; transition: 0.3s; }
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
-        .form-input:read-only, .form-textarea:read-only { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; } /* Updated styling for readonly */
+        .form-input:read-only, .form-textarea:read-only { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; } 
         
         .required { color: red; margin-left: 3px; font-weight: bold; }
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
         .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
         
-        /* Password styles */
-        .password-requirements { margin-top: 8px; font-size: 12px; }
-        .requirement-item { display: flex; align-items: center; margin-bottom: 3px; color: #888; }
-        .requirement-item.valid { color: var(--success); }
-        .requirement-item.invalid { color: var(--gray); }
-        .requirement-item i { width: 15px; text-align: center; margin-right: 5px; }
-
-        .password-input-group { display: flex; width: 100%; }
-        .password-input-container { position: relative; flex: 1; display: flex;}
-        .password-input-container input { flex: 1; border-radius: 5px 0 0 5px; border-right: none; }
-        .password-input-container button.toggle-password { position: static; border: 1px solid var(--gray-light); border-left: none; border-radius: 0; background: white; padding: 0 10px; transform: none; cursor: pointer; color: var(--gray); }
-        .btn-small { padding: 0 12px; border-radius: 0 5px 5px 0; border: 1px solid var(--gray-light); border-left: none; background: #f8f9fa; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--primary); transition: 0.2s; }
-        .btn-small:hover { background: #e9ecef; }
-        .confirm-check { position: absolute; right: 50px; top: 50%; transform: translateY(-50%); color: var(--success); font-size: 14px; display: none; z-index: 5; }
-
         .phone-format { display: flex; align-items: center; }
         .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid var(--gray-light); border-right: none; border-radius: 5px 0 0 5px; color: var(--gray); }
         .phone-input { border-radius: 0 5px 5px 0 !important; }
@@ -789,7 +742,6 @@ $galleryData = [];
                                 <div id="menu-<?php echo $staff['Staff_ID']; ?>" class="dropdown-content">
                                     <div onclick="openViewStaffModal(<?php echo htmlspecialchars(json_encode($staff)); ?>)"><i class="fas fa-eye"></i> View Details</div>
                                     <div onclick='openEditStaffModal(<?php echo json_encode($staff); ?>)'><i class="fas fa-edit"></i> Edit Details</div>
-                                    <div onclick="openChangePasswordModal(<?php echo $staff['Staff_ID']; ?>)"><i class="fas fa-key"></i> Change Password</div>
                                     <div onclick="openBlockStaffModal(<?php echo $staff['Staff_ID']; ?>, '<?php echo addslashes($staff['Staff_FullName']); ?>')" class="text-delete"><i class="fas fa-ban"></i> Block Staff</div>
                                 </div>
                             </div>
@@ -898,7 +850,7 @@ $galleryData = [];
         <div class="modal-content">
             <div class="modal-header"><h2>Add New Staff</h2><button class="close-btn" onclick="closeAddStaffModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="addStaffForm" action="staff_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')">
+                <form id="addStaffForm" action="staff_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')" novalidate>
                     <input type="hidden" name="add_staff" value="1">
                     
                     <div class="form-group">
@@ -1001,7 +953,7 @@ $galleryData = [];
         <div class="modal-content">
             <div class="modal-header"><h2>Edit Staff</h2><button class="close-btn" onclick="closeEditStaffModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="editStaffForm" action="staff_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('edit')">
+                <form id="editStaffForm" action="staff_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('edit')" novalidate>
                     <input type="hidden" name="update_staff" value="1">
                     <input type="hidden" id="edit_staff_id" name="staff_id">
                     
@@ -1087,58 +1039,6 @@ $galleryData = [];
                         <span class="form-guide">Optional notes (e.g., specific skills, emergency contact info, or department details).</span>
                     </div>
                     <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Update Staff</button></div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal" id="changePasswordModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Change Staff Password</h2><button class="close-btn" onclick="closeChangePasswordModal()">&times;</button></div>
-            <div class="modal-body">
-                <form id="changePasswordForm" action="staff_management_page.php" method="POST" onsubmit="return validateChangePassword()">
-                    <input type="hidden" name="change_password" value="1">
-                    <input type="hidden" name="target_staff_id" id="cp_target_id">
-                    
-                    <div class="form-group">
-                        <label class="form-label">Your Current Admin Password (Authorization) <span class="required">*</span></label>
-                        <div class="password-input-container">
-                            <input type="password" name="auth_password" class="form-input" required placeholder="Enter logged-in admin password">
-                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility(this.previousElementSibling.id || this.previousElementSibling)"><i class="fas fa-eye"></i></button>
-                        </div>
-                        <span class="form-guide">To ensure security, please enter your own password to proceed.</span>
-                    </div>
-                    
-                    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-
-                    <div class="form-group">
-                        <label class="form-label">New Password for Staff <span class="required">*</span></label>
-                        <div class="password-input-group">
-                            <div class="password-input-container">
-                                <input type="password" id="cp_new_password" name="new_password" class="form-input" required oninput="validatePasswordRequirements('cp_new_password', 'cp_req_list', 'cp_')">
-                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('cp_new_password')"><i class="fas fa-eye"></i></button>
-                            </div>
-                            <button type="button" class="btn-small" onclick="generateStrongPassword('cp_new_password', 'cp_confirm_password')">Auto Generate</button>
-                        </div>
-                        <div class="password-requirements" id="cp_req_list">
-                            <div class="requirement-item invalid" id="cp_lengthReq"><i class="fas fa-times"></i> Must be 8-15 characters long</div>
-                            <div class="requirement-item invalid" id="cp_uppercaseReq"><i class="fas fa-times"></i> Must contain at least one Uppercase letter</div>
-                            <div class="requirement-item invalid" id="cp_lowercaseReq"><i class="fas fa-times"></i> Must contain at least one Lowercase letter</div>
-                            <div class="requirement-item invalid" id="cp_numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div>
-                            <div class="requirement-item invalid" id="cp_specialReq"><i class="fas fa-times"></i> Must contain at least one Special character (e.g. !@#)</div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Confirm New Password <span class="required">*</span></label>
-                        <div class="password-input-container">
-                            <input type="password" id="cp_confirm_password" name="confirm_new_password" class="form-input" required oninput="validateMatch(this.id, 'cp_new_password', 'cp_match_error')">
-                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('cp_confirm_password')"><i class="fas fa-eye"></i></button>
-                        </div>
-                        <div id="cp_match_error" class="error-message">Passwords do not match</div>
-                    </div>
-
-                    <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-key"></i> Update Password</button></div>
                 </form>
             </div>
         </div>
@@ -1276,7 +1176,6 @@ $galleryData = [];
                 if (event.target == document.getElementById('addStaffModal')) closeAddStaffModal();
                 if (event.target == document.getElementById('editStaffModal')) closeEditStaffModal();
                 if (event.target == document.getElementById('viewStaffModal')) closeModal('viewStaffModal');
-                if (event.target == document.getElementById('changePasswordModal')) closeChangePasswordModal();
                 if (event.target == document.getElementById('blockStaffModal')) closeModal('blockStaffModal');
                 if (event.target == document.getElementById('imageLightbox')) closeLightbox();
             }
@@ -1319,7 +1218,7 @@ $galleryData = [];
                 if (val.length > 8) { newVal += '-' + val.substring(8, 12); }
                 this.value = newVal;
 
-                // --- NEW: Logic to Auto-Fill and Lock DOB ---
+                // --- Logic to Auto-Fill and Lock DOB ---
                 if (val.length >= 6) {
                     const yearPrefix = parseInt(val.substring(0, 2));
                     const month = val.substring(2, 4);
@@ -1354,35 +1253,6 @@ $galleryData = [];
                     dobInput.style.cursor = "";
                 }
             });
-        }
-
-        function generateStrongPassword(passId, confirmId) {
-            const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-            const lower = "abcdefghijklmnopqrstuvwxyz";
-            const numbers = "0123456789";
-            const specials = "!@#$%^&*";
-            const all = upper + lower + numbers + specials;
-            let password = "";
-            password += upper[Math.floor(Math.random() * upper.length)];
-            password += lower[Math.floor(Math.random() * lower.length)];
-            password += numbers[Math.floor(Math.random() * numbers.length)];
-            password += specials[Math.floor(Math.random() * specials.length)];
-            for (let i = 4; i < 12; i++) { password += all[Math.floor(Math.random() * all.length)]; }
-            password = password.split('').sort(() => 0.5 - Math.random()).join('');
-            
-            document.getElementById(passId).value = password;
-            document.getElementById(passId).dispatchEvent(new Event('input'));
-
-            if(confirmId) {
-                document.getElementById(confirmId).value = password;
-                document.getElementById(confirmId).dispatchEvent(new Event('input'));
-            }
-            
-            const passInput = document.getElementById(passId);
-            passInput.type = "text";
-            if(passInput.parentNode.querySelector('.toggle-password i')) {
-                passInput.parentNode.querySelector('.toggle-password i').className = 'fas fa-eye-slash';
-            }
         }
 
         function previewImage(input, containerId, infoId, nameId) {
@@ -1530,20 +1400,6 @@ $galleryData = [];
         }
         function closeEditStaffModal() { document.getElementById('editStaffModal').style.display = 'none'; }
         
-        function openChangePasswordModal(id) {
-            if (!id) return;
-            document.getElementById('changePasswordModal').style.display = 'flex';
-            document.getElementById('cp_target_id').value = id;
-            document.getElementById('changePasswordForm').reset();
-            
-            document.querySelectorAll('#cp_req_list .requirement-item').forEach(el => {
-                el.className = 'requirement-item invalid';
-                el.querySelector('i').className = 'fas fa-times';
-            });
-            document.getElementById('cp_match_error').style.display = 'none';
-        }
-        function closeChangePasswordModal() { document.getElementById('changePasswordModal').style.display = 'none'; }
-        
         function validateName(input) { input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); }
         
         function validateEmail(id) {
@@ -1575,95 +1431,55 @@ $galleryData = [];
             return ""; 
         }
 
-        function validatePasswordRequirements(passId, listContainerId, prefix = '') {
-            const pw = document.getElementById(passId).value;
-            const reqs = { 
-                lengthReq: pw.length >= 8 && pw.length <= 15, 
-                uppercaseReq: /[A-Z]/.test(pw), 
-                lowercaseReq: /[a-z]/.test(pw), 
-                numberReq: /\d/.test(pw), 
-                specialReq: /[!@#$%^&*]/.test(pw) 
-            };
-            let allValid = true;
-            
-            for (const [key, valid] of Object.entries(reqs)) {
-                let elId = prefix + key;
-                const el = document.getElementById(elId);
-                if(el) {
-                    const icon = el.querySelector('i');
-                    if (valid) { el.className = 'requirement-item valid'; icon.className = 'fas fa-check'; }
-                    else { el.className = 'requirement-item invalid'; icon.className = 'fas fa-times'; allValid = false; }
-                }
-            }
-            return allValid;
-        }
-        
-        function validateMatch(confirmId, passId, errorId) {
-            const pw = document.getElementById(passId).value;
-            const cpw = document.getElementById(confirmId).value;
-            const match = pw === cpw && pw !== "";
-            document.getElementById(errorId).style.display = (match || cpw === "") ? 'none' : 'block';
-            return match;
-        }
-
-        function togglePasswordVisibility(idOrElement) {
-            let f;
-            if (typeof idOrElement === 'string') { f = document.getElementById(idOrElement); } 
-            else { f = idOrElement; }
-            
-            if (!f) return;
-            let icon;
-            if (f.nextElementSibling && f.nextElementSibling.tagName === 'BUTTON') { icon = f.nextElementSibling.querySelector('i'); } 
-            else if (f.parentNode.querySelector('button i')) { icon = f.parentNode.querySelector('button i'); }
-            
-            if(f.type === 'password') { f.type = 'text'; if(icon) icon.className = 'fas fa-eye-slash'; }
-            else { f.type = 'password'; if(icon) icon.className = 'fas fa-eye'; }
-        }
-
-        // --- REPLACED ALERTS WITH CUSTOM SYSTEM ERROR ---
+        // --- UPDATED: Validate Form to use System Error instead of localhost popups ---
         function validateForm(type) {
             let errors = [];
+            let name, email, dob, contactId, icNum;
 
             if (type === 'add') {
-                let emailMsg = validateEmail('email');
-                if(emailMsg) errors.push("Email: " + emailMsg);
-                document.getElementById('emailError').style.display = emailMsg ? 'block' : 'none';
-
-                if(!validateAge('dob', 'ageError')) errors.push("Age: Must be at least 18 years old.");
-
-                let phoneMsg = validatePhone('add_contact');
-                if(phoneMsg) errors.push("Contact Number: " + phoneMsg);
-
-                if(!document.getElementById('ic_number').value) errors.push("IC Number is required.");
+                name = document.getElementById('full_name').value.trim();
+                email = document.getElementById('email').value.trim();
+                dob = document.getElementById('dob').value;
+                contactId = 'add_contact';
+                icNum = document.getElementById('ic_number').value.trim();
+            } else {
+                name = document.getElementById('edit_fullname').value.trim();
+                email = document.getElementById('edit_email').value.trim();
+                dob = document.getElementById('edit_dob').value;
+                contactId = 'edit_contact';
+                icNum = document.getElementById('edit_ic_number').value.trim();
             }
-            else if (type === 'edit') {
-                let emailMsg = validateEmail('edit_email');
+
+            // 1. Basic Required Field Checks (Manual because novalidate is on)
+            if (!name) errors.push("Full Name is required.");
+            if (!email) errors.push("Email is required.");
+            if (!icNum) errors.push("IC Number is required.");
+            if (!dob) errors.push("Date of Birth is required.");
+            
+            const contactVal = document.getElementById(contactId).value.trim();
+            if (!contactVal) errors.push("Contact Number is required.");
+
+            // 2. Specific Format Validations
+            if (email) {
+                let emailMsg = validateEmail(type === 'add' ? 'email' : 'edit_email');
                 if(emailMsg) errors.push("Email: " + emailMsg);
-                document.getElementById('editEmailError').style.display = emailMsg ? 'block' : 'none';
+            }
 
-                if(!validateAge('edit_dob', 'editAgeError')) errors.push("Age: Must be at least 18 years old.");
+            if (dob && !validateAge(type === 'add' ? 'dob' : 'edit_dob', type === 'add' ? 'ageError' : 'editAgeError')) {
+                errors.push("Age: Must be at least 18 years old.");
+            }
 
-                let phoneMsg = validatePhone('edit_contact');
+            if (contactVal) {
+                let phoneMsg = validatePhone(contactId);
                 if(phoneMsg) errors.push("Contact Number: " + phoneMsg);
             }
 
             if (errors.length > 0) {
-                // Modified to use system error instead of alert
-                showSystemError("Please correct the following errors: " + errors.join(". "));
+                // Use system error instead of alert
+                showSystemError("Please correct the following errors: " + errors.join(" "));
                 return false; 
             }
             return true; 
-        }
-        
-        function validateChangePassword() {
-            const vPass = validatePasswordRequirements('cp_new_password', 'cp_req_list', 'cp_');
-            const vMatch = validateMatch('cp_confirm_password', 'cp_new_password', 'cp_match_error');
-            if(!vPass || !vMatch) {
-                // Modified to use system error instead of alert
-                showSystemError("Please fix password requirements or matching issues.");
-                return false;
-            }
-            return true;
         }
     </script>
 </body>
