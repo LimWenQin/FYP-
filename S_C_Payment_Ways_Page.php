@@ -17,29 +17,36 @@ $current_donor_id = $_SESSION['donor_id'];
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
     
     $amount = (float)$_POST['amount'];
-    $case_id = (int)$_POST['case_id'];
+    // [FIX] 同时接收两个 ID
+    $case_id = isset($_POST['case_id']) ? (int)$_POST['case_id'] : 0;
+    $activity_id = isset($_POST['activity_id']) ? (int)$_POST['activity_id'] : 0;
+    
     $type = $_POST['donation_type'];
     $tax_receipt = isset($_POST['tax_receipt']) ? 1 : 0;
 
-    if ($amount <= 0 || $case_id <= 0) {
-        echo "<script>alert('Invalid data.'); window.history.back();</script>";
+    // [FIX] 验证逻辑：只要其中一个ID有效即可
+    if ($amount <= 0 || ($case_id <= 0 && $activity_id <= 0)) {
+        echo "<script>alert('Invalid data. No project selected.'); window.history.back();</script>";
         exit();
     }
+
+    // [FIX] 确定来源类型
+    $source_type = ($activity_id > 0) ? 'activity' : 'special_case';
 
     // 存入 Session
     $_SESSION['donation_data'] = [
         'amount' => $amount,
         'type' => $type,
         'case_id' => $case_id,
+        'activity_id' => $activity_id, // [FIX] 保存 Activity ID
         'branch_id' => 0,
-        'activity_id' => 0,
         'tax_receipt' => $tax_receipt,
-        'source' => 'special_case' // 关键标记：告诉后续页面这是 Special Case
+        'source' => $source_type // [FIX] 动态标记来源
     ];
 }
 
 // Session 检查
-if (empty($_SESSION['donation_data']) || $_SESSION['donation_data']['source'] != 'special_case') {
+if (empty($_SESSION['donation_data'])) {
     header("Location: Homepage.php");
     exit();
 }
@@ -48,9 +55,11 @@ if (empty($_SESSION['donation_data']) || $_SESSION['donation_data']['source'] !=
 $amount = $_SESSION['donation_data']['amount'];
 $donation_type = $_SESSION['donation_data']['type'];
 $case_id = $_SESSION['donation_data']['case_id'];
+$activity_id = $_SESSION['donation_data']['activity_id'];
 $tax_status = $_SESSION['donation_data']['tax_receipt'];
+$current_source = $_SESSION['donation_data']['source'];
 
-// 3. 获取钱包余额 (用于 JS 检查) - 这一步是新加的，为了 E-Wallet 功能
+// 3. 获取钱包余额 (用于 JS 检查)
 $wallet_sql = "SELECT Donor_Wallet FROM donor WHERE Donor_ID = ?";
 $w_stmt = $conn->prepare($wallet_sql);
 $w_stmt->bind_param("i", $current_donor_id);
@@ -59,15 +68,25 @@ $w_res = $w_stmt->get_result()->fetch_assoc();
 $current_balance = $w_res['Donor_Wallet'] ?? 0.00;
 $w_stmt->close();
 
-// 4. 查询 Case 名字
-$case_title = "Special Case";
-$sql = "SELECT Case_Title FROM special_case WHERE Case_ID = ?";
+// 4. [FIX] 动态查询项目名称 (Case 或 Activity)
+$project_title = "Unknown Project";
+
+if ($activity_id > 0) {
+    // 查询 Activity 表
+    $sql = "SELECT Activity_Name as title FROM activity WHERE Activity_ID = ?";
+    $param_id = $activity_id;
+} else {
+    // 查询 Special Case 表
+    $sql = "SELECT Case_Title as title FROM special_case WHERE Case_ID = ?";
+    $param_id = $case_id;
+}
+
 if ($stmt = $conn->prepare($sql)) {
-    $stmt->bind_param("i", $case_id);
+    $stmt->bind_param("i", $param_id);
     $stmt->execute();
     $res = $stmt->get_result();
     if ($r = $res->fetch_assoc()) {
-        $case_title = $r['Case_Title'];
+        $project_title = $r['title'];
     }
     $stmt->close();
 }
@@ -136,7 +155,7 @@ include 'header_UI.php';
     <div class="overlay"></div>
     <div class="hero-content">
         <h1>Secure Payment</h1>
-        <p>Complete your donation for <?php echo htmlspecialchars($case_title); ?></p>
+        <p>Complete your donation for <?php echo htmlspecialchars($project_title); ?></p>
     </div>
 </div>
 
@@ -159,7 +178,7 @@ include 'header_UI.php';
                 <div class="summary-card">
                     <div class="summary-item">
                         <span class="summary-label">Project</span>
-                        <span class="summary-value"><?php echo htmlspecialchars($case_title); ?></span>
+                        <span class="summary-value"><?php echo htmlspecialchars($project_title); ?></span>
                     </div>
                     <div class="summary-item">
                         <span class="summary-label">Type</span>
@@ -178,7 +197,11 @@ include 'header_UI.php';
                 </div>
                 
                 <div class="nav-buttons">
-                    <a href="S_C_Payment_Page.php?case_id=<?php echo $case_id; ?>" class="btn-prev">
+                    <?php 
+                        // [FIX] 返回按钮链接根据类型跳转
+                        $back_link_param = ($activity_id > 0) ? "activity_id=$activity_id" : "case_id=$case_id";
+                    ?>
+                    <a href="S_C_Payment_Page.php?<?php echo $back_link_param; ?>" class="btn-prev">
                         <i class="fas fa-arrow-left"></i> Back to Details
                     </a>
                 </div>
