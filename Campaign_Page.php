@@ -1,6 +1,6 @@
 <?php
 include 'dataconnection.php';
-include 'header_function.php';
+// include 'header_function.php'; // 如果不需要可以注释掉
 
 // 获取所有活动，按状态和日期排序
 $query = "SELECT * FROM activity ORDER BY 
@@ -48,12 +48,12 @@ include 'header_UI.php';
         
         /* Header Styles */
         .campaign-header {
+
             /* 修改部分：背景图片 + 红色遮罩 */
             background: linear-gradient(rgb(108 99 98 / 85%), rgb(108 99 98 / 85%)), url(https://images.unsplash.com/photo-1559027615-cd4628902d4a?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80);
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            
             color: white;
             padding: 80px 20px;
             text-align: center;
@@ -78,7 +78,7 @@ include 'header_UI.php';
             font-weight: 700;
             margin-bottom: 15px;
             position: relative;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3); /* 增加文字阴影提高可读性 */
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
         
         .page-description {
@@ -87,7 +87,7 @@ include 'header_UI.php';
             margin: 0 auto 30px;
             opacity: 0.95;
             position: relative;
-            font-weight: 500; /*稍微加粗*/
+            font-weight: 500;
         }
         
         /* Campaign Stats */
@@ -101,7 +101,7 @@ include 'header_UI.php';
         }
         
         .stat-box {
-            background: rgba(255, 255, 255, 0.2); /* 稍微增加不透明度 */
+            background: rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(10px);
             padding: 20px 30px;
             border-radius: 15px;
@@ -202,25 +202,24 @@ include 'header_UI.php';
         
         /* Campaign Card */
         .campaign-card {
-        background: var(--white);
-        border-radius: 15px;
-        overflow: hidden;
-        box-shadow: 0 8px 25px var(--shadow);
-        border: 1px solid var(--medium-gray);
-        opacity: 1;
-        transform: translateY(0);
-        transition: opacity 0.4s ease, transform 0.4s ease, box-shadow 0.3s ease;
-}
+            background: var(--white);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px var(--shadow);
+            border: 1px solid var(--medium-gray);
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 0.4s ease, transform 0.4s ease, box-shadow 0.3s ease;
+        }
 
-        
         .campaign-card.hidden {
-        opacity: 0;
-        transform: translateY(20px);
-        visibility: hidden;
-        pointer-events: none;
-}
+            opacity: 0;
+            transform: translateY(20px);
+            visibility: hidden;
+            pointer-events: none;
+            position: absolute; /* 防止隐藏后占用空间 */
+        }
 
-        
         .campaign-card:hover {
             transform: translateY(-10px);
             box-shadow: 0 15px 35px rgba(229, 57, 53, 0.15);
@@ -247,24 +246,11 @@ include 'header_UI.php';
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
         }
         
-        .badge-ongoing {
-            background: var(--success);
-            color: white;
-        }
+        .badge-ongoing { background: var(--success); color: white; }
+        .badge-upcoming { background: var(--warning); color: white; }
+        .badge-past { background: var(--dark-gray); color: white; }
         
-        .badge-upcoming {
-            background: var(--warning);
-            color: white;
-        }
-        
-        .badge-past {
-            background: var(--dark-gray);
-            color: white;
-        }
-        
-        .campaign-content {
-            padding: 25px;
-        }
+        .campaign-content { padding: 25px; }
         
         .campaign-dates {
             color: var(--dark-gray);
@@ -275,9 +261,7 @@ include 'header_UI.php';
             gap: 8px;
         }
         
-        .campaign-dates i {
-            color: var(--primary-red);
-        }
+        .campaign-dates i { color: var(--primary-red); }
         
         .campaign-title {
             font-size: 22px;
@@ -308,14 +292,10 @@ include 'header_UI.php';
             margin-bottom: 20px;
         }
         
-        .campaign-location i {
-            color: var(--primary-red);
-        }
+        .campaign-location i { color: var(--primary-red); }
         
         /* Progress Bar */
-        .progress-container {
-            margin-bottom: 20px;
-        }
+        .progress-container { margin-bottom: 20px; }
         
         .progress-label {
             display: flex;
@@ -346,9 +326,7 @@ include 'header_UI.php';
             border-bottom: 1px solid var(--medium-gray);
         }
         
-        .stat-item {
-            text-align: center;
-        }
+        .stat-item { text-align: center; }
         
         .stat-value {
             font-size: 24px;
@@ -364,10 +342,7 @@ include 'header_UI.php';
             letter-spacing: 1px;
         }
         
-        .campaign-actions {
-            display: flex;
-            gap: 10px;
-        }
+        .campaign-actions { display: flex; gap: 10px; }
         
         .btn-donate {
             flex: 1;
@@ -407,15 +382,14 @@ include 'header_UI.php';
             display: inline-block;
         }
         
-        .btn-details:hover {
-            background: var(--lighter-red);
-        }
+        .btn-details:hover { background: var(--lighter-red); }
         
         /* Empty State */
         .no-campaigns {
             grid-column: 1 / -1;
             text-align: center;
             padding: 60px 20px;
+            display: none; /* 默认隐藏 */
         }
         
         .no-campaigns i {
@@ -443,77 +417,24 @@ include 'header_UI.php';
         }
         
         @media (max-width: 768px) {
-            .page-title {
-                font-size: 36px;
-            }
-            
-            .page-description {
-                font-size: 18px;
-                padding: 0 20px;
-            }
-            
-            .campaign-stats {
-                gap: 20px;
-            }
-            
-            .stat-box {
-                min-width: 140px;
-                padding: 15px 20px;
-            }
-            
-            .stat-number {
-                font-size: 28px;
-            }
-            
-            .filters {
-                justify-content: center;
-            }
-            
-            .filter-btn {
-                padding: 10px 20px;
-                font-size: 14px;
-            }
-            
-            .campaign-grid {
-                grid-template-columns: 1fr;
-                gap: 20px;
-            }
-            
-            .campaign-container {
-                padding: 20px;
-            }
+            .page-title { font-size: 36px; }
+            .page-description { font-size: 18px; padding: 0 20px; }
+            .campaign-stats { gap: 20px; }
+            .stat-box { min-width: 140px; padding: 15px 20px; }
+            .stat-number { font-size: 28px; }
+            .filters { justify-content: center; }
+            .filter-btn { padding: 10px 20px; font-size: 14px; }
+            .campaign-grid { grid-template-columns: 1fr; gap: 20px; }
+            .campaign-container { padding: 20px; }
         }
         
         @media (max-width: 480px) {
-            .campaign-header {
-                padding: 40px 0;
-            }
-            
-            .page-title {
-                font-size: 28px;
-            }
-            
-            .campaign-stats {
-                flex-direction: column;
-                align-items: center;
-                gap: 15px;
-            }
-            
-            .stat-box {
-                width: 100%;
-                max-width: 250px;
-            }
-            
-            .filters {
-                justify-content: space-around;
-            }
-            
-            .filter-btn {
-                flex: 1;
-                justify-content: center;
-                padding: 12px;
-                font-size: 13px;
-            }
+            .campaign-header { padding: 40px 0; }
+            .page-title { font-size: 28px; }
+            .campaign-stats { flex-direction: column; align-items: center; gap: 15px; }
+            .stat-box { width: 100%; max-width: 250px; }
+            .filters { justify-content: space-around; }
+            .filter-btn { flex: 1; justify-content: center; padding: 12px; font-size: 13px; }
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -567,13 +488,11 @@ include 'header_UI.php';
                 $totalRaised = 0;
                 $activeCount = 0;
                 $totalCount = 0;
-                $campaignsData = [];
                 
                 while($campaign = $result->fetch_assoc()): 
                     $totalCount++;
                     $totalRaised += $campaign['Activity_GetAmount'];
                     
-                    // 确定活动状态
                     $currentDate = date('Y-m-d');
                     $startDate = $campaign['Activity_StartDate'];
                     $endDate = $campaign['Activity_EndDate'];
@@ -600,179 +519,171 @@ include 'header_UI.php';
                         $badgeText = 'Completed';
                     }
                     
-                    // 计算进度百分比
-                   $targetAmount = $campaign['Activity_TargetAmount'];
-    $raisedAmount = $campaign['Activity_GetAmount'];
-    $progress = ($targetAmount > 0) ? min(($raisedAmount / $targetAmount) * 100, 100) : 0;
-
-    
-    ob_start();
-    ?>
+                    $targetAmount = $campaign['Activity_TargetAmount'];
+                    $raisedAmount = $campaign['Activity_GetAmount'];
+                    $progress = ($targetAmount > 0) ? min(($raisedAmount / $targetAmount) * 100, 100) : 0;
                     
-                        <div class="campaign-card" data-status="<?php echo $campaignStatus; ?>">
-                            <div style="position: relative;">
+                    ob_start();
+            ?>
+                    
+                    <div class="campaign-card" data-status="<?php echo $campaignStatus; ?>">
+                        <div style="position: relative;">
+                            <?php 
+                            $imagePath = !empty($campaign['Activity_Picture']) ? $campaign['Activity_Picture'] : 'images/campaign-default.jpg';
+                            // 检查图片是否存在 (可选)
+                            // if (!file_exists($imagePath)) $imagePath = 'images/campaign-default.jpg';
+                            ?>
+                            <img src="<?php echo htmlspecialchars($imagePath); ?>" 
+                                 alt="<?php echo htmlspecialchars($campaign['Activity_Name']); ?>" 
+                                 class="campaign-image"
+                                 onerror="this.src='images/campaign-default.jpg'">
+                            
+                            <span class="campaign-badge <?php echo $badgeClass; ?>">
+                                <?php echo $badgeText; ?>
+                            </span>
+                        </div>
+                        
+                        <div class="campaign-content">
+                            <div class="campaign-dates">
+                                <i class="far fa-calendar"></i>
                                 <?php 
-                                $imagePath = !empty($campaign['Activity_Picture']) ? $campaign['Activity_Picture'] : 'images/campaign-default.jpg';
-                                if (!file_exists($imagePath) && $imagePath != 'images/campaign-default.jpg') {
-                                    $imagePath = 'images/campaign-default.jpg';
-                                }
+                                    $startFormatted = date('M d, Y', strtotime($startDate));
+                                    $endFormatted = date('M d, Y', strtotime($endDate));
+                                    echo $startFormatted . ' - ' . $endFormatted;
                                 ?>
-                                <span class="campaign-badge <?php echo $badgeClass; ?>">
-                                    <?php echo $badgeText; ?>
-                                </span>
                             </div>
                             
-                            <div class="campaign-content">
-                                <div class="campaign-dates">
-                                    <i class="far fa-calendar"></i>
-                                    <?php 
-                                        $startFormatted = date('M d, Y', strtotime($startDate));
-                                        $endFormatted = date('M d, Y', strtotime($endDate));
-                                        echo $startFormatted . ' - ' . $endFormatted;
-                                    ?>
+                            <h3 class="campaign-title"><?php echo htmlspecialchars($campaign['Activity_Name']); ?></h3>
+                            
+                            <p class="campaign-details"><?php echo htmlspecialchars($campaign['Activity_Details']); ?></p>
+                            
+                            <div class="campaign-location">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <?php 
+                                    echo htmlspecialchars($campaign['Activity_City']) . ', ' . 
+                                         htmlspecialchars($campaign['Activity_State']);
+                                ?>
+                            </div>
+                            
+                            <div class="progress-container">
+                                <div class="progress-label">
+                                    <span>Raised: RM <?php echo number_format($raisedAmount, 2); ?></span>
+                                    <span>Goal: RM <?php echo number_format($targetAmount, 2); ?></span>
                                 </div>
-                                
-                                <h3 class="campaign-title"><?php echo htmlspecialchars($campaign['Activity_Name']); ?></h3>
-                                
-                                <p class="campaign-details"><?php echo htmlspecialchars($campaign['Activity_Details']); ?></p>
-                                
-                                <div class="campaign-location">
-                                    <i class="fas fa-map-marker-alt"></i>
-                                    <?php 
-                                        echo htmlspecialchars($campaign['Activity_City']) . ', ' . 
-                                             htmlspecialchars($campaign['Activity_State']) . ', ' . 
-                                             htmlspecialchars($campaign['Activity_Country']);
-                                    ?>
-                                </div>
-                                
-                                <div class="progress-container">
-                                    <div class="progress-label">
-                                        <span>Raised: RM <?php echo number_format($raisedAmount, 2); ?></span>
-                                        <span>Goal: RM <?php echo number_format($targetAmount, 2); ?></span>
-                                    </div>
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: <?php echo $progress; ?>%"></div>
-                                    </div>
-                                </div>
-                                
-                                <div class="campaign-stats-row">
-                                    <div class="stat-item">
-                                        <span class="stat-value"><?php echo number_format($progress, 0); ?>%</span>
-                                        <span class="stat-text">Funded</span>
-                                    </div>
-                                </div>
-                                
-                                <div class="campaign-actions">
-                                    <a href="donate.php?activity_id=<?php echo $campaign['Activity_ID']; ?>" class="btn-donate">
-                                        <i class="fas fa-heart"></i> Donate Now
-                                    </a>
-                                    <a href="activity_detail.php?id=<?php echo $campaign['Activity_ID']; ?>" class="btn-details">
-                                        Details
-                                    </a>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: <?php echo $progress; ?>%"></div>
                                 </div>
                             </div>
+                            
+                            <div class="campaign-stats-row">
+                                <div class="stat-item">
+                                    <span class="stat-value"><?php echo number_format($progress, 0); ?>%</span>
+                                    <span class="stat-text">Funded</span>
+                                </div>
+                            </div>
+                            
+                            <div class="campaign-actions">
+                                <a href="S_C_Payment_Page.php?activity_id=<?php echo $campaign['Activity_ID']; ?>" class="btn-donate">
+                                    <i class="fas fa-heart"></i> Donate Now
+                                </a>
+                                
+                                <a href="activity_detail.php?id=<?php echo $campaign['Activity_ID']; ?>" class="btn-details">
+                                    Details
+                                </a>
+                            </div>
                         </div>
-                    <?php 
+                    </div>
+            <?php 
                     echo ob_get_clean();
-                    endwhile;
-                    ?>
+                endwhile;
+            endif; 
+            ?>
 
-                <div class="no-campaigns">
-                    <i class="fas fa-calendar-times"></i>
-                    <h3>No campaigns found</h3>
-                    <p>Check back later for upcoming campaigns and events.</p>
-                </div>
-            <?php endif; ?>
+            <div class="no-campaigns" id="noCampaignsMsg">
+                <i class="fas fa-calendar-times"></i>
+                <h3>No campaigns found</h3>
+                <p>Try changing the filter or check back later.</p>
+            </div>
         </div>
     </div>
             
-     <?php include 'footer.php'; ?>
+    <?php include 'footer.php'; ?>
 
     <script>
-        // Update stats on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // Get counts from PHP variables
+            // Stats logic
             const totalCampaigns = <?php echo $totalCount; ?>;
             const activeCampaigns = <?php echo $activeCount; ?>;
             const totalRaised = <?php echo $totalRaised; ?>;
             
-            // Animate the counters
             animateCounter('totalCampaigns', 0, totalCampaigns, 1000);
             animateCounter('activeCampaigns', 0, activeCampaigns, 1000);
             animateCurrencyCounter('totalRaised', 0, totalRaised, 1500);
             
-            // Filter functionality
+            // Filter logic
             const filterButtons = document.querySelectorAll('.filter-btn');
             const campaignCards = document.querySelectorAll('.campaign-card');
+            const noMsg = document.getElementById('noCampaignsMsg');
             
             filterButtons.forEach(button => {
                 button.addEventListener('click', function() {
-                    // Remove active class from all buttons
                     filterButtons.forEach(btn => btn.classList.remove('active'));
-                    // Add active class to clicked button
                     this.classList.add('active');
                     
                     const filter = this.getAttribute('data-filter');
+                    let visibleCount = 0;
                     
                     campaignCards.forEach(card => {
                         const status = card.getAttribute('data-status');
                         
                         if (filter === 'all' || status === filter) {
                             card.classList.remove('hidden');
-                            // Add a small delay for smooth transition
+                            card.style.position = 'relative'; // 恢复布局
                             setTimeout(() => {
                                 card.style.opacity = '1';
                                 card.style.transform = 'translateY(0)';
                             }, 10);
+                            visibleCount++;
                         } else {
                             card.style.opacity = '0';
                             card.style.transform = 'translateY(20px)';
-                            // Wait for transition to complete before hiding
-                           card.classList.add('hidden');
-
+                            card.classList.add('hidden');
+                            card.style.position = 'absolute'; // 防止占用空间
                         }
                     });
+
+                    if(visibleCount === 0) {
+                        noMsg.style.display = 'block';
+                    } else {
+                        noMsg.style.display = 'none';
+                    }
                 });
             });
         });
         
-        // Function to animate counters
         function animateCounter(elementId, start, end, duration) {
             const element = document.getElementById(elementId);
             let startTimestamp = null;
-            
             const step = (timestamp) => {
                 if (!startTimestamp) startTimestamp = timestamp;
                 const progress = Math.min((timestamp - startTimestamp) / duration, 1);
                 const value = Math.floor(progress * (end - start) + start);
-                
                 element.textContent = value;
-                
-                if (progress < 1) {
-                    window.requestAnimationFrame(step);
-                }
+                if (progress < 1) window.requestAnimationFrame(step);
             };
-            
             window.requestAnimationFrame(step);
         }
         
-        // Function to animate currency counters
         function animateCurrencyCounter(elementId, start, end, duration) {
             const element = document.getElementById(elementId);
             let startTimestamp = null;
-            
             const step = (timestamp) => {
                 if (!startTimestamp) startTimestamp = timestamp;
                 const progress = Math.min((timestamp - startTimestamp) / duration, 1);
                 const value = Math.floor(progress * (end - start) + start);
-                
                 element.textContent = 'RM ' + value.toLocaleString();
-                
-                if (progress < 1) {
-                    window.requestAnimationFrame(step);
-                }
+                if (progress < 1) window.requestAnimationFrame(step);
             };
-            
             window.requestAnimationFrame(step);
         }
     </script>

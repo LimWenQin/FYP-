@@ -1,4 +1,5 @@
 <?php
+// TNG_Page.php
 // 1. 开启 Session
 session_start();
 include 'dataconnection.php';
@@ -22,10 +23,14 @@ if (empty($_SESSION['donation_data'])) {
 $sess_data = $_SESSION['donation_data'];
 $amount = $sess_data['amount'];
 $donation_type = $sess_data['type'];
-// 防止 null 报错
-$branch_id = $sess_data['branch_id'] ?? null;
-$case_id = $sess_data['case_id'] ?? null;
-$activity_id = $sess_data['activity_id'] ?? null;
+
+// [FIX START] 关键修复：处理外键 ID
+// 如果 Session 里的 ID 是 0，必须转为 null，否则会触发 Foreign Key 报错
+$branch_id = !empty($sess_data['branch_id']) ? $sess_data['branch_id'] : null;
+$case_id = !empty($sess_data['case_id']) ? $sess_data['case_id'] : null;
+$activity_id = !empty($sess_data['activity_id']) ? $sess_data['activity_id'] : null;
+// [FIX END]
+
 $source = $sess_data['source'] ?? 'standard'; // 来源标记
 
 // 4. 获取用户资料
@@ -91,6 +96,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
          Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID)
         VALUES (?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
+    // 注意：bind_param 遇到 null 会正确处理为 SQL NULL
     $stmt->bind_param("ssssdssssssssiiiii", 
         $user_data['Donor_Name'], 
         $user_data['Donor_ContactNumber'], 
@@ -99,7 +105,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         $amount, $payment_method, $status, $txn_ref, $order_type, $order_status, $tax_status, $now, $now, 
         $current_donor_id, $payment_id, $branch_id, $activity_id, $case_id
     );
-    $stmt->execute();
+    
+    if (!$stmt->execute()) {
+        // 调试用：如果报错显示具体信息
+        die("Error inserting order: " . $stmt->error);
+    }
     $stmt->close();
 
     // 3️⃣ 插入 recurring_donation 表
@@ -154,7 +164,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     .order-summary p { margin: 8px 0; font-size: 15px; }
     .order-summary .total { font-size: 18px; font-weight: bold; text-align: right; color: #F28585; margin-top: 15px; }
 
-    /* [NEW] Buttons Style */
+    /* Buttons Style */
     .nav-buttons { display: flex; gap: 15px; margin-top: 30px; }
     .btn-nav {
         flex: 1; padding: 12px; border-radius: 8px; font-size: 1rem; font-weight: bold;
@@ -180,10 +190,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         // 动态 Stepper
         if ($source == 'special_case') {
             $flow_type = 'special';
-            $current_step = 3; // Special 流程的第3步 (Details -> Method -> Payment)
+            $current_step = 3; 
         } else {
             $flow_type = 'standard';
-            $current_step = 4; // Standard 流程的第4步
+            $current_step = 4; 
         }
         
         if (file_exists('stepper.php')) {

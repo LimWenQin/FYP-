@@ -486,6 +486,10 @@ $activeStaffStats = $conn->query("SELECT COUNT(*) as total FROM staff WHERE Staf
 $inactiveStaffStats = $totalStaffStats - $activeStaffStats;
 
 $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'];
+
+// --- ARRAY FOR GALLERY DATA ---
+// We prepare this array to pass to JavaScript for the lightbox navigation
+$galleryData = [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -536,7 +540,8 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
         .staff-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-color: #F28585; }
         .card-header-actions { position: absolute; top: 15px; right: 15px; z-index: 10; }
         .card-body { padding: 25px 20px 20px; text-align: center; flex: 1; }
-        .card-avatar { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 15px; background: #ffe5e5; color: #F28585; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 28px; object-fit: cover; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .card-avatar { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 15px; background: #ffe5e5; color: #F28585; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 28px; object-fit: cover; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s; }
+        .card-avatar:hover { transform: scale(1.05); border-color: var(--primary); }
         .card-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .card-name { font-size: 18px; font-weight: 700; color: #333; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .card-role { font-size: 14px; color: #666; margin-bottom: 12px; display: inline-block; background: #f8f9fa; padding: 4px 12px; border-radius: 20px; font-weight: 500; }
@@ -602,9 +607,10 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
         .file-name { font-size: 12px; color: #555; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .file-remove { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 14px; padding: 0 5px; }
 
-        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; max-width: 400px; }
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; max-width: 400px; animation: slideIn 0.3s; }
         .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
         .dropdown-content { display: none; position: absolute; right: 0; top: 40px; background-color: white; min-width: 180px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); z-index: 100; border-radius: 8px; overflow: hidden; border: 1px solid #eee; text-align: left; }
         .dropdown-content div, .dropdown-content a { color: #333; padding: 12px 16px; text-decoration: none; display: block; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 10px; }
@@ -616,6 +622,72 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
         .pagination-btn.active { background-color: #F28585; color: white; border-color: #F28585; cursor: default; }
         .pagination-btn.disabled { color: #ccc; cursor: not-allowed; background-color: #f8f9fa; border-color: #eee; }
 
+        /* --- LIGHTBOX (GALLERY) CSS --- */
+        .lightbox-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            padding-top: 50px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: rgba(0, 0, 0, 0.9);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .lightbox-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 80vh;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+            object-fit: contain;
+            animation: zoomIn 0.3s;
+        }
+        @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
+        
+        .close-lightbox {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+            z-index: 2002;
+        }
+        .close-lightbox:hover, .close-lightbox:focus {
+            color: #bbb;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        
+        .lightbox-nav {
+            cursor: pointer;
+            position: absolute;
+            top: 50%;
+            width: auto;
+            padding: 16px;
+            margin-top: -50px;
+            color: white;
+            font-weight: bold;
+            font-size: 30px;
+            transition: 0.6s ease;
+            border-radius: 0 3px 3px 0;
+            user-select: none;
+            z-index: 2001;
+            background-color: rgba(0,0,0,0.3);
+        }
+        .lightbox-nav:hover { background-color: rgba(255,255,255,0.2); }
+        .lightbox-prev { left: 0; border-radius: 0 3px 3px 0; }
+        .lightbox-next { right: 0; border-radius: 3px 0 0 3px; }
+        /* ---------------------------------- */
+
         @media (max-width: 768px) {
             .stats-cards { grid-template-columns: 1fr 1fr; }
             .form-row { flex-direction: column; gap: 0; }
@@ -626,18 +698,16 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
     </style>
 </head>
 <body>
-    <?php if (isset($_GET['success'])): ?>
-        <div class="floating-alert floating-alert-success" id="floatingSuccess">
-            <i class="fas fa-check-circle"></i>
-            <div><?php echo htmlspecialchars($_GET['success']); ?></div>
-        </div>
-    <?php endif; ?>
-    <?php if (isset($_GET['error'])): ?>
-        <div class="floating-alert floating-alert-danger" id="floatingError">
-            <i class="fas fa-exclamation-circle"></i>
-            <div><?php echo htmlspecialchars($_GET['error']); ?></div>
-        </div>
-    <?php endif; ?>
+    
+    <div class="floating-alert floating-alert-success" id="floatingSuccess" style="display: <?php echo isset($_GET['success']) ? 'flex' : 'none'; ?>">
+        <i class="fas fa-check-circle"></i>
+        <div id="floatingSuccessText"><?php echo isset($_GET['success']) ? htmlspecialchars($_GET['success']) : ''; ?></div>
+    </div>
+
+    <div class="floating-alert floating-alert-danger" id="floatingError" style="display: <?php echo isset($_GET['error']) ? 'flex' : 'none'; ?>">
+        <i class="fas fa-exclamation-circle"></i>
+        <div id="floatingErrorText"><?php echo isset($_GET['error']) ? htmlspecialchars($_GET['error']) : ''; ?></div>
+    </div>
 
     <?php include 'admin_sidebar.php'; ?>
 
@@ -698,7 +768,18 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                 </form>
                 
                 <div class="staff-grid">
-                    <?php if (count($staffMembers) > 0): foreach($staffMembers as $staff): ?>
+                    <?php if (count($staffMembers) > 0): foreach($staffMembers as $index => $staff): ?>
+                        <?php 
+                            // Prepare Gallery Data for this user
+                            $imgSrc = '';
+                            if (!empty($staff['Staff_ProfilePicture']) && file_exists($staff['Staff_ProfilePicture'])) {
+                                $imgSrc = $staff['Staff_ProfilePicture'];
+                            } else {
+                                // Fallback image for gallery consistency (optional)
+                                $imgSrc = 'https://ui-avatars.com/api/?name='.urlencode($staff['Staff_FullName']).'&background=random&size=512';
+                            }
+                            $galleryData[] = $imgSrc;
+                        ?>
                     <div class="staff-card">
                         <div class="card-header-actions">
                             <div class="action-menu">
@@ -715,7 +796,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                         </div>
 
                         <div class="card-body">
-                            <div class="card-avatar">
+                            <div class="card-avatar" onclick="openLightbox(<?php echo $index; ?>)" title="Click to enlarge">
                                 <?php if (!empty($staff['Staff_ProfilePicture']) && file_exists($staff['Staff_ProfilePicture'])): ?>
                                     <img src="<?php echo htmlspecialchars($staff['Staff_ProfilePicture']); ?>" alt="Profile">
                                 <?php else: ?>
@@ -786,6 +867,13 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                 </div>
             </div>
         </div>
+    </div>
+
+    <div id="imageLightbox" class="lightbox-modal">
+        <span class="close-lightbox" onclick="closeLightbox()">&times;</span>
+        <a class="lightbox-nav lightbox-prev" onclick="changeLightboxImage(-1)">&#10094;</a>
+        <img class="lightbox-content" id="lightboxImage">
+        <a class="lightbox-nav lightbox-next" onclick="changeLightboxImage(1)">&#10095;</a>
     </div>
 
     <div class="modal" id="viewStaffModal">
@@ -1084,6 +1172,76 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
     </div>
 
     <script>
+        // --- NEW: SYSTEM ALERT FUNCTION ---
+        function showSystemError(message) {
+            const errorBox = document.getElementById('floatingError');
+            const errorText = document.getElementById('floatingErrorText');
+            if(errorBox && errorText) {
+                errorText.innerText = message;
+                errorBox.style.display = 'flex';
+                
+                // Auto hide after 5 seconds
+                setTimeout(() => {
+                    errorBox.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // --- LIGHTBOX JS LOGIC ---
+        const galleryImages = <?php echo json_encode($galleryData); ?>;
+        let currentImageIndex = 0;
+
+        function openLightbox(index) {
+            currentImageIndex = index;
+            document.getElementById('imageLightbox').style.display = "flex";
+            updateLightboxImage();
+        }
+
+        function closeLightbox() {
+            document.getElementById('imageLightbox').style.display = "none";
+        }
+
+        function changeLightboxImage(n) {
+            currentImageIndex += n;
+            if (currentImageIndex >= galleryImages.length) {
+                currentImageIndex = 0;
+            } else if (currentImageIndex < 0) {
+                currentImageIndex = galleryImages.length - 1;
+            }
+            updateLightboxImage();
+        }
+
+        function updateLightboxImage() {
+            const imgElement = document.getElementById('lightboxImage');
+            imgElement.src = galleryImages[currentImageIndex];
+            
+            // If only 1 image, hide arrows
+            if(galleryImages.length <= 1) {
+                document.querySelector('.lightbox-prev').style.display = 'none';
+                document.querySelector('.lightbox-next').style.display = 'none';
+            } else {
+                document.querySelector('.lightbox-prev').style.display = 'block';
+                document.querySelector('.lightbox-next').style.display = 'block';
+            }
+        }
+
+        // Close when clicking outside image
+        window.addEventListener('click', function(event) {
+            if (event.target == document.getElementById('imageLightbox')) {
+                closeLightbox();
+            }
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(event) {
+            if (document.getElementById('imageLightbox').style.display === "flex") {
+                if (event.key === "Escape") closeLightbox();
+                if (event.key === "ArrowLeft") changeLightboxImage(-1);
+                if (event.key === "ArrowRight") changeLightboxImage(1);
+            }
+        });
+        // -----------------------
+
         function toggleFilterInputs() {
             const type = document.getElementById('filterType').value;
             document.querySelectorAll('.secondary-filter').forEach(el => {
@@ -1112,7 +1270,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
             }, 5000);
             
             window.onclick = function(event) {
-                if (!event.target.matches('.menu-btn') && !event.target.matches('.menu-btn *')) {
+                if (!event.target.matches('.menu-btn') && !event.target.matches('.menu-btn *') && !event.target.matches('.card-avatar') && !event.target.matches('.card-avatar img')) {
                     document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
                 }
                 if (event.target == document.getElementById('addStaffModal')) closeAddStaffModal();
@@ -1120,6 +1278,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                 if (event.target == document.getElementById('viewStaffModal')) closeModal('viewStaffModal');
                 if (event.target == document.getElementById('changePasswordModal')) closeChangePasswordModal();
                 if (event.target == document.getElementById('blockStaffModal')) closeModal('blockStaffModal');
+                if (event.target == document.getElementById('imageLightbox')) closeLightbox();
             }
         });
 
@@ -1461,6 +1620,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
             else { f.type = 'password'; if(icon) icon.className = 'fas fa-eye'; }
         }
 
+        // --- REPLACED ALERTS WITH CUSTOM SYSTEM ERROR ---
         function validateForm(type) {
             let errors = [];
 
@@ -1488,7 +1648,8 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
             }
 
             if (errors.length > 0) {
-                alert("Please correct the following errors before saving:\n\n- " + errors.join("\n- "));
+                // Modified to use system error instead of alert
+                showSystemError("Please correct the following errors: " + errors.join(". "));
                 return false; 
             }
             return true; 
@@ -1498,7 +1659,8 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
             const vPass = validatePasswordRequirements('cp_new_password', 'cp_req_list', 'cp_');
             const vMatch = validateMatch('cp_confirm_password', 'cp_new_password', 'cp_match_error');
             if(!vPass || !vMatch) {
-                alert("Please fix password requirements or matching issues.");
+                // Modified to use system error instead of alert
+                showSystemError("Please fix password requirements or matching issues.");
                 return false;
             }
             return true;

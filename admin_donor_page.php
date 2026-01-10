@@ -431,8 +431,6 @@ function formatAddress($donor) {
     return implode("<br>", $addressParts);
 }
 
-// ⚠️ 已删除 $conn->close(); 以修复 "mysqli object is already closed" 错误
-
 $malaysiaStates = [ 'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu' ];
 $years = range(date('Y'), 2020); 
 $exportParams = $_GET; $exportParams['action'] = 'export_excel'; unset($exportParams['page']);
@@ -447,7 +445,6 @@ $exportUrl = "?" . http_build_query($exportParams);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin_common.css">
     <style>
-        /* [保留你的所有 CSS 样式] */
         .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-5px); }
@@ -482,7 +479,10 @@ $exportUrl = "?" . http_build_query($exportParams);
         .donor-table th { font-weight: 600; color: var(--gray); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
         .donor-info { display: flex; align-items: center; }
         .donor-avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 15px; background: var(--primary-light); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; overflow: hidden; }
-        .donor-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* Modified Avatar Image to show clickability */
+        .donor-avatar img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+        
         .donor-details h4 { font-size: 14px; margin-bottom: 4px; color: var(--dark); }
         .donor-details p { font-size: 12px; color: #888; margin: 0; }
         .address-display { font-size: 13px; color: #666; line-height: 1.5; margin: 0; padding: 0; display: block; }
@@ -553,6 +553,53 @@ $exportUrl = "?" . http_build_query($exportParams);
         .status-pending { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
         .empty-state-card { text-align: center; padding: 40px 20px; color: #999; background: #f8f9fa; border-radius: 8px; border: 2px dashed #eee; }
         .empty-state-card i { font-size: 32px; margin-bottom: 10px; color: #ddd; }
+
+        /* --- LIGHTBOX (IMAGE VIEWER) CSS --- */
+        .lightbox-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            padding-top: 50px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: rgba(0, 0, 0, 0.9);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .lightbox-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 80vh;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+            object-fit: contain;
+            animation: zoomIn 0.3s;
+        }
+        @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
+        
+        .close-lightbox {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+            z-index: 2002;
+        }
+        .close-lightbox:hover, .close-lightbox:focus {
+            color: #bbb;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        /* ---------------------------------- */
+
         @media (max-width: 768px) { .stats-cards { grid-template-columns: repeat(2, 1fr); } .form-row { flex-direction: column; gap: 0; } .pagination-container { flex-direction: column; gap: 15px; } .donor-search { flex-direction: column; align-items: stretch; } .filter-group { flex-wrap: wrap; } .history-card { flex-direction: column; align-items: flex-start; gap: 10px; } .h-info-right { align-items: flex-start; width: 100%; flex-direction: row; justify-content: space-between; } }
     </style>
 </head>
@@ -621,7 +668,11 @@ $exportUrl = "?" . http_build_query($exportParams);
                                 <td>
                                     <div class="donor-info">
                                         <div class="donor-avatar">
-                                            <?php if (!empty($donor['Donor_ProfilePicture'])): ?><img src="<?php echo htmlspecialchars($donor['Donor_ProfilePicture']); ?>" alt="Profile"><?php else: echo substr($donor['Donor_Name'], 0, 1); endif; ?>
+                                            <?php if (!empty($donor['Donor_ProfilePicture'])): ?>
+                                                <img src="<?php echo htmlspecialchars($donor['Donor_ProfilePicture']); ?>" 
+                                                     alt="Profile" 
+                                                     onclick="openLightbox('<?php echo htmlspecialchars($donor['Donor_ProfilePicture']); ?>')">
+                                            <?php else: echo substr($donor['Donor_Name'], 0, 1); endif; ?>
                                         </div>
                                         <div class="donor-details"><h4><?php echo htmlspecialchars($donor['Donor_Name']); ?></h4><p>ID: <?php echo htmlspecialchars($donor['Donor_ID']); ?></p></div>
                                     </div>
@@ -930,6 +981,11 @@ $exportUrl = "?" . http_build_query($exportParams);
         </div>
     </div>
 
+    <div id="imageLightbox" class="lightbox-modal">
+        <span class="close-lightbox" onclick="closeLightbox()">&times;</span>
+        <img class="lightbox-content" id="lightboxImage">
+    </div>
+
     <script>
         function toggleFilterInputs() {
             const type = document.getElementById('filterType').value;
@@ -948,9 +1004,33 @@ $exportUrl = "?" . http_build_query($exportParams);
             if(s) setTimeout(() => s.style.display='none', 5000); if(e) setTimeout(() => e.style.display='none', 5000);
             window.addEventListener('click', function(event) {
                 if (!event.target.matches('.menu-btn') && !event.target.matches('.menu-btn *')) document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
+                
+                // Close regular modals if clicked outside
                 if (event.target.classList.contains('modal')) event.target.style.display = "none";
+                
+                // Close lightbox if clicked outside the image
+                if (event.target.id == 'imageLightbox') closeLightbox();
+            });
+
+            // Keyboard support for Lightbox (ESC key)
+            document.addEventListener('keydown', function(event) {
+                if (event.key === "Escape" && document.getElementById('imageLightbox').style.display === "flex") {
+                    closeLightbox();
+                }
             });
         });
+
+        // --- LIGHTBOX JS FUNCTIONS ---
+        function openLightbox(imageSrc) {
+            if (!imageSrc) return;
+            document.getElementById('lightboxImage').src = imageSrc;
+            document.getElementById('imageLightbox').style.display = "flex";
+        }
+
+        function closeLightbox() {
+            document.getElementById('imageLightbox').style.display = "none";
+        }
+        // -----------------------------
 
         function openBlockModal(id, name) {
             document.getElementById('block_donor_id').value = id;
