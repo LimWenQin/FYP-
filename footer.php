@@ -60,27 +60,6 @@
             padding-left: 5px; /* 悬停时稍微右移 */
         }
 
-        
-
-        /* --- 社交媒体图标 (用字符代替) --- */
-        /*.social-links a {
-            display: inline-block;
-            width: 35px;
-            height: 35px;
-            background: rgba(255,255,255,0.1);
-            color: #fff;
-            text-align: center;
-            line-height: 35px;
-            border-radius: 50%;
-            margin-right: 10px;
-            text-decoration: none;
-            font-weight: bold;
-            transition: 0.3s;
-        }
-        .social-links a:hover {
-            background: #c82e03ff;
-        }*/
-
         /* --- 版权信息 --- */
         .copyright-section {
             text-align: center;
@@ -89,6 +68,17 @@
             border-top: 1px solid rgba(255,255,255,0.1);
             font-size: 14px;
             color: #777;
+        }
+        
+        /* [新增] 版权栏链接的样式 */
+        .copyright-section a {
+            color: #777; /* 与版权文字颜色一致 */
+            text-decoration: none;
+            margin: 0 15px; /* 左右间距 */
+            transition: 0.3s;
+        }
+        .copyright-section a:hover {
+            color: #fff; /* 悬停变白 */
         }
     </style>
 </head>
@@ -108,40 +98,40 @@
                     <li><a href="Homepage.php">Home</a></li>
                     <li><a href="About_us.php">About Us</a></li>
                     <li><a href="Contact_us.php">Contact Us</a></li>
-                    <li><a href="terms&condition.php">Terms & Conditions</a></li>
-                    <li><a href="privacy.php">Privacy Policy</a></li>
                     <li><a href="FAQs.php">FAQ</a></li>
                     </ul>
             </div>
 
             <div class="footer-col">
-               
-
                <div class="footer-col">
-            <h3 class="footer-heading">Contact Us</h3>
-            <ul class="footer-links">
-                <li style="color: #b3b3b3; margin-bottom: 15px;">
-                <span style="color: #fff; font-weight:bold;">Address:</span><br>
-                123, Jalan Love Bridge,<br>
-                75450 Melaka, Malaysia
-            </li>
-            <li>
-            <span style="color: #fff; font-weight:bold;">Phone:</span><br>
-            <a href="tel:+60123456789">+60 12-345 6789</a>
-        </li>
-        <li>
-            <span style="color: #fff; font-weight:bold;">Email:</span><br>
-            <a href="mailto:info@lovebridge.org">info@lovebridge.org</a>
-        </li>
-    </ul>
-</div>
+                    <h3 class="footer-heading">Contact Us</h3>
+                    <ul class="footer-links">
+                        <li style="color: #b3b3b3; margin-bottom: 15px;">
+                            <span style="color: #fff; font-weight:bold;">Address:</span><br>
+                            123, Jalan Love Bridge,<br>
+                            75450 Melaka, Malaysia
+                        </li>
+                        <li>
+                            <span style="color: #fff; font-weight:bold;">Phone:</span><br>
+                            <a href="https://wa.me/601111190233" target="_blank">+60 11-1119 0233</a>
+                        </li>
+                        <li>
+                            <span style="color: #fff; font-weight:bold;">Email:</span><br>
+                            <a href="mailto:lovebridge1201@gmail.com">lovebridge1201@gmail.com</a>
+                        </li>
+                    </ul>
+                </div>
             </div>
 
         </div>
 
         <div class="footer-container">
             <div class="copyright-section" style="width: 100%;">
-                Copyright &copy; 2025 All rights reserved | Love Bridge
+                <a href="terms&condition.php">Terms & Conditions</a>
+                |
+                <span style="margin: 0 10px;">Copyright &copy; 2025 All rights reserved | Love Bridge</span>
+                |
+                <a href="privacy.php">Privacy Policy</a>
             </div>
         </div>
     </footer>

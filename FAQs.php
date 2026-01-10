@@ -234,8 +234,7 @@ include 'header_UI.php';
     </style>
 </head>
 <body>
-   
-    <!-- FAQ页面主要内容 -->
+    
     <main>
         <section class="faq-hero">
             <div class="faq-hero-content">
@@ -245,7 +244,6 @@ include 'header_UI.php';
         </section>
 
         <div class="faq-container">
-            <!-- 捐款相关FAQ -->
             <div class="faq-category">
                 <div class="category-title">
                     <div class="category-icon">
@@ -261,14 +259,12 @@ include 'header_UI.php';
                             <i class="fas fa-chevron-down"></i>
                         </div>
                         <div class="faq-answer">
-                            <p>Making a donation is simple:</p>
+                            <p>Making a donation is simple and accessible from anywhere on our site:</p>
                             <ul>
-                                <li>Browse our campaigns and select one that resonates with you</li>
-                                <li>Click the "Donate" button on the campaign page</li>
-                                <li>Choose your donation amount and payment method</li>
-                                <li>Complete the secure payment process</li>
+                                <li><strong>Quick Donate:</strong> Click the "Donate" button located at the <strong>top right corner</strong> of the navigation bar.</li>
+                                <li><strong>Specific Causes:</strong> Browse our <strong>Campaign</strong> or <strong>Special Case</strong> pages and click the "Donate" button on the specific cause you wish to support.</li>
                             </ul>
-                            <p>You'll receive a confirmation email with your donation receipt.</p>
+                            <p>Follow the on-screen instructions to complete your contribution securely.</p>
                         </div>
                     </div>
                     
@@ -278,14 +274,14 @@ include 'header_UI.php';
                             <i class="fas fa-chevron-down"></i>
                         </div>
                         <div class="faq-answer">
-                            <p>We accept various payment methods for your convenience:</p>
+                            <p>We offer a variety of secure payment options:</p>
                             <ul>
-                                <li>Credit/Debit Cards (Visa, MasterCard, American Express)</li>
-                                <li>PayPal</li>
-                                <li>Bank Transfers</li>
-                                <li>Digital Wallets (Google Pay, Apple Pay)</li>
+                                <li><strong>Credit & Debit Cards</strong> (Visa, MasterCard, etc.)</li>
+                                <li><strong>E-Wallets</strong> (Touch 'n Go, GrabPay, Boost, etc.)</li>
+                                <li><strong>Love Bridge Wallet</strong> (Use your account balance directly)</li>
+                                <li>Online Banking (FPX)</li>
                             </ul>
-                            <p>All payments are processed through secure, encrypted channels.</p>
+                            <p>Choose the method that is most convenient for you at checkout.</p>
                         </div>
                     </div>
                     
@@ -295,8 +291,12 @@ include 'header_UI.php';
                             <i class="fas fa-chevron-down"></i>
                         </div>
                         <div class="faq-answer">
-                            <p>Yes, Love Bridge is a registered non-profit organization, and all donations are tax-deductible to the extent allowed by law. After your donation, you'll receive an official receipt that you can use for tax purposes.</p>
-                            <p>If you need additional documentation for tax purposes, please contact our support team at <a href="mailto:receipts@lovebridge.org">receipts@lovebridge.org</a>.</p>
+                            <p>Yes, Love Bridge is a registered non-profit organization. To request a Tax Exemption receipt, please follow these steps:</p>
+                            <ol>
+                                <li><strong>Complete Your Profile:</strong> Ensure your user profile is updated with your full <strong>IC Number</strong> and <strong>Mailing Address</strong>.</li>
+                                <li><strong>Select Option:</strong> When making a donation, check the box that says <strong>"Request Tax Exemption"</strong>.</li>
+                            </ol>
+                            <p>The receipt will be generated based on your profile details.</p>
                         </div>
                     </div>
                     
@@ -313,7 +313,6 @@ include 'header_UI.php';
                 </div>
             </div>
             
-            <!-- 活动相关FAQ -->
             <div class="faq-category">
                 <div class="category-title">
                     <div class="category-icon">
@@ -375,7 +374,6 @@ include 'header_UI.php';
                 </div>
             </div>
             
-            <!-- 账户相关FAQ -->
             <div class="faq-category">
                 <div class="category-title">
                     <div class="category-icon">
@@ -438,17 +436,16 @@ include 'header_UI.php';
             </div>
         </div>
         
-        <!-- 联系部分 -->
         <section class="contact-section">
             <div class="contact-content">
                 <h2>Still Have Questions?</h2>
                 <p>Our support team is here to help you with any questions you may have about Love Bridge.</p>
                 
                 <div class="contact-buttons">
-                    <a href="mailto:support@lovebridge.org" class="contact-btn">
+                    <a href="mailto:lovebridge1201@gmail.com" class="contact-btn">
                         <i class="fas fa-envelope"></i> Email Us
                     </a>
-                    <a href="tel:+60123456789" class="contact-btn">
+                   <a href="https://wa.me/601111190233" target="_blank" class="contact-btn">
                         <i class="fas fa-phone"></i> Call Us
                     </a>
                     <a href="Contact_Us.php" class="contact-btn">
