@@ -14,9 +14,33 @@ $topup_successful = false;
 $success_amount = 0;
 
 // ==========================================
-// 2. 处理充值逻辑
+// [关键修复] 2. 提前获取并验证用户资料
 // ==========================================
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_topup'])) {
+// 在执行任何资金操作前，确保用户是有效的，防止后面的 Order_Name 为空报错
+$stmt_info = $conn->prepare("SELECT Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?");
+$stmt_info->bind_param("i", $current_donor_id);
+$stmt_info->execute();
+$res_info = $stmt_info->get_result();
+$d_row = $res_info->fetch_assoc();
+$stmt_info->close();
+
+// 如果找不到用户，强制登出
+if (!$d_row) {
+    session_destroy();
+    echo "<script>alert('User not found. Please login again.'); window.location.href='donor_login.php';</script>";
+    exit();
+}
+
+// 提取用户资料供后续使用
+$d_name    = $d_row['Donor_Name'];
+$d_contact = $d_row['Donor_ContactNumber'];
+$d_ic      = $d_row['Donor_ICNumber'];
+$d_email   = $d_row['Donor_Email'];
+
+// ==========================================
+// 3. 处理充值逻辑
+// ==========================================
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
     
     $amount = $_POST['amount'];
     $method = $_POST['payment_method']; 
@@ -31,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_topup'])) {
         $stmt->close();
 
         // B. 记录 Payment
-        $txn_ref = "TXN-TOPUP-" . date("YmdHis");
+        $txn_ref = "TXN-TOPUP-" . date("YmdHis") . "-" . rand(100, 999);
         $now = date("Y-m-d H:i:s");
         $status = "Success";
         
@@ -43,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_topup'])) {
             $bank_name = 'TNG eWallet';
         } elseif ($method == 'Credit/Debit Card') {
             $bank_name = $_POST['bank_display'] ?? 'Credit Card';
-            $card_num = str_replace(' ', '', $_POST['card']); // 去除空格
+            $card_num = isset($_POST['card']) ? str_replace(' ', '', $_POST['card']) : '0000';
             $masked = substr($card_num, 0, 4) . " **** **** " . substr($card_num, -4);
         }
 
@@ -53,38 +77,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_topup'])) {
         $payment_id = $stmt_pay->insert_id;
         $stmt_pay->close();
 
-        // ==========================================
-        // C. 插入 Order 记录 (已修改：存入真实 Donor 资料)
-        // ==========================================
-
-        // 1. 获取 Donor 完整资料
-        $stmt_info = $conn->prepare("SELECT Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?");
-        $stmt_info->bind_param("i", $current_donor_id);
-        $stmt_info->execute();
-        $res_info = $stmt_info->get_result();
-        $d_row = $res_info->fetch_assoc();
-        $stmt_info->close();
-
-        // 准备变量
-        $d_name    = $d_row['Donor_Name'];
-        $d_contact = $d_row['Donor_ContactNumber'];
-        $d_ic      = $d_row['Donor_ICNumber'];
-        $d_email   = $d_row['Donor_Email'];
-        
-        // 保持 One-time 类型
+        // C. 插入 Order 记录
         $order_type_val = "One-time"; 
-
-        // 2. 插入数据库 (包含所有字段)
+        
+        // [修复点] 现在 $d_name 等变量一定有值，不会报错了
         $sql_insert = "INSERT INTO orders (
             Donor_ID, Payment_ID, Order_Amount, Order_Status, Order_Type, 
             Order_TXN_Ref, Order_Created_At, Order_Name, Order_PaymentMethod,
-            Order_ContactNumber, Order_ICNumber, Order_Email
-        ) VALUES (?, ?, ?, 'Completed', ?, ?, ?, ?, ?, ?, ?, ?)";
+            Order_ContactNumber, Order_ICNumber, Order_Email, Order_Updated_At
+        ) VALUES (?, ?, ?, 'Completed', ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         $stmt_ord = $conn->prepare($sql_insert);
         
-        // 绑定参数
-        $stmt_ord->bind_param("iidssssssss", 
+        $stmt_ord->bind_param("iidsssssssss", 
             $current_donor_id, 
             $payment_id, 
             $amount, 
@@ -95,10 +100,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['confirm_topup'])) {
             $method,
             $d_contact,
             $d_ic,
-            $d_email
+            $d_email,
+            $now
         );
         
-        $stmt_ord->execute();
+        if (!$stmt_ord->execute()) {
+            // 如果插入失败，记录错误 (生产环境建议记录日志)
+            echo "<script>alert('Error creating order: " . addslashes($stmt_ord->error) . "');</script>";
+        }
         $stmt_ord->close();
 
         // 设置成功标记
@@ -150,12 +159,12 @@ include 'header_UI.php';
     .method-body { display: none; padding: 20px; border-top: 1px solid #eee; background: #fff; animation: slideDown 0.3s ease-out; }
     .method-container.selected .method-body { display: block; }
 
-    /* 表单控件样式 (与 Credit_Debit_Page 保持一致) */
-    .form-group { margin-bottom: 15px; position: relative; } /* Added relative for icon */
+    /* 表单控件样式 */
+    .form-group { margin-bottom: 15px; position: relative; } 
     .form-group label { display: block; font-size: 0.9rem; font-weight: 600; color: #555; margin-bottom: 5px; }
     .form-control { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; height: 50px; }
-    .form-control:focus { border-color: #0057B7; outline: none; } /* Focus color */
-    .card-icon { position: absolute; right: 15px; top: 38px; font-size: 24px; color: #999; } /* Adjusted top for label */
+    .form-control:focus { border-color: #0057B7; outline: none; } 
+    .card-icon { position: absolute; right: 15px; top: 38px; font-size: 24px; color: #999; } 
     .form-row { display: flex; gap: 15px; }
 
     /* TNG QR Box */
@@ -294,7 +303,7 @@ include 'header_UI.php';
         }
     }
 
-    // 3. 智能输入逻辑 (移植自 Credit_Debit_Page.php)
+    // 3. 智能输入逻辑
     document.addEventListener('DOMContentLoaded', function() {
         const cardInput = document.getElementById('card');
         const bankDisplay = document.getElementById('bank_display');
@@ -302,10 +311,9 @@ include 'header_UI.php';
         const expInput = document.getElementById('exp');
         const cvcInput = document.getElementById('cvc');
 
-        // A. 卡号格式化 & 识别
         if(cardInput) {
             cardInput.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, ''); // 只能输入数字
+                let value = e.target.value.replace(/\D/g, ''); 
                 let formattedValue = '';
                 for (let i = 0; i < value.length; i++) {
                     if (i > 0 && i % 4 === 0) formattedValue += ' ';
@@ -316,10 +324,9 @@ include 'header_UI.php';
             });
         }
 
-        // B. 日期格式化 (MM/YY)
         if(expInput) {
             expInput.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, ''); // 只能输入数字
+                let value = e.target.value.replace(/\D/g, ''); 
                 if (value.length >= 3) {
                     e.target.value = value.slice(0, 2) + '/' + value.slice(2, 4);
                 } else {
@@ -328,10 +335,9 @@ include 'header_UI.php';
             });
         }
 
-        // C. CVC 限制
         if(cvcInput) {
             cvcInput.addEventListener('input', function(e) {
-                e.target.value = e.target.value.replace(/\D/g, ''); // 只能输入数字
+                e.target.value = e.target.value.replace(/\D/g, ''); 
             });
         }
 
@@ -345,62 +351,43 @@ include 'header_UI.php';
             else if (patterns.mastercard.test(number)) { type = 'mastercard'; bankName = 'MasterCard'; } 
             else if (patterns.amex.test(number)) { type = 'amex'; bankName = 'American Express'; }
 
-            bankDisplay.value = bankName;
-            cardIcon.className = `fab ${icons[type]} card-icon`;
-            cardIcon.style.color = type === 'unknown' ? '#999' : '#00a651';
+            if(bankDisplay) bankDisplay.value = bankName;
+            if(cardIcon) {
+                cardIcon.className = `fab ${icons[type]} card-icon`;
+                cardIcon.style.color = type === 'unknown' ? '#999' : '#00a651';
+            }
         }
     });
     
     // 4. 表单提交最终验证
     document.getElementById('topupForm').addEventListener('submit', function(e){
-        // 基础检查
         if(selectedAmount <= 0 || selectedMethod === "") {
             e.preventDefault();
             Swal.fire('Error', 'Please select Amount and Payment Method', 'warning');
             return;
         }
         
-        // 如果是信用卡，进行严格检查
         if(selectedMethod === 'Credit/Debit Card') {
             const expValue = document.getElementById('exp').value;
             const cardValue = document.getElementById('card').value.replace(/\s/g, '');
             const cvcValue = document.getElementById('cvc').value;
 
-            // 卡号长度
             if(cardValue.length < 13) {
                 e.preventDefault();
                 Swal.fire('Invalid Card', 'Please enter a valid card number.', 'error');
                 return;
             }
 
-            // 日期长度
             if (expValue.length !== 5) {
                 e.preventDefault();
                 Swal.fire('Invalid Date', 'Please enter expiry date in MM/YY format.', 'error');
                 return;
             }
 
-            // CVC 长度
             if (cvcValue.length < 3) {
                 e.preventDefault();
                 Swal.fire('Invalid CVC', 'CVC must be at least 3 digits.', 'error');
                 return;
-            }
-
-            // 日期逻辑检查
-            const [mm, yy] = expValue.split('/').map(num => parseInt(num, 10));
-            const now = new Date();
-            const currentYear = parseInt(now.getFullYear().toString().substr(-2)); 
-            const currentMonth = now.getMonth() + 1; 
-
-            let errorMsg = '';
-            if (mm < 1 || mm > 12) errorMsg = "Invalid month (01-12).";
-            else if (yy < currentYear) errorMsg = "Card has expired.";
-            else if (yy === currentYear && mm < currentMonth) errorMsg = "Card has expired.";
-
-            if (errorMsg !== '') {
-                e.preventDefault(); 
-                Swal.fire({ title: 'Error', text: errorMsg, icon: 'error', confirmButtonColor: '#00a651' });
             }
         }
     });

@@ -17,11 +17,32 @@ $current_donor_id = $_SESSION['donor_id'];
 // ==========================================
 // 2. 智能识别：是 Campaign (Activity) 还是 Special Case？
 // ==========================================
-$activity_id = isset($_GET['activity_id']) ? (int)$_GET['activity_id'] : 0;
-$case_id = isset($_GET['case_id']) ? (int)$_GET['case_id'] : 0;
+// 获取 URL 参数
+$get_activity_id = isset($_GET['activity_id']) ? (int)$_GET['activity_id'] : 0;
+$get_case_id = isset($_GET['case_id']) ? (int)$_GET['case_id'] : 0;
 
-// Session 恢复逻辑
-if ($activity_id == 0 && $case_id == 0) {
+// 初始化 ID 变量
+$activity_id = 0;
+$case_id = 0;
+
+// 逻辑 A: 如果 URL 明确传递了参数，优先使用 URL 参数，并清理 Session 防止干扰
+if ($get_activity_id > 0) {
+    $activity_id = $get_activity_id;
+    // 清除可能存在的旧 Session 数据，确保页面显示的是最新的 URL 请求
+    if (isset($_SESSION['donation_data'])) {
+        unset($_SESSION['donation_data']['case_id']); // 移除干扰
+        $_SESSION['donation_data']['activity_id'] = $activity_id; // 更新 Session
+    }
+} elseif ($get_case_id > 0) {
+    $case_id = $get_case_id;
+    // 清除可能存在的旧 Session 数据
+    if (isset($_SESSION['donation_data'])) {
+        unset($_SESSION['donation_data']['activity_id']); // 移除干扰
+        $_SESSION['donation_data']['case_id'] = $case_id; // 更新 Session
+    }
+} 
+// 逻辑 B: 如果 URL 没有参数，尝试从 Session 恢复 (用于“上一步”返回场景)
+else {
     if (!empty($_SESSION['donation_data']['activity_id'])) {
         $activity_id = $_SESSION['donation_data']['activity_id'];
     } elseif (!empty($_SESSION['donation_data']['case_id'])) {
@@ -29,29 +50,35 @@ if ($activity_id == 0 && $case_id == 0) {
     }
 }
 
+// 初始化模式和数据
 $mode = '';
 $main_data = [];
+$param_id = 0;
 
 if ($activity_id > 0) {
+    // --- 模式：Activity (Campaign) ---
     $mode = 'activity';
+    $param_id = $activity_id;
     $sql = "SELECT Activity_ID as id, Activity_Name as title, Activity_Picture as image, Activity_Details as `desc`, Activity_GetAmount as raised, Activity_TargetAmount as target 
             FROM activity WHERE Activity_ID = ?";
-    $param_id = $activity_id;
     $page_label = "Campaign Donation";
     $other_label = "Other Campaigns";
     
 } elseif ($case_id > 0) {
+    // --- 模式：Special Case ---
     $mode = 'case';
+    $param_id = $case_id;
     $sql = "SELECT Case_ID as id, Case_Title as title, Case_Image as image, Case_Description as `desc`, Raised_Amount as raised, Target_Amount as target 
             FROM special_case WHERE Case_ID = ?";
-    $param_id = $case_id;
     $page_label = "Special Case Donation";
     $other_label = "Other Urgent Cases";
 } else {
-    echo "<script>alert('Invalid Request.'); window.location.href='Homepage.php';</script>";
+    // --- 两个 ID 都没有，无效请求 ---
+    echo "<script>alert('Invalid Request. No campaign or case specified.'); window.location.href='Homepage.php';</script>";
     exit();
 }
 
+// 执行主查询
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $param_id);
 $stmt->execute();
@@ -84,7 +111,7 @@ $stmt_other->bind_param("i", $param_id);
 $stmt_other->execute();
 $other_res = $stmt_other->get_result();
 
-// Session 数据恢复
+// Session 数据恢复 (金额、类型等)
 $sess_amount = $_SESSION['donation_data']['amount'] ?? '';
 $sess_type = $_SESSION['donation_data']['type'] ?? 'one-time';
 $sess_receipt = $_SESSION['donation_data']['tax_receipt'] ?? '0';
@@ -289,10 +316,10 @@ include 'header_UI.php';
                         <input type="hidden" id="tax_receipt" name="tax_receipt" value="0">
                         
                         <?php if ($mode == 'activity'): ?>
-                            <input type="hidden" name="activity_id" value="<?php echo htmlspecialchars($main_data['id']); ?>">
+                            <input type="hidden" name="activity_id" value="<?php echo $main_data['id']; ?>">
                             <input type="hidden" name="case_id" value="0">
                         <?php else: ?>
-                            <input type="hidden" name="case_id" value="<?php echo htmlspecialchars($main_data['id']); ?>">
+                            <input type="hidden" name="case_id" value="<?php echo $main_data['id']; ?>">
                             <input type="hidden" name="activity_id" value="0">
                         <?php endif; ?>
 
