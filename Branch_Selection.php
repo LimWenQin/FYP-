@@ -29,31 +29,63 @@ if (empty($_SESSION['donation_data'])) {
     exit();
 }
 
-// 从 Session 获取数据
+// 从 Session 获取之前选中的分行（如果有）
 $pre_selected_branch = $_SESSION['donation_data']['branch_id'];
-$selected_case_id = $_SESSION['donation_data']['case_id'];
-$selected_activity_id = $_SESSION['donation_data']['activity_id'];
 
-// [UPDATED] 查询所有分行，包含 HQ
+// ==========================================
+// 2. [FIXED] 获取总部 (HQ) 数据
+// ==========================================
+// 直接从 headquarters 表读取，不再混淆 branch 表
+$hq_sql = "SELECT HQ_Name, HQ_Description, HQ_Image, Headquarters_State 
+           FROM headquarters 
+           WHERE HQ_ID = 1 LIMIT 1";
+$hq_result = $conn->query($hq_sql);
+$hq_data = $hq_result->fetch_assoc();
+
+$hq_branch = null;
+
+if ($hq_data) {
+    // 将 HQ 数据格式化为与 Branch 通用的结构，方便下方 HTML 调用
+    $hq_branch = [
+        'Branch_ID' => '', // HQ 的 Branch_ID 设为空，表示 General Fund
+        'Branch_Name' => $hq_data['HQ_Name'],
+        'Branch_Type' => 'Headquarters', // 显示标签
+        'Branch_Description' => $hq_data['HQ_Description'],
+        'Branch_City' => $hq_data['Headquarters_State'], // 对应数据库字段
+        'decoded_images' => [] 
+    ];
+
+    // 处理图片：如果数据库有图片路径，放入数组；否则用默认图
+    if (!empty($hq_data['HQ_Image'])) {
+        $hq_branch['decoded_images'][] = $hq_data['HQ_Image'];
+    } else {
+        $hq_branch['decoded_images'][] = 'images/hero_3.jpg'; // 默认备用图
+    }
+}
+
+// ==========================================
+// 3. [FIXED] 获取其他分行 (Branches) 数据
+// ==========================================
+// 从 branch 表读取所有开启的分行
 $sql = "SELECT Branch_ID, Branch_Name, Branch_Type, Branch_Description, Branch_Address1, Branch_City, Branch_Images 
         FROM branch 
-        WHERE Is_Deleted = 0 AND Branch_OperationalStatus = 'Open'";
+        WHERE Is_Deleted = 0 AND Branch_OperationalStatus = 'Open'
+        ORDER BY Branch_ID ASC";
 $result = $conn->query($sql);
 
 $other_branches = [];
-$hq_branch = null;
 
 if ($result->num_rows > 0) {
     while($row = $result->fetch_assoc()) {
-        // 解码 JSON 图片路径
+        // 解码 Branch 表的 JSON 图片路径
         $row['decoded_images'] = !empty($row['Branch_Images']) ? json_decode($row['Branch_Images'], true) : [];
         
-        // 分离 HQ 分行和其他分行
-        if ($row['Branch_Type'] === 'Headquarters') {
-            $hq_branch = $row;
-        } else {
-            $other_branches[] = $row;
+        // 如果解码失败或没有图片，给一个空数组，HTML里会处理显示默认图
+        if (!is_array($row['decoded_images'])) {
+            $row['decoded_images'] = [];
         }
+        
+        $other_branches[] = $row;
     }
 }
 
@@ -113,7 +145,7 @@ include 'header_UI.php';
         box-shadow: 0 8px 25px rgba(220, 38, 38, 0.15);
         transform: translateY(-2px);
     }
-    /* 既然点击就跳转，其实选中样式用户可能看不到了，但保留着比较好 */
+    
     .branch-option input[type="radio"]:checked + .branch-card {
         border-color: #dc2626;
         background-color: #fffafa;
@@ -169,6 +201,8 @@ include 'header_UI.php';
         font-size: 0.8rem; font-weight: 600; 
         white-space: nowrap;
     }
+    /* Special color for HQ tag */
+    .type-hq { background: #fef3c7; color: #d97706; }
 
     .branch-desc {
         color: #666; font-size: 0.95rem; line-height: 1.6;
@@ -199,7 +233,7 @@ include 'header_UI.php';
         transition: 0.3s;
         text-align: center;
     }
-    /* 为了交互感，鼠标悬停时按钮变红 */
+    
     .branch-option:hover .select-btn {
         background: #dc2626;
         border-color: #dc2626;
@@ -214,8 +248,7 @@ include 'header_UI.php';
     }
 
     /* Navigation Buttons */
-    .nav-buttons { display: flex; gap: 20px; margin-top: 40px; }
-    /* 让 Previous 按钮宽度自适应，或者你可以保持 flex:1 */
+    .nav-buttons { display: flex; gap: 20px; margin-top: 40px; justify-content: center; }
     .btn-nav { padding: 15px 40px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; border: none; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 10px; transition: 0.2s; }
     .btn-prev { background: #e5e7eb; color: #374151; border: 1px solid #d1d5db; }
     .btn-prev:hover { background: #d1d5db; color: #111; }
@@ -254,15 +287,11 @@ include 'header_UI.php';
                             <div class="branch-card">
                                 <div class="branch-carousel" id="carousel-hq">
                                     <?php 
-                                        if ($hq_branch) {
-                                            $images = $hq_branch['decoded_images'];
-                                            if (!empty($images) && is_array($images)) {
-                                                foreach ($images as $index => $img_path) {
-                                                    $activeClass = ($index === 0) ? 'active' : '';
-                                                    echo '<img src="'.htmlspecialchars($img_path).'" class="carousel-img '.$activeClass.'" alt="HQ Image">';
-                                                }
-                                            } else {
-                                                echo '<img src="images/hero_3.jpg" class="default-img" alt="General Fund">';
+                                        // 这里的逻辑已统一，无论是 HQ 还是 Branch 都使用 decoded_images
+                                        if ($hq_branch && !empty($hq_branch['decoded_images'])) {
+                                            foreach ($hq_branch['decoded_images'] as $index => $img_path) {
+                                                $activeClass = ($index === 0) ? 'active' : '';
+                                                echo '<img src="'.htmlspecialchars($img_path).'" class="carousel-img '.$activeClass.'" alt="HQ Image">';
                                             }
                                         } else {
                                             echo '<img src="images/hero_3.jpg" class="default-img" alt="General Fund">';
@@ -273,9 +302,9 @@ include 'header_UI.php';
                                     <div>
                                         <div class="info-header">
                                             <h4 class="branch-title">
-                                                <?php echo $hq_branch ? htmlspecialchars($hq_branch['Branch_Name']) : 'General Fund (HQ)'; ?>
+                                                <?php echo $hq_branch ? htmlspecialchars($hq_branch['Branch_Name']) : 'Love Bridge HQ'; ?>
                                             </h4>
-                                            <span class="branch-type">Headquarters</span>
+                                            <span class="branch-type type-hq">Headquarters</span>
                                         </div>
                                         <p class="branch-desc">
                                             <?php 
@@ -315,7 +344,7 @@ include 'header_UI.php';
                                                         echo '<img src="'.htmlspecialchars($img_path).'" class="carousel-img '.$activeClass.'" alt="Branch Image">';
                                                     }
                                                 } else {
-                                                    echo '<img src="images/hero_3.jpg" class="default-img" alt="No Image" onerror="this.src=\'https://via.placeholder.com/400x300?text=No+Image\'">';
+                                                    echo '<img src="images/hero_3.jpg" class="default-img" alt="No Image">';
                                                 }
                                             ?>
                                         </div>
@@ -343,11 +372,11 @@ include 'header_UI.php';
 
                     </div>
 
-                    <div class="nav-buttons text-center">
+                    <div class="nav-buttons">
                         <a href="Payment_Page.php" class="btn-nav btn-prev">
                             <i class="fas fa-arrow-left"></i> Previous Step
                         </a>
-                        </div>
+                    </div>
                 </form>
 
             </div>
