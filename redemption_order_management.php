@@ -18,7 +18,51 @@ if (!isset($_SESSION['admin_id'])) {
 
 include 'dataconnection.php';
 
-// --- 0. HANDLE EXPORT TO EXCEL ---
+// 定义网站基础 URL (用于生成邮件里的确认链接)
+// 请根据你的实际环境修改，例如 http://localhost/donation_system/
+define('BASE_URL', 'http://localhost/donation_system/');
+
+// ==========================================
+// 0. AUTOMATED TASKS (LAZY CRON)
+// 每次管理员加载此页面时，自动检查并执行后台任务
+// ==========================================
+function checkAutomatedTasks($conn) {
+    // A. 自动完成 (Auto-Complete): 发货超过 21 天未确认 -> 设为 Completed
+    $sqlAutoComp = "UPDATE redemption_order 
+                    SET Redemption_Status = 'Completed', Redemption_Updated_At = NOW() 
+                    WHERE Redemption_Status = 'Shipped' 
+                    AND Redemption_Shipped_At < DATE_SUB(NOW(), INTERVAL 21 DAY)";
+    $conn->query($sqlAutoComp);
+
+    // B. 发送跟进邮件 (Follow-Up): 超过预计到达日期 -> 发邮件询问
+    // 获取需要发邮件的订单
+    $sqlFollow = "SELECT r.Redemption_ID, d.Donor_Name, d.Donor_Email, rw.Reward_ItemName 
+                  FROM redemption_order r
+                  JOIN donor d ON r.Donor_ID = d.Donor_ID
+                  JOIN reward_item rw ON r.Reward_ID = rw.Reward_ID
+                  WHERE r.Redemption_Status = 'Shipped' 
+                  AND r.Redemption_FollowUp_Sent = 0
+                  AND r.Redemption_Est_Delivery_Date <= CURDATE()";
+    
+    $resFollow = $conn->query($sqlFollow);
+    if ($resFollow && $resFollow->num_rows > 0) {
+        while ($row = $resFollow->fetch_assoc()) {
+            // 发送跟进邮件
+            if (sendFollowUpEmail($row['Donor_Email'], $row['Donor_Name'], $row['Reward_ItemName'], $row['Redemption_ID'])) {
+                // 标记为已发送
+                $rid = $row['Redemption_ID'];
+                $conn->query("UPDATE redemption_order SET Redemption_FollowUp_Sent = 1 WHERE Redemption_ID = $rid");
+            }
+        }
+    }
+}
+// 执行自动化任务
+checkAutomatedTasks($conn);
+
+
+// ==========================================
+// 1. HANDLE EXPORT TO EXCEL
+// ==========================================
 if (isset($_GET['export']) && $_GET['export'] == 'excel') {
     $filename = "redemption_orders_" . date('Ymd') . ".xls";
     
@@ -93,7 +137,7 @@ $searchTerm = "";
 $filterStatus = "";
 $whereConditions = [];
 
-// 1. Search (Order ID, Donor Name, Reward Name)
+// 1. Search
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $searchTerm = $conn->real_escape_string($_GET['search']);
     $whereConditions[] = "(r.Redemption_ID LIKE '%$searchTerm%' 
@@ -112,11 +156,14 @@ if (count($whereConditions) > 0) {
     $whereClause = "WHERE " . implode(" AND ", $whereConditions);
 }
 
-// --- HELPER: EMAIL FUNCTION (PHPMAILER) ---
-function sendStatusEmail($to, $name, $status, $itemName, $tracking = null) {
+// ==========================================
+// EMAIL FUNCTIONS
+// ==========================================
+
+// 1. 常规状态更新邮件 (Shipped / Cancelled)
+function sendStatusEmail($to, $name, $status, $itemName, $tracking = null, $estDate = null) {
     $subject = "Update on your Redemption Order - Love Bridge";
     
-    // 构建邮件内容
     $bodyContent = "<div style='font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;'>";
     $bodyContent .= "<div style='background-color: white; padding: 20px; border-radius: 10px; max-width: 600px; margin: auto;'>";
     $bodyContent .= "<h2 style='color: #F28585;'>Redemption Status Update</h2>";
@@ -127,11 +174,14 @@ function sendStatusEmail($to, $name, $status, $itemName, $tracking = null) {
         if ($tracking) {
             $bodyContent .= "<p style='font-size:16px; font-weight:bold; color:#333;'>Tracking Number: $tracking</p>";
         }
-        $bodyContent .= "<p>You should receive it soon.</p>";
+        if ($estDate) {
+            $formattedDate = date('d M Y', strtotime($estDate));
+            $bodyContent .= "<p>Estimated Delivery Date: <strong>$formattedDate</strong></p>";
+        }
+        $bodyContent .= "<p>You should receive it soon!</p>";
     } elseif ($status == 'Cancelled') {
         $bodyContent .= "<p style='color:#dc3545;'>We regret to inform you that your redemption for <strong>'$itemName'</strong> has been cancelled/rejected.</p>";
         $bodyContent .= "<p>Any points used have been fully refunded to your account.</p>";
-        $bodyContent .= "<p>Please contact us if you have any questions.</p>";
     } else {
         $bodyContent .= "<p>The status of your redemption order for <strong>'$itemName'</strong> has been updated to: <strong>$status</strong>.</p>";
     }
@@ -139,7 +189,36 @@ function sendStatusEmail($to, $name, $status, $itemName, $tracking = null) {
     $bodyContent .= "<br><p>Thank you for your support,<br>Love Bridge Team</p>";
     $bodyContent .= "</div></div>";
 
-    // PHPMailer Configuration
+    return sendEmailViaSMTP($to, $subject, $bodyContent);
+}
+
+// 2. 跟进邮件 (Ask if received)
+function sendFollowUpEmail($to, $name, $itemName, $orderId) {
+    $subject = "Did you receive your item? - Love Bridge";
+    
+    // 生成确认链接 (假设有一个 donor_confirm.php 处理这个逻辑，或者跳转到 donor portal)
+    $confirmLink = BASE_URL . "donor_portal.php?action=confirm_receipt&order_id=" . $orderId; 
+    
+    $bodyContent = "<div style='font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;'>";
+    $bodyContent .= "<div style='background-color: white; padding: 20px; border-radius: 10px; max-width: 600px; margin: auto;'>";
+    $bodyContent .= "<h2 style='color: #28a745;'>Has your reward arrived?</h2>";
+    $bodyContent .= "<p>Dear <strong>$name</strong>,</p>";
+    $bodyContent .= "<p>Our records show that your redeemed item <strong>'$itemName'</strong> should have arrived by now.</p>";
+    $bodyContent .= "<p>Could you please confirm if you have received it?</p>";
+    
+    $bodyContent .= "<div style='text-align:center; margin: 30px 0;'>";
+    $bodyContent .= "<a href='$confirmLink' style='background-color:#F28585; color:white; padding:12px 25px; text-decoration:none; border-radius:5px; font-weight:bold;'>Yes, I Received It</a>";
+    $bodyContent .= "</div>";
+    
+    $bodyContent .= "<p style='font-size:12px; color:#666;'>If you haven't received it yet, please reply to this email.</p>";
+    $bodyContent .= "<br><p>Thank you,<br>Love Bridge Team</p>";
+    $bodyContent .= "</div></div>";
+
+    return sendEmailViaSMTP($to, $subject, $bodyContent);
+}
+
+// SMTP 发送核心函数
+function sendEmailViaSMTP($to, $subject, $body) {
     $mail = new PHPMailer(true);
     try {
         $mail->isSMTP();
@@ -155,7 +234,7 @@ function sendStatusEmail($to, $name, $status, $itemName, $tracking = null) {
 
         $mail->isHTML(true);
         $mail->Subject = $subject;
-        $mail->Body    = $bodyContent;
+        $mail->Body    = $body;
 
         $mail->send();
         return true;
@@ -228,6 +307,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $redemptionId = intval($_POST['redemption_id']);
         $newStatus = $_POST['new_status'];
         $tracking = isset($_POST['tracking_number']) ? $conn->real_escape_string($_POST['tracking_number']) : null;
+        $estDays = isset($_POST['estimated_days']) ? intval($_POST['estimated_days']) : 5; // Get from Hidden Input
         
         $checkSql = "SELECT r.Redemption_Status, r.Redemption_PointsSpent, r.Donor_ID, 
                             d.Donor_Email, d.Donor_Name, rw.Reward_ItemName 
@@ -239,24 +319,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $orderData = $checkResult->fetch_assoc();
         $oldStatus = $orderData['Redemption_Status'];
 
+        // Logic for Cancelled (Refund Points)
         if ($newStatus == 'Cancelled' && $oldStatus != 'Cancelled') {
             $refundPoints = $orderData['Redemption_PointsSpent'];
             $donorId = $orderData['Donor_ID'];
             $conn->query("UPDATE point SET Points_Total = Points_Total + $refundPoints, Points_Updated_At = NOW() WHERE Donor_ID = $donorId");
         }
 
-        $sql = "UPDATE redemption_order SET Redemption_Status = '$newStatus', Redemption_Updated_At = NOW()";
+        // Logic for Shipped (Set Date & Est Date)
+        $extraUpdate = "";
+        $estDeliveryDate = null;
+        if ($newStatus == 'Shipped' && $oldStatus != 'Shipped') {
+            $estDeliveryDate = date('Y-m-d', strtotime("+$estDays days"));
+            $extraUpdate = ", Redemption_Shipped_At = NOW(), Redemption_Est_Delivery_Date = '$estDeliveryDate', Redemption_FollowUp_Sent = 0";
+        }
+
+        $sql = "UPDATE redemption_order SET Redemption_Status = '$newStatus', Redemption_Updated_At = NOW() $extraUpdate";
         if ($tracking) {
             $sql .= ", Redemption_TrackingNumber = '$tracking'";
         }
         $sql .= " WHERE Redemption_ID = $redemptionId";
         
         if ($conn->query($sql)) {
-            sendStatusEmail($orderData['Donor_Email'], $orderData['Donor_Name'], $newStatus, $orderData['Reward_ItemName'], $tracking);
+            // Send Notification Email
+            sendStatusEmail($orderData['Donor_Email'], $orderData['Donor_Name'], $newStatus, $orderData['Reward_ItemName'], $tracking, $estDeliveryDate);
 
             $msg = "Order #$redemptionId updated to $newStatus.";
             if ($newStatus == 'Cancelled') $msg .= " Points refunded to donor.";
-            if ($newStatus == 'Shipped') $msg .= " Email notification sent.";
+            if ($newStatus == 'Shipped') $msg .= " Donor notified (Est. Arrival: $estDeliveryDate).";
             
             header("Location: redemption_order_management.php?success=" . urlencode($msg));
             exit();
@@ -348,26 +438,15 @@ $stateCoords = [
 $malaysiaStates = array_keys($stateCoords);
 
 // --- FETCH HEADQUARTERS STATE (SAFE MODE) ---
-// I added a Try-Catch block here to prevent Fatal Errors if the column is missing
-$hqState = "Kuala Lumpur"; // Default fallback
+$hqState = "Kuala Lumpur"; // Default
 try {
-    // Check if table column exists first to be extra safe, or just try querying
     $hqSql = "SELECT Headquarters_State FROM headquarters LIMIT 1";
     $hqResult = $conn->query($hqSql);
-    
     if ($hqResult && $hqResult->num_rows > 0) {
         $row = $hqResult->fetch_assoc();
-        if (!empty($row['Headquarters_State'])) {
-            $hqState = $row['Headquarters_State'];
-        }
+        if (!empty($row['Headquarters_State'])) $hqState = $row['Headquarters_State'];
     }
-} catch (mysqli_sql_exception $e) {
-    // If the column doesn't exist, we catch the error here and do nothing.
-    // The system will just use the default "Kuala Lumpur" defined above.
-    // You should still run the SQL command to fix the database permanently.
-} catch (Exception $e) {
-    // Catch generic errors
-}
+} catch (Exception $e) {}
 
 ?>
 <!DOCTYPE html>
@@ -380,11 +459,12 @@ try {
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin_common.css">
     <style>
-        /* --- 1. STATS CARDS --- */
+        /* UI Styles */
         .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-5px); }
@@ -393,12 +473,11 @@ try {
         .stat-desc { font-size: 12px; color: #28a745; display: flex; align-items: center; gap: 5px; font-weight: 500;}
         .stat-icon { width: 60px; height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
         
-        .stat-card:nth-child(1) .stat-icon { background: rgba(255, 193, 7, 0.2); color: #ffc107; } /* Pending */
-        .stat-card:nth-child(2) .stat-icon { background: rgba(23, 162, 184, 0.2); color: #17a2b8; } /* Shipped */
-        .stat-card:nth-child(3) .stat-icon { background: rgba(40, 167, 69, 0.2); color: #28a745; } /* Completed - Green */
-        .stat-card:nth-child(4) .stat-icon { background: rgba(220, 53, 69, 0.2); color: #dc3545; } /* Total Points - Red */
+        .stat-card:nth-child(1) .stat-icon { background: rgba(255, 193, 7, 0.2); color: #ffc107; } 
+        .stat-card:nth-child(2) .stat-icon { background: rgba(23, 162, 184, 0.2); color: #17a2b8; } 
+        .stat-card:nth-child(3) .stat-icon { background: rgba(40, 167, 69, 0.2); color: #28a745; } 
+        .stat-card:nth-child(4) .stat-icon { background: rgba(220, 53, 69, 0.2); color: #dc3545; } 
 
-        /* --- 2. LIST SECTION STYLES --- */
         .order-management { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); margin-bottom: 30px; }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .section-header h2 { font-size: 18px; font-weight: 600; color: #333; }
@@ -406,17 +485,10 @@ try {
         .btn { padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; color: white; transition: 0.3s; font-size: 14px; text-decoration: none; }
         .btn-primary { background: #F28585; }
         .btn-success { background: #28a745; }
-        
-        .btn-light-pending { 
-            background: #fff3cd; 
-            color: #856404; 
-            border: 1px solid #ffeeba;
-        }
-        .btn-light-pending:hover {
-            background: #ffeeba;
-        }
+        .btn-light-pending { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .btn-light-pending:hover { background: #ffeeba; }
 
-        /* --- 3. PAGINATION STYLES --- */
+        /* Pagination */
         .pagination-container { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid #eee; margin-top: 10px; }
         .pagination-info { font-size: 13px; color: #666; }
         .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; transition: all 0.3s; display: inline-block; margin-left: 5px;}
@@ -429,10 +501,22 @@ try {
         .status-completed { background: #d4edda; color: #155724; }
         .status-cancelled { background: #f8d7da; color: #721c24; }
         .item-preview { display: flex; align-items: center; gap: 10px; }
-        .item-thumb { width: 50px; height: 50px; border-radius: 5px; object-fit: cover; border: 1px solid #eee; }
+        
+        .item-thumb { width: 50px; height: 50px; border-radius: 5px; object-fit: cover; border: 1px solid #eee; cursor: zoom-in; transition: transform 0.2s; }
+        .item-thumb:hover { transform: scale(1.05); border-color: #F28585; }
+
         .order-meta { font-size: 12px; color: #666; margin-top: 5px; }
 
-        /* Modal Styles */
+        /* Action Menu (Same as Donor Page) */
+        .action-cell { display: flex; justify-content: center; align-items: center; }
+        .action-menu { position: relative; display: inline-block; }
+        .menu-btn { background-color: #f8f9fa; border: 1px solid #e9ecef; cursor: pointer; width: 35px; height: 35px; border-radius: 50%; color: #6c757d; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; outline: none; }
+        .menu-btn:hover { background-color: #e2e6ea; color: #F28585; }
+        .dropdown-content { display: none; position: absolute; right: 0; top: 40px; background-color: white; min-width: 160px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); z-index: 100; border-radius: 8px; overflow: hidden; border: 1px solid #eee; text-align: left; }
+        .dropdown-content div, .dropdown-content a { color: #333; padding: 12px 16px; text-decoration: none; display: block; font-size: 13px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 10px; }
+        .dropdown-content div:hover, .dropdown-content a:hover { background-color: #f8f9fa; color: #F28585; }
+
+        /* Modals */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; border-radius: 10px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid #eee; }
@@ -440,7 +524,6 @@ try {
         .form-group { margin-bottom: 15px; }
         .form-label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px; }
         .form-input, .form-select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
-        
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
 
         .ai-panel { background: #f0f8ff; border: 1px solid #cce5ff; border-radius: 8px; padding: 15px; margin-top: 15px; position: relative; overflow: hidden; }
@@ -457,56 +540,47 @@ try {
         .info-box div { font-size: 14px; font-weight: 500; color: #333; }
         .full-width { grid-column: span 2; }
 
-        .select2-container .select2-selection--single {
-            height: 42px !important;
-            border: 1px solid #ddd !important;
-            border-radius: 5px !important;
-            display: flex;
-            align-items: center;
-        }
-        .select2-container--default .select2-selection--single .select2-selection__arrow {
-            height: 40px !important;
-        }
-        .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable {
-            background-color: #F28585 !important;
-            color: white !important;
-        }
+        .select2-container .select2-selection--single { height: 42px !important; border: 1px solid #ddd !important; border-radius: 5px !important; display: flex; align-items: center; }
+        .select2-container--default .select2-selection--single .select2-selection__arrow { height: 40px !important; }
+        .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable { background-color: #F28585 !important; color: white !important; }
 
-        .register-hint {
-            margin-top: 5px;
-            padding: 10px;
-            background-color: #f0f8ff;
-            border-left: 3px solid #17a2b8;
-            font-size: 13px;
-            color: #555;
-            border-radius: 4px;
-        }
-        .register-hint a {
-            color: #F28585; 
-            font-weight: 700;
-            text-decoration: underline;
-            margin-left: 5px;
-        }
+        .register-hint { margin-top: 5px; padding: 10px; background-color: #f0f8ff; border-left: 3px solid #17a2b8; font-size: 13px; color: #555; border-radius: 4px; }
+        .register-hint a { color: #F28585; font-weight: 700; text-decoration: underline; margin-left: 5px; }
         .register-hint a:hover { color: #d65f5f; }
-
         .phone-format { display: flex; align-items: center; }
         .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid #ddd; border-right: none; border-radius: 5px 0 0 5px; color: #666; font-weight: bold; font-size: 14px; }
         .phone-input { border-radius: 0 5px 5px 0 !important; }
+
+        /* Lightbox */
+        .lightbox-modal { display: none; position: fixed; z-index: 2000; padding-top: 50px; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; background-color: rgba(0, 0, 0, 0.9); flex-direction: column; justify-content: center; align-items: center; }
+        .lightbox-content { margin: auto; display: block; max-width: 90%; max-height: 80vh; border-radius: 5px; box-shadow: 0 0 20px rgba(255,255,255,0.1); object-fit: contain; animation: zoomIn 0.3s; }
+        @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
+        .close-lightbox { position: absolute; top: 20px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; z-index: 2002; }
+        .close-lightbox:hover { color: #bbb; }
     </style>
 </head>
 <body>
     
     <?php if (isset($_GET['success'])): ?>
-        <div class="floating-alert floating-alert-success" id="floatingSuccess" style="position: fixed; top: 20px; right: 20px; padding: 15px 20px; background: white; border-left: 4px solid var(--success); box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; z-index: 1100; color: var(--success);">
-            <i class="fas fa-check-circle"></i>
-            <div><?php echo htmlspecialchars($_GET['success']); ?></div>
-        </div>
+        <script>
+            Swal.fire({
+                icon: 'success',
+                title: 'Success',
+                text: '<?php echo addslashes($_GET['success']); ?>',
+                confirmButtonColor: '#28a745',
+                timer: 3000
+            });
+        </script>
     <?php endif; ?>
     <?php if (isset($_GET['error'])): ?>
-        <div class="floating-alert floating-alert-danger" id="floatingError" style="position: fixed; top: 20px; right: 20px; padding: 15px 20px; background: white; border-left: 4px solid var(--danger); box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 10px; z-index: 1100; color: var(--danger);">
-            <i class="fas fa-exclamation-circle"></i>
-            <div><?php echo htmlspecialchars($_GET['error']); ?></div>
-        </div>
+        <script>
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: '<?php echo addslashes($_GET['error']); ?>',
+                confirmButtonColor: '#dc3545'
+            });
+        </script>
     <?php endif; ?>
 
     <?php include 'admin_sidebar.php'; ?>
@@ -616,8 +690,8 @@ try {
                                     </td>
                                     <td style="padding: 15px; vertical-align: top;">
                                         <div class="item-preview">
-                                            <?php $img = !empty($order['Reward_PhotoPath']) ? $order['Reward_PhotoPath'] : 'uploads/rewards/default.jpg'; ?>
-                                            <img src="<?php echo htmlspecialchars($img); ?>" class="item-thumb" alt="Item">
+                                            <?php $img = !empty($order['Reward_PhotoPath']) ? 'uploads/rewards/' . $order['Reward_PhotoPath'] : 'uploads/rewards/default.jpg'; ?>
+                                            <img src="<?php echo htmlspecialchars($img); ?>" class="item-thumb" alt="Item" onclick="openLightbox('<?php echo htmlspecialchars($img); ?>')">
                                             <div>
                                                 <div style="font-weight: 500; font-size: 14px;"><?php echo htmlspecialchars($order['Reward_ItemName']); ?></div>
                                                 <div style="font-size: 12px; color: #dc3545; font-weight: bold;">-<?php echo $order['Redemption_PointsSpent']; ?> pts</div>
@@ -639,9 +713,18 @@ try {
                                         <span class="status-badge <?php echo $class; ?>"><?php echo $s; ?></span>
                                     </td>
                                     <td style="padding: 15px; text-align: center;">
-                                        <button onclick='openManageModal(<?php echo json_encode($order); ?>)' style="background: none; border: 1px solid #ddd; padding: 6px 12px; border-radius: 5px; cursor: pointer; color: #555; transition: 0.2s;">
-                                            <i class="fas fa-tasks"></i> Manage
-                                        </button>
+                                        <div class="action-cell">
+                                            <div class="action-menu">
+                                                <button class="menu-btn" onclick="toggleMenu(event, <?php echo $order['Redemption_ID']; ?>)">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <div id="menu-<?php echo $order['Redemption_ID']; ?>" class="dropdown-content">
+                                                    <div onclick='openManageModal(<?php echo json_encode($order); ?>)'>
+                                                        <i class="fas fa-tasks"></i> Manage Order
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -655,33 +738,25 @@ try {
                     <div class="pagination-info">Showing <?php echo $start_record; ?> to <?php echo $end_record; ?> of <?php echo $total_records; ?> results</div>
                     <div class="pagination-controls">
                         <?php 
-                        // Build pagination URL parameters
                         $queryParams = [];
                         if(!empty($searchTerm)) $queryParams['search'] = $searchTerm;
                         if(!empty($filterStatus)) $queryParams['status'] = $filterStatus;
-                        
                         $queryString = http_build_query($queryParams);
                         $paginationUrl = !empty($queryString) ? '&' . $queryString : '';
                         
-                        if ($page > 1): ?>
-                            <a href="?page=<?php echo $page - 1 . $paginationUrl; ?>" class="pagination-btn">Previous</a>
-                        <?php else: ?>
-                            <span class="pagination-btn disabled">Previous</span>
-                        <?php endif; ?>
+                        if ($page > 1) echo '<a href="?page=' . ($page - 1) . $paginationUrl . '" class="pagination-btn">Previous</a>'; 
+                        else echo '<span class="pagination-btn disabled">Previous</span>';
                         
-                        <?php for ($i = 1; $i <= $total_pages; $i++) { 
+                        for ($i = 1; $i <= $total_pages; $i++) { 
                             if ($i == $page) echo '<span class="pagination-btn active">' . $i . '</span>'; 
                             else echo '<a href="?page=' . $i . $paginationUrl . '" class="pagination-btn">' . $i . '</a>'; 
-                        } ?>
+                        } 
                         
-                        <?php if ($page < $total_pages): ?>
-                            <a href="?page=<?php echo $page + 1 . $paginationUrl; ?>" class="pagination-btn">Next</a>
-                        <?php else: ?>
-                            <span class="pagination-btn disabled">Next</span>
-                        <?php endif; ?>
+                        if ($page < $total_pages) echo '<a href="?page=' . ($page + 1) . $paginationUrl . '" class="pagination-btn">Next</a>'; 
+                        else echo '<span class="pagination-btn disabled">Next</span>';
+                        ?>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
@@ -705,16 +780,13 @@ try {
                                         data-address3="<?php echo htmlspecialchars($d['Donor_Address3']); ?>"
                                         data-city="<?php echo htmlspecialchars($d['Donor_City']); ?>"
                                         data-state="<?php echo htmlspecialchars($d['Donor_State']); ?>"
-                                        data-postal="<?php echo htmlspecialchars($d['Donor_PostalCode']); ?>"
-                                        >
+                                        data-postal="<?php echo htmlspecialchars($d['Donor_PostalCode']); ?>">
                                     <?php echo htmlspecialchars($d['Donor_Name']) . " (" . $d['Donor_ICNumber'] . ")"; ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
                         <div class="register-hint">
-                            <i class="fas fa-info-circle"></i> 
-                            Donor doesn't have an account? 
-                            <a href="admin_donor_page.php">Register Donor Here</a>
+                            <i class="fas fa-info-circle"></i> Donor doesn't have an account? <a href="admin_donor_page.php">Register Donor Here</a>
                         </div>
                     </div>
 
@@ -728,7 +800,6 @@ try {
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <span class="form-guide">Select the reward item the donor wishes to redeem.</span>
                     </div>
 
                     <div class="form-group">
@@ -737,37 +808,16 @@ try {
                             <span class="phone-prefix">+60</span>
                             <input type="text" name="contact" id="add_contact" class="form-input phone-input" required placeholder="12-3456789" maxlength="11">
                         </div>
-                        <span class="form-guide">Format: 12-3456789 or 11-12345678 (Auto-filled).</span>
                     </div>
 
                     <div style="border-top:1px solid #eee; margin:15px 0; padding-top:10px;">
-                        
-                        <div class="form-group">
-                            <label class="form-label">Address Line 1</label>
-                            <input type="text" name="address1" class="form-input" required placeholder="e.g. No. 123, Jalan Example">
-                            <span class="form-guide">House unit no., floor, building, street name.</span>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Address Line 2</label>
-                            <input type="text" name="address2" class="form-input" placeholder="e.g. Taman Sri">
-                            <span class="form-guide">Residential area, village, or section.</span>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label">Address Line 3</label>
-                            <input type="text" name="address3" class="form-input" placeholder="Address Line 3 (Optional)">
-                        </div>
+                        <div class="form-group"><label class="form-label">Address Line 1</label><input type="text" name="address1" class="form-input" required></div>
+                        <div class="form-group"><label class="form-label">Address Line 2</label><input type="text" name="address2" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" name="address3" class="form-input"></div>
 
                         <div style="display:flex; gap:10px;">
-                            <div class="form-group" style="flex:1">
-                                <label class="form-label">Postal Code</label>
-                                <input type="text" name="postal_code" id="add_postal_code" class="form-input" required placeholder="e.g. 50000">
-                            </div>
-                            <div class="form-group" style="flex:1">
-                                <label class="form-label">City</label>
-                                <input type="text" name="city" class="form-input" required>
-                            </div>
+                            <div class="form-group" style="flex:1"><label class="form-label">Postal Code</label><input type="text" name="postal_code" id="add_postal_code" class="form-input" required></div>
+                            <div class="form-group" style="flex:1"><label class="form-label">City</label><input type="text" name="city" class="form-input" required></div>
                         </div>
 
                         <div class="form-group">
@@ -778,7 +828,6 @@ try {
                             </select>
                         </div>
                     </div>
-
                     <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Create Order</button>
                 </form>
             </div>
@@ -810,25 +859,16 @@ try {
                 <div class="ai-panel">
                     <div class="ai-title"><i class="fas fa-robot"></i> AI Logistics Intelligence</div>
                     <div class="ai-data">
-                        <div class="ai-metric">
-                            <span>Estimated Distance</span>
-                            <strong id="aiDistance">Calculating...</strong>
-                        </div>
-                        <div class="ai-metric">
-                            <span>Recommended Courier</span>
-                            <strong id="aiCourier">Analyzing...</strong>
-                        </div>
-                        <div class="ai-metric">
-                            <span>Est. Delivery Days</span>
-                            <strong id="aiTime">...</strong>
-                        </div>
+                        <div class="ai-metric"><span>Estimated Distance</span><strong id="aiDistance">Calculating...</strong></div>
+                        <div class="ai-metric"><span>Recommended Courier</span><strong id="aiCourier">Analyzing...</strong></div>
+                        <div class="ai-metric"><span>Est. Delivery</span><strong id="aiTime">...</strong></div>
                     </div>
-                    <div class="ai-map-hint">Distance calculated from Headquarters (<?php echo htmlspecialchars($hqState); ?>) to Donor's State location.</div>
                 </div>
 
                 <form method="POST" action="redemption_order_management.php" id="manageForm">
                     <input type="hidden" name="action" value="update_status">
                     <input type="hidden" name="redemption_id" id="mFormId">
+                    <input type="hidden" name="estimated_days" id="hiddenEstDays" value="5">
                     
                     <h3 style="margin-top:20px;">Update Status</h3>
                     <div class="form-group">
@@ -850,59 +890,69 @@ try {
                         <button type="button" class="btn-reject" onclick="setStatus('Cancelled')"><i class="fas fa-times"></i> Reject & Refund</button>
                         <button type="button" class="btn-approve" onclick="setStatus('Shipped')"><i class="fas fa-check"></i> Approve & Ship</button>
                     </div>
-                    <p style="font-size:11px; color:#666; text-align:center; margin-top:10px;">* Email notification will be sent automatically upon Approval or Rejection.</p>
+                    <p style="font-size:11px; color:#666; text-align:center; margin-top:10px;">* Email notification will be sent automatically.</p>
                 </form>
             </div>
         </div>
     </div>
 
-    <script>
-        // Initialize Select2 and Auto-fill Logic
-        $(document).ready(function() {
-            $('#add_donor_select').select2({
-                placeholder: "-- Choose Donor --",
-                allowClear: true,
-                dropdownParent: $('#addOrderModal') 
-            });
+    <div id="imageLightbox" class="lightbox-modal">
+        <span class="close-lightbox" onclick="closeLightbox()">&times;</span>
+        <img class="lightbox-content" id="lightboxImage">
+    </div>
 
+    <script>
+        // Init Select2
+        $(document).ready(function() {
+            $('#add_donor_select').select2({ placeholder: "-- Choose Donor --", allowClear: true, dropdownParent: $('#addOrderModal') });
             $('#add_donor_select').on('change', function() {
                 var selected = $(this).find(':selected');
-                
-                var rawContact = selected.data('contact');
-                var addr1 = selected.data('address1');
-                var addr2 = selected.data('address2');
-                var addr3 = selected.data('address3');
-                var city = selected.data('city');
-                var state = selected.data('state');
-                var postal = selected.data('postal');
-
-                $('input[name="address1"]').val(addr1);
-                $('input[name="address2"]').val(addr2);
-                $('input[name="address3"]').val(addr3);
-                $('input[name="city"]').val(city);
-                $('input[name="postal_code"]').val(postal);
-                
-                if (rawContact && rawContact.startsWith('+60')) {
-                    rawContact = rawContact.substring(3);
-                }
-                $('#add_contact').val(rawContact);
-                
-                let event = new Event('input', { bubbles: true });
-                document.getElementById('add_contact').dispatchEvent(event);
-
-                if(state) {
-                    $('select[name="state"]').val(state).change();
-                }
+                $('input[name="address1"]').val(selected.data('address1'));
+                $('input[name="address2"]').val(selected.data('address2'));
+                $('input[name="address3"]').val(selected.data('address3'));
+                $('input[name="city"]').val(selected.data('city'));
+                $('input[name="postal_code"]').val(selected.data('postal'));
+                let c = selected.data('contact');
+                if(c && c.startsWith('+60')) c = c.substring(3);
+                $('#add_contact').val(c);
+                if(selected.data('state')) $('select[name="state"]').val(selected.data('state')).change();
             });
-
             setupPhoneInput('add_contact');
             setupPostcodeState('add_postal_code', 'add_state_select');
         });
 
-        // AI DATA: PHP Array to JS Object
         const stateCoords = <?php echo json_encode($stateCoords); ?>;
         const currentHqState = "<?php echo htmlspecialchars($hqState); ?>";
         
+        // --- DROPDOWN LOGIC ---
+        function toggleMenu(e, id) { 
+            e.stopPropagation(); 
+            document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); 
+            const menu = document.getElementById('menu-' + id); 
+            if(menu) menu.style.display = 'block'; 
+        }
+
+        window.onclick = function(e) {
+            // Close dropdowns
+            if (!e.target.matches('.menu-btn') && !e.target.matches('.menu-btn *')) { 
+                document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); 
+            }
+            // Close Modals
+            if(e.target == document.getElementById('addOrderModal')) closeModal('addOrderModal');
+            if(e.target == document.getElementById('manageModal')) closeModal('manageModal');
+            // Close Lightbox
+            if(e.target.id == 'imageLightbox') closeLightbox();
+        }
+
+        // --- LIGHTBOX ---
+        function openLightbox(src) {
+            document.getElementById('lightboxImage').src = src;
+            document.getElementById('imageLightbox').style.display = 'flex';
+        }
+        function closeLightbox() {
+            document.getElementById('imageLightbox').style.display = 'none';
+        }
+
         function openAddOrderModal() { document.getElementById('addOrderModal').style.display = 'flex'; }
         
         function openManageModal(order) {
@@ -913,65 +963,42 @@ try {
             
             let addr = order.Redemption_Address1;
             if(order.Redemption_Address2) addr += ", " + order.Redemption_Address2;
-            if(order.Redemption_Address3) addr += ", " + order.Redemption_Address3;
             addr += ", " + order.Redemption_PostalCode + " " + order.Redemption_City + ", " + order.Redemption_State;
-            
             document.getElementById('mAddress').innerText = addr;
-            
             document.getElementById('mItemName').innerText = order.Reward_ItemName;
             document.getElementById('mPoints').innerText = order.Redemption_PointsSpent;
-            document.getElementById('mItemImg').src = order.Reward_PhotoPath || 'uploads/rewards/default.jpg';
-            
+            document.getElementById('mItemImg').src = order.Reward_PhotoPath ? 'uploads/rewards/' + order.Reward_PhotoPath : 'uploads/rewards/default.jpg';
             document.getElementById('mStatusSelect').value = order.Redemption_Status;
             document.getElementById('mTracking').value = order.Redemption_TrackingNumber || '';
             
             toggleTracking(); 
             calculateAI(order.Redemption_State); 
-
             document.getElementById('manageModal').style.display = 'flex';
         }
 
-        // --- HELPER FUNCTION: Phone Input Formatting ---
         function setupPhoneInput(inputId) {
-            const input = document.getElementById(inputId); 
-            if(!input) return;
+            const input = document.getElementById(inputId); if(!input) return;
             input.addEventListener('input', function(e) { 
-                let val = this.value.replace(/\D/g, ''); 
-                if (val.length > 11) val = val.substring(0, 11); 
-                let newVal = val; 
-                if (val.length > 2) newVal = val.substring(0, 2) + '-' + val.substring(2); 
+                let val = this.value.replace(/\D/g, ''); if (val.length > 11) val = val.substring(0, 11); 
+                let newVal = val; if (val.length > 2) newVal = val.substring(0, 2) + '-' + val.substring(2); 
                 this.value = newVal; 
             });
         }
 
-        // --- HELPER FUNCTION: Postcode to State ---
         function setupPostcodeState(postcodeId, stateSelectId) {
-            const pcInput = document.getElementById(postcodeId); 
-            const stateSelect = document.getElementById(stateSelectId);
+            const pcInput = document.getElementById(postcodeId); const stateSelect = document.getElementById(stateSelectId);
             if (!pcInput || !stateSelect) return;
             pcInput.addEventListener('input', function() {
                 const val = this.value.replace(/\D/g, '');
                 if (val.length >= 2) {
                     const prefix = parseInt(val.substring(0, 2));
                     let state = "";
-                    if (prefix >= 1 && prefix <= 2) state = "Perlis"; 
-                    else if (prefix >= 5 && prefix <= 9) state = "Kedah"; 
-                    else if (prefix >= 10 && prefix <= 14) state = "Penang";
-                    else if (prefix >= 15 && prefix <= 18) state = "Kelantan"; 
-                    else if (prefix >= 20 && prefix <= 24) state = "Terengganu"; 
-                    else if (prefix >= 25 && prefix <= 28) state = "Pahang";
-                    else if (prefix >= 30 && prefix <= 36) state = "Perak"; 
-                    else if (prefix >= 40 && prefix <= 48) state = "Selangor"; 
-                    else if (prefix >= 50 && prefix <= 60) state = "Kuala Lumpur";
-                    else if (prefix >= 62 && prefix <= 62) state = "Putrajaya"; 
-                    else if (prefix >= 63 && prefix <= 68) state = "Selangor"; 
-                    else if (prefix >= 70 && prefix <= 73) state = "Negeri Sembilan";
-                    else if (prefix >= 75 && prefix <= 78) state = "Melaka"; 
-                    else if (prefix >= 79 && prefix <= 86) state = "Johor"; 
-                    else if (prefix == 87) state = "Labuan";
-                    else if (prefix >= 88 && prefix <= 91) state = "Sabah"; 
-                    else if (prefix >= 93 && prefix <= 98) state = "Sarawak";
-                    
+                    if (prefix >= 1 && prefix <= 2) state = "Perlis"; else if (prefix >= 5 && prefix <= 9) state = "Kedah"; else if (prefix >= 10 && prefix <= 14) state = "Penang";
+                    else if (prefix >= 15 && prefix <= 18) state = "Kelantan"; else if (prefix >= 20 && prefix <= 24) state = "Terengganu"; else if (prefix >= 25 && prefix <= 28) state = "Pahang";
+                    else if (prefix >= 30 && prefix <= 36) state = "Perak"; else if (prefix >= 40 && prefix <= 48) state = "Selangor"; else if (prefix >= 50 && prefix <= 60) state = "Kuala Lumpur";
+                    else if (prefix >= 62 && prefix <= 62) state = "Putrajaya"; else if (prefix >= 63 && prefix <= 68) state = "Selangor"; else if (prefix >= 70 && prefix <= 73) state = "Negeri Sembilan";
+                    else if (prefix >= 75 && prefix <= 78) state = "Melaka"; else if (prefix >= 79 && prefix <= 86) state = "Johor"; else if (prefix == 87) state = "Labuan";
+                    else if (prefix >= 88 && prefix <= 91) state = "Sabah"; else if (prefix >= 93 && prefix <= 98) state = "Sarawak";
                     if (state) $(stateSelect).val(state).trigger('change');
                 }
             });
@@ -980,14 +1007,30 @@ try {
         function setStatus(status) {
             document.getElementById('mStatusSelect').value = status;
             toggleTracking();
+
+            // Validation for Shipping
             if(status === 'Shipped' && document.getElementById('mTracking').value.trim() === '') {
-                alert("Please enter a Tracking Number to Approve/Ship.");
-                document.getElementById('mTracking').focus();
+                Swal.fire('Tracking Required', 'Please enter a tracking number.', 'warning');
                 return;
             }
-            if(confirm("Are you sure you want to set status to " + status + "? An email will be sent.")) {
-                document.getElementById('manageForm').submit();
-            }
+
+            // SweetAlert2 Confirmation
+            let title = status === 'Cancelled' ? 'Reject & Refund?' : 'Approve & Ship?';
+            let text = status === 'Cancelled' ? 'Points will be refunded and donor notified.' : 'Donor will be notified of shipment.';
+            let confirmColor = status === 'Cancelled' ? '#dc3545' : '#28a745';
+
+            Swal.fire({
+                title: title,
+                text: text,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: confirmColor,
+                confirmButtonText: 'Yes, Confirm'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('manageForm').submit();
+                }
+            });
         }
 
         function toggleTracking() {
@@ -1000,61 +1043,31 @@ try {
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
         function calculateAI(donorState) {
-            let hqLat = 3.1390; 
-            let hqLng = 101.6869;
-
-            if (stateCoords[currentHqState]) {
-                hqLat = stateCoords[currentHqState][0];
-                hqLng = stateCoords[currentHqState][1];
-            }
+            let hqLat = 3.1390; let hqLng = 101.6869;
+            if (stateCoords[currentHqState]) { hqLat = stateCoords[currentHqState][0]; hqLng = stateCoords[currentHqState][1]; }
             
-            let distText = "Unknown";
-            let courier = "Standard Post";
-            let time = "3-5 Days";
+            let distText = "Unknown"; let courier = "Standard Post"; let time = "3-5 Days"; let daysInt = 5;
 
             if (stateCoords[donorState]) {
-                const lat2 = stateCoords[donorState][0];
-                const lon2 = stateCoords[donorState][1];
-                
+                const lat2 = stateCoords[donorState][0]; const lon2 = stateCoords[donorState][1];
                 const R = 6371; 
-                const dLat = deg2rad(lat2 - hqLat);
-                const dLon = deg2rad(lon2 - hqLng);
-                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                          Math.cos(deg2rad(hqLat)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                const dLat = (lat2 - hqLat) * (Math.PI/180);
+                const dLon = (lon2 - hqLng) * (Math.PI/180);
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(hqLat*(Math.PI/180)) * Math.cos(lat2*(Math.PI/180)) * Math.sin(dLon/2) * Math.sin(dLon/2);
                 const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
                 const d = Math.round(R * c);
                 
                 distText = "~" + d + " km";
                 
-                if (d < 50) {
-                    courier = "Lalamove / Grab";
-                    time = "Same Day";
-                } else if (donorState === 'Sabah' || donorState === 'Sarawak' || donorState === 'Labuan') {
-                    courier = "Pos Laju (Air)";
-                    time = "5-7 Days";
-                } else {
-                    courier = "J&T Express";
-                    time = "2-3 Days";
-                }
+                if (d < 50) { courier = "Lalamove / Grab"; time = "Same Day (1 Day)"; daysInt = 1; } 
+                else if (donorState === 'Sabah' || donorState === 'Sarawak' || donorState === 'Labuan') { courier = "Pos Laju (Air)"; time = "5-7 Days"; daysInt = 7; } 
+                else { courier = "J&T Express"; time = "2-3 Days"; daysInt = 3; }
             }
             
             document.getElementById('aiDistance').innerText = distText;
             document.getElementById('aiCourier').innerText = courier;
             document.getElementById('aiTime').innerText = time;
-        }
-
-        function deg2rad(deg) { return deg * (Math.PI/180); }
-
-        setTimeout(() => {
-            const s = document.getElementById('floatingSuccess');
-            const e = document.getElementById('floatingError');
-            if(s) s.style.display='none';
-            if(e) e.style.display='none';
-        }, 4000);
-
-        window.onclick = function(e) {
-            if(e.target == document.getElementById('addOrderModal')) closeModal('addOrderModal');
-            if(e.target == document.getElementById('manageModal')) closeModal('manageModal');
+            document.getElementById('hiddenEstDays').value = daysInt; // Send to PHP
         }
     </script>
 </body>

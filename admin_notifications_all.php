@@ -3,7 +3,7 @@
 session_start();
 
 // 1. 检查用户登录
-if (!isset($_SESSION['admin_id'])) {
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
 }
@@ -11,65 +11,88 @@ if (!isset($_SESSION['admin_id'])) {
 include 'dataconnection.php';
 
 // ==========================================
-// 2. [新增] 获取当前 Admin 的个人资料 (为了 Header 显示)
+// 2. 确定角色
 // ==========================================
-// 必须在 include 'admin_header.php' 之前准备好这些变量
-$admin_id = $_SESSION['admin_id'];
-$admin_sql = "SELECT * FROM admin WHERE Admin_ID = ?";
-$stmt = $conn->prepare($admin_sql);
-$stmt->bind_param("i", $admin_id);
-$stmt->execute();
-$admin_result = $stmt->get_result();
-
-if ($admin_row = $admin_result->fetch_assoc()) {
-    $adminName = $admin_row['Admin_Name'];
-    $adminPosition = $admin_row['Admin_Role']; // 对应数据库里的 Admin_Role
-    $adminProfilePicture = $admin_row['Admin_ProfilePicture'];
-} else {
-    // 如果找不到，使用默认值
-    $adminName = "Admin";
-    $adminPosition = "Administrator";
-    $adminProfilePicture = null;
+$current_role = 'Guest';
+if (isset($_SESSION['admin_id'])) {
+    $aid = $_SESSION['admin_id'];
+    $q = mysqli_query($conn, "SELECT Admin_Role FROM admin WHERE Admin_ID = $aid");
+    if ($r = mysqli_fetch_assoc($q)) $current_role = $r['Admin_Role'];
+} elseif (isset($_SESSION['staff_id'])) {
+    $current_role = 'Staff';
 }
-$stmt->close();
 
 // ==========================================
-// 3. 处理操作 (Soft Delete / Mark Read)
+// 3. 构建过滤条件 (WHERE)
+// ==========================================
+// 基础条件：未删除
+$whereClause = "WHERE n.Is_Deleted = 0";
+
+if ($current_role === 'Super Admin') {
+    // Show all
+} elseif ($current_role === 'Admin') {
+    // Show mostly all
+} elseif ($current_role === 'Staff') {
+    // Filter out Staff, Payment, Contact, Receipt
+    $whereClause .= " AND n.Type NOT IN ('New_Staff', 'Donation', 'receipt_request', 'New_Contact')";
+}
+
+// ==========================================
+// 4. 处理操作 (Soft Delete / Mark Read)
 // ==========================================
 
-// A. 单个删除 (Soft Delete)
+// A. 单个删除
 if (isset($_POST['delete_id'])) {
     $del_id = intval($_POST['delete_id']); 
+    // 简单做，不校验所属权，因为是软删
     $conn->query("UPDATE admin_notifications SET Is_Deleted = 1 WHERE AdminNotification_ID = $del_id");
+    header("Location: admin_notifications_all.php"); // 防止刷新重提交
+    exit;
 }
 
-// B. 全部删除 (Soft Delete All)
+// B. 全部删除 (基于当前过滤条件)
 if (isset($_POST['delete_all'])) {
-    $conn->query("UPDATE admin_notifications SET Is_Deleted = 1 WHERE Is_Deleted = 0");
+    // 比较复杂，因为不能删别人看不到的。这里简单处理：只删符合当前 whereClause 的
+    // 由于 $whereClause 有别名 n.，Update 语法要小心
+    // 简化：UPDATE admin_notifications n SET Is_Deleted = 1 WHERE n.Is_Deleted=0 AND [Role Logic]
+    // 既然逻辑复用较多，直接全删符合 role 的
+    if($current_role === 'Staff') {
+         $conn->query("UPDATE admin_notifications SET Is_Deleted = 1 WHERE Is_Deleted = 0 AND Type NOT IN ('New_Staff', 'Donation', 'receipt_request', 'New_Contact')");
+    } else {
+         $conn->query("UPDATE admin_notifications SET Is_Deleted = 1 WHERE Is_Deleted = 0");
+    }
+    header("Location: admin_notifications_all.php");
+    exit;
 }
 
 // C. 全部已读
 if (isset($_POST['mark_all_read'])) {
-    $conn->query("UPDATE admin_notifications SET Is_Read = 1 WHERE Is_Read = 0 AND Is_Deleted = 0");
+    if($current_role === 'Staff') {
+         $conn->query("UPDATE admin_notifications SET Is_Read = 1 WHERE Is_Read = 0 AND Is_Deleted = 0 AND Type NOT IN ('New_Staff', 'Donation', 'receipt_request', 'New_Contact')");
+    } else {
+         $conn->query("UPDATE admin_notifications SET Is_Read = 1 WHERE Is_Read = 0 AND Is_Deleted = 0");
+    }
+    header("Location: admin_notifications_all.php");
+    exit;
 }
 
 // ==========================================
-// 4. 获取通知数据
+// 5. 获取数据
 // ==========================================
 
-// 计算未读 (只算未删除的)
-$countSql = "SELECT COUNT(*) as unread FROM admin_notifications WHERE Is_Read = 0 AND Is_Deleted = 0";
-$countResult = $conn->query($countSql);
-$countRow = $countResult->fetch_assoc();
-$unreadCount = $countRow['unread']; 
-
-// 获取列表 (关联 Contact_Messages 表以获取发件人名字和Email)
+// 获取列表 (关联 Contact_Messages 只是为了显示发件人名字，非必须)
 $sql = "SELECT n.*, c.Email as ContactEmail, c.Name as ContactName, c.Title as ContactSubject 
         FROM admin_notifications n 
         LEFT JOIN contact_messages c ON n.Contact_ID = c.Contact_ID 
-        WHERE n.Is_Deleted = 0 
+        $whereClause 
         ORDER BY n.Created_At DESC";
 $result = $conn->query($sql);
+
+// 计算未读 (基于当前 Filter)
+$countSql = "SELECT COUNT(*) as unread FROM admin_notifications n $whereClause AND n.Is_Read = 0";
+$countResult = $conn->query($countSql);
+$countRow = $countResult->fetch_assoc();
+$unreadCount = $countRow['unread']; 
 ?>
 
 <!DOCTYPE html>
@@ -85,7 +108,6 @@ $result = $conn->query($sql);
         body { background-color: #f5f7fa; }
         .notif-container { padding: 30px; max-width: 1100px; margin: 0 auto; }
         
-        /* 顶部工具栏 */
         .toolbar { 
             display: flex; justify-content: space-between; align-items: center; 
             margin-bottom: 20px; background: white; padding: 15px 25px; 
@@ -104,18 +126,15 @@ $result = $conn->query($sql);
         .btn-clear { background: #fff0f0; color: #dc3545; }
         .btn-clear:hover { background: #ffe0e0; }
 
-        /* 邮件列表容器 */
         .email-list { background: white; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); overflow: hidden; }
 
-        /* 单个通知行 */
         .email-item { 
             display: flex; align-items: center; padding: 18px 25px; border-bottom: 1px solid #f1f1f1; 
-            transition: all 0.2s ease; position: relative;
+            transition: all 0.2s ease; position: relative; cursor: pointer;
         }
         .email-item:hover { background-color: #f8f9fa; z-index: 1; box-shadow: 0 0 10px rgba(0,0,0,0.02); }
         .email-item:last-child { border-bottom: none; }
         
-        /* 未读状态：左侧红条 + 背景微红 + 文字加粗 */
         .email-item.unread { background-color: #fffdfd; }
         .email-item.unread::before {
             content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #ff4757;
@@ -123,19 +142,16 @@ $result = $conn->query($sql);
         .email-item.unread .email-subject { font-weight: 700; color: #000; }
         .email-item.unread .email-time { color: #ff4757; font-weight: 600; }
 
-        /* 图标区域 */
         .email-icon { 
             width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; 
             color: white; font-size: 18px; margin-right: 20px; flex-shrink: 0;
         }
         
-        /* 内容区域 */
         .email-content { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
         .email-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
         .email-subject { font-size: 15px; color: #333; line-height: 1.4; margin-right: 15px; }
         .email-meta { font-size: 13px; color: #888; display: flex; gap: 15px; }
         
-        /* 右侧操作按钮 (悬停显示) */
         .email-actions { 
             display: flex; align-items: center; gap: 10px; opacity: 0; transition: opacity 0.2s; 
             margin-left: 20px; min-width: 100px; justify-content: flex-end;
@@ -148,25 +164,40 @@ $result = $conn->query($sql);
         }
         .action-btn:hover { transform: translateY(-2px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .action-btn.delete:hover { color: #dc3545; border-color: #dc3545; }
-        .action-btn.reply:hover { color: #17a2b8; border-color: #17a2b8; }
         
-        /* 颜色类 */
-        .bg-green { background: linear-gradient(135deg, #2ecc71, #26af61); box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3); }
-        .bg-red { background: linear-gradient(135deg, #e74c3c, #c0392b); box-shadow: 0 4px 10px rgba(231, 76, 60, 0.3); }
-        .bg-blue { background: linear-gradient(135deg, #3498db, #2980b9); box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3); }
-        .bg-yellow { background: linear-gradient(135deg, #f1c40f, #f39c12); box-shadow: 0 4px 10px rgba(241, 196, 15, 0.3); }
-        .bg-purple { background: linear-gradient(135deg, #9b59b6, #8e44ad); box-shadow: 0 4px 10px rgba(155, 89, 182, 0.3); }
+        /* Colors */
+        .bg-green { background: linear-gradient(135deg, #2ecc71, #26af61); }
+        .bg-red { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .bg-blue { background: linear-gradient(135deg, #3498db, #2980b9); }
+        .bg-yellow { background: linear-gradient(135deg, #f1c40f, #f39c12); }
+        .bg-purple { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
         .bg-gray { background: #95a5a6; }
 
-        /* 空状态 */
         .empty-state { text-align: center; padding: 60px 20px; color: #aab; }
         .empty-state i { font-size: 50px; margin-bottom: 20px; opacity: 0.5; }
         
-        /* 响应式 */
-        @media (max-width: 768px) {
-            .email-meta { flex-direction: column; gap: 2px; }
-            .email-actions { opacity: 1; } /* 手机版常显 */
+        /* 自定义 Modal 样式 */
+        .confirm-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;
         }
+        .confirm-box {
+            background: white; width: 90%; max-width: 400px; border-radius: 10px; 
+            padding: 25px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .confirm-box i { font-size: 40px; color: #f1c40f; margin-bottom: 15px; display: block; }
+        .confirm-box h3 { margin: 0 0 10px; color: #333; }
+        .confirm-box p { color: #666; margin-bottom: 25px; font-size: 14px; }
+        .confirm-btns { display: flex; gap: 10px; justify-content: center; }
+        .confirm-btns button {
+            padding: 10px 25px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        .btn-cancel { background: #f1f1f1; color: #555; }
+        .btn-confirm { background: #dc3545; color: white; }
+        .btn-confirm:hover { background: #c82333; }
+
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body>
@@ -174,11 +205,7 @@ $result = $conn->query($sql);
     <?php include 'admin_sidebar.php'; ?> 
 
     <div class="main-content" id="mainContent">
-        
-        <?php 
-        // 这里的 admin_header.php 会自动使用上方第2步定义的 $adminName 等变量
-        include 'admin_header.php'; 
-        ?> 
+        <?php include 'admin_header.php'; ?> 
 
         <div class="notif-container">
             <div class="toolbar">
@@ -196,10 +223,11 @@ $result = $conn->query($sql);
                         </button>
                     </form>
 
-                    <form method="POST" onsubmit="return confirm('Are you sure you want to clear all notifications?');" style="display:inline;">
-                        <button type="submit" name="delete_all" class="btn-tool btn-clear">
-                            <i class="fas fa-trash"></i> Clear All
-                        </button>
+                    <button type="button" onclick="openConfirmModal('deleteAllForm')" class="btn-tool btn-clear">
+                        <i class="fas fa-trash"></i> Clear All
+                    </button>
+                    <form id="deleteAllForm" method="POST" style="display:none;">
+                        <input type="hidden" name="delete_all" value="1">
                     </form>
                 </div>
             </div>
@@ -207,24 +235,30 @@ $result = $conn->query($sql);
             <div class="email-list">
                 <?php if ($result->num_rows > 0): ?>
                     <?php while($row = $result->fetch_assoc()): 
-                        // 逻辑：判断图标颜色
+                        // 图标和颜色逻辑
                         $type = strtolower($row['Type']);
                         $iconClass = 'fa-bell'; $bgClass = 'bg-gray';
                         
-                        if(strpos($type, 'donation') !== false) { 
+                        if(strpos($type, 'donation') !== false || strpos($type, 'payment') !== false) { 
                             $iconClass = 'fa-hand-holding-usd'; $bgClass = 'bg-green'; 
                         } elseif(strpos($type, 'fail') !== false) { 
                             $iconClass = 'fa-times-circle'; $bgClass = 'bg-red'; 
-                        } elseif(strpos($type, 'contact') !== false || strpos($type, 'new_contact') !== false) { 
+                        } elseif(strpos($type, 'contact') !== false) { 
                             $iconClass = 'fa-envelope-open-text'; $bgClass = 'bg-blue'; 
                         } elseif(strpos($type, 'target') !== false || strpos($type, 'case') !== false) { 
                             $iconClass = 'fa-trophy'; $bgClass = 'bg-yellow'; 
-                        } elseif(strpos($type, 'user') !== false) {
-                            $iconClass = 'fa-user'; $bgClass = 'bg-purple';
+                        } elseif(strpos($type, 'staff') !== false) {
+                            $iconClass = 'fa-user-tie'; $bgClass = 'bg-purple';
+                        } elseif(strpos($type, 'donor') !== false || strpos($type, 'user') !== false) {
+                            $iconClass = 'fa-user-plus'; $bgClass = 'bg-purple';
                         }
+
+                        // 跳转链接
+                        $targetLink = !empty($row['Link']) ? $row['Link'] : 'javascript:void(0)';
                     ?>
                     
-                    <div class="email-item <?php echo $row['Is_Read'] == 0 ? 'unread' : ''; ?>">
+                    <div class="email-item <?php echo $row['Is_Read'] == 0 ? 'unread' : ''; ?>" 
+                         onclick="if(!event.target.closest('.email-actions')) window.location.href='<?php echo $targetLink; ?>'">
                         
                         <div class="email-icon <?php echo $bgClass; ?>">
                             <i class="fas <?php echo $iconClass; ?>"></i>
@@ -243,19 +277,13 @@ $result = $conn->query($sql);
                         </div>
 
                         <div class="email-actions">
+                            <button type="button" class="action-btn delete" title="Delete" 
+                                    onclick="event.stopPropagation(); openConfirmModal('deleteSingleForm<?php echo $row['AdminNotification_ID']; ?>')">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
                             
-                            <?php if (!empty($row['ContactEmail'])): ?>
-                                <a href="mailto:<?php echo $row['ContactEmail']; ?>?subject=RE: <?php echo htmlspecialchars($row['ContactSubject']); ?>&body=Dear <?php echo htmlspecialchars($row['ContactName']); ?>,%0D%0A%0D%0ARegarding your message:%0D%0A> <?php echo htmlspecialchars($row['Message']); ?>%0D%0A%0D%0A" 
-                                   class="action-btn reply" title="Reply via Email">
-                                    <i class="fas fa-reply"></i>
-                                </a>
-                            <?php endif; ?>
-
-                            <form method="POST" onsubmit="return confirm('Delete this notification?');" style="margin:0;">
+                            <form id="deleteSingleForm<?php echo $row['AdminNotification_ID']; ?>" method="POST" style="display:none;">
                                 <input type="hidden" name="delete_id" value="<?php echo $row['AdminNotification_ID']; ?>">
-                                <button type="submit" class="action-btn delete" title="Delete">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
                             </form>
                         </div>
 
@@ -273,5 +301,56 @@ $result = $conn->query($sql);
         </div>
     </div>
     
+    <div class="confirm-modal" id="customConfirmModal">
+        <div class="confirm-box">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>Are you sure?</h3>
+            <p>Do you really want to delete this notification? This process cannot be undone.</p>
+            <div class="confirm-btns">
+                <button class="btn-cancel" onclick="closeConfirmModal()">Cancel</button>
+                <button class="btn-confirm" id="confirmActionBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let formToSubmit = null;
+
+        function openConfirmModal(formId) {
+            formToSubmit = document.getElementById(formId);
+            const modal = document.getElementById('customConfirmModal');
+            
+            // 简单的文本替换 logic
+            const title = modal.querySelector('h3');
+            const desc = modal.querySelector('p');
+            
+            if (formId === 'deleteAllForm') {
+                title.innerText = "Clear All Notifications?";
+                desc.innerText = "This will remove all notifications from your inbox.";
+            } else {
+                title.innerText = "Delete Notification?";
+                desc.innerText = "This will remove this notification from your list.";
+            }
+
+            modal.style.display = 'flex';
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('customConfirmModal').style.display = 'none';
+            formToSubmit = null;
+        }
+
+        document.getElementById('confirmActionBtn').addEventListener('click', function() {
+            if (formToSubmit) {
+                formToSubmit.submit();
+            }
+        });
+
+        // 点击背景关闭
+        document.getElementById('customConfirmModal').addEventListener('click', function(e) {
+            if (e.target === this) closeConfirmModal();
+        });
+    </script>
+
 </body>
 </html>

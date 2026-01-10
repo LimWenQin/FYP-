@@ -151,10 +151,28 @@ if (isset($_SESSION['admin_id'])) {
 </div>
 
 <style>
-    .notification-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; align-items: start; gap: 10px; }
-    .notification-item.unread { background-color: #f0f7ff; }
-    .notif-icon { margin-top: 3px; }
-    .notif-content p { margin: 0; font-size: 13px; color: #333; }
+    /* 这里的 Style 只保留 Notification Dropdown 内部的样式，不影响 Header 图标本身 */
+    .notification-item { 
+        padding: 0; 
+        border-bottom: 1px solid #eee; 
+    }
+    .notification-link {
+        display: flex; 
+        align-items: start; 
+        gap: 12px;
+        text-decoration: none;
+        padding: 12px 15px;
+        transition: background-color 0.2s;
+    }
+    .notification-link:hover {
+        background-color: #f8f9fa;
+    }
+    .notification-item.unread .notification-link { background-color: #f0f7ff; }
+    .notification-item.unread .notification-link:hover { background-color: #e6f0ff; }
+
+    .notif-icon { margin-top: 3px; font-size: 16px; }
+    .notif-content { flex: 1; }
+    .notif-content p { margin: 0; font-size: 13px; color: #333; line-height: 1.4; }
     .notif-time { font-size: 11px; color: #888; display: block; margin-top: 4px; }
     
     .notification-count { 
@@ -187,6 +205,11 @@ if (isset($_SESSION['admin_id'])) {
                 closeAllMenus(null);
             });
         });
+
+        if(typeof fetchNotifications === "function") {
+             fetchNotifications();
+             setInterval(fetchNotifications, 5000);
+        }
     });
 
     function closeGlobalLogoutModal() { document.getElementById('globalLogoutModal').style.display = 'none'; }
@@ -234,7 +257,7 @@ if (isset($_SESSION['admin_id'])) {
         fetch('fetch_admin_notifications.php')
             .then(response => response.json())
             .then(data => { updateNotificationUI(data); })
-            .catch(error => { });
+            .catch(error => { console.error(error); });
     }
 
     function updateNotificationUI(data) {
@@ -251,11 +274,17 @@ if (isset($_SESSION['admin_id'])) {
         } else if (data) {
             let html = '';
             data.notifications.forEach(notif => {
-                const isUnreadClass = notif.is_read == 0 ? 'unread' : '';
+                const isUnreadClass = 'unread'; 
+                // 保持功能：点击跳转
                 html += `
                     <div class="notification-item ${isUnreadClass}">
-                        <div class="notif-icon" style="color: ${notif.color}"><i class="fas ${notif.icon}"></i></div>
-                        <div class="notif-content"><p>${notif.message}</p><span class="notif-time">${notif.time}</span></div>
+                        <a href="${notif.link}" class="notification-link">
+                            <div class="notif-icon" style="color: ${notif.color}"><i class="fas ${notif.icon}"></i></div>
+                            <div class="notif-content">
+                                <p>${notif.message}</p>
+                                <span class="notif-time">${notif.time}</span>
+                            </div>
+                        </a>
                     </div>`;
             });
             listContainer.innerHTML = html;
@@ -268,11 +297,4 @@ if (isset($_SESSION['admin_id'])) {
             .then(response => response.text())
             .then(result => { fetchNotifications(); });
     }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        if(typeof fetchNotifications === "function") {
-             fetchNotifications();
-             setInterval(fetchNotifications, 5000);
-        }
-    });
 </script>

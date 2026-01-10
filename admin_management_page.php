@@ -384,39 +384,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
     elseif (!empty($errorMessage)) { header("Location: admin_management_page.php?error=" . urlencode($errorMessage)); exit(); }
 }
 
-// --- HANDLE CHANGE PASSWORD ---
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password'])) {
-    $targetAdminId = mysqli_real_escape_string($conn, $_POST['target_admin_id']);
-    $authPassword = $_POST['auth_password']; 
-    $newPassword = $_POST['new_password'];
-    $confirmPassword = $_POST['confirm_new_password'];
-    
-    $loggedInAdminId = $_SESSION['admin_id'];
-    
-    $authSql = "SELECT Admin_Password FROM admin WHERE Admin_ID = $loggedInAdminId";
-    $authResult = $conn->query($authSql);
-    $currentUser = $authResult->fetch_assoc();
-    
-    if (!$currentUser || !password_verify($authPassword, $currentUser['Admin_Password'])) {
-        $errorMessage = "Authorization failed: Your current password is incorrect.";
-    } elseif ($newPassword !== $confirmPassword) {
-        $errorMessage = "New passwords do not match.";
-    } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>])[A-Za-z\d!@#$%^&*()\-_=+{};:,<.>]{8,15}$/', $newPassword)) {
-        $errorMessage = "New password does not meet security requirements.";
-    } else {
-        $newHashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
-        $updatePassSql = "UPDATE admin SET Admin_Password = '$newHashedPassword' WHERE Admin_ID = $targetAdminId";
-        if ($conn->query($updatePassSql)) {
-            $successMessage = "Password changed successfully!";
-        } else {
-            $errorMessage = "Error changing password: " . $conn->error;
-        }
-    }
-    
-    if (!empty($successMessage)) { header("Location: admin_management_page.php?success=" . urlencode($successMessage)); exit(); }
-    elseif (!empty($errorMessage)) { header("Location: admin_management_page.php?error=" . urlencode($errorMessage)); exit(); }
-}
-
 // --- HANDLE BLOCK ADMIN ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['block_admin'])) {
     $blockId = intval($_POST['block_admin_id']);
@@ -626,21 +593,6 @@ $malaysiaStates = [
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
         .required { color: red; margin-left: 3px; font-weight: bold; }
 
-        /* Password Specific */
-        .password-input-group { display: flex; width: 100%; }
-        .password-input-container { position: relative; flex: 1; display: flex; }
-        .password-input-container input { border-radius: 5px 0 0 5px; border-right: none; width: 100%; }
-        .password-input-container button.toggle-password { position: static; border: 1px solid var(--gray-light); border-left: none; border-radius: 0; background: white; padding: 0 10px; cursor: pointer; color: #888; width: 40px; display: flex; align-items: center; justify-content: center; }
-        .btn-small { padding: 0 12px; border-radius: 0 5px 5px 0; border: 1px solid var(--gray-light); border-left: none; background: #f8f9fa; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--primary); transition: 0.2s; }
-        
-        .confirm-check { position: absolute; right: 50px; top: 50%; transform: translateY(-50%); color: var(--success); font-size: 14px; display: none; z-index: 2; }
-
-        .password-requirements { margin-top: 8px; font-size: 12px; }
-        .requirement-item { display: flex; align-items: center; margin-bottom: 3px; color: #888; }
-        .requirement-item.valid { color: var(--success); }
-        .requirement-item.invalid { color: var(--gray); }
-        .requirement-item i { width: 15px; text-align: center; margin-right: 5px; }
-
         .phone-format { display: flex; align-items: center; }
         .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid var(--gray-light); border-right: none; border-radius: 5px 0 0 5px; color: var(--gray); font-weight: bold; }
         .phone-input { border-radius: 0 5px 5px 0 !important; }
@@ -757,7 +709,6 @@ $malaysiaStates = [
                                 <div id="menu-<?php echo $admin['Admin_ID']; ?>" class="dropdown-content">
                                     <div onclick="openViewAdminModal(<?php echo htmlspecialchars(json_encode($admin)); ?>)"><i class="fas fa-eye"></i> View Details</div>
                                     <div onclick='openEditAdminModal(<?php echo json_encode($admin); ?>)'><i class="fas fa-edit"></i> Edit Details</div>
-                                    <div onclick="openChangePasswordModal(<?php echo $admin['Admin_ID']; ?>)"><i class="fas fa-key"></i> Change Password</div>
                                     
                                     <div onclick="openBlockAdminModal(<?php echo $admin['Admin_ID']; ?>, '<?php echo htmlspecialchars($admin['Admin_Name'], ENT_QUOTES); ?>')" class="text-delete"><i class="fas fa-ban"></i> Block Admin</div>
                                 </div>
@@ -849,7 +800,7 @@ $malaysiaStates = [
         <div class="modal-content">
             <div class="modal-header"><h2>Add New Administrator</h2><button class="close-btn" onclick="closeAddAdminModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="addAdminForm" action="admin_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')">
+                <form id="addAdminForm" action="admin_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')" novalidate>
                     <input type="hidden" name="add_admin" value="1">
                     
                     <div class="form-group">
@@ -962,7 +913,7 @@ $malaysiaStates = [
         <div class="modal-content">
             <div class="modal-header"><h2>Edit Administrator Info</h2><button class="close-btn" onclick="closeEditAdminModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="editAdminForm" action="admin_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('edit')">
+                <form id="editAdminForm" action="admin_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('edit')" novalidate>
                     <input type="hidden" name="update_admin" value="1">
                     <input type="hidden" name="admin_id" id="edit_admin_id">
                     
@@ -978,14 +929,14 @@ $malaysiaStates = [
                     
                     <div class="form-group">
                         <label class="form-label">Full Name <span class="required">*</span></label>
-                        <input type="text" id="edit_name" name="name" class="form-input" required oninput="validateName(this)">
+                        <input type="text" id="edit_name" name="name" class="form-input" required placeholder="e.g. John Doe" oninput="validateName(this)">
                         <span class="form-guide">Enter full name as per IC. English letters only.</span>
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Email <span class="required">*</span></label>
-                            <input type="email" id="edit_email" name="email" class="form-input" required onblur="validateEmail('edit_email', 'editEmailError')">
+                            <input type="email" id="edit_email" name="email" class="form-input" required placeholder="e.g. admin@example.com" onblur="validateEmail('edit_email', 'editEmailError')">
                             <span class="form-guide">Valid email address (e.g. name@domain.com).</span>
                             <div id="editEmailError" class="error-message">Invalid email format.</div>
                         </div>
@@ -993,16 +944,16 @@ $malaysiaStates = [
                             <label class="form-label">Contact Number <span class="required">*</span></label>
                             <div class="phone-format">
                                 <span class="phone-prefix">+60</span>
-                                <input type="text" id="edit_contact" name="contact" class="form-input phone-input" required maxlength="11">
+                                <input type="text" id="edit_contact" name="contact" class="form-input phone-input" required maxlength="11" placeholder="12-3456789">
                             </div>
-                            <span class="form-guide">Format: 12-3456789 (No need for +60).</span>
+                            <span class="form-guide">Format: 12-3456789 or 11-23456789 (No need for +60).</span>
                         </div>
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">IC Number <span class="required">*</span></label>
-                            <input type="text" id="edit_ic_number" name="ic_number" class="form-input" required maxlength="14">
+                            <input type="text" id="edit_ic_number" name="ic_number" class="form-input" required maxlength="14" placeholder="XXXXXX-XX-XXXX">
                             <span class="form-guide">Format: YYMMDD-PB-#### (e.g. 990101-07-1234).</span>
                         </div>
                         <div class="form-group">
@@ -1014,23 +965,23 @@ $malaysiaStates = [
 
                     <div class="form-group">
                         <label class="form-label">Address Line 1</label>
-                        <input type="text" id="edit_address1" name="address1" class="form-input" placeholder="Line 1">
+                        <input type="text" id="edit_address1" name="address1" class="form-input" placeholder="e.g. No. 123, Jalan Example">
                         <span class="form-guide">House unit no., floor, building, street name.</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Address Line 2</label>
-                        <input type="text" id="edit_address2" name="address2" class="form-input" placeholder="Line 2">
+                        <input type="text" id="edit_address2" name="address2" class="form-input" placeholder="e.g. Taman Sri">
                         <span class="form-guide">Residential area, village, or section.</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Address Line 3</label>
-                        <input type="text" id="edit_address3" name="address3" class="form-input" placeholder="Line 3">
+                        <input type="text" id="edit_address3" name="address3" class="form-input" placeholder="Address Line 3 (Optional)">
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">City</label>
-                            <input type="text" id="edit_city" name="city" class="form-input">
+                            <input type="text" id="edit_city" name="city" class="form-input" placeholder="e.g. Kuala Lumpur">
                         </div>
                         <div class="form-group">
                             <label class="form-label">State</label>
@@ -1044,7 +995,7 @@ $malaysiaStates = [
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Postal Code</label>
-                            <input type="text" id="edit_postal_code" name="postal_code" class="form-input" oninput="autoSelectState('edit_postal_code', 'edit_state')">
+                            <input type="text" id="edit_postal_code" name="postal_code" class="form-input" oninput="autoSelectState('edit_postal_code', 'edit_state')" placeholder="e.g. 50000">
                             <span class="form-guide">5-digit postcode.</span>
                         </div>
                         <div class="form-group">
@@ -1060,7 +1011,7 @@ $malaysiaStates = [
                     
                     <div class="form-group">
                         <label class="form-label">Description / Comment</label>
-                        <textarea id="edit_comment" name="comment" class="form-textarea" rows="2"></textarea>
+                        <textarea id="edit_comment" name="comment" class="form-textarea" rows="2" placeholder="Optional notes..."></textarea>
                         <span class="form-guide">Optional notes.</span>
                     </div>
 
@@ -1085,57 +1036,6 @@ $malaysiaStates = [
                 <div class="form-group"><label class="form-label">Address</label><textarea id="view_address" class="form-textarea" readonly rows="3"></textarea></div>
                 <div class="form-row"><div class="form-group"><label class="form-label">Role</label><input type="text" id="view_role" class="form-input" readonly></div><div class="form-group"><label class="form-label">Status</label><input type="text" id="view_status" class="form-input" readonly></div></div>
                 <div class="form-group"><label class="form-label">Comment</label><textarea id="view_comment" class="form-textarea" readonly rows="2"></textarea></div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal" id="changePasswordModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Change Password</h2><button class="close-btn" onclick="closeChangePasswordModal()">&times;</button></div>
-            <div class="modal-body">
-                <form id="changePasswordForm" action="admin_management_page.php" method="POST" onsubmit="return validateChangePassword()">
-                    <input type="hidden" name="change_password" value="1">
-                    <input type="hidden" name="target_admin_id" id="cp_target_id">
-                    
-                    <div class="form-group">
-                        <label class="form-label">Your Current Password (Authorization) <span class="required">*</span></label>
-                        <div class="password-input-container">
-                            <input type="password" name="auth_password" class="form-input" required placeholder="Enter logged-in admin password">
-                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility(this.previousElementSibling, this)"><i class="fas fa-eye"></i></button>
-                        </div>
-                    </div>
-                    
-                    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-
-                    <div class="form-group">
-                        <label class="form-label">New Password <span class="required">*</span></label>
-                        <div class="password-input-group">
-                            <div class="password-input-container">
-                                <input type="password" id="cp_new_password" name="new_password" class="form-input" required oninput="validatePasswordRequirements('cp_new_password', 'cp_req_list', 'cp_')">
-                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('cp_new_password', this)"><i class="fas fa-eye"></i></button>
-                            </div>
-                            <button type="button" class="btn-small" onclick="generateStrongPassword('cp_new_password', 'cp_confirm_password')">Auto Generate</button>
-                        </div>
-                        <div class="password-requirements" id="cp_req_list">
-                            <div class="requirement-item invalid" id="cp_lengthReq"><i class="fas fa-times"></i> Must be 8-15 characters long</div>
-                            <div class="requirement-item invalid" id="cp_uppercaseReq"><i class="fas fa-times"></i> Must contain at least one Uppercase letter</div>
-                            <div class="requirement-item invalid" id="cp_lowercaseReq"><i class="fas fa-times"></i> Must contain at least one Lowercase letter</div>
-                            <div class="requirement-item invalid" id="cp_numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div>
-                            <div class="requirement-item invalid" id="cp_specialReq"><i class="fas fa-times"></i> Must contain at least one Special character</div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Confirm New Password <span class="required">*</span></label>
-                        <div class="password-input-container">
-                            <input type="password" id="cp_confirm_password" name="confirm_new_password" class="form-input" required oninput="validatePasswordMatch('cp_new_password', 'cp_confirm_password', 'cp_match_error')">
-                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('cp_confirm_password', this)"><i class="fas fa-eye"></i></button>
-                        </div>
-                        <div id="cp_match_error" class="error-message">Passwords do not match</div>
-                    </div>
-
-                    <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-key"></i> Update Password</button></div>
-                </form>
             </div>
         </div>
     </div>
@@ -1319,23 +1219,6 @@ $malaysiaStates = [
         }
         function closeEditAdminModal() { document.getElementById('editAdminModal').style.display = 'none'; document.getElementById('editAdminForm').reset(); }
 
-        function openChangePasswordModal(id) {
-            if (!id) return;
-            document.getElementById('changePasswordModal').style.display = 'flex';
-            document.getElementById('cp_target_id').value = id;
-            document.getElementById('changePasswordForm').reset();
-            resetReqList('cp_req_list', 'cp_');
-        }
-        function closeChangePasswordModal() { document.getElementById('changePasswordModal').style.display = 'none'; }
-        
-        function resetReqList(listId, prefix) {
-            const list = document.getElementById(listId);
-            list.querySelectorAll('.requirement-item').forEach(el => {
-                el.className = 'requirement-item invalid';
-                el.querySelector('i').className = 'fas fa-times';
-            });
-        }
-
         function openViewAdminModal(admin) {
             const img = document.getElementById('view_profile_picture');
             const icon = document.getElementById('view_default_icon');
@@ -1507,16 +1390,6 @@ $malaysiaStates = [
             }
         }
 
-        function togglePasswordVisibility(idOrEl, btnElement) { 
-            let input;
-            if (typeof idOrEl === 'string') { input = document.getElementById(idOrEl); }
-            else { input = idOrEl; } 
-            
-            const icon = btnElement.querySelector('i'); 
-            if(input.type==='password') { input.type='text'; icon.className='fas fa-eye-slash'; } 
-            else { input.type='password'; icon.className='fas fa-eye'; } 
-        }
-
         function validateName(input) { input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); }
         
         function validateEmail(id, errorId) { 
@@ -1556,97 +1429,59 @@ $malaysiaStates = [
             return valid; 
         }
 
-        function generateStrongPassword(passId, confirmId) {
-            const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; 
-            const lower = "abcdefghijklmnopqrstuvwxyz"; 
-            const numbers = "0123456789"; 
-            const specials = "!@#$%^&*"; 
-            const all = upper + lower + numbers + specials;
-            let password = ""; 
-            password += upper[Math.floor(Math.random() * upper.length)]; 
-            password += lower[Math.floor(Math.random() * lower.length)]; 
-            password += numbers[Math.floor(Math.random() * numbers.length)]; 
-            password += specials[Math.floor(Math.random() * specials.length)];
-            for (let i = 4; i < 12; i++) { password += all[Math.floor(Math.random() * all.length)]; }
-            password = password.split('').sort(() => 0.5 - Math.random()).join('');
-            
-            document.getElementById(passId).value = password; 
-            document.getElementById(confirmId).value = password;
-            document.getElementById(passId).dispatchEvent(new Event('input'));
-            document.getElementById(confirmId).dispatchEvent(new Event('input'));
-            
-            const passInput = document.getElementById(passId);
-            passInput.type = "text";
-            if(passInput.nextElementSibling) passInput.nextElementSibling.querySelector('i').className = 'fas fa-eye-slash';
-             
-             const confInput = document.getElementById(confirmId);
-             confInput.type = "text";
-             if(confInput.nextElementSibling) confInput.nextElementSibling.querySelector('i').className = 'fas fa-eye-slash';
-        }
-
-        function validatePasswordRequirements(passId = 'password', listContainerId = 'passReqList', prefix = '') {
-            if(prefix === '' && passId !== 'password') prefix = 'cp_';
-            const p = document.getElementById(passId).value;
-            const reqs = { 
-                lengthReq: p.length>=8 && p.length<=15, 
-                uppercaseReq: /[A-Z]/.test(p), 
-                lowercaseReq: /[a-z]/.test(p), 
-                numberReq: /\d/.test(p), 
-                specialReq: /[!@#$%^&*]/.test(p) 
-            };
-            let allValid = true;
-            for (const [key, valid] of Object.entries(reqs)) {
-                const el = document.getElementById(prefix + key);
-                if(el) {
-                    const icon = el.querySelector('i');
-                    if(valid) { el.className='requirement-item valid'; icon.className='fas fa-check'; }
-                    else { el.className='requirement-item invalid'; icon.className='fas fa-times'; allValid=false; }
-                }
-            }
-            return allValid;
-        }
-
-        function validatePasswordMatch(passId, confirmId, errorId) {
-            const m = document.getElementById(passId).value === document.getElementById(confirmId).value;
-            document.getElementById(errorId).style.display = m ? 'none' : 'block';
-            return m;
-        }
-
         // --- UPDATED: REPLACED ALERT WITH CUSTOM SYSTEM ERROR ---
         function validateForm(type) { 
             let errors = [];
+            let name, email, dob, contactId, contactVal, icNum;
+
             if (type === 'add') {
-                let emailMsg = validateEmail('email', 'emailError');
+                name = document.getElementsByName('name')[0].value.trim();
+                email = document.getElementById('email').value.trim();
+                dob = document.getElementById('dob').value;
+                contactId = 'add_contact';
+                icNum = document.getElementById('ic_number').value.trim();
+            } else {
+                name = document.getElementById('edit_name').value.trim();
+                email = document.getElementById('edit_email').value.trim();
+                dob = document.getElementById('edit_dob').value;
+                contactId = 'edit_contact';
+                icNum = document.getElementById('edit_ic_number').value.trim();
+            }
+
+            // 1. Basic Required Field Checks (Manual because novalidate is on)
+            if (!name) errors.push("Full Name is required.");
+            if (!email) errors.push("Email is required.");
+            if (!icNum) errors.push("IC Number is required.");
+            if (!dob) errors.push("Date of Birth is required.");
+            
+            contactVal = document.getElementById(contactId).value.trim();
+            if (!contactVal) errors.push("Contact Number is required.");
+
+            // 2. Specific Format Validations
+            if (name && /\d/.test(name)) errors.push("Name cannot contain numbers.");
+
+            if (email) {
+                let emailMsg = validateEmail(type === 'add' ? 'email' : 'edit_email', type === 'add' ? 'emailError' : 'editEmailError');
                 if(emailMsg) errors.push("Email: " + emailMsg);
-                if(!validateAge('dob', 'ageError')) errors.push("Age: Must be 18+.");
-                let phoneMsg = validatePhone('add_contact');
-                if(phoneMsg) errors.push("Contact: " + phoneMsg);
-            } 
-            else if (type === 'edit') {
-                let emailMsg = validateEmail('edit_email', 'editEmailError');
-                if(emailMsg) errors.push("Email: " + emailMsg);
-                if(!validateAge('edit_dob', 'editAgeError')) errors.push("Age: Must be 18+.");
-                let phoneMsg = validatePhone('edit_contact');
+            }
+
+            if (dob) {
+                if (!validateAge(type === 'add' ? 'dob' : 'edit_dob', type === 'add' ? 'ageError' : 'editAgeError')) {
+                    errors.push("Age: Must be 18+.");
+                }
+            }
+
+            if (contactVal) {
+                let phoneMsg = validatePhone(contactId);
                 if(phoneMsg) errors.push("Contact: " + phoneMsg);
             }
 
             if (errors.length > 0) {
                 // Modified: Use showSystemError instead of alert
-                showSystemError("Please correct errors: " + errors.join(". "));
+                showSystemError("Please correct errors: " + errors.join(" "));
                 return false; 
             }
             return true; 
-        }
-        
-        function validateChangePassword() {
-            const vPass = validatePasswordRequirements('cp_new_password', 'cp_req_list', 'cp_');
-            const vMatch = validatePasswordMatch('cp_new_password', 'cp_confirm_password', 'cp_match_error');
-            if(!vPass || !vMatch) {
-                // Modified: Use showSystemError instead of alert
-                showSystemError("Please fix password issues before submitting.");
-                return false;
-            }
-            return true;
         }
     </script>
 </body>

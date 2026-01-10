@@ -1,5 +1,5 @@
 <?php
-// admin_activity_details.php
+// admin_special_case_details.php
 session_start();
 
 // Check Login
@@ -10,55 +10,55 @@ if (!isset($_SESSION['admin_id'])) {
 include 'dataconnection.php';
 
 if (!isset($_GET['id'])) {
-    die("Invalid Activity ID.");
+    die("Invalid Case ID.");
 }
 
 $id = intval($_GET['id']);
 
-// Fetch Activity Data (including Branch Name)
-$sql = "SELECT a.*, b.Branch_Name 
-        FROM activity a 
-        LEFT JOIN branch b ON a.Branch_ID = b.Branch_ID 
-        WHERE a.Activity_ID = $id";
+// Fetch Case Data
+$sql = "SELECT * FROM special_case WHERE Case_ID = $id";
 $result = $conn->query($sql);
 
-if ($result->num_rows == 0) die("Activity not found.");
-$activity = $result->fetch_assoc();
+if ($result->num_rows == 0) die("Case not found.");
+$case = $result->fetch_assoc();
 
 // Calculate Percentage
 $percent = 0;
-if ($activity['Activity_TargetAmount'] > 0) {
-    $percent = min(100, ($activity['Activity_GetAmount'] / $activity['Activity_TargetAmount']) * 100);
+if ($case['Target_Amount'] > 0) {
+    $percent = min(100, ($case['Raised_Amount'] / $case['Target_Amount']) * 100);
 }
 
 // Handle Images JSON
-$images = json_decode($activity['Activity_Images'], true);
+$images = json_decode($case['Case_Images'], true);
+// Compatibility check: if old data was a single string, make it an array
+if (!is_array($images) && !empty($case['Case_Images'])) {
+    $images = [$case['Case_Images']];
+}
 $hasImages = ($images && !empty($images));
 if (!$hasImages) $images = [];
 
-// Format Address with ALL fields
-$fullAddress = $activity['Activity_Address1'];
-if(!empty($activity['Activity_Address2'])) $fullAddress .= "<br>" . $activity['Activity_Address2'];
-if(!empty($activity['Activity_Address3'])) $fullAddress .= "<br>" . $activity['Activity_Address3'];
-$fullAddress .= "<br>" . $activity['Activity_PostalCode'] . " " . $activity['Activity_City'];
-$fullAddress .= "<br>" . $activity['Activity_State'] . ", " . $activity['Activity_Country'];
+// Format Address
+$fullAddress = $case['Case_Address1'];
+if(!empty($case['Case_Address2'])) $fullAddress .= "<br>" . $case['Case_Address2'];
+if(!empty($case['Case_Address3'])) $fullAddress .= "<br>" . $case['Case_Address3'];
+$fullAddress .= "<br>" . $case['Case_PostalCode'] . " " . $case['Case_City'];
+$fullAddress .= "<br>" . $case['Case_State'] . ", " . $case['Case_Country'];
 
 // Determine Status Colors
 $statusClass = 'status-active';
-if ($activity['Activity_Status'] == 'Completed') $statusClass = 'status-completed';
-if ($activity['Activity_Status'] == 'Cancelled') $statusClass = 'status-cancelled';
-if ($activity['Activity_Status'] == 'Upcoming') $statusClass = 'status-upcoming';
+if ($case['Case_Status'] == 'Completed') $statusClass = 'status-completed';
+if ($case['Case_Status'] == 'Cancelled') $statusClass = 'status-cancelled';
+if ($case['Case_Status'] == 'Upcoming') $statusClass = 'status-upcoming';
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title><?php echo htmlspecialchars($activity['Activity_Name']); ?> - Details</title>
+    <title><?php echo htmlspecialchars($case['Case_Title']); ?> - Details</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="admin_common.css">
     <style>
-        body { background: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px 20px; }
+        body { background: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px 20px; margin: 0; }
         .detail-wrapper { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
         
         .top-bar { display: flex; justify-content: space-between; align-items: center; }
@@ -76,7 +76,7 @@ if ($activity['Activity_Status'] == 'Upcoming') $statusClass = 'status-upcoming'
         /* HEADER SECTION */
         .profile-header { padding: 30px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: flex-start; }
         .h-main h1 { margin: 0; font-size: 28px; color: #333; font-weight: 800; }
-        .h-main .badge-branch { background: #e3f2fd; color: #1976d2; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; margin-bottom: 8px; display: inline-block; }
+        .h-main .badge-category { background: #fff3cd; color: #856404; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; margin-bottom: 8px; display: inline-block; }
         .date-range { font-size: 13px; color: #666; margin-top: 5px; }
 
         .status-pill { padding: 6px 14px; border-radius: 30px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
@@ -85,8 +85,9 @@ if ($activity['Activity_Status'] == 'Upcoming') $statusClass = 'status-upcoming'
         .status-upcoming { background: #fff3cd; color: #664d03; border: 1px solid #ffecb5; }
         .status-cancelled { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
 
-        /* GALLERY SECTION */
+        /* GALLERY SECTION - MODIFIED FOR FULL FILL */
         .gallery-container { height: 350px; position: relative; background: #f8f9fa; border-bottom: 1px solid #eee; overflow: hidden; }
+        /* Changed object-fit to cover and removed background: black */
         .gallery-img { width: 100%; height: 100%; object-fit: cover; display: none; cursor: zoom-in; transition: opacity 0.3s; }
         .gallery-img:hover { opacity: 0.95; }
         .gallery-img.active { display: block; }
@@ -140,8 +141,8 @@ if ($activity['Activity_Status'] == 'Upcoming') $statusClass = 'status-upcoming'
 
     <div class="detail-wrapper">
         <div class="top-bar">
-            <a href="javascript:void(0);" onclick="goBackAndClose()" class="back-link"><i class="fas fa-arrow-left"></i> Back to List</a>
-            <div style="font-size:12px; color:#999;">ID: #<?php echo str_pad($activity['Activity_ID'], 4, '0', STR_PAD_LEFT); ?></div>
+            <a href="javascript:void(0);" onclick="goBackAndClose()" class="back-link"><i class="fas fa-arrow-left"></i> Back to Management</a>
+            <div style="font-size:12px; color:#999;">Case ID: #<?php echo str_pad($case['Case_ID'], 4, '0', STR_PAD_LEFT); ?></div>
         </div>
 
         <div class="profile-card">
@@ -161,73 +162,83 @@ if ($activity['Activity_Status'] == 'Upcoming') $statusClass = 'status-upcoming'
 
             <div class="profile-header">
                 <div class="h-main">
-                    <span class="badge-branch"><i class="fas fa-building"></i> <?php echo htmlspecialchars($activity['Branch_Name']); ?></span>
-                    <h1><?php echo htmlspecialchars($activity['Activity_Name']); ?></h1>
+                    <span class="badge-category"><i class="fas fa-tags"></i> <?php echo htmlspecialchars($case['Case_Category']); ?></span>
+                    <h1><?php echo htmlspecialchars($case['Case_Title']); ?></h1>
                     <div class="date-range">
                         <i class="far fa-calendar-alt"></i> 
-                        <?php echo date('d M Y', strtotime($activity['Activity_StartDate'])); ?> - <?php echo date('d M Y', strtotime($activity['Activity_EndDate'])); ?>
+                        <?php 
+                            if($case['Start_Date']) echo date('d M Y', strtotime($case['Start_Date'])); 
+                            else echo 'TBA';
+                        ?> 
+                        - 
+                        <?php 
+                            if($case['End_Date']) echo date('d M Y', strtotime($case['End_Date'])); 
+                            else echo 'Ongoing';
+                        ?>
                     </div>
                 </div>
-                <div class="status-pill <?php echo $statusClass; ?>"><?php echo $activity['Activity_Status']; ?></div>
+                <div class="status-pill <?php echo $statusClass; ?>"><?php echo $case['Case_Status']; ?></div>
             </div>
 
             <div class="content-body">
                 <div class="left-col">
-                    <div class="section-title"><i class="fas fa-align-left"></i> Description & Details</div>
-                    <div class="description-box"><?php echo nl2br(htmlspecialchars($activity['Activity_Description'])); ?></div>
+                    <div class="section-title"><i class="fas fa-align-left"></i> Description & Story</div>
+                    <div class="description-box"><?php echo nl2br(htmlspecialchars($case['Case_Description'])); ?></div>
 
-                    <div class="section-title"><i class="fas fa-info-circle"></i> Event Logistics</div>
+                    <div class="section-title"><i class="fas fa-info-circle"></i> Case Logistics</div>
                     <div class="info-card">
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-map-marked-alt"></i></div>
-                            <div class="ir-data"><h5>Venue Name</h5><p><?php echo htmlspecialchars($activity['Activity_Venue'] ?? 'N/A'); ?></p></div>
+                            <div class="ir-data"><h5>Venue / Location Name</h5><p><?php echo htmlspecialchars($case['Case_Venue'] ?? 'N/A'); ?></p></div>
                         </div>
                         <div class="info-row">
-                            <div class="ir-icon"><i class="fas fa-calendar-day"></i></div>
-                            <div class="ir-data"><h5>Specific Date</h5><p><?php echo $activity['Activity_Date'] ? date('d M Y', strtotime($activity['Activity_Date'])) : 'N/A'; ?></p></div>
+                            <div class="ir-icon"><i class="fas fa-clock"></i></div>
+                            <div class="ir-data"><h5>Created At</h5><p><?php echo date('d M Y, h:i A', strtotime($case['Created_At'])); ?></p></div>
                         </div>
+                        <?php if($case['Cancel_Reason']): ?>
                         <div class="info-row">
-                            <div class="ir-icon"><i class="fas fa-users"></i></div>
-                            <div class="ir-data"><h5>Max Participants</h5><p><?php echo $activity['Activity_Max_Participants'] > 0 ? $activity['Activity_Max_Participants'] : 'Unlimited'; ?></p></div>
+                            <div class="ir-icon"><i class="fas fa-ban"></i></div>
+                            <div class="ir-data"><h5>Cancellation Reason</h5><p style="color:red;"><?php echo htmlspecialchars($case['Cancel_Reason']); ?></p></div>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
                 <div class="right-col">
                     <div class="financial-card">
                         <div class="fin-grid">
-                            <div class="fin-item"><span>Target</span><span>RM <?php echo number_format($activity['Activity_TargetAmount'], 2); ?></span></div>
-                            <div class="fin-item"><span>Raised</span><span>RM <?php echo number_format($activity['Activity_GetAmount'], 2); ?></span></div>
+                            <div class="fin-item"><span>Target</span><span>RM <?php echo number_format($case['Target_Amount'], 2); ?></span></div>
+                            <div class="fin-item"><span>Raised</span><span>RM <?php echo number_format($case['Raised_Amount'], 2); ?></span></div>
                         </div>
                         <div class="p-bar-bg"><div class="p-bar-fill" style="width: <?php echo $percent; ?>%"></div></div>
                         <div class="p-text"><?php echo number_format($percent, 1); ?>% Funded</div>
                     </div>
 
-                    <div class="section-title"><i class="fas fa-user-tie"></i> Organizer</div>
+                    <div class="section-title"><i class="fas fa-user-tie"></i> Organizer / Contact</div>
                     <div class="info-card">
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-sitemap"></i></div>
-                            <div class="ir-data"><h5>Organizer</h5><p><?php echo htmlspecialchars($activity['Activity_Organizer'] ?? 'N/A'); ?></p></div>
+                            <div class="ir-data"><h5>Organizer</h5><p><?php echo htmlspecialchars($case['Case_Organizer'] ?? 'Love Bridge HQ'); ?></p></div>
                         </div>
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-user"></i></div>
-                            <div class="ir-data"><h5>Contact Person</h5><p><?php echo htmlspecialchars($activity['Activity_Contact_Name'] ?? 'N/A'); ?></p></div>
+                            <div class="ir-data"><h5>Contact Person</h5><p><?php echo htmlspecialchars($case['Contact_Name'] ?? 'N/A'); ?></p></div>
                         </div>
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-phone"></i></div>
-                            <div class="ir-data"><h5>Phone</h5><p><?php echo htmlspecialchars($activity['Activity_Contact_Number'] ?? 'N/A'); ?></p></div>
+                            <div class="ir-data"><h5>Phone</h5><p><?php echo htmlspecialchars($case['Contact_Number'] ?? 'N/A'); ?></p></div>
                         </div>
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-envelope"></i></div>
-                            <div class="ir-data"><h5>Email</h5><p><?php echo htmlspecialchars($activity['Activity_Contact_Email'] ?? 'N/A'); ?></p></div>
+                            <div class="ir-data"><h5>Email</h5><p><?php echo htmlspecialchars($case['Contact_Email'] ?? 'N/A'); ?></p></div>
                         </div>
                     </div>
 
-                    <div class="section-title"><i class="fas fa-map-marker-alt"></i> Location</div>
+                    <div class="section-title"><i class="fas fa-map-marker-alt"></i> Address</div>
                     <div class="info-card">
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-map"></i></div>
-                            <div class="ir-data"><h5>Address</h5><p><?php echo $fullAddress; ?></p></div>
+                            <div class="ir-data"><h5>Location</h5><p><?php echo $fullAddress; ?></p></div>
                         </div>
                     </div>
                 </div>
@@ -245,12 +256,16 @@ if ($activity['Activity_Status'] == 'Upcoming') $statusClass = 'status-upcoming'
     </div>
 
     <script>
+        // Logic to close tab and focus back on parent, or redirect
         function goBackAndClose() {
             window.close();
-            setTimeout(function() { if (!window.closed) window.location.href = 'activity_management.php'; }, 100);
+            // Fallback if window.close() is blocked by browser (only works if script opened the window)
+            setTimeout(function() { 
+                if (!window.closed) window.location.href = 'special_case_management.php'; 
+            }, 100);
         }
 
-        // Gallery
+        // Gallery Slider Logic
         let slideIndex = 0;
         const slides = document.querySelectorAll('.gallery-img');
         function changeSlide(n) {
@@ -262,7 +277,7 @@ if ($activity['Activity_Status'] == 'Upcoming') $statusClass = 'status-upcoming'
             slides[slideIndex].classList.add('active');
         }
 
-        // Lightbox
+        // Lightbox Logic
         const imageList = <?php echo json_encode($images); ?>;
         let lightboxIndex = 0;
         const modal = document.getElementById('lightboxModal');
@@ -274,7 +289,7 @@ if ($activity['Activity_Status'] == 'Upcoming') $statusClass = 'status-upcoming'
             modal.classList.add('show');
             updateLightboxImage();
             document.addEventListener('keydown', handleKeydown);
-            document.body.style.overflow = 'hidden';
+            document.body.style.overflow = 'hidden'; // Prevent scrolling
         }
 
         function closeLightbox() {
