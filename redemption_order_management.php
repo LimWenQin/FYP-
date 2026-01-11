@@ -551,6 +551,11 @@ try {
         .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid #ddd; border-right: none; border-radius: 5px 0 0 5px; color: #666; font-weight: bold; font-size: 14px; }
         .phone-input { border-radius: 0 5px 5px 0 !important; }
 
+        /* Floating Alert */
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; max-width: 400px; display: none; }
+        .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
+        .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
+
         /* Lightbox */
         .lightbox-modal { display: none; position: fixed; z-index: 2000; padding-top: 50px; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; background-color: rgba(0, 0, 0, 0.9); flex-direction: column; justify-content: center; align-items: center; }
         .lightbox-content { margin: auto; display: block; max-width: 90%; max-height: 80vh; border-radius: 5px; box-shadow: 0 0 20px rgba(255,255,255,0.1); object-fit: contain; animation: zoomIn 0.3s; }
@@ -561,27 +566,15 @@ try {
 </head>
 <body>
     
-    <?php if (isset($_GET['success'])): ?>
-        <script>
-            Swal.fire({
-                icon: 'success',
-                title: 'Success',
-                text: '<?php echo addslashes($_GET['success']); ?>',
-                confirmButtonColor: '#28a745',
-                timer: 3000
-            });
-        </script>
-    <?php endif; ?>
-    <?php if (isset($_GET['error'])): ?>
-        <script>
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: '<?php echo addslashes($_GET['error']); ?>',
-                confirmButtonColor: '#dc3545'
-            });
-        </script>
-    <?php endif; ?>
+    <div class="floating-alert floating-alert-success" id="floatingSuccess" style="display: <?php echo isset($_GET['success']) ? 'flex' : 'none'; ?>">
+        <i class="fas fa-check-circle"></i>
+        <div id="floatingSuccessText"><?php echo isset($_GET['success']) ? htmlspecialchars($_GET['success']) : ''; ?></div>
+    </div>
+
+    <div class="floating-alert floating-alert-danger" id="floatingError" style="display: <?php echo isset($_GET['error']) ? 'flex' : 'none'; ?>">
+        <i class="fas fa-exclamation-circle"></i>
+        <div id="alertErrorText"><?php echo isset($_GET['error']) ? htmlspecialchars($_GET['error']) : ''; ?></div>
+    </div>
 
     <?php include 'admin_sidebar.php'; ?>
 
@@ -765,7 +758,7 @@ try {
         <div class="modal-content">
             <div class="modal-header"><h2>Add Redemption Order</h2><button onclick="closeModal('addOrderModal')" style="border:none; background:none; font-size:24px; cursor:pointer;">&times;</button></div>
             <div class="modal-body">
-                <form method="POST" action="redemption_order_management.php">
+                <form method="POST" action="redemption_order_management.php" id="addOrderForm" onsubmit="return validateAddOrder()" novalidate>
                     <input type="hidden" name="add_order" value="1">
                     
                     <div class="form-group">
@@ -792,7 +785,7 @@ try {
 
                     <div class="form-group">
                         <label class="form-label">Select Reward Item <span style="color:red">*</span></label>
-                        <select name="reward_id" class="form-select" required>
+                        <select name="reward_id" id="add_reward_id" class="form-select" required>
                             <option value="">-- Choose Reward --</option>
                             <?php foreach($rewardList as $r): ?>
                                 <option value="<?php echo $r['Reward_ID']; ?>">
@@ -811,13 +804,13 @@ try {
                     </div>
 
                     <div style="border-top:1px solid #eee; margin:15px 0; padding-top:10px;">
-                        <div class="form-group"><label class="form-label">Address Line 1</label><input type="text" name="address1" class="form-input" required></div>
-                        <div class="form-group"><label class="form-label">Address Line 2</label><input type="text" name="address2" class="form-input"></div>
-                        <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" name="address3" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">Address Line 1</label><input type="text" name="address1" id="add_address1" class="form-input" required></div>
+                        <div class="form-group"><label class="form-label">Address Line 2</label><input type="text" name="address2" id="add_address2" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" name="address3" id="add_address3" class="form-input"></div>
 
                         <div style="display:flex; gap:10px;">
                             <div class="form-group" style="flex:1"><label class="form-label">Postal Code</label><input type="text" name="postal_code" id="add_postal_code" class="form-input" required></div>
-                            <div class="form-group" style="flex:1"><label class="form-label">City</label><input type="text" name="city" class="form-input" required></div>
+                            <div class="form-group" style="flex:1"><label class="form-label">City</label><input type="text" name="city" id="add_city" class="form-input" required></div>
                         </div>
 
                         <div class="form-group">
@@ -942,6 +935,60 @@ try {
             if(e.target == document.getElementById('manageModal')) closeModal('manageModal');
             // Close Lightbox
             if(e.target.id == 'imageLightbox') closeLightbox();
+        }
+
+        // --- NEW: SYSTEM ALERT FUNCTION ---
+        function showSystemError(message) {
+            const errorBox = document.getElementById('floatingError');
+            const errorText = document.getElementById('alertErrorText');
+            if(errorBox && errorText) {
+                errorText.innerText = message;
+                errorBox.style.display = 'flex';
+                // Auto hide after 5 seconds
+                setTimeout(() => {
+                    errorBox.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // --- AUTO HIDE ALERTS ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const s = document.getElementById('floatingSuccess');
+            const e = document.getElementById('floatingError');
+            if(s && s.style.display === 'flex') setTimeout(() => { s.style.display='none'; }, 5000);
+            if(e && e.style.display === 'flex') setTimeout(() => { e.style.display='none'; }, 5000);
+        });
+
+        // --- VALIDATE FORM (Manual) ---
+        function validateAddOrder() {
+            let errors = [];
+            
+            // Get values. Using jQuery for select2 value
+            const donor = $('#add_donor_select').val(); 
+            const reward = document.getElementById('add_reward_id').value;
+            const contact = document.getElementById('add_contact').value.trim();
+            const addr1 = document.getElementById('add_address1').value.trim();
+            const postal = document.getElementById('add_postal_code').value.trim();
+            const city = document.getElementById('add_city').value.trim();
+            const state = document.getElementById('add_state_select').value;
+
+            // Checks
+            if (!donor) errors.push("Donor is required.");
+            if (!reward) errors.push("Reward Item is required.");
+            
+            if (!contact) errors.push("Contact Number is required.");
+            else if (contact.length < 9) errors.push("Invalid Contact Number.");
+            
+            if (!addr1) errors.push("Address Line 1 is required.");
+            if (!postal) errors.push("Postal Code is required.");
+            if (!city) errors.push("City is required.");
+            if (!state) errors.push("State is required.");
+
+            if (errors.length > 0) {
+                showSystemError("Validation Error: " + errors.join(" "));
+                return false;
+            }
+            return true;
         }
 
         // --- LIGHTBOX ---

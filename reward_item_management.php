@@ -842,7 +842,7 @@ $categories = array_keys($categoryPrefixes);
         <div class="modal-content">
             <div class="modal-header"><h2>Add New Reward</h2><button class="close-btn" onclick="closeModal('addModal')">&times;</button></div>
             <div class="modal-body">
-                <form id="addForm" method="POST" enctype="multipart/form-data" onsubmit="return validateRewardForm('add')">
+                <form id="addForm" method="POST" enctype="multipart/form-data" onsubmit="return validateRewardForm('add')" novalidate>
                     <input type="hidden" name="add_reward" value="1">
                     
                     <div class="form-group">
@@ -885,12 +885,12 @@ $categories = array_keys($categoryPrefixes);
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Points Required <span class="required-star">*</span></label>
-                            <input type="number" name="points" class="form-control" required placeholder="0" min="0" oninput="validity.valid||(value='');">
+                            <input type="number" name="points" id="add_points" class="form-control" required placeholder="0" min="0" oninput="validity.valid||(value='');">
                             <span class="form-guide">Points needed to redeem one unit.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Stock Quantity (Max 500) <span class="required-star">*</span></label>
-                            <input type="number" name="stock" class="form-control" required placeholder="0" min="0" max="500" oninput="validity.valid||(value='');">
+                            <input type="number" name="stock" id="add_stock" class="form-control" required placeholder="0" min="0" max="500" oninput="validity.valid||(value='');">
                             <span class="form-guide">Initial inventory count. Cannot exceed 500.</span>
                         </div>
                     </div>
@@ -903,14 +903,14 @@ $categories = array_keys($categoryPrefixes);
                         </div>
                         <div class="form-group" id="add_expiry_container" style="display:none;">
                             <label class="form-label">Expiry Date <span class="required-star">*</span></label>
-                            <input type="date" name="expiry_date" class="form-control">
+                            <input type="date" name="expiry_date" id="add_expiry" class="form-control">
                             <span class="form-guide">Required for Food or Voucher categories.</span>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Description <span class="required-star">*</span></label>
-                        <textarea name="description" class="form-control" rows="4" style="resize: vertical;" required placeholder="Enter full details about this item..."></textarea>
+                        <textarea name="description" id="add_desc" class="form-control" rows="4" style="resize: vertical;" required placeholder="Enter full details about this item..."></textarea>
                         <span class="form-guide">Include dimensions, material, weight, usage instructions, and any important terms. Be as detailed as possible.</span>
                     </div>
 
@@ -924,7 +924,7 @@ $categories = array_keys($categoryPrefixes);
         <div class="modal-content">
             <div class="modal-header"><h2>Edit Reward</h2><button class="close-btn" onclick="closeModal('editModal')">&times;</button></div>
             <div class="modal-body">
-                <form id="editForm" method="POST" enctype="multipart/form-data" onsubmit="return validateRewardForm('edit')">
+                <form id="editForm" method="POST" enctype="multipart/form-data" onsubmit="return validateRewardForm('edit')" novalidate>
                     <input type="hidden" name="update_reward" value="1">
                     <input type="hidden" name="reward_id" id="edit_id">
                     
@@ -1017,7 +1017,7 @@ $categories = array_keys($categoryPrefixes);
                 <button class="close-btn" onclick="closeModal('stockModal')">&times;</button>
             </div>
             <div class="modal-body">
-                <form method="POST" onsubmit="return validateStockAdd()">
+                <form method="POST" onsubmit="return validateStockAdd()" novalidate>
                     <input type="hidden" name="quick_stock_update" value="1">
                     <input type="hidden" name="stock_reward_id" id="stock_reward_id">
                     
@@ -1134,13 +1134,19 @@ $categories = array_keys($categoryPrefixes);
         // [MODIFIED] Replaced alert() with showSystemError()
         function validateStockAdd() {
             const current = parseInt(document.getElementById('display_current_stock').innerText);
-            const added = parseInt(document.getElementById('add_stock_qty').value);
+            const qtyInput = document.getElementById('add_stock_qty');
+            
+            if (!qtyInput.value) {
+                showSystemError("Please enter a quantity.");
+                return false;
+            }
+
+            const added = parseInt(qtyInput.value);
             const max = 500;
             const total = current + added;
 
             if (total > max) {
                 const allowed = max - current;
-                const exceeded = total - max;
                 showSystemError(`Stock Limit Exceeded! Max: ${max}, Current: ${current}. You tried adding ${added}. Only ${allowed} allowed.`);
                 return false;
             }
@@ -1149,23 +1155,54 @@ $categories = array_keys($categoryPrefixes);
 
         // [NEW] Validate Form (Similar to Donor Page)
         function validateRewardForm(type) {
-            const nameId = type === 'add' ? 'add_name' : 'edit_name';
-            const errorId = type === 'add' ? 'add_name_error' : 'edit_name_error';
+            let errors = [];
+            const prefix = (type === 'add') ? 'add' : 'edit';
             
-            const nameInput = document.getElementById(nameId);
-            const errorDiv = document.getElementById(errorId);
+            // Get Elements
+            const elName = document.getElementById(prefix + '_name');
+            const elPoints = document.getElementById(prefix + '_points');
+            const elStock = document.getElementById(prefix + '_stock');
+            const elDesc = document.getElementById(prefix + '_desc');
+            const elCat = document.getElementById(prefix + '_category');
             
-            // 1. Basic Name Validation
-            // Allows letters, numbers, spaces, hyphens. Disallows special symbols like @#$%.
+            // Check Required
+            if (!elName.value.trim()) errors.push("Item Name is required.");
+            if (!elCat.value) errors.push("Category is required.");
+            if (!elPoints.value) errors.push("Points Required is required.");
+            if (!elStock.value) errors.push("Stock Quantity is required.");
+            if (!elDesc.value.trim()) errors.push("Description is required.");
+
+            // Image Check (Add only)
+            if (type === 'add') {
+                const elPhoto = document.getElementById('add_photo');
+                if (!elPhoto.files || elPhoto.files.length === 0) {
+                    errors.push("Reward Image is required.");
+                }
+            }
+
+            // Expiry Check (If visible/required based on category)
+            const catVal = elCat.value;
+            if (['Food', 'Voucher'].includes(catVal)) {
+                const elExpiry = document.getElementById(prefix + '_expiry');
+                if (!elExpiry.value) errors.push("Expiry Date is required for this category.");
+            }
+
+            // Regex Check for Name
             const nameRegex = /^[a-zA-Z0-9\s\-]+$/;
+            const errorDiv = document.getElementById(prefix + '_name_error');
             
-            if (!nameRegex.test(nameInput.value)) {
-                errorDiv.innerText = "Name can only contain letters, numbers, spaces and hyphens.";
-                errorDiv.style.display = 'block';
+            if (elName.value.trim() && !nameRegex.test(elName.value.trim())) {
+                errors.push("Name can only contain letters, numbers, spaces and hyphens.");
+                if(errorDiv) errorDiv.style.display = 'block';
+            } else {
+                if(errorDiv) errorDiv.style.display = 'none';
+            }
+
+            if (errors.length > 0) {
+                showSystemError("Validation Error: " + errors.join(" "));
                 return false;
             }
-            
-            errorDiv.style.display = 'none';
+
             return true;
         }
 

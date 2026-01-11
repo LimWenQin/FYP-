@@ -815,7 +815,7 @@ $exportUrl = "?" . http_build_query($exportParams);
         <div class="modal-content">
             <div class="modal-header"><h2>Add New Branch</h2><button class="close-btn" onclick="closeModal('addModal')">&times;</button></div>
             <div class="modal-body">
-                <form action="branch_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')">
+                <form action="branch_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')" novalidate>
                     <input type="hidden" name="add_branch" value="1">
                     
                     <div class="form-group">
@@ -833,14 +833,14 @@ $exportUrl = "?" . http_build_query($exportParams);
 
                     <div class="form-group">
                         <label class="form-label">Branch Name <span class="required">*</span></label>
-                        <input type="text" name="branch_name" class="form-input" required placeholder="e.g. Sunny Shelter">
+                        <input type="text" name="branch_name" id="add_branch_name" class="form-input" required placeholder="e.g. Sunny Shelter">
                         <span class="form-guide">Enter the official registered name of the branch.</span>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Category <span class="required">*</span></label>
-                            <select name="branch_type" class="form-select" required>
+                            <select name="branch_type" id="add_branch_type" class="form-select" required>
                                 <option value="">Select Category...</option>
                                 <?php foreach($branchTypes as $t) echo "<option value='$t'>$t</option>"; ?>
                             </select>
@@ -848,7 +848,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                         </div>
                         <div class="form-group">
                             <label class="form-label">Status <span class="required">*</span></label>
-                            <select name="operational_status" class="form-select" required>
+                            <select name="operational_status" id="add_operational_status" class="form-select" required>
                                 <option value="Open">Open</option>
                                 <option value="Closed">Closed</option>
                             </select>
@@ -879,7 +879,7 @@ $exportUrl = "?" . http_build_query($exportParams);
 
                     <div class="form-group">
                         <label class="form-label">PIC Name <span class="required">*</span></label>
-                        <input type="text" name="branch_head" class="form-input" required placeholder="Full Name">
+                        <input type="text" name="branch_head" id="add_branch_head" class="form-input" required placeholder="Full Name">
                         <span class="form-guide">Full name of the Person In Charge / Branch Manager.</span>
                     </div>
 
@@ -905,29 +905,29 @@ $exportUrl = "?" . http_build_query($exportParams);
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Capacity (Pax) <span class="required">*</span></label>
-                            <input type="number" name="capacity" class="form-input" required>
+                            <input type="number" name="capacity" id="add_capacity" class="form-input" required>
                             <span class="form-guide">Maximum number of residents/pax the branch can accommodate.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Est. Date <span class="required">*</span></label>
-                            <input type="date" name="est_date" class="form-input" required>
+                            <input type="date" name="est_date" id="add_est_date" class="form-input" required>
                             <span class="form-guide">The official opening date of this branch.</span>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Address Line 1 <span class="required">*</span></label>
-                        <input type="text" name="address1" class="form-input" required placeholder="House No, Street Name">
+                        <input type="text" name="address1" id="add_address1" class="form-input" required placeholder="House No, Street Name">
                         <span class="form-guide">Unit number, building name, street address.</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Address Line 2 <span class="required">*</span></label>
-                        <input type="text" name="address2" class="form-input" required placeholder="Apartment / Unit">
+                        <input type="text" name="address2" id="add_address2" class="form-input" required placeholder="Apartment / Unit">
                         <span class="form-guide">Residential area, Taman, or Section.</span>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Address Line 3 <span class="required">*</span></label>
-                        <input type="text" name="address3" class="form-input" required placeholder="Additional Address Info">
+                        <label class="form-label">Address Line 3</label>
+                        <input type="text" name="address3" id="add_address3" class="form-input" placeholder="Additional Address Info">
                         <span class="form-guide">Additional address details.</span>
                     </div>
                     
@@ -939,7 +939,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                         </div>
                         <div class="form-group">
                             <label class="form-label">City <span class="required">*</span></label>
-                            <input type="text" name="city" class="form-input" required>
+                            <input type="text" name="city" id="add_city" class="form-input" required>
                             <span class="form-guide">City or District name.</span>
                         </div>
                     </div>
@@ -961,7 +961,7 @@ $exportUrl = "?" . http_build_query($exportParams);
 
                     <div class="form-group">
                         <label class="form-label">Description (Full Details) <span class="required">*</span></label>
-                        <textarea name="description" class="form-textarea" required placeholder="Describe the mission and needs of this branch..."></textarea>
+                        <textarea name="description" id="add_description" class="form-textarea" required placeholder="Describe the mission and needs of this branch..."></textarea>
                         <span class="form-guide">Detailed mission statement, history, or specific needs.</span>
                     </div>
 
@@ -975,7 +975,7 @@ $exportUrl = "?" . http_build_query($exportParams);
         <div class="modal-content">
             <div class="modal-header"><h2>Edit Branch</h2><button class="close-btn" onclick="closeModal('editModal')">&times;</button></div>
             <div class="modal-body">
-                <form action="branch_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('edit')">
+                <form action="branch_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('edit')" novalidate>
                     <input type="hidden" name="update_branch" value="1">
                     <input type="hidden" name="branch_id" id="edit_branch_id">
                     <input type="hidden" name="existing_images_json" id="edit_existing_images_input">
@@ -1082,8 +1082,8 @@ $exportUrl = "?" . http_build_query($exportParams);
                         <span class="form-guide">Residential area, Taman, or Section.</span>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Address 3 <span class="required">*</span></label>
-                        <input type="text" name="address3" id="edit_address3" class="form-input" required>
+                        <label class="form-label">Address 3</label>
+                        <input type="text" name="address3" id="edit_address3" class="form-input">
                         <span class="form-guide">Additional address details.</span>
                     </div>
                     
@@ -1091,7 +1091,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                         <div class="form-group">
                             <label class="form-label">Postcode <span class="required">*</span></label>
                             <input type="text" name="postal_code" id="edit_postal_code" class="form-input" required>
-                            <span class="form-guide">5-digit postal code (e.g., 81300).</span>
+                            <span class="form-guide">5-digit postcode.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">City <span class="required">*</span></label>
@@ -1169,7 +1169,6 @@ $exportUrl = "?" . http_build_query($exportParams);
 
         // --- AUTO HIDE FLASH MESSAGES (5 Seconds) ---
         document.addEventListener('DOMContentLoaded', function() {
-            // New logic for floating alerts
             const successAlert = document.getElementById('floatingSuccess');
             const errorAlert = document.getElementById('floatingError');
             
@@ -1462,41 +1461,93 @@ $exportUrl = "?" . http_build_query($exportParams);
         setupPhoneInput('add_head_contact'); setupPhoneInput('edit_head_contact');
 
         function checkEmail(val) {
-            if(!val) return true; 
+            if(!val) return true; // Let required check handle empty
             return /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val);
         }
 
-        // [MODIFIED] Added showSystemError for validation
+        // [MODIFIED] Updated Validate Form to use System Error instead of browser popups
         function validateForm(mode) {
-            let isValid = true;
             let errors = [];
             
-            const emailId = mode + '_email';
-            const emailErr = mode + 'EmailError';
-            if(!checkEmail(document.getElementById(emailId).value)) {
-                document.getElementById(emailErr).style.display = 'block'; 
-                isValid = false;
-                errors.push("Invalid Branch Email format.");
-            } else {
-                document.getElementById(emailErr).style.display = 'none';
-            }
+            // Map IDs for easier checking
+            let fields = {
+                name: mode === 'add' ? 'add_branch_name' : 'edit_branch_name',
+                type: mode === 'add' ? 'add_branch_type' : 'edit_branch_type',
+                status: mode === 'add' ? 'add_operational_status' : 'edit_operational_status',
+                email: mode === 'add' ? 'add_email' : 'edit_email',
+                contact: mode === 'add' ? 'add_contact' : 'edit_contact_number',
+                head: mode === 'add' ? 'add_branch_head' : 'edit_branch_head',
+                headEmail: mode === 'add' ? 'add_head_email' : 'edit_head_email',
+                headContact: mode === 'add' ? 'add_head_contact' : 'edit_head_contact',
+                capacity: mode === 'add' ? 'add_capacity' : 'edit_capacity',
+                estDate: mode === 'add' ? 'add_est_date' : 'edit_est_date',
+                addr1: mode === 'add' ? 'add_address1' : 'edit_address1',
+                addr2: mode === 'add' ? 'add_address2' : 'edit_address2',
+                addr3: mode === 'add' ? 'add_address3' : 'edit_address3',
+                city: mode === 'add' ? 'add_city' : 'edit_city',
+                state: mode === 'add' ? 'add_state' : 'edit_state',
+                postcode: mode === 'add' ? 'add_postal_code' : 'edit_postal_code',
+                desc: mode === 'add' ? 'add_description' : 'edit_description'
+            };
+
+            const isEmpty = (id) => { const el = document.getElementById(id); return !el || !el.value.trim(); };
+
+            // Check Required Fields manually because of 'novalidate'
+            if (isEmpty(fields.name)) errors.push("Branch Name is required");
+            if (isEmpty(fields.type)) errors.push("Category is required");
+            if (isEmpty(fields.status)) errors.push("Status is required");
             
-            const headEmailId = mode + '_head_email';
-            const headEmailErr = mode + 'HeadEmailError';
-            const headVal = document.getElementById(headEmailId).value;
-            if(!checkEmail(headVal)) {
-                document.getElementById(headEmailErr).style.display = 'block'; 
-                isValid = false;
-                errors.push("Invalid PIC Email format.");
+            // Email Checks
+            if (isEmpty(fields.email)) errors.push("Branch Email is required");
+            else if (!checkEmail(document.getElementById(fields.email).value)) {
+                document.getElementById(mode + 'EmailError').style.display = 'block'; 
+                errors.push("Invalid Branch Email format");
             } else {
-                document.getElementById(headEmailErr).style.display = 'none';
+                document.getElementById(mode + 'EmailError').style.display = 'none'; 
             }
 
-            if (!isValid) {
-                showSystemError("Please fix the validation errors: " + errors.join(" "));
+            if (isEmpty(fields.contact)) errors.push("Branch Contact is required");
+            
+            // PIC Checks
+            if (isEmpty(fields.head)) errors.push("PIC Name is required");
+            
+            if (isEmpty(fields.headEmail)) errors.push("PIC Email is required");
+            else if (!checkEmail(document.getElementById(fields.headEmail).value)) {
+                document.getElementById(mode + 'HeadEmailError').style.display = 'block'; 
+                errors.push("Invalid PIC Email format");
+            } else {
+                document.getElementById(mode + 'HeadEmailError').style.display = 'none';
             }
 
-            return isValid;
+            if (isEmpty(fields.headContact)) errors.push("PIC Contact is required");
+
+            // Details Checks
+            if (isEmpty(fields.capacity)) errors.push("Capacity is required");
+            if (isEmpty(fields.estDate)) errors.push("Est. Date is required");
+            if (isEmpty(fields.addr1)) errors.push("Address Line 1 is required");
+            if (isEmpty(fields.addr2)) errors.push("Address Line 2 is required");
+            // Address 3 removed from required checks
+            if (isEmpty(fields.city)) errors.push("City is required");
+            if (isEmpty(fields.state)) errors.push("State is required");
+            if (isEmpty(fields.postcode)) errors.push("Postcode is required");
+            if (isEmpty(fields.desc)) errors.push("Description is required");
+
+            // Image Check
+            if (mode === 'add') {
+                if (addFiles.length === 0) errors.push("At least one image is required");
+            } else {
+                if (editNewFiles.length === 0 && editExistingImages.length === 0) {
+                    errors.push("At least one image is required");
+                }
+            }
+
+            if (errors.length > 0) {
+                // Show errors in system popup
+                showSystemError("Validation Error: " + errors.join(". "));
+                return false;
+            }
+
+            return true;
         }
 
         function setupPostcodeState(postcodeId, stateSelectId) {

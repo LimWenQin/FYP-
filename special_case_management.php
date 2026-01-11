@@ -457,7 +457,7 @@ $allCaseImagesMap = [];
         .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
         .form-group { flex: 1; margin-bottom: 15px; }
         .form-label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 13px; color: var(--dark); }
-        .form-input, .form-select, .form-textarea { width: 100%; padding: 10px; border: 1px solid var(--gray-light); border-radius: 5px; font-size: 13px; outline: none; transition: 0.3s; }
+        .form-input, .form-select, .form-textarea { width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; font-size: 13px; outline: none; transition: 0.3s; }
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
         .form-textarea { min-height: 100px; resize: vertical; }
         .required { color: red; margin-left: 3px; font-weight: bold; }
@@ -709,7 +709,7 @@ $allCaseImagesMap = [];
         <div class="modal-content">
             <div class="modal-header"><h2>Add New Special Case</h2><button class="close-btn" onclick="closeAddSpecialCaseModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="addSpecialCaseForm" action="special_case_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateSpecialCaseForm('add')">
+                <form id="addSpecialCaseForm" action="special_case_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateSpecialCaseForm('add')" novalidate>
                     <input type="hidden" name="add_special_case" value="1">
                     
                     <div class="form-group">
@@ -747,7 +747,7 @@ $allCaseImagesMap = [];
                         </div>
                         <div class="form-group">
                             <label class="form-label">Status <span class="required">*</span></label>
-                            <select name="case_status" class="form-select" required>
+                            <select id="add_case_status" name="case_status" class="form-select" required>
                                 <option value="Active">Active</option>
                                 <option value="Upcoming">Upcoming</option>
                             </select>
@@ -779,8 +779,8 @@ $allCaseImagesMap = [];
                         <span class="form-guide">House no, street, etc.</span>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" name="address2" class="form-input" required placeholder="e.g. Taman Melati"><span class="form-guide">Area/Taman.</span></div>
-                        <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" name="address3" class="form-input" placeholder="e.g. Section 12"></div>
+                        <div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" id="add_address2" name="address2" class="form-input" required placeholder="e.g. Taman Melati"><span class="form-guide">Area/Taman.</span></div>
+                        <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" id="add_address3" name="address3" class="form-input" placeholder="e.g. Section 12"></div>
                     </div>
                     <div class="form-row">
                         <div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" id="add_postal_code" name="postal_code" class="form-input" required placeholder="e.g. 50000"><span class="form-guide">Valid postal code.</span></div>
@@ -839,7 +839,7 @@ $allCaseImagesMap = [];
         <div class="modal-content">
             <div class="modal-header"><h2>Edit Special Case</h2><button class="close-btn" onclick="closeEditSpecialCaseModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="editSpecialCaseForm" action="special_case_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateSpecialCaseForm('edit')">
+                <form id="editSpecialCaseForm" action="special_case_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateSpecialCaseForm('edit')" novalidate>
                     <input type="hidden" id="edit_case_id" name="case_id"><input type="hidden" name="update_special_case" value="1">
                     <input type="hidden" id="existing_images_json" name="existing_images_json">
                     
@@ -1246,7 +1246,7 @@ $allCaseImagesMap = [];
             document.getElementById('edit_cancel_div').style.display = (val === 'Cancelled') ? 'block' : 'none';
         }
 
-        // --- VALIDATION ---
+        // --- UPDATED: REPLACED ALERT WITH CUSTOM SYSTEM ERROR ---
         function checkEmail(val) {
             if(!val) return true; 
             return /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val);
@@ -1263,17 +1263,36 @@ $allCaseImagesMap = [];
             let errors = [];
             const prefix = (type === 'add') ? 'add' : 'edit';
             
-            // 1. Mandatory Fields (Basic check, browser handles 'required' mostly)
-            const title = document.getElementById(prefix + '_case_title').value;
-            const start = document.getElementById(prefix + '_start_date').value;
-            const end = document.getElementById(prefix + '_end_date').value;
+            const getValue = (id) => document.getElementById(id) ? document.getElementById(id).value.trim() : '';
+
+            // 1. Mandatory Fields Check (Manual because novalidate is on)
+            if (type === 'add' && addFiles.length === 0) errors.push("At least one image is required.");
+            if (type === 'edit' && editNewFiles.length === 0 && editExistingImages.length === 0) errors.push("At least one image is required.");
+
+            if(!getValue(prefix + '_case_title')) errors.push("Title is required.");
+            if(!getValue(prefix + '_case_category')) errors.push("Category is required.");
+            if(!getValue(prefix + '_case_description')) errors.push("Description is required.");
+            if(!getValue(prefix + '_target_amount')) errors.push("Target Amount is required.");
             
-            if(!title || !start || !end) {
-                errors.push("Please fill in all mandatory fields (*).");
-                isValid = false;
-            }
+            if(type === 'add' && !document.getElementById('add_case_status').value) errors.push("Status is required.");
+            
+            if(!getValue(prefix + '_start_date')) errors.push("Start Date is required.");
+            if(!getValue(prefix + '_end_date')) errors.push("End Date is required.");
+            if(!getValue(prefix + '_case_venue')) errors.push("Venue is required.");
+            if(!getValue(prefix + '_address1')) errors.push("Address Line 1 is required.");
+            if(!getValue(prefix + '_address2')) errors.push("Address Line 2 is required.");
+            if(!getValue(prefix + '_postal_code')) errors.push("Postcode is required.");
+            if(!getValue(prefix + '_city')) errors.push("City is required.");
+            if(!getValue(prefix + '_state')) errors.push("State is required.");
+            
+            if(!getValue(prefix + '_case_organizer')) errors.push("Organizer is required.");
+            if(!getValue(prefix + '_contact_name')) errors.push("Contact Name is required.");
+            if(!getValue(prefix + '_contact_number')) errors.push("Contact Phone is required.");
+            if(!getValue(prefix + '_contact_email')) errors.push("Contact Email is required.");
 
             // 2. Date Logic
+            const start = document.getElementById(prefix + '_start_date').value;
+            const end = document.getElementById(prefix + '_end_date').value;
             if(start && end) {
                 if(new Date(end) < new Date(start)) {
                     errors.push("End Date cannot be earlier than Start Date.");
@@ -1298,7 +1317,7 @@ $allCaseImagesMap = [];
             const emailId = prefix + '_contact_email';
             const emailErrId = prefix + 'EmailError';
             const emailVal = document.getElementById(emailId).value;
-            if(!checkEmail(emailVal)) {
+            if(emailVal && !checkEmail(emailVal)) {
                 if(document.getElementById(emailErrId)) document.getElementById(emailErrId).style.display = 'block';
                 errors.push("Invalid Email Format.");
                 isValid = false;
@@ -1306,10 +1325,12 @@ $allCaseImagesMap = [];
                 if(document.getElementById(emailErrId)) document.getElementById(emailErrId).style.display = 'none';
             }
 
-            if(!isValid) {
+            if(!isValid || errors.length > 0) {
+                // Use system error instead of alert
                 showSystemError("Validation Error: " + errors.join(" "));
+                return false;
             }
-            return isValid;
+            return true;
         }
 
         function openViewDonors(caseId) {
@@ -1334,6 +1355,7 @@ $allCaseImagesMap = [];
         }
 
         function confirmDeleteSpecialCase(id) {
+            // Confirm delete still uses native confirm, as requested only form validation messages were specified.
             if(confirm("Delete this case?")) window.location.href = `special_case_management.php?delete_case_id=${id}`;
         }
 

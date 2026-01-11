@@ -708,7 +708,7 @@ $allActivityImagesMap = [];
         <div class="modal-content">
             <div class="modal-header"><h2>Add New Activity</h2><button class="close-btn" onclick="closeAddActivityModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="addActivityForm" action="activity_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateActivityForm('add')">
+                <form id="addActivityForm" action="activity_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateActivityForm('add')" novalidate>
                     <input type="hidden" name="add_activity" value="1">
                     
                     <div class="form-group">
@@ -719,19 +719,19 @@ $allActivityImagesMap = [];
 
                     <div class="form-group">
                         <label class="form-label">Activity Name <span class="required">*</span></label>
-                        <input type="text" name="activity_name" class="form-input" required>
+                        <input type="text" id="add_activity_name" name="activity_name" class="form-input" required>
                         <span class="form-guide">Enter the official name of the campaign or event (e.g., "Charity Fun Run 2026").</span>
                     </div>
 
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Branch <span class="required">*</span></label>
-                            <select name="branch_id" class="form-select" required><option value="">Select Branch</option><?php foreach($branches as $b) echo "<option value='{$b['Branch_ID']}'>{$b['Branch_Name']}</option>"; ?></select>
+                            <select id="add_branch_id" name="branch_id" class="form-select" required><option value="">Select Branch</option><?php foreach($branches as $b) echo "<option value='{$b['Branch_ID']}'>{$b['Branch_Name']}</option>"; ?></select>
                             <span class="form-guide">Select the branch responsible for organizing this event.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Status <span class="required">*</span></label>
-                            <select name="activity_status" class="form-select" required><option value="Active">Active</option><option value="Upcoming">Upcoming</option><option value="Completed">Completed</option></select>
+                            <select id="add_activity_status" name="activity_status" class="form-select" required><option value="Active">Active</option><option value="Upcoming">Upcoming</option><option value="Completed">Completed</option></select>
                             <span class="form-guide">Current operational status of the activity.</span>
                         </div>
                     </div>
@@ -743,7 +743,7 @@ $allActivityImagesMap = [];
                         </div>
                         <div class="form-group">
                             <label class="form-label">Max Participants <span class="required">*</span></label>
-                            <input type="number" name="max_participants" class="form-input" placeholder="0 for unlimited" required>
+                            <input type="number" id="add_max_participants" name="max_participants" class="form-input" placeholder="0 for unlimited" required>
                             <span class="form-guide">Limit the number of attendees (0 means no limit).</span>
                         </div>
                     </div>
@@ -804,18 +804,18 @@ $allActivityImagesMap = [];
 
                     <div class="form-group">
                         <label class="form-label">Address 1 <span class="required">*</span></label>
-                        <input type="text" name="address1" class="form-input" required>
+                        <input type="text" id="add_address1" name="address1" class="form-input" required>
                         <span class="form-guide">House unit no., floor, building, street name.</span>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Address 2 <span class="required">*</span></label>
-                            <input type="text" name="address2" class="form-input" required>
+                            <input type="text" id="add_address2" name="address2" class="form-input" required>
                             <span class="form-guide">Residential area, village, or section.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Address 3</label>
-                            <input type="text" name="address3" class="form-input">
+                            <input type="text" id="add_address3" name="address3" class="form-input">
                             <span class="form-guide">Additional address details (Optional).</span>
                         </div>
                     </div>
@@ -838,13 +838,13 @@ $allActivityImagesMap = [];
                         </div>
                         <div class="form-group">
                             <label class="form-label">Country</label>
-                            <input type="text" name="country" class="form-input" value="Malaysia" readonly>
+                            <input type="text" id="add_country" name="country" class="form-input" value="Malaysia" readonly>
                         </div>
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label">Description <span class="required">*</span></label>
-                        <textarea name="activity_description" class="form-textarea" required></textarea>
+                        <textarea id="add_activity_description" name="activity_description" class="form-textarea" required></textarea>
                         <span class="form-guide">Provide a detailed explanation of the activity, its purpose, and itinerary.</span>
                     </div>
                     <div class="form-group"><button type="submit" class="btn btn-primary" style="width:100%"><i class="fas fa-save"></i> Save Activity</button></div>
@@ -857,7 +857,7 @@ $allActivityImagesMap = [];
         <div class="modal-content">
             <div class="modal-header"><h2>Edit Activity</h2><button class="close-btn" onclick="closeEditActivityModal()">&times;</button></div>
             <div class="modal-body">
-                <form id="editActivityForm" action="activity_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateActivityForm('edit')">
+                <form id="editActivityForm" action="activity_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateActivityForm('edit')" novalidate>
                     <input type="hidden" id="edit_activity_id" name="activity_id">
                     <input type="hidden" name="update_activity" value="1">
                     <input type="hidden" id="existing_images_json" name="existing_images_json">
@@ -1163,11 +1163,40 @@ $allActivityImagesMap = [];
             return !/\d/.test(val);
         }
 
+        // --- UPDATED: CUSTOM VALIDATION FUNCTION ---
         function validateActivityForm(prefix) { 
             let isValid = true;
             let errors = [];
 
-            // 1. Date Validation
+            // Helper to get value
+            const getValue = (id) => {
+                const el = document.getElementById(id);
+                return el ? el.value.trim() : '';
+            };
+
+            // 1. Required Field Checks (Manual because novalidate is on)
+            if (prefix === 'add' && addFiles.length === 0) errors.push("At least one image is required.");
+            if (prefix === 'edit' && editNewFiles.length === 0 && editExistingImages.length === 0) errors.push("At least one image is required.");
+
+            if (!getValue(prefix + '_activity_name')) errors.push("Activity Name is required.");
+            if (!getValue(prefix + '_branch_id')) errors.push("Branch is required.");
+            if (!getValue(prefix + '_activity_status')) errors.push("Status is required.");
+            if (!getValue(prefix + '_target_amount')) errors.push("Target Amount is required.");
+            if (!getValue(prefix + '_max_participants')) errors.push("Max Participants is required.");
+            if (!getValue(prefix + '_start_date')) errors.push("Start Date is required.");
+            if (!getValue(prefix + '_end_date')) errors.push("End Date is required.");
+            if (!getValue(prefix + '_organizer')) errors.push("Organizer Name is required.");
+            if (!getValue(prefix + '_contact_name')) errors.push("Contact Person is required.");
+            if (!getValue(prefix + '_contact_number')) errors.push("Contact Number is required.");
+            if (!getValue(prefix + '_contact_email')) errors.push("Contact Email is required.");
+            if (!getValue(prefix + '_address1')) errors.push("Address Line 1 is required.");
+            if (!getValue(prefix + '_address2')) errors.push("Address Line 2 is required.");
+            if (!getValue(prefix + '_city')) errors.push("City is required.");
+            if (!getValue(prefix + '_state')) errors.push("State is required.");
+            if (!getValue(prefix + '_postal_code')) errors.push("Postcode is required.");
+            if (!getValue(prefix + '_activity_description')) errors.push("Description is required.");
+
+            // 2. Date Validation
             const start = document.getElementById(prefix + '_start_date').value;
             const end = document.getElementById(prefix + '_end_date').value;
             
@@ -1196,15 +1225,14 @@ $allActivityImagesMap = [];
                 }
             }
 
-            // 2. Amount Validation
+            // 3. Amount Validation
             const amountId = prefix + '_target_amount'; 
             const amountErrId = prefix + '_amount_error';
             if(!validateAmount(amountId, amountErrId)) {
                 isValid = false;
-                // Amount error handled by validateAmount display logic
             }
 
-            // 3. Name Validation (No Numbers)
+            // 4. Name Validation (No Numbers)
             const organizerName = document.getElementById(prefix + '_organizer').value;
             const contactName = document.getElementById(prefix + '_contact_name').value;
             
@@ -1217,11 +1245,11 @@ $allActivityImagesMap = [];
                 isValid = false;
             }
 
-            // 4. Email Validation
+            // 5. Email Validation
             const emailId = prefix + '_contact_email';
             const emailErrId = prefix + 'EmailError';
             const emailVal = document.getElementById(emailId).value;
-            if(!checkEmail(emailVal)) {
+            if(emailVal && !checkEmail(emailVal)) {
                 document.getElementById(emailErrId).style.display = 'block';
                 errors.push("Invalid Email Format.");
                 isValid = false;
@@ -1229,8 +1257,9 @@ $allActivityImagesMap = [];
                 document.getElementById(emailErrId).style.display = 'none';
             }
 
-            if(!isValid) {
+            if(errors.length > 0) {
                 showSystemError("Validation Error: " + errors.join(" "));
+                return false;
             }
 
             return isValid;
