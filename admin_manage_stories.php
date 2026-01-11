@@ -1,33 +1,51 @@
 <?php
+// admin_manage_stories.php
 session_start();
-include 'dataconnection.php';
 
-// 检查登录 (保持不变)
-if (!isset($_SESSION['admin_id'])) {
+// --- 修改 1: 检查是否登录 (Admin 或 Staff 均可) ---
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
 }
 
-// 获取管理员信息 (保持不变)
-$adminId = $_SESSION['admin_id'];
-$adminName = $_SESSION['admin_name'] ?? 'Admin';
-$adminProfilePicture = $_SESSION['admin_pic'] ?? '';
-$adminPosition = 'Admin';
+include 'dataconnection.php';
 
-// 同步 Header 信息 (保持不变)
-$stmt = $conn->prepare("SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = ?");
-$stmt->bind_param("i", $adminId);
-$stmt->execute();
-$res = $stmt->get_result();
-if ($row = $res->fetch_assoc()) {
-    $adminName = $row['Admin_Name'];
-    $adminProfilePicture = $row['Admin_ProfilePicture'];
-    $adminPosition = $row['Admin_Role'];
+// --- 修改 2: 获取当前用户信息 (支持 Admin 和 Staff) ---
+$adminName = "User";
+$adminPosition = "Role";
+$adminProfilePicture = null;
+
+if (isset($_SESSION['admin_id'])) {
+    $currentId = $_SESSION['admin_id'];
+    $stmt = $conn->prepare("SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = ?");
+    $stmt->bind_param("i", $currentId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
+        $adminName = $row['Admin_Name'];
+        $adminProfilePicture = $row['Admin_ProfilePicture'];
+        $adminPosition = $row['Admin_Role'];
+    }
+    $stmt->close();
+} elseif (isset($_SESSION['staff_id'])) {
+    $currentId = $_SESSION['staff_id'];
+    $stmt = $conn->prepare("SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role FROM staff WHERE Staff_ID = ?");
+    $stmt->bind_param("i", $currentId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
+        $adminName = $row['Staff_FullName'];
+        $adminProfilePicture = $row['Staff_ProfilePicture'];
+        $adminPosition = $row['Staff_Role'];
+    }
+    $stmt->close();
 }
 
-$message = "";
+// 消息变量
+$successMsg = "";
+$errorMsg = "";
 
-// 处理删除 (保持不变)
+// 处理删除
 if (isset($_GET['delete'])) {
     $id = intval($_GET['delete']);
     $imgQ = $conn->query("SELECT Story_Image FROM story WHERE Story_ID = $id");
@@ -35,16 +53,20 @@ if (isset($_GET['delete'])) {
         if(file_exists($imgR['Story_Image']) && !empty($imgR['Story_Image'])) unlink($imgR['Story_Image']);
     }
     
-    $conn->query("DELETE FROM story WHERE Story_ID = $id");
-    header("Location: admin_manage_stories.php?msg=deleted");
-    exit();
+    if($conn->query("DELETE FROM story WHERE Story_ID = $id")) {
+        header("Location: admin_manage_stories.php?success=Story deleted successfully");
+        exit();
+    } else {
+        header("Location: admin_manage_stories.php?error=Database error");
+        exit();
+    }
 }
 
-if(isset($_GET['msg']) && $_GET['msg'] == 'deleted') {
-    $message = "<div class='alert alert-success'><i class='fas fa-check-circle'></i> Story deleted successfully.</div>";
-}
+// 获取 URL 参数中的消息
+if(isset($_GET['success'])) $successMsg = htmlspecialchars($_GET['success']);
+if(isset($_GET['error'])) $errorMsg = htmlspecialchars($_GET['error']);
 
-// 处理添加新 Story (保持不变)
+// 处理添加新 Story
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $title = $_POST['title'];
     $desc = $_POST['description'];
@@ -53,29 +75,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!file_exists($target_dir)) mkdir($target_dir, 0777, true);
     
     $imagePath = "";
+    $uploadOk = true;
+
     if (isset($_FILES["image"]) && $_FILES["image"]["error"] == 0) {
         $fileName = time() . "_" . basename($_FILES["image"]["name"]);
         $target_file = $target_dir . $fileName;
         if(move_uploaded_file($_FILES["image"]["tmp_name"], $target_file)) {
             $imagePath = $target_file;
         } else {
-             $message = "<div class='alert alert-danger'><i class='fas fa-exclamation-circle'></i> Image upload failed. Please check folder permissions.</div>";
+             $errorMsg = "Image upload failed. Please check folder permissions.";
+             $uploadOk = false;
         }
     }
 
-    if(empty($message)) {
-        // 假设数据库有 Created_At 字段
-        $sql = "INSERT INTO story (Story_Title, Story_Description, Story_Image, Created_At) VALUES (?, ?, ?, NOW())";
-        // 如果你的数据库没有 Created_At 字段，请使用下面这行:
-        // $sql = "INSERT INTO story (Story_Title, Story_Description, Story_Image) VALUES (?, ?, ?)";
-
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("sss", $title, $desc, $imagePath);
+    if($uploadOk && empty($errorMsg)) {
+        // 检查数据库字段是否存在 Created_At
+        $checkCol = $conn->query("SHOW COLUMNS FROM story LIKE 'Created_At'");
+        if($checkCol && $checkCol->num_rows > 0) {
+            $sql = "INSERT INTO story (Story_Title, Story_Description, Story_Image, Created_At) VALUES (?, ?, ?, NOW())";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("sss", $title, $desc, $imagePath);
+        } else {
+            $sql = "INSERT INTO story (Story_Title, Story_Description, Story_Image) VALUES (?, ?, ?)";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("sss", $title, $desc, $imagePath);
+        }
         
         if ($stmt->execute()) {
-            $message = "<div class='alert alert-success'><i class='fas fa-check-circle'></i> Story published successfully!</div>";
+            // 重定向以防止表单重复提交
+            header("Location: admin_manage_stories.php?success=Story published successfully!");
+            exit();
         } else {
-            $message = "<div class='alert alert-danger'><i class='fas fa-exclamation-circle'></i> Database error: " . $conn->error . "</div>";
+            $errorMsg = "Database error: " . $conn->error;
         }
     }
 }
@@ -88,6 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Stories - Love Bridge Admin</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="admin_common.css">
     <style>
         /* Page Header */
@@ -206,17 +238,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             border-radius: 50%;
             background: rgba(220, 53, 69, 0.1); color: var(--danger);
             text-decoration: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
         }
         .btn-delete-icon:hover { background: var(--danger); color: white; transform: scale(1.15); }
         
-        /* Alerts */
-        .alert { padding: 16px 20px; margin-bottom: 25px; border-radius: 12px; display: flex; align-items: center; gap: 12px; font-weight: 500; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
-        .alert-success { background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
-        .alert-danger { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
-        .alert i { font-size: 18px; }
+        /* Floating Alert Styles */
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; max-width: 400px; display: none; animation: slideIn 0.3s; }
+        .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
+        .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
 </head>
 <body>
+
+    <div class="floating-alert floating-alert-success" id="floatingSuccess" style="display: <?php echo !empty($successMsg) ? 'flex' : 'none'; ?>">
+        <i class="fas fa-check-circle"></i>
+        <div id="floatingSuccessText"><?php echo $successMsg; ?></div>
+    </div>
+
+    <div class="floating-alert floating-alert-danger" id="floatingError" style="display: <?php echo !empty($errorMsg) ? 'flex' : 'none'; ?>">
+        <i class="fas fa-exclamation-circle"></i>
+        <div id="floatingErrorText"><?php echo $errorMsg; ?></div>
+    </div>
 
     <?php include 'admin_sidebar.php'; ?>
 
@@ -229,8 +272,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <h2>Manage Success Stories</h2>
                 <p>Share impactful stories and inspire the community.</p>
             </div>
-
-            <?php echo $message; ?>
 
             <div class="content-grid">
                 
@@ -329,7 +370,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         <?php echo $dateStr; ?>
                                     </td>
                                     <td style="text-align: center;">
-                                        <a href="?delete=<?php echo $row['Story_ID']; ?>" class="btn-delete-icon" onclick="return confirm('Are you sure you want to permanently delete this story?')" title="Delete Story">
+                                        <a href="javascript:confirmDelete(<?php echo $row['Story_ID']; ?>)" class="btn-delete-icon" title="Delete Story">
                                             <i class="fas fa-trash-alt"></i>
                                         </a>
                                     </td>
@@ -359,8 +400,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         const previewContainer = document.getElementById('preview-container');
         const previewImage = document.getElementById('preview-image');
 
-        // 更新计数 (一个小细节)
+        // 更新计数
         document.getElementById('story-count').innerText = "<?php echo $count; ?> Stories";
+
+        // Auto Hide Alerts
+        setTimeout(function() {
+            const success = document.getElementById('floatingSuccess');
+            const error = document.getElementById('floatingError');
+            if (success) success.style.display = 'none';
+            if (error) error.style.display = 'none';
+        }, 5000);
+
+        // System Alert Function
+        function showSystemError(msg) {
+            const el = document.getElementById('floatingError');
+            document.getElementById('floatingErrorText').innerText = msg;
+            el.style.display = 'flex';
+            setTimeout(() => el.style.display='none', 5000);
+        }
+
+        // Custom Delete Confirmation (SweetAlert2)
+        function confirmDelete(id) {
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You won't be able to revert this!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, delete it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = '?delete=' + id;
+                }
+            })
+        }
 
         // Drag and drop styling
         ['dragenter', 'dragover'].forEach(eventName => {
@@ -377,7 +451,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             dropZone.classList.remove('dragover');
         }
 
-        // Handle file selection (via click or drop)
+        // Handle file selection
         imageInput.addEventListener('change', function(e) {
             handleFiles(this.files);
         });
@@ -386,7 +460,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if (files && files[0]) {
                 const file = files[0];
                 if (!file.type.startsWith('image/')){
-                     alert("Please select an image file.");
+                     // Replace native alert with system alert
+                     showSystemError("Please select an image file.");
                      removeImage();
                      return;
                 }
@@ -395,18 +470,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 reader.onload = function(e) {
                     previewImage.src = e.target.result;
                     previewContainer.style.display = 'block';
-                    dropZone.style.display = 'none'; // Hide the upload box once image is selected
+                    dropZone.style.display = 'none'; 
                 }
                 reader.readAsDataURL(file);
             }
         }
 
-        // Function to remove selected image
         function removeImage() {
-            imageInput.value = ''; // Clear the input file
+            imageInput.value = ''; 
             previewImage.src = '#';
             previewContainer.style.display = 'none';
-            dropZone.style.display = 'block'; // Show the upload box again
+            dropZone.style.display = 'block'; 
         }
     </script>
 </body>

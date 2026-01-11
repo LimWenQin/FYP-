@@ -62,7 +62,7 @@ if (isset($_SESSION['admin_id'])) {
                 <a href="admin_manage_stories.php"><i class="fas fa-book-open"></i> Manage Stories</a>
                 <a href="admin_manage_pages.php?type=about_us"><i class="fas fa-info-circle"></i> About Us</a>
                 <a href="admin_manage_pages.php?type=contact_us"><i class="fas fa-address-book"></i> Contact Us</a>
-                <a href="admin_manage_pages.php?type=terms_condition"><i class="fas fa-file-contract"></i> Terms & Cond.</a>
+                <a href="admin_manage_pages.php?type=terms_condition"><i class="fas fa-file-contract"></i> Terms & Conditions</a>
                 <a href="admin_manage_pages.php?type=privacy_policy"><i class="fas fa-user-shield"></i> Privacy Policy</a>
             </div>
         </div>
