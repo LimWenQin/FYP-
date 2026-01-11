@@ -28,7 +28,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
     
     if (!empty($missing_fields)) {
-        $error_message = "Please fill in all required fields: " . implode(', ', $missing_fields);
+        $error_message = "Please fill in all required fields.";
     } elseif ($password !== $confirm_password) {
         $error_message = "Passwords do not match.";
     } elseif (strlen($password) < 8) {
@@ -37,9 +37,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $error_message = "Please enter a valid email address.";
     } else {
         
-        // --- 修改开始：检查 Email 和 Is_Deleted 状态 ---
-        
-        // 1. 查询该 Email 是否存在，同时获取 ID 和 Is_Deleted 状态
+        // --- 检查 Email ---
         $check_query = "SELECT Donor_ID, Is_Deleted FROM donor WHERE Donor_Email = ?";
         $stmt = $conn->prepare($check_query);
         $stmt->bind_param("s", $email);
@@ -54,11 +52,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $row = $result->fetch_assoc();
             $existing_id = $row['Donor_ID'];
             
-            // 如果 Is_Deleted 是 0，说明账号正在使用中，不能注册
             if ($row['Is_Deleted'] == 0) {
                 $account_exists = true;
             } else {
-                // 如果 Is_Deleted 是 1，说明是旧账号，标记为“已删除账号”
                 $is_deleted_account = true;
             }
         }
@@ -71,8 +67,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt_action = null;
 
             if ($is_deleted_account) {
-                // --- 情况 A: 账号存在但被删除了 (Is_Deleted = 1) ---
-                // 执行 UPDATE 操作：更新资料并将 Is_Deleted 设回 0 (复活账号)
+                // Update
                 $update_query = "UPDATE donor SET 
                                  Donor_Name = ?, 
                                  Donor_ContactNumber = ?, 
@@ -84,7 +79,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $stmt_action->bind_param("ssssi", $name, $contact, $hashed_password, $dob, $existing_id);
 
             } else {
-               
+                // Insert
                 $insert_query = "INSERT INTO donor (Donor_Name, Donor_ContactNumber, Donor_Email, 
                                  Donor_Password, Donor_DOB, Is_Deleted) 
                                  VALUES (?, ?, ?, ?, ?, 0)";
@@ -92,11 +87,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $stmt_action->bind_param("sssss", $name, $contact, $email, $hashed_password, $dob);
             }
             
-         
             if ($stmt_action->execute()) {
                 $success_message = "Registration successful! <a href='donor_login.php' class='login-link'>Click here to Login Now <i class='fas fa-arrow-right'></i></a>";
-                
-                // Clear form data
                 $name = $contact = $email = $dob = "";
                 $_POST = array();
             } else {
@@ -105,8 +97,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt_action->close();
         }
         $stmt->close();
-        
-}}
+    }
+}
 include 'header_UI.php';
 ?>
 
@@ -173,6 +165,7 @@ include 'header_UI.php';
 
         .form-group {
             margin-bottom: 25px;
+            position: relative;
         }
 
         .form-group label {
@@ -206,10 +199,46 @@ include 'header_UI.php';
 
         .form-control.error {
             border-color: var(--primary-red);
+            background-color: #fff5f5;
         }
 
         .form-control.success {
             border-color: var(--success-green);
+        }
+        
+        .field-error-msg {
+            color: var(--error-red);
+            font-size: 0.85rem;
+            margin-top: 5px;
+            display: none;
+            font-weight: 500;
+        }
+        
+        .field-error-msg.visible {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        .field-info-msg {
+            font-size: 0.85rem;
+            margin-top: 5px;
+            display: none;
+            font-weight: 500;
+        }
+
+        .field-info-msg.match {
+            color: var(--success-green);
+            display: block;
+        }
+        
+        .field-info-msg.mismatch {
+            color: var(--error-red);
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .form-help {
@@ -236,31 +265,12 @@ include 'header_UI.php';
             color: var(--medium-gray);
         }
 
-        .requirement-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .requirement-item i {
-            margin-right: 8px;
-            font-size: 0.8rem;
-            width: 16px;
-        }
-
-        .requirement-item.valid {
-            color: var(--success-green);
-        }
-
-        .requirement-item.valid i {
-            color: var(--success-green);
-        }
-
-        .requirement-item.invalid {
-            color: var(--medium-gray);
-        }
-
-        .requirement-item.invalid i {
-            color: var(--medium-gray);
-        }
+        .requirement-item:last-child { margin-bottom: 0; }
+        .requirement-item i { margin-right: 8px; font-size: 0.8rem; width: 16px; }
+        .requirement-item.valid { color: var(--success-green); }
+        .requirement-item.valid i { color: var(--success-green); }
+        .requirement-item.invalid { color: var(--medium-gray); }
+        .requirement-item.invalid i { color: var(--medium-gray); }
 
         .error-message {
             background-color: var(--light-red);
@@ -286,11 +296,10 @@ include 'header_UI.php';
         .success-message span {
             width: 100%;
             display: flex;
-            justify-content: space-between; /* 关键：文字在左，按钮在右 */
+            justify-content: space-between; 
             align-items: center;
         }
 
-        /* Style specifically for the Login Link inside the success message */
         .success-message .login-link {
             background-color: #059669;
             color: white;
@@ -303,11 +312,8 @@ include 'header_UI.php';
             margin-left: 15px;
         }
 
-        .success-message .login-link:hover {
-            background-color: #047857;
-        }
+        .success-message .login-link:hover { background-color: #047857; }
 
-        /* Button Container */
         .button-container {
             display: flex;
             justify-content: center;
@@ -337,18 +343,6 @@ include 'header_UI.php';
             box-shadow: 0 5px 15px rgba(220, 38, 38, 0.3);
         }
 
-        .btn:active {
-            transform: translateY(0);
-        }
-
-        .btn:disabled {
-            background: var(--border-color);
-            color: var(--medium-gray);
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
         .form-footer {
             text-align: center;
             margin-top: 30px;
@@ -357,83 +351,8 @@ include 'header_UI.php';
             color: var(--medium-gray);
         }
 
-        .form-footer a {
-            color: var(--primary-red);
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        .form-footer a:hover {
-            text-decoration: underline;
-        }
-
-        /* Responsive design */
-        @media (max-width: 768px) {
-            .container {
-                margin: 20px auto;
-                padding: 0 15px;
-            }
-            
-            .form-container {
-                padding: 25px;
-            }
-            
-            .form-title {
-                font-size: 1.8rem;
-            }
-            
-            .form-row {
-                grid-template-columns: 1fr;
-                gap: 20px;
-            }
-            
-            .button-container {
-                flex-direction: column;
-                gap: 15px;
-            }
-            
-            .btn {
-                width: 100%;
-            }
-            
-            .success-message {
-                flex-direction: column;
-                text-align: center;
-                gap: 10px;
-            }
-            
-            .success-message .login-link {
-                margin-left: 0;
-                width: 100%;
-                text-align: center;
-                box-sizing: border-box;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .form-container {
-                padding: 20px;
-            }
-            
-            .form-title {
-                font-size: 1.5rem;
-            }
-            
-            .btn {
-                padding: 12px 20px;
-                font-size: 1rem;
-            }
-        }
-
-        /* Custom select styling */
-        select.form-control {
-            appearance: none;
-            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-            background-repeat: no-repeat;
-            background-position: right 15px center;
-            background-size: 15px;
-            padding-right: 45px;
-        }
+        .form-footer a { color: var(--primary-red); text-decoration: none; font-weight: 600; }
+        .form-footer a:hover { text-decoration: underline; }
 
         /* Password strength indicator */
         .password-strength {
@@ -446,29 +365,24 @@ include 'header_UI.php';
 
         .password-strength-bar {
             height: 100%;
-            width: 0%;
-            transition: width 0.3s ease;
-            border-radius: 3px;
+            width: 0%; 
+            transition: width 0.3s ease, background-color 0.3s ease;
         }
 
-        .strength-weak {
-            background-color: var(--primary-red);
-            width: 25%;
-        }
-
-        .strength-medium {
-            background-color: #f59e0b;
-            width: 50%;
-        }
-
-        .strength-strong {
-            background-color: var(--success-green);
-            width: 75%;
-        }
-
-        .strength-very-strong {
-            background-color: #059669;
-            width: 100%;
+        .strength-weak { background-color: var(--primary-red); width: 25%; }
+        .strength-medium { background-color: #f59e0b; width: 50%; }
+        .strength-strong { background-color: var(--success-green); width: 75%; }
+        .strength-very-strong { background-color: #059669; width: 100%; }
+        
+        @media (max-width: 768px) {
+            .container { margin: 20px auto; padding: 0 15px; }
+            .form-container { padding: 25px; }
+            .form-title { font-size: 1.8rem; }
+            .form-row { grid-template-columns: 1fr; gap: 20px; }
+            .button-container { flex-direction: column; gap: 15px; }
+            .btn { width: 100%; }
+            .success-message { flex-direction: column; text-align: center; gap: 10px; }
+            .success-message .login-link { margin-left: 0; width: 100%; text-align: center; box-sizing: border-box; }
         }
     </style>
 </head>
@@ -487,15 +401,16 @@ include 'header_UI.php';
                 </div>
             <?php endif; ?>
             
-            <form method="POST" action="donor_register.php" id="registerForm">
+            <form method="POST" action="donor_register.php" id="registerForm" novalidate>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="name" class="required">Full Name</label>
                         <input type="text" class="form-control" id="name" name="name" 
-                               pattern="[A-Za-z\s]+" title="Only alphabets and spaces allowed"
+                               pattern="[A-Za-z\s]+" 
                                value="<?php echo htmlspecialchars($name); ?>" 
                                required>
                         <span class="form-help">Enter your full name (letters and spaces only)</span>
+                        <div class="field-error-msg" id="nameError">Full Name is required.</div>
                     </div>
                 </div>
 
@@ -503,19 +418,19 @@ include 'header_UI.php';
                     <div class="form-group">
                         <label for="dob" class="required">Date of Birth</label>
                         <input type="date" class="form-control" id="dob" name="dob" 
-                               max="<?php echo date('Y-m-d'); ?>"
                                value="<?php echo htmlspecialchars($dob); ?>" 
                                required>
+                        <div class="field-error-msg" id="dobError">Date of Birth is required.</div>
                     </div>
                     
                     <div class="form-group">
                         <label for="contact" class="required">Contact Number</label>
                         <input type="tel" class="form-control" id="contact" name="contact" 
-                               pattern="01[0-9]-[0-9]{7,8}" title="Format: 01X-XXXXXXX or 01X-XXXXXXXX"
                                placeholder="012-3456789"
                                value="<?php echo htmlspecialchars($contact); ?>" 
                                required>
                         <span class="form-help">Format: 01X-XXXXXXX</span>
+                        <div class="field-error-msg" id="contactError">Contact Number is required.</div>
                     </div>
                 </div>
 
@@ -526,6 +441,7 @@ include 'header_UI.php';
                                placeholder="example@example.com"
                                value="<?php echo htmlspecialchars($email); ?>" 
                                required>
+                        <div class="field-error-msg" id="emailError">Email Address is required.</div>
                     </div>
                 </div>
 
@@ -544,12 +460,15 @@ include 'header_UI.php';
                             <div class="requirement-item invalid" id="numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div>
                             <div class="requirement-item invalid" id="specialReq"><i class="fas fa-times"></i> Must contain at least one Special character (e.g. !@#)</div>
                         </div>
+                         <div class="field-error-msg" id="passwordError">Password is required.</div>
                     </div>
                     
                     <div class="form-group">
                         <label for="confirm_password" class="required">Confirm Password</label>
                         <input type="password" class="form-control" id="confirm_password" name="confirm_password" 
                                required placeholder="Re-enter your password">
+                        <div class="field-info-msg" id="matchMsg"></div>
+                        <div class="field-error-msg" id="confirmPasswordError">Please confirm your password.</div>
                     </div>
                 </div>
 
@@ -561,6 +480,7 @@ include 'header_UI.php';
                             and <a href="privacy.php" target="_blank" style="color: var(--primary-red);">Privacy Policy</a> of Love Bridge Donation System.
                         </label>
                     </div>
+                    <div class="field-error-msg" id="termsError">You must agree to the Terms and Conditions to proceed.</div>
                 </div>
                 
                 <div class="button-container">
@@ -578,70 +498,182 @@ include 'header_UI.php';
     </div>
  <?php include 'footer.php'; ?>
     <script>
-        // Client-side validation and enhanced features
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('registerForm');
             const password = document.getElementById('password');
             const confirmPassword = document.getElementById('confirm_password');
             const email = document.getElementById('email');
-            const passwordStrengthBar = document.getElementById('passwordStrengthBar');
             const dobInput = document.getElementById('dob');
-            const submitBtn = document.getElementById('submitBtn');
+            const nameInput = document.getElementById('name');
+            const contactInput = document.getElementById('contact');
+            const termsInput = document.getElementById('terms');
             
-            // Password requirement elements
-            const lengthReq = document.getElementById('lengthReq');
-            const uppercaseReq = document.getElementById('uppercaseReq');
-            const lowercaseReq = document.getElementById('lowercaseReq');
-            const numberReq = document.getElementById('numberReq');
-            const specialReq = document.getElementById('specialReq');
+            function setFieldState(elementId, isError, message = "") {
+                const el = document.getElementById(elementId);
+                if (isError) {
+                    el.classList.add('visible');
+                    if(message) el.innerText = message;
+                } else {
+                    el.classList.remove('visible');
+                }
+            }
+
+            // --- 1. Password Logic ---
+            function checkPasswordMatch() {
+                const matchMsg = document.getElementById('matchMsg');
+                const confirmError = document.getElementById('confirmPasswordError');
+                const pass = password.value;
+                const confirm = confirmPassword.value;
+
+                if (confirm.length === 0) {
+                    matchMsg.className = 'field-info-msg';
+                    matchMsg.innerText = '';
+                    confirmPassword.classList.remove('error', 'success');
+                    
+                    // 【关键修改】不要在这里隐藏 confirmPasswordError
+                    // 让 submit handler 去控制 "Required" 的错误提示
+                    // confirmError.classList.remove('visible');  <-- 删掉这行或让它只在 typing 时生效
+                    // 为了简单起见，这里我们只做清空 matchMsg 的动作
+                    
+                    return false;
+                }
+
+                // 如果有输入了，我们才去隐藏 "Required" 的错误，并开始比对
+                confirmError.classList.remove('visible');
+
+                if (pass === confirm) {
+                    matchMsg.className = 'field-info-msg match';
+                    matchMsg.innerHTML = '<i class="fas fa-check"></i> Passwords match';
+                    confirmPassword.classList.remove('error');
+                    confirmPassword.classList.add('success');
+                    return true;
+                } else {
+                    matchMsg.className = 'field-info-msg mismatch';
+                    matchMsg.innerHTML = '<i class="fas fa-times"></i> Passwords do not match';
+                    confirmPassword.classList.add('error');
+                    confirmPassword.classList.remove('success');
+                    return false;
+                }
+            }
+
+            confirmPassword.addEventListener('input', checkPasswordMatch);
+            password.addEventListener('input', checkPasswordMatch);
+
+            // --- 2. Validation Functions ---
+            function validateAge() {
+                const dobValue = dobInput.value;
+                if (!dobValue) return true; 
+
+                const today = new Date();
+                const birthDate = new Date(dobValue);
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+
+                if (age < 18) {
+                    dobInput.classList.add('error');
+                    setFieldState('dobError', true, "Must be 18 years old and above.");
+                    return false;
+                } else {
+                    dobInput.classList.remove('error');
+                    setFieldState('dobError', false);
+                    return true;
+                }
+            }
+            dobInput.addEventListener('change', validateAge);
+
+            function validateEmail() {
+                if(!email.value) return true; 
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email.value)) {
+                    email.classList.add('error');
+                    setFieldState('emailError', true, "Please enter a valid email address.");
+                    return false;
+                } else {
+                    email.classList.remove('error');
+                    setFieldState('emailError', false);
+                    return true;
+                }
+            }
+            email.addEventListener('blur', validateEmail);
+
+            function validateName() {
+                if(!nameInput.value) return true; 
+                const nameRegex = /^[A-Za-z\s]+$/;
+                if (!nameRegex.test(nameInput.value)) {
+                    nameInput.classList.add('error');
+                    setFieldState('nameError', true, "Name must contain letters only.");
+                    return false;
+                } else {
+                    nameInput.classList.remove('error');
+                    setFieldState('nameError', false);
+                    return true;
+                }
+            }
+            nameInput.addEventListener('input', validateName);
             
-            // Set max date for DOB (must be at least 18 years old)
-            const today = new Date();
-            const maxDate = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
-            dobInput.max = maxDate.toISOString().split('T')[0];
-            
-            // Password strength checker and requirement validation
+            function validateContact() {
+                 if(!contactInput.value) return true;
+                 if(contactInput.value.length < 10) {
+                     contactInput.classList.add('error');
+                     setFieldState('contactError', true, "Please enter a valid contact number.");
+                     return false;
+                 } else {
+                     contactInput.classList.remove('error');
+                     setFieldState('contactError', false);
+                     return true;
+                 }
+            }
+            contactInput.addEventListener('blur', validateContact);
+
+            // --- Password Strength UI ---
+            const passwordStrengthBar = document.getElementById('passwordStrengthBar');
+            const reqs = {
+                length: document.getElementById('lengthReq'),
+                upper: document.getElementById('uppercaseReq'),
+                lower: document.getElementById('lowercaseReq'),
+                number: document.getElementById('numberReq'),
+                special: document.getElementById('specialReq')
+            };
+
             password.addEventListener('input', function() {
                 const value = password.value;
-                let strength = 0;
                 
-                // Check requirements
-                const hasLength = value.length >= 8 && value.length <= 15;
-                const hasUppercase = /[A-Z]/.test(value);
-                const hasLowercase = /[a-z]/.test(value);
-                const hasNumber = /[0-9]/.test(value);
-                const hasSpecial = /[^A-Za-z0-9]/.test(value);
-                
-                // Update requirement indicators
-                updateRequirement(lengthReq, hasLength);
-                updateRequirement(uppercaseReq, hasUppercase);
-                updateRequirement(lowercaseReq, hasLowercase);
-                updateRequirement(numberReq, hasNumber);
-                updateRequirement(specialReq, hasSpecial);
-                
-                // Calculate strength
-                if (hasLength) strength++;
-                if (hasUppercase) strength++;
-                if (hasLowercase) strength++;
-                if (hasNumber) strength++;
-                if (hasSpecial) strength++;
-                
-                // Reset classes
-                passwordStrengthBar.className = 'password-strength-bar';
-                
-                // Set strength level
-                if (strength <= 1) {
-                    passwordStrengthBar.classList.add('strength-weak');
-                } else if (strength === 2) {
-                    passwordStrengthBar.classList.add('strength-medium');
-                } else if (strength === 3 || strength === 4) {
-                    passwordStrengthBar.classList.add('strength-strong');
-                } else if (strength >= 5) {
-                    passwordStrengthBar.classList.add('strength-very-strong');
+                if (value.length === 0) {
+                    passwordStrengthBar.className = 'password-strength-bar'; 
+                    passwordStrengthBar.style.width = '0%';
+                    
+                    for(let key in reqs) {
+                        updateRequirement(reqs[key], false);
+                    }
+                    return; 
                 }
+
+                passwordStrengthBar.style.width = ''; 
+
+                let strength = 0;
+                const checks = {
+                    length: value.length >= 8 && value.length <= 15,
+                    upper: /[A-Z]/.test(value),
+                    lower: /[a-z]/.test(value),
+                    number: /[0-9]/.test(value),
+                    special: /[^A-Za-z0-9]/.test(value)
+                };
+                
+                for(let key in checks) {
+                    updateRequirement(reqs[key], checks[key]);
+                    if(checks[key]) strength++;
+                }
+                
+                passwordStrengthBar.className = 'password-strength-bar';
+                if (strength <= 1) passwordStrengthBar.classList.add('strength-weak');
+                else if (strength === 2) passwordStrengthBar.classList.add('strength-medium');
+                else if (strength === 3 || strength === 4) passwordStrengthBar.classList.add('strength-strong');
+                else if (strength >= 5) passwordStrengthBar.classList.add('strength-very-strong');
             });
-            
-            // Update requirement indicator
+
             function updateRequirement(element, isValid) {
                 if (isValid) {
                     element.classList.remove('invalid');
@@ -654,111 +686,76 @@ include 'header_UI.php';
                 }
             }
             
-            // Real-time validation
-            function validateEmail() {
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (email.value && !emailRegex.test(email.value)) {
-                    email.classList.add('error');
-                    return false;
-                } else {
-                    email.classList.remove('error');
-                    return true;
-                }
-            }
-            
-            function validatePassword() {
-                if (password.value.length < 8) {
-                    password.classList.add('error');
-                    return false;
-                } else {
-                    password.classList.remove('error');
-                    return true;
-                }
-            }
-            
-            function validateConfirmPassword() {
-                if (confirmPassword.value && password.value !== confirmPassword.value) {
-                    confirmPassword.classList.add('error');
-                    return false;
-                } else {
-                    confirmPassword.classList.remove('error');
-                    return true;
-                }
-            }
-            
-            // Validate all fields
-            function validateForm() {
-                let isValid = true;
-                
-                // Check all required fields
-                const requiredFields = form.querySelectorAll('[required]');
-                requiredFields.forEach(field => {
-                    if (!field.value.trim()) {
-                        field.classList.add('error');
-                        isValid = false;
-                    } else {
-                        field.classList.remove('error');
-                    }
-                });
-                
-                // Validate specific fields
-                if (!validateEmail()) isValid = false;
-                if (!validatePassword()) isValid = false;
-                if (!validateConfirmPassword()) isValid = false;
-                
-                // Validate terms agreement
-                const terms = document.getElementById('terms');
-                if (!terms.checked) {
-                    alert('You must agree to the Terms and Conditions.');
-                    isValid = false;
-                }
-                
-                return isValid;
-            }
-            
-            // Event listeners for real-time validation
-            email.addEventListener('blur', validateEmail);
-            password.addEventListener('blur', validatePassword);
-            confirmPassword.addEventListener('blur', validateConfirmPassword);
-            
-            // Form submission validation
-            form.addEventListener('submit', function(e) {
-                // Validate all fields before submission
-                if (!validateForm()) {
-                    e.preventDefault();
-                    alert('Please correct the errors before submitting.');
-                    return;
-                }
-                
-                // Check if email and confirm email match
-                if (password.value !== confirmPassword.value) {
-                    e.preventDefault();
-                    alert('Passwords do not match.');
-                    return;
-                }
-                
-                // Validate terms agreement
-                const terms = document.getElementById('terms');
-                if (!terms.checked) {
-                    e.preventDefault();
-                    alert('You must agree to the Terms and Conditions.');
-                    return;
-                }
-            });
-            
-            // Auto-format contact number
-            const contactInput = document.getElementById('contact');
             contactInput.addEventListener('input', function(e) {
                 let value = e.target.value.replace(/\D/g, '');
-                
-                if (value.length > 3) {
-                    value = value.substring(0, 3) + '-' + value.substring(3);
-                }
-                if (value.length > 12) {
-                    value = value.substring(0, 12);
-                }
-                
+                if (value.length > 3) value = value.substring(0, 3) + '-' + value.substring(3);
+                if (value.length > 12) value = value.substring(0, 12);
                 e.target.value = value;
+            });
+
+            // --- 3. FINAL SUBMISSION HANDLER ---
+            form.addEventListener('submit', function(e) {
+                let isValid = true;
+                
+                // A. Check Empty Fields (这里会把 Confirm Password 设为 Error)
+                const requiredInputs = [
+                    { input: nameInput, errorId: 'nameError', msg: 'Full Name is required.' },
+                    { input: dobInput, errorId: 'dobError', msg: 'Date of Birth is required.' },
+                    { input: contactInput, errorId: 'contactError', msg: 'Contact Number is required.' },
+                    { input: email, errorId: 'emailError', msg: 'Email Address is required.' },
+                    { input: password, errorId: 'passwordError', msg: 'Password is required.' },
+                    { input: confirmPassword, errorId: 'confirmPasswordError', msg: 'Please confirm your password.' }
+                ];
+
+                requiredInputs.forEach(item => {
+                    if (!item.input.value.trim()) {
+                        item.input.classList.add('error');
+                        setFieldState(item.errorId, true, item.msg);
+                        isValid = false;
+                    } else {
+                         item.input.classList.remove('error');
+                         setFieldState(item.errorId, false);
+                    }
+                });
+
+                if (!validateAge()) isValid = false;
+                if (!validateEmail()) isValid = false;
+                if (!validateName()) isValid = false;
+                
+                // 【重点修改】只有当 Confirm Password 不为空时，才进行“匹配检查”
+                // 如果它是空的，上面的 requiredInputs 循环已经报错了，我们不要让 checkPasswordMatch 把它覆盖掉
+                if (confirmPassword.value.trim() !== "") {
+                    if (!checkPasswordMatch()) isValid = false;
+                }
+                
+                if (!validateContact()) isValid = false;
+
+                const invalidReqs = document.querySelectorAll('.requirement-item.invalid');
+                if (invalidReqs.length > 0 && password.value) {
+                    password.classList.add('error');
+                    setFieldState('passwordError', true, "Please meet all password requirements.");
+                    isValid = false;
+                }
+
+                if (!termsInput.checked) {
+                    setFieldState('termsError', true);
+                    isValid = false;
+                } else {
+                    setFieldState('termsError', false);
+                }
+
+                if (!isValid) {
+                    e.preventDefault(); 
+                    const firstError = document.querySelector('.form-control.error, .field-error-msg.visible');
+                    if (firstError) {
+                        firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        if (firstError.tagName === 'INPUT') firstError.focus();
+                        else {
+                             const prevInput = firstError.parentElement.querySelector('input');
+                             if(prevInput) prevInput.focus();
+                        }
+                    }
+                }
             });
         });
     </script>

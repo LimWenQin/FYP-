@@ -352,7 +352,12 @@ include 'header_UI.php';
                     <div class="info-icon">📞</div>
                     <div class="info-details">
                         <h4>Phone Number</h4>
-                        <p>+603-1234 5678<br>Monday - Friday, 9:00 AM - 6:00 PM</p>
+                      <a href="https://wa.me/601111190233" target="_blank">
+                    
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                  
+                    +60 11-1119 0233
+                </a><br>Monday - Friday, 9:00 AM - 6:00 PM</p>
                     </div>
                 </div>
                 
@@ -360,7 +365,7 @@ include 'header_UI.php';
                     <div class="info-icon">✉️</div>
                     <div class="info-details">
                         <h4>Email Address</h4>
-                        <p>info@lovebridge.org.my<br>donations@lovebridge.org.my</p>
+                        <a href="mailto:lovebridge1201@gmail.com">lovebridge1201@gmail.com</a>
                     </div>
                 </div>
                 
