@@ -158,7 +158,8 @@ function handleMultipleImageUpload($files) {
 }
 
 // --- VALIDATION HELPER (Server Side) ---
-function validateCaseInput($post) {
+// Added $mode parameter to distinguish between 'add' and 'edit'
+function validateCaseInput($post, $mode = 'add') {
     if (preg_match('/\d/', $post['contact_name'])) return "Contact Name cannot contain numbers.";
     if (!empty($post['case_organizer']) && preg_match('/\d/', $post['case_organizer'])) return "Organizer Name cannot contain numbers.";
 
@@ -169,16 +170,36 @@ function validateCaseInput($post) {
     $startDate = new DateTime($post['start_date']);
     $endDate = new DateTime($post['end_date']);
     
+    // Normalize today for comparison (set time to 00:00:00)
+    $today = new DateTime();
+    $today->setTime(0, 0, 0); 
+    
+    // Check 1: End Date vs Start Date
     if ($endDate < $startDate) {
         return "End Date cannot be earlier than Start Date.";
     }
+
+    // Check 2: Start Date vs Today (Only for NEW cases)
+    // For 'edit', we allow past dates because the case might have started already.
+    if ($mode === 'add') {
+        if ($startDate < $today) {
+            return "Start Date cannot be before the current date.";
+        }
+    }
+
+    // Check 3: Validation for Target Amount
+    if (floatval($post['target_amount']) < 0) {
+        return "Target Amount cannot be negative.";
+    }
+
     return true;
 }
 
 // --- ADD LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
     
-    $validation = validateCaseInput($_POST);
+    // Pass 'add' mode
+    $validation = validateCaseInput($_POST, 'add');
     if ($validation !== true) {
         header("Location: special_case_management.php?error=" . urlencode($validation));
         exit();
@@ -239,7 +260,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
 // --- UPDATE LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_special_case'])) {
     
-    $validation = validateCaseInput($_POST);
+    // Pass 'edit' mode to allow past start dates for existing cases
+    $validation = validateCaseInput($_POST, 'edit');
     if ($validation !== true) {
         header("Location: special_case_management.php?error=" . urlencode($validation));
         exit();
@@ -742,7 +764,8 @@ $allCaseImagesMap = [];
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Target Amount (RM) <span class="required">*</span></label>
-                            <input type="number" id="add_target_amount" name="target_amount" class="form-input" step="0.01" min="1" required placeholder="e.g. 50000">
+                            <input type="number" id="add_target_amount" name="target_amount" class="form-input" step="0.01" min="0" required placeholder="e.g. 50000">
+                            <div id="add_amount_error" class="error-message">Cannot be negative.</div>
                             <span class="form-guide">Total funds required for this case.</span>
                         </div>
                         <div class="form-group">
@@ -759,7 +782,7 @@ $allCaseImagesMap = [];
                     <div class="form-row">
                          <div class="form-group">
                             <label class="form-label">Start Date <span class="required">*</span></label>
-                            <input type="date" id="add_start_date" name="start_date" class="form-input" required>
+                            <input type="date" id="add_start_date" name="start_date" class="form-input" required min="<?php echo date('Y-m-d'); ?>">
                             <span class="form-guide">When the campaign or assistance starts.</span>
                         </div>
                         <div class="form-group">
@@ -873,7 +896,8 @@ $allCaseImagesMap = [];
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Target Amount (RM) <span class="required">*</span></label>
-                            <input type="number" id="edit_target_amount" name="target_amount" class="form-input" step="0.01" required>
+                            <input type="number" id="edit_target_amount" name="target_amount" class="form-input" step="0.01" min="0" required>
+                            <div id="edit_amount_error" class="error-message">Cannot be negative.</div>
                             <span class="form-guide">Fundraising goal.</span>
                         </div>
                         <div class="form-group">
@@ -1298,6 +1322,29 @@ $allCaseImagesMap = [];
                     errors.push("End Date cannot be earlier than Start Date.");
                     isValid = false;
                 }
+            }
+            
+            // --- NEW: Start Date Validation (Can't be past) ---
+            // Only check this for 'add' mode, to allow editing existing cases.
+            if (type === 'add' && start) {
+                const startDate = new Date(start);
+                const today = new Date();
+                today.setHours(0,0,0,0); // Normalize today to midnight
+                
+                if(startDate < today) {
+                     errors.push("Start Date cannot be in the past.");
+                     isValid = false;
+                }
+            }
+            
+            // --- NEW: Target Amount Validation ---
+            const amountVal = document.getElementById(prefix + '_target_amount').value;
+            if (amountVal && parseFloat(amountVal) < 0) {
+                 if(document.getElementById(prefix + '_amount_error')) document.getElementById(prefix + '_amount_error').style.display = 'block';
+                 errors.push("Target Amount cannot be negative.");
+                 isValid = false;
+            } else {
+                 if(document.getElementById(prefix + '_amount_error')) document.getElementById(prefix + '_amount_error').style.display = 'none';
             }
 
             // 3. Name Validation (No Numbers)

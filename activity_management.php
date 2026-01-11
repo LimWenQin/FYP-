@@ -133,7 +133,8 @@ function handleMultiImageUpload($files) {
 }
 
 // --- SERVER-SIDE VALIDATION HELPER ---
-function validateActivityInput($post) {
+// Added $mode parameter to distinguish between 'add' and 'edit'
+function validateActivityInput($post, $mode = 'add') {
     // 1. Name Check (No numbers allowed in Name or Organizer)
     if (preg_match('/\d/', $post['contact_name'])) return "Contact Name cannot contain numbers.";
     if (!empty($post['organizer']) && preg_match('/\d/', $post['organizer'])) return "Organizer Name cannot contain numbers.";
@@ -148,6 +149,10 @@ function validateActivityInput($post) {
     $endDate = new DateTime($post['end_date']);
     $now = new DateTime();
     
+    // Normalize "now" to today at midnight for comparison
+    $today = new DateTime();
+    $today->setTime(0, 0, 0); 
+
     // Start date cannot be more than 1 year from today
     $oneYearLimit = (clone $now)->modify('+1 year');
     if ($startDate > $oneYearLimit) {
@@ -160,8 +165,26 @@ function validateActivityInput($post) {
         return "Activity duration cannot exceed 1 year.";
     }
     
+    // End date must be after start date
     if ($endDate < $startDate) {
         return "End Date cannot be earlier than Start Date.";
+    }
+
+    // --- NEW: Start Date cannot be in the past (Only for 'add' mode) ---
+    // We skip this check for 'edit' so you can update old events without error
+    if ($mode === 'add') {
+        if ($startDate < $today) {
+            return "Start Date cannot be before the current date.";
+        }
+    }
+
+    // 4. Numeric Checks (Target Amount & Max Participants)
+    if (floatval($post['target_amount']) < 0) {
+        return "Target Amount cannot be negative.";
+    }
+
+    if (intval($post['max_participants']) < 0) {
+        return "Max Participants cannot be negative (Enter 0 for unlimited).";
     }
 
     return true; // Valid
@@ -170,8 +193,8 @@ function validateActivityInput($post) {
 // --- ADD ACTIVITY LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
     
-    // Server Validation First
-    $validation = validateActivityInput($_POST);
+    // Server Validation First (Pass 'add' mode)
+    $validation = validateActivityInput($_POST, 'add');
     if ($validation !== true) {
         header("Location: activity_management.php?error=" . urlencode($validation));
         exit();
@@ -247,8 +270,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
 // --- UPDATE ACTIVITY LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
     
-    // Server Validation
-    $validation = validateActivityInput($_POST);
+    // Server Validation (Pass 'edit' mode)
+    $validation = validateActivityInput($_POST, 'edit');
     if ($validation !== true) {
         header("Location: activity_management.php?error=" . urlencode($validation));
         exit();
@@ -743,7 +766,8 @@ $allActivityImagesMap = [];
                         </div>
                         <div class="form-group">
                             <label class="form-label">Max Participants <span class="required">*</span></label>
-                            <input type="number" id="add_max_participants" name="max_participants" class="form-input" placeholder="0 for unlimited" required>
+                            <input type="number" id="add_max_participants" name="max_participants" class="form-input" placeholder="0 for unlimited" min="0" required>
+                            <div id="add_participants_error" class="error-message">Cannot be negative.</div>
                             <span class="form-guide">Limit the number of attendees (0 means no limit).</span>
                         </div>
                     </div>
@@ -751,7 +775,7 @@ $allActivityImagesMap = [];
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Start Date <span class="required">*</span></label>
-                            <input type="date" id="add_start_date" name="start_date" class="form-input" required>
+                            <input type="date" id="add_start_date" name="start_date" class="form-input" required min="<?php echo date('Y-m-d'); ?>">
                             <span class="form-guide">Date when the activity begins.</span>
                         </div>
                         <div class="form-group">
@@ -888,12 +912,13 @@ $allActivityImagesMap = [];
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Target (RM) <span class="required">*</span></label>
-                            <input type="number" id="edit_target_amount" name="target_amount" class="form-input" step="0.01" required><div id="edit_amount_error" class="error-message">Cannot be negative.</div>
+                            <input type="number" id="edit_target_amount" name="target_amount" class="form-input" step="0.01" min="0" required><div id="edit_amount_error" class="error-message">Cannot be negative.</div>
                             <span class="form-guide">Update the fundraising goal.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Max Participants <span class="required">*</span></label>
-                            <input type="number" id="edit_max_participants" name="max_participants" class="form-input" required>
+                            <input type="number" id="edit_max_participants" name="max_participants" class="form-input" min="0" required>
+                            <div id="edit_participants_error" class="error-message">Cannot be negative.</div>
                             <span class="form-guide">Update participant limit (0 for unlimited).</span>
                         </div>
                     </div>
@@ -961,7 +986,7 @@ $allActivityImagesMap = [];
                         <div class="form-group">
                             <label class="form-label">Address 2 <span class="required">*</span></label>
                             <input type="text" id="edit_address2" name="address2" class="form-input" required>
-                            <span class="form-guide">Residential area, village, or section.</span>
+                            <span class="form-guide">Residential area, Taman, or Section.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Address 3</label>
@@ -1223,6 +1248,16 @@ $allActivityImagesMap = [];
                     errors.push("Activity duration cannot exceed 1 year."); 
                     isValid = false; 
                 }
+
+                // --- NEW: Start Date cannot be in the past (Only for 'add' mode) ---
+                if (prefix === 'add') {
+                    const todayMid = new Date();
+                    todayMid.setHours(0,0,0,0);
+                    if (sDate < todayMid) {
+                        errors.push("Start Date cannot be before today.");
+                        isValid = false;
+                    }
+                }
             }
 
             // 3. Amount Validation
@@ -1232,7 +1267,22 @@ $allActivityImagesMap = [];
                 isValid = false;
             }
 
-            // 4. Name Validation (No Numbers)
+            // 4. Max Participants Validation
+            const partId = prefix + '_max_participants';
+            const partVal = document.getElementById(partId).value;
+            // Assuming IDs: add_participants_error / edit_participants_error
+            const partErrId = prefix + '_participants_error';
+            const partErrDiv = document.getElementById(partErrId);
+
+            if (partVal && parseInt(partVal) < 0) {
+                if(partErrDiv) partErrDiv.style.display = 'block';
+                errors.push("Max Participants cannot be negative.");
+                isValid = false;
+            } else {
+                if(partErrDiv) partErrDiv.style.display = 'none';
+            }
+
+            // 5. Name Validation (No Numbers)
             const organizerName = document.getElementById(prefix + '_organizer').value;
             const contactName = document.getElementById(prefix + '_contact_name').value;
             
@@ -1245,7 +1295,7 @@ $allActivityImagesMap = [];
                 isValid = false;
             }
 
-            // 5. Email Validation
+            // 6. Email Validation
             const emailId = prefix + '_contact_email';
             const emailErrId = prefix + 'EmailError';
             const emailVal = document.getElementById(emailId).value;
