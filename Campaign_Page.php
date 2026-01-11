@@ -48,8 +48,6 @@ include 'header_UI.php';
         
         /* Header Styles */
         .campaign-header {
-
-            /* 修改部分：背景图片 + 红色遮罩 */
             background: linear-gradient(rgb(108 99 98 / 85%), rgb(108 99 98 / 85%)), url(https://images.unsplash.com/photo-1559027615-cd4628902d4a?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80);
             background-size: cover;
             background-position: center;
@@ -529,14 +527,33 @@ include 'header_UI.php';
                     <div class="campaign-card" data-status="<?php echo $campaignStatus; ?>">
                         <div style="position: relative;">
                             <?php 
-                            $imagePath = !empty($campaign['Activity_Picture']) ? $campaign['Activity_Picture'] : 'images/campaign-default.jpg';
-                            // 检查图片是否存在 (可选)
-                            // if (!file_exists($imagePath)) $imagePath = 'images/campaign-default.jpg';
+                            // --- 修改开始：JSON 图片处理逻辑 ---
+                            $defaultImage = 'images/campaign-default.jpg';
+                            $imagePath = $defaultImage;
+                            
+                            // 优先读取 Activity_Images (数据库实际存 JSON 的列)
+                            // 备用读取 Activity_Picture (兼容旧代码可能的列名)
+                            $dbImage = isset($campaign['Activity_Images']) ? $campaign['Activity_Images'] : (isset($campaign['Activity_Picture']) ? $campaign['Activity_Picture'] : '');
+
+                            if (!empty($dbImage)) {
+                                // 尝试解码 JSON
+                                $decoded = json_decode($dbImage, true);
+                                
+                                // 如果是有效的数组且不为空，取第一张
+                                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded) && count($decoded) > 0) {
+                                    $imagePath = $decoded[0];
+                                } 
+                                // 否则如果是字符串（旧数据），直接使用
+                                else {
+                                    $imagePath = $dbImage;
+                                }
+                            }
+                            // --- 修改结束 ---
                             ?>
                             <img src="<?php echo htmlspecialchars($imagePath); ?>" 
                                  alt="<?php echo htmlspecialchars($campaign['Activity_Name']); ?>" 
                                  class="campaign-image"
-                                 onerror="this.src='images/campaign-default.jpg'">
+                                 onerror="this.onerror=null; this.src='<?php echo $defaultImage; ?>'">
                             
                             <span class="campaign-badge <?php echo $badgeClass; ?>">
                                 <?php echo $badgeText; ?>
@@ -555,7 +572,7 @@ include 'header_UI.php';
                             
                             <h3 class="campaign-title"><?php echo htmlspecialchars($campaign['Activity_Name']); ?></h3>
                             
-                            <p class="campaign-details"><?php echo htmlspecialchars($campaign['Activity_Details']); ?></p>
+                            <p class="campaign-details"><?php echo htmlspecialchars($campaign['Activity_Description']); // 注意：数据库通常是 Description 不是 Details ?></p>
                             
                             <div class="campaign-location">
                                 <i class="fas fa-map-marker-alt"></i>
