@@ -279,7 +279,7 @@ include 'header_UI.php';
                                 <li><strong>Credit & Debit Cards</strong> (Visa, MasterCard, etc.)</li>
                                 <li><strong>E-Wallets</strong> (Touch 'n Go, GrabPay, Boost, etc.)</li>
                                 <li><strong>Love Bridge Wallet</strong> (Use your account balance directly)</li>
-                                <li>Online Banking (FPX)</li>
+                               
                             </ul>
                             <p>Choose the method that is most convenient for you at checkout.</p>
                         </div>
@@ -313,66 +313,9 @@ include 'header_UI.php';
                 </div>
             </div>
             
-            <div class="faq-category">
-                <div class="category-title">
-                    <div class="category-icon">
-                        <i class="fas fa-hands-helping"></i>
-                    </div>
-                    <h2>Campaign Questions</h2>
-                </div>
+            
                 
-                <div class="faq-list">
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            <span>How are campaigns selected and verified?</span>
-                            <i class="fas fa-chevron-down"></i>
-                        </div>
-                        <div class="faq-answer">
-                            <p>All campaigns on Love Bridge go through a rigorous verification process:</p>
-                            <ul>
-                                <li>Initial application and background check</li>
-                                <li>Documentation verification (medical reports, financial needs, etc.)</li>
-                                <li>Interview with our campaign review team</li>
-                                <li>Regular updates and accountability checks</li>
-                            </ul>
-                            <p>We strive to ensure that every campaign represents a genuine need and that funds are used appropriately.</p>
-                        </div>
-                    </div>
-                    
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            <span>What happens if a campaign exceeds its fundraising goal?</span>
-                            <i class="fas fa-chevron-down"></i>
-                        </div>
-                        <div class="faq-answer">
-                            <p>If a campaign exceeds its fundraising goal, the additional funds are used in one of two ways:</p>
-                            <ul>
-                                <li>For the beneficiary's ongoing needs (if related to the original cause)</li>
-                                <li>Directed to our General Fund to support other urgent cases</li>
-                            </ul>
-                            <p>Donors to that specific campaign will be notified if surplus funds are redirected to the General Fund.</p>
-                        </div>
-                    </div>
-                    
-                    <div class="faq-item">
-                        <div class="faq-question">
-                            <span>How can I start my own fundraising campaign?</span>
-                            <i class="fas fa-chevron-down"></i>
-                        </div>
-                        <div class="faq-answer">
-                            <p>To start a campaign:</p>
-                            <ol>
-                                <li>Create a donor account on Love Bridge</li>
-                                <li>Click "Start a Campaign" in your profile</li>
-                                <li>Complete the application form with all required information</li>
-                                <li>Submit supporting documents</li>
-                                <li>Our team will review your application within 3-5 business days</li>
-                            </ol>
-                            <p>Once approved, you can launch your campaign and start fundraising!</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+              
             
             <div class="faq-category">
                 <div class="category-title">
@@ -392,9 +335,9 @@ include 'header_UI.php';
                             <p>To update your profile:</p>
                             <ul>
                                 <li>Log in to your Love Bridge account</li>
-                                <li>Click on "Profile" in the navigation menu</li>
-                                <li>Select "Edit Profile"</li>
-                                <li>Update your information and click "Save Changes"</li>
+                                <li>Click on "Account" in the navigation header</li>
+                                <li>Select "Profile"</li>
+                                <li>Update your information and click "Update Profile"</li>
                             </ul>
                             <p>If you have trouble accessing your account, use the "Forgot Password" link on the login page.</p>
                         </div>
@@ -411,7 +354,7 @@ include 'header_UI.php';
                                 <li>Log in to your account</li>
                                 <li>Go to "Profile" and select "Donation History"</li>
                                 <li>You'll see a list of all your donations with dates, amounts, and campaign details</li>
-                                <li>You can filter by date range or download your donation history as a PDF</li>
+                                <li>You can receive your donation history as a PDF in your email</li>
                             </ol>
                         </div>
                     </div>
@@ -425,7 +368,8 @@ include 'header_UI.php';
                             <p>We're sorry to see you go! To delete your account:</p>
                             <ul>
                                 <li>Log in to your profile</li>
-                                <li>Go to "Account Settings"</li>
+                                <li>Go to "Account"</li>
+                                <li>Select Profile</li>
                                 <li>Scroll to the bottom and click "Delete Account"</li>
                                 <li>Confirm your decision</li>
                             </ul>
@@ -442,10 +386,10 @@ include 'header_UI.php';
                 <p>Our support team is here to help you with any questions you may have about Love Bridge.</p>
                 
                 <div class="contact-buttons">
-                    <a href="mailto:lovebridge1201@gmail.com" class="contact-btn">
+                    <a href="mailto:support@lovebridge.org" class="contact-btn">
                         <i class="fas fa-envelope"></i> Email Us
                     </a>
-                   <a href="https://wa.me/601111190233" target="_blank" class="contact-btn">
+                    <a href="tel:+60123456789" class="contact-btn">
                         <i class="fas fa-phone"></i> Call Us
                     </a>
                     <a href="Contact_Us.php" class="contact-btn">

@@ -2,10 +2,10 @@
 -- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
--- Host: 127.0.0.1
--- Generation Time: Jan 06, 2026 at 07:54 AM
--- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- 主机： 127.0.0.1
+-- 生成日期： 2026-01-11 06:09:47
+-- 服务器版本： 10.4.32-MariaDB
+-- PHP 版本： 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -18,13 +18,13 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `donation_system`
+-- 数据库： `donation_system`
 --
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `achievement`
+-- 表的结构 `achievement`
 --
 
 CREATE TABLE `achievement` (
@@ -38,17 +38,23 @@ CREATE TABLE `achievement` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `activity`
+-- 表的结构 `activity`
 --
 
 CREATE TABLE `activity` (
   `Activity_ID` int(11) NOT NULL,
   `Activity_Name` varchar(255) NOT NULL DEFAULT 'Default Activity Name',
+  `Activity_Venue` varchar(255) DEFAULT NULL,
   `Activity_Date` date DEFAULT NULL,
   `Activity_StartDate` date DEFAULT NULL,
   `Activity_EndDate` date DEFAULT NULL,
-  `Activity_Details` text NOT NULL,
-  `Activity_Picture` varchar(255) DEFAULT NULL,
+  `Activity_Description` text DEFAULT NULL,
+  `Activity_Organizer` varchar(100) DEFAULT NULL,
+  `Activity_Contact_Name` varchar(100) DEFAULT NULL,
+  `Activity_Contact_Number` varchar(20) DEFAULT NULL,
+  `Activity_Contact_Email` varchar(100) DEFAULT NULL,
+  `Activity_Max_Participants` int(11) DEFAULT 0,
+  `Activity_Images` longtext DEFAULT NULL,
   `Activity_Status` varchar(50) NOT NULL,
   `Activity_GetAmount` decimal(10,2) NOT NULL,
   `Activity_TargetAmount` decimal(10,2) DEFAULT 0.00,
@@ -63,20 +69,38 @@ CREATE TABLE `activity` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `activity`
+-- 转存表中的数据 `activity`
 --
 
-INSERT INTO `activity` (`Activity_ID`, `Activity_Name`, `Activity_Date`, `Activity_StartDate`, `Activity_EndDate`, `Activity_Details`, `Activity_Picture`, `Activity_Status`, `Activity_GetAmount`, `Activity_TargetAmount`, `Activity_Address1`, `Activity_Address2`, `Activity_Address3`, `Activity_City`, `Activity_State`, `Activity_PostalCode`, `Activity_Country`, `Branch_ID`) VALUES
-(1, 'Charity Fun Run 2025', NULL, '2025-12-20', '2025-12-25', 'A 5km run to raise funds for local orphanages. Join us for a healthy morning!', NULL, 'Cancelled', 12500.00, 50000.00, 'Dataran Merdeka', '', '', 'Kuala Lumpur', 'Kuala Lumpur', '50050', 'Malaysia', 1),
-(2, 'Beach Cleanup Drive', NULL, '2025-11-01', '2025-11-02', 'Cleaning up Batu Ferringhi beach to protect marine life. Volunteers needed.', NULL, 'Completed', 5000.00, 5000.00, 'Batu Ferringhi Public Beach', NULL, NULL, 'Batu Ferringhi', 'Penang', '11100', 'Malaysia', 2),
-(3, 'Soup Kitchen Weekly', NULL, '2026-01-10', '2026-01-10', 'Distributing warm meals to the homeless community in Chow Kit area.', NULL, 'Active', 0.00, 2000.00, 'Jalan Chow Kit', NULL, NULL, 'Kuala Lumpur', 'Kuala Lumpur', '50300', 'Malaysia', 1),
-(4, 'Flood Relief Mission', NULL, '2025-10-15', '2025-10-20', 'Emergency relief for flood victims in the East Coast. Collecting dry food and clothes.', NULL, 'Completed', 85000.00, 100000.00, 'Community Hall', NULL, NULL, 'Kuantan', 'Pahang', '25000', 'Malaysia', 1),
-(5, 'Senior Care Visit', NULL, '2025-12-15', '2025-12-18', 'Spending time with the elderly, playing games, and providing medical checkups.', NULL, 'Active', 4500.00, 8000.00, 'Rumah Kasih Sayang', NULL, NULL, 'Petaling Jaya', 'Selangor', '46000', 'Malaysia', 1);
+INSERT INTO `activity` (`Activity_ID`, `Activity_Name`, `Activity_Venue`, `Activity_Date`, `Activity_StartDate`, `Activity_EndDate`, `Activity_Description`, `Activity_Organizer`, `Activity_Contact_Name`, `Activity_Contact_Number`, `Activity_Contact_Email`, `Activity_Max_Participants`, `Activity_Images`, `Activity_Status`, `Activity_GetAmount`, `Activity_TargetAmount`, `Activity_Address1`, `Activity_Address2`, `Activity_Address3`, `Activity_City`, `Activity_State`, `Activity_PostalCode`, `Activity_Country`, `Branch_ID`) VALUES
+(1, 'Charity Fun Run 2025', NULL, NULL, '2025-12-20', '2025-12-25', 'A 5km run to raise funds for local orphanages. Join us for a healthy morning!', NULL, NULL, NULL, NULL, 0, NULL, 'Cancelled', 12500.00, 50000.00, 'Dataran Merdeka', '', '', 'Kuala Lumpur', 'Kuala Lumpur', '50050', 'Malaysia', 1),
+(2, 'Beach Cleanup Drive', NULL, NULL, '2025-11-01', '2025-11-02', 'Cleaning up Batu Ferringhi beach to protect marine life. Volunteers needed.', NULL, NULL, NULL, NULL, 0, NULL, 'Completed', 5000.00, 5000.00, 'Batu Ferringhi Public Beach', NULL, NULL, 'Batu Ferringhi', 'Penang', '11100', 'Malaysia', 2),
+(3, 'Soup Kitchen Weekly', NULL, NULL, '2026-01-10', '2026-01-10', 'Distributing warm meals to the homeless community in Chow Kit area.', NULL, NULL, NULL, NULL, 0, '[\"uploads\\/activities\\/act_1767981044_69613ff450bc2_0.png\",\"uploads\\/activities\\/act_1767981044_69613ff450dba_1.png\",\"uploads\\/activities\\/act_1767981044_69613ff451081_2.png\",\"uploads\\/activities\\/act_1767981044_69613ff4513e4_3.png\"]', 'Active', 0.00, 2000.00, 'Jalan Chow Kit', '', '', 'Kuala Lumpur', 'Kuala Lumpur', '50300', 'Malaysia', 1),
+(4, 'Flood Relief Mission', NULL, NULL, '2025-10-15', '2025-10-20', 'Emergency relief for flood victims in the East Coast. Collecting dry food and clothes.', NULL, NULL, NULL, NULL, 0, NULL, 'Completed', 85000.00, 100000.00, 'Community Hall', NULL, NULL, 'Kuantan', 'Pahang', '25000', 'Malaysia', 1),
+(5, 'Senior Care Visit', NULL, NULL, '2025-12-15', '2025-12-18', 'Spending time with the elderly, playing games, and providing medical checkups.', NULL, NULL, NULL, NULL, 0, NULL, 'Active', 4500.00, 8000.00, 'Rumah Kasih Sayang', NULL, NULL, 'Petaling Jaya', 'Selangor', '46000', 'Malaysia', 1);
+
+--
+-- 触发器 `activity`
+--
+DELIMITER $$
+CREATE TRIGGER `notify_activity_insert` AFTER INSERT ON `activity` FOR EACH ROW BEGIN
+    INSERT INTO `admin_notifications` (`Message`, `Type`, `Link`, `Is_Read`, `Created_At`) 
+    VALUES (CONCAT('New Activity Created: ', NEW.Activity_Name), 'Target', 'activity_management.php', 0, NOW());
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `notify_activity_update` AFTER UPDATE ON `activity` FOR EACH ROW BEGIN
+    INSERT INTO `admin_notifications` (`Message`, `Type`, `Link`, `Is_Read`, `Created_At`) 
+    VALUES (CONCAT('Activity Updated: ', NEW.Activity_Name), 'Update', 'activity_management.php', 0, NOW());
+END
+$$
+DELIMITER ;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `admin`
+-- 表的结构 `admin`
 --
 
 CREATE TABLE `admin` (
@@ -85,7 +109,7 @@ CREATE TABLE `admin` (
   `Admin_ContactNumber` varchar(20) NOT NULL,
   `Admin_ICNUMBER` varchar(20) NOT NULL,
   `Admin_Email` varchar(100) NOT NULL,
-  `Admin_Password` varchar(255) NOT NULL,
+  `Admin_Password` varchar(255) DEFAULT NULL,
   `Admin_DOB` date NOT NULL,
   `Admin_Address1` varchar(255) NOT NULL,
   `Admin_Address2` varchar(255) DEFAULT NULL,
@@ -103,22 +127,24 @@ CREATE TABLE `admin` (
   `Admin_Comment` text NOT NULL,
   `Admin_LoginAttempts` int(11) DEFAULT 0,
   `Admin_LastFailedLogin` datetime DEFAULT NULL,
-  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted'
+  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted',
+  `Admin_IsFirstLogin` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `admin`
+-- 转存表中的数据 `admin`
 --
 
-INSERT INTO `admin` (`Admin_ID`, `Admin_Name`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address1`, `Admin_Address2`, `Admin_Address3`, `Admin_City`, `Admin_State`, `Admin_PostalCode`, `Admin_Country`, `Admin_ProfilePicture`, `Admin_Role`, `Admin_Status`, `Admin_LastLogin`, `Admin_CreatedAt`, `Admin_UpdatedAt`, `Admin_Comment`, `Admin_LoginAttempts`, `Admin_LastFailedLogin`, `Is_Deleted`) VALUES
-(1, 'Super Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Level 12', 'Menara Love Bridge', 'Jalan Charity', 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', '2025-12-06 20:35:49', '2025-11-28 12:00:00', '2025-12-10 21:15:44', 'System Super Administrator', 5, '2025-12-10 21:15:44', 0),
-(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$bL3GDvE//gV.k149JNo6rejq/rwqubykoY3eMULa9vrndOYWFMjq.', '2003-05-17', '11， jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', 'uploads/admins/admin_1765013470_6933f7de52098.jpg', 'Super Admin', 'Active', '2026-01-05 21:44:14', '2025-12-06 17:31:10', '2026-01-05 21:44:14', 'Added via admin management system', 0, '2026-01-05 19:43:25', 0),
-(3, 'Tan Choo Yee', '+6019-9878299', '010203-05-1234', 'ujintan218@gmail.com', '$2y$10$5zA9gCym9VbjQDdR0XcxK.de.K7M8mtKAh92m7r2IgOsJ..2Z2MVa', '2001-02-03', 'Blk 914Jurong West Street 91', 'taman bukit beruang utama', '', 'Melaka', 'Melaka', '75450', 'Malaysia', NULL, 'Admin', 'Active', '2025-12-10 21:17:38', '2025-12-07 20:35:18', '2025-12-10 21:17:38', 'Added via admin management system', 0, NULL, 0);
+INSERT INTO `admin` (`Admin_ID`, `Admin_Name`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address1`, `Admin_Address2`, `Admin_Address3`, `Admin_City`, `Admin_State`, `Admin_PostalCode`, `Admin_Country`, `Admin_ProfilePicture`, `Admin_Role`, `Admin_Status`, `Admin_LastLogin`, `Admin_CreatedAt`, `Admin_UpdatedAt`, `Admin_Comment`, `Admin_LoginAttempts`, `Admin_LastFailedLogin`, `Is_Deleted`, `Admin_IsFirstLogin`) VALUES
+(1, 'Super Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Level 12', 'Menara Love Bridge', 'Jalan Charity', 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', '2025-12-06 20:35:49', '2025-11-28 12:00:00', '2025-12-10 21:15:44', 'System Super Administrator', 5, '2025-12-10 21:15:44', 0, 1),
+(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$yRnaaAeLqift7YsGSVjF8.70L7.tQMHtDFrLkD7gbeapVr4KLfHR2', '2003-05-17', '11， jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', 'uploads/profiles/admin_2_1767838052.jpg', 'Super Admin', 'Active', '2026-01-10 20:06:47', '2025-12-06 17:31:10', '2026-01-10 20:06:47', 'Added via admin management system', 0, '2026-01-09 12:17:06', 0, 0),
+(5, 'ujin', '+6019-9878299', '050218-05-1234', 'ujintan218@gmail.com', '$2y$10$1BvJVRIgBpkgfPOpeiXBOulnxttZFxJKfHEOtMyImfaLzjSUvkJhO', '2005-02-18', '', '', '', '', '', '', 'Malaysia', NULL, 'Admin', 'Active', '2026-01-08 22:00:05', '2026-01-08 21:55:12', '2026-01-08 23:33:10', '', 0, NULL, 0, 0),
+(6, 'Lim Wen Qin', '+6011-19848732', '060504-03-0201', 'qinwenlin989@gmail.com', '$2y$10$CpJi2tClyKoRBpDt4sR4B.QRW/yTjENkBVnKLReWKaGGts1eAKAUy', '2006-05-04', '', '', '', '', '', '', 'Malaysia', NULL, 'Admin', 'Active', '2026-01-09 13:47:37', '2026-01-09 13:44:39', '2026-01-09 13:47:57', '', 0, NULL, 0, 0);
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `admin_notifications`
+-- 表的结构 `admin_notifications`
 --
 
 CREATE TABLE `admin_notifications` (
@@ -126,29 +152,34 @@ CREATE TABLE `admin_notifications` (
   `Message` text NOT NULL,
   `Contact_ID` int(11) DEFAULT NULL,
   `Type` varchar(50) NOT NULL,
+  `Link` varchar(255) DEFAULT NULL,
   `Is_Read` tinyint(1) DEFAULT 0,
+  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0,
   `Created_At` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `admin_notifications`
+-- 转存表中的数据 `admin_notifications`
 --
 
-INSERT INTO `admin_notifications` (`AdminNotification_ID`, `Message`, `Contact_ID`, `Type`, `Is_Read`, `Created_At`) VALUES
-(7, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 0, '2026-01-06 00:46:27'),
-(8, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 0, '2026-01-06 00:46:27'),
-(9, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 0, '2026-01-06 00:46:27');
+INSERT INTO `admin_notifications` (`AdminNotification_ID`, `Message`, `Contact_ID`, `Type`, `Link`, `Is_Read`, `Is_Deleted`, `Created_At`) VALUES
+(1, 'New Donor Registered: thong', NULL, 'New_Donor', 'admin_donor_page.php', 0, 0, '2026-01-11 01:09:57');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `branch`
+-- 表的结构 `branch`
 --
 
 CREATE TABLE `branch` (
   `Branch_ID` int(11) NOT NULL,
   `Branch_Name` varchar(100) NOT NULL,
-  `Branch_Type` varchar(50) NOT NULL,
+  `Branch_Head` varchar(100) NOT NULL,
+  `Branch_Head_Contact` varchar(20) DEFAULT NULL,
+  `Branch_Head_Email` varchar(100) DEFAULT NULL,
+  `Branch_Type` enum('Old Folks Home','Orphanage','Disabled Care Center') NOT NULL,
+  `Branch_Capacity` int(11) NOT NULL DEFAULT 0,
+  `Branch_EstablishedDate` date DEFAULT NULL,
   `Branch_Address1` varchar(255) NOT NULL,
   `Branch_Address2` varchar(255) DEFAULT NULL,
   `Branch_Address3` varchar(255) DEFAULT NULL,
@@ -159,27 +190,26 @@ CREATE TABLE `branch` (
   `Branch_ContactNumber` varchar(20) NOT NULL,
   `Branch_Email` varchar(100) NOT NULL,
   `Branch_Description` text NOT NULL,
+  `Branch_Images` text DEFAULT NULL,
   `Admin_ID` int(11) NOT NULL,
-  `Branch_ProfilePicture` varchar(255) DEFAULT NULL,
   `Branch_OperationalStatus` enum('Open','Closed') DEFAULT 'Open',
-  `Branch_TargetAmount` decimal(10,2) DEFAULT 10000.00,
   `Branch_CreatedAt` datetime DEFAULT current_timestamp(),
   `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `branch`
+-- 转存表中的数据 `branch`
 --
 
-INSERT INTO `branch` (`Branch_ID`, `Branch_Name`, `Branch_Type`, `Branch_Address1`, `Branch_Address2`, `Branch_Address3`, `Branch_City`, `Branch_State`, `Branch_PostalCode`, `Branch_Country`, `Branch_ContactNumber`, `Branch_Email`, `Branch_Description`, `Admin_ID`, `Branch_ProfilePicture`, `Branch_OperationalStatus`, `Branch_TargetAmount`, `Branch_CreatedAt`, `Is_Deleted`) VALUES
-(1, 'fourace', 'Orphanage', 'Blk 914Jurong West Street 91', '', '', 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-1190233', '', '', 2, NULL, 'Open', 200000.00, '2025-12-15 23:02:23', 0),
-(2, 'KL Main Branch', 'Headquarters', 'Level 12, Menara Love Bridge', '', '', 'Kuala Lumpur', 'Kuala Lumpur', '50450', 'Malaysia', '+6011-12345633', 'admin@donationsystem.com', 'Main operating center for central region.', 1, NULL, 'Open', 10000.00, '2025-12-15 23:02:23', 0),
-(3, 'Penang Outreach', 'Regional Center', '15, Jalan Georgetown', NULL, NULL, 'Georgetown', 'Penang', '10200', 'Malaysia', '04-2223333', '', 'Northern region support center.', 1, NULL, 'Open', 10000.00, '2025-12-15 23:02:23', 0);
+INSERT INTO `branch` (`Branch_ID`, `Branch_Name`, `Branch_Head`, `Branch_Head_Contact`, `Branch_Head_Email`, `Branch_Type`, `Branch_Capacity`, `Branch_EstablishedDate`, `Branch_Address1`, `Branch_Address2`, `Branch_Address3`, `Branch_City`, `Branch_State`, `Branch_PostalCode`, `Branch_Country`, `Branch_ContactNumber`, `Branch_Email`, `Branch_Description`, `Branch_Images`, `Admin_ID`, `Branch_OperationalStatus`, `Branch_CreatedAt`, `Is_Deleted`) VALUES
+(1, 'fourace', '', NULL, NULL, 'Orphanage', 0, NULL, 'Blk 914Jurong West Street 91', '', '', 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-1190233', '', '', NULL, 2, 'Open', '2025-12-15 23:02:23', 0),
+(2, 'KL Main Branch', '', NULL, NULL, '', 0, NULL, 'Level 12, Menara Love Bridge', '', '', 'Kuala Lumpur', 'Kuala Lumpur', '50450', 'Malaysia', '+6011-12345633', 'admin@donationsystem.com', 'Main operating center for central region.', NULL, 1, 'Open', '2025-12-15 23:02:23', 0),
+(3, 'Penang Outreach', 'ronald', '+6011-11190223', '', 'Old Folks Home', 32, '2026-01-09', '15, Jalan Georgetown', '', '', 'Georgetown', 'Penang', '10200', 'Malaysia', '+6011-11190233', 'admin@donationsystem.com', 'Northern region support center.', '[\"uploads/branches/br_1767960081_6960ee113ef84_0.jpg\",\"uploads/branches/br_1767960081_6960ee113f17b_1.png\",\"uploads/branches/br_1767960081_6960ee113f331_2.png\",\"uploads/branches/br_1767960081_6960ee113f713_3.png\"]', 1, 'Open', '2025-12-15 23:02:23', 0);
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `contact_messages`
+-- 表的结构 `contact_messages`
 --
 
 CREATE TABLE `contact_messages` (
@@ -194,33 +224,27 @@ CREATE TABLE `contact_messages` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `contact_messages`
+-- 转存表中的数据 `contact_messages`
 --
 
 INSERT INTO `contact_messages` (`Contact_ID`, `Name`, `Email`, `Phone`, `Title`, `Message`, `Status`, `Created_At`) VALUES
 (17, 'LIM WEN QIN', 'lll8694798586@gmail.com', '011-12345678', 'a', 'qw', 'New', '2026-01-06 00:46:27');
 
--- --------------------------------------------------------
-
 --
--- Table structure for table `donations`
+-- 触发器 `contact_messages`
 --
-
-CREATE TABLE `donations` (
-  `Donation_ID` int(11) NOT NULL,
-  `Donor_ID` int(11) NOT NULL,
-  `Project_Name` varchar(255) DEFAULT 'General Donation',
-  `Donation_Amount` decimal(10,2) NOT NULL,
-  `Donation_Date` datetime DEFAULT current_timestamp(),
-  `Payment_Status` enum('pending','completed','failed') DEFAULT 'completed',
-  `Payment_Method` varchar(50) DEFAULT NULL,
-  `Transaction_ID` varchar(100) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+DELIMITER $$
+CREATE TRIGGER `notify_message_insert` AFTER INSERT ON `contact_messages` FOR EACH ROW BEGIN
+    INSERT INTO `admin_notifications` (`Message`, `Type`, `Link`, `Is_Read`, `Created_At`, `Contact_ID`) 
+    VALUES (CONCAT('New Contact Message from ', NEW.Name, ': ', NEW.Title), 'New_Contact', 'admin_notifications_all.php', 0, NOW(), NEW.Contact_ID);
+END
+$$
+DELIMITER ;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `donor`
+-- 表的结构 `donor`
 --
 
 CREATE TABLE `donor` (
@@ -229,7 +253,8 @@ CREATE TABLE `donor` (
   `Donor_ContactNumber` varchar(20) NOT NULL,
   `Donor_ICNumber` varchar(20) NOT NULL,
   `Donor_Email` varchar(100) NOT NULL,
-  `Donor_Password` varchar(255) NOT NULL,
+  `Donor_Password` varchar(255) DEFAULT NULL,
+  `Donor_Wallet` decimal(10,2) NOT NULL DEFAULT 0.00,
   `Donor_Address1` varchar(255) NOT NULL,
   `Donor_Address2` varchar(255) DEFAULT NULL,
   `Donor_Address3` varchar(255) DEFAULT NULL,
@@ -243,24 +268,44 @@ CREATE TABLE `donor` (
   `Donor_LastLogin` datetime DEFAULT NULL,
   `Donor_ProfilePicture` varchar(255) DEFAULT NULL,
   `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted',
-  `donor_last_reset_request` datetime DEFAULT NULL,
   `donor_reset_count` int(11) DEFAULT 0,
-  `donor_last_password_change` datetime DEFAULT NULL
+  `donor_last_reset_request` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `donor`
+-- 转存表中的数据 `donor`
 --
 
-INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_ContactNumber`, `Donor_ICNumber`, `Donor_Email`, `Donor_Password`, `Donor_Address1`, `Donor_Address2`, `Donor_Address3`, `Donor_City`, `Donor_State`, `Donor_PostalCode`, `Donor_Country`, `Donor_DOB`, `Donor_Description`, `Donor_RegisteredAt`, `Donor_LastLogin`, `Donor_ProfilePicture`, `Is_Deleted`, `donor_last_reset_request`, `donor_reset_count`, `donor_last_password_change`) VALUES
-(2, 'RONALD TAN BIN HONG', '012-7212535', '030404011183', 'abc@gmail.com', '$2y$10$3hsuDLLcdM4mr9bqhvJekOZqH80/6aF.7GR2vLxXHbcgWT.RjOe.O', 'No19.jalan melawati 19, taman melawati', '', '', 'Johor Bahru', 'Johor', '81300', 'Malaysia', '2003-04-04', '', '2025-12-15 22:27:40', NULL, NULL, 0, NULL, 0, NULL),
-(3, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$PNOaF1e8KP0y9i404VCz9OWhn3XVyLHx8roawWiJjvPR0hyRunfeW', 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '2003-05-17', '', '2026-01-03 21:43:26', NULL, 'uploads/donors/donor_1767447806_69591cfe10e76.jpg', 0, NULL, 0, NULL),
-(4, 'LIM WEN QIN', '011-12345678', '543252336857', 'lll8694798586@gmail.com', '$2y$10$8GkDtCyIx0NsWl0y6zP2Fev19Q3/9BPeOh/G7UvtF7mk1/3R4eGHG', '', NULL, NULL, '', '', '', 'Malaysia', '2008-01-01', '', '2026-01-06 13:33:25', NULL, NULL, 0, NULL, 0, NULL);
+INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_ContactNumber`, `Donor_ICNumber`, `Donor_Email`, `Donor_Password`, `Donor_Wallet`, `Donor_Address1`, `Donor_Address2`, `Donor_Address3`, `Donor_City`, `Donor_State`, `Donor_PostalCode`, `Donor_Country`, `Donor_DOB`, `Donor_Description`, `Donor_RegisteredAt`, `Donor_LastLogin`, `Donor_ProfilePicture`, `Is_Deleted`, `donor_reset_count`, `donor_last_reset_request`) VALUES
+(2, 'RONALD TAN BIN HONG', '012-7212535', '030404011183', 'abc@gmail.com', '$2y$10$3hsuDLLcdM4mr9bqhvJekOZqH80/6aF.7GR2vLxXHbcgWT.RjOe.O', 0.00, 'No19.jalan melawati 19, taman melawati', '', '', 'Johor Bahru', 'Johor', '81300', 'Malaysia', '2003-04-04', '', '2025-12-15 22:27:40', NULL, NULL, 0, 0, NULL),
+(3, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$PNOaF1e8KP0y9i404VCz9OWhn3XVyLHx8roawWiJjvPR0hyRunfeW', 0.00, 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '2003-05-17', '', '2026-01-03 21:43:26', NULL, 'uploads/donors/donor_1767879100_695fb1bc6d8e7.png', 0, 0, NULL),
+(4, 'johndoe', '+6011-11190233', '', 'admin@donationsystem.com', NULL, 0.00, '', '', '', '', '', '', 'Malaysia', '0000-00-00', '', '2026-01-08 10:17:29', NULL, NULL, 0, 0, NULL),
+(5, 'thong', '+6011-11190233', '', 'thong@example.com', '$2y$10$yIcrpElLqaB33nLEva5rB.cfnVFib.XdekEbMYbJROuPcpHi.lshi', 0.00, '', '', '', '', '', '', 'Malaysia', '0000-00-00', '', '2026-01-11 01:09:57', NULL, NULL, 0, 0, NULL);
+
+--
+-- 触发器 `donor`
+--
+DELIMITER $$
+CREATE TRIGGER `notify_donor_insert` AFTER INSERT ON `donor` FOR EACH ROW BEGIN
+    INSERT INTO `admin_notifications` (`Message`, `Type`, `Link`, `Is_Read`, `Created_At`) 
+    VALUES (CONCAT('New Donor Registered: ', NEW.Donor_Name), 'New_Donor', 'admin_donor_page.php', 0, NOW());
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `notify_donor_update` AFTER UPDATE ON `donor` FOR EACH ROW BEGIN
+    IF OLD.Donor_Name != NEW.Donor_Name OR OLD.Donor_Email != NEW.Donor_Email THEN
+        INSERT INTO `admin_notifications` (`Message`, `Type`, `Link`, `Is_Read`, `Created_At`) 
+        VALUES (CONCAT('Donor Profile Updated: ', NEW.Donor_Name), 'Update', 'admin_donor_page.php', 0, NOW());
+    END IF;
+END
+$$
+DELIMITER ;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `donor_achievement`
+-- 表的结构 `donor_achievement`
 --
 
 CREATE TABLE `donor_achievement` (
@@ -273,58 +318,58 @@ CREATE TABLE `donor_achievement` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `donor_password_history`
+-- 表的结构 `donor_login_attempts`
 --
 
-CREATE TABLE `donor_password_history` (
-  `history_id` int(11) NOT NULL,
-  `donor_id` int(11) NOT NULL,
-  `password_hash` varchar(255) NOT NULL,
-  `change_timestamp` datetime DEFAULT current_timestamp(),
-  `changed_by` varchar(50) DEFAULT 'system'
+CREATE TABLE `donor_login_attempts` (
+  `id` int(11) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `attempt_time` datetime NOT NULL DEFAULT current_timestamp(),
+  `status` enum('failed','success') NOT NULL DEFAULT 'failed'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `donor_password_reset`
+-- 表的结构 `donor_password_reset`
 --
 
 CREATE TABLE `donor_password_reset` (
   `reset_id` int(11) NOT NULL,
   `donor_id` int(11) NOT NULL,
-  `reset_token` varchar(64) NOT NULL,
-  `reset_email` varchar(100) NOT NULL,
+  `reset_token` varchar(255) NOT NULL,
+  `reset_email` varchar(255) NOT NULL,
   `reset_expires` datetime NOT NULL,
-  `reset_used` tinyint(1) DEFAULT 0,
-  `reset_created` datetime DEFAULT current_timestamp(),
-  `reset_updated` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `reset_created` datetime NOT NULL DEFAULT current_timestamp(),
+  `reset_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
   `ip_address` varchar(45) DEFAULT NULL,
-  `user_agent` varchar(255) DEFAULT NULL,
-  `reset_status` enum('pending','used','expired','invalidated') DEFAULT 'pending'
+  `user_agent` text DEFAULT NULL,
+  `reset_status` enum('pending','used','expired','invalidated') NOT NULL DEFAULT 'pending',
+  `reset_used` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `donor_security_logs`
+-- 表的结构 `donor_security_logs`
 --
 
 CREATE TABLE `donor_security_logs` (
   `log_id` int(11) NOT NULL,
   `donor_id` int(11) DEFAULT NULL,
   `log_type` varchar(50) NOT NULL,
-  `log_action` varchar(100) NOT NULL,
+  `log_action` varchar(50) NOT NULL,
   `ip_address` varchar(45) DEFAULT NULL,
-  `user_agent` varchar(255) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
   `log_details` text DEFAULT NULL,
-  `log_timestamp` datetime DEFAULT current_timestamp()
+  `log_date` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `email_logs`
+-- 表的结构 `email_logs`
 --
 
 CREATE TABLE `email_logs` (
@@ -338,7 +383,7 @@ CREATE TABLE `email_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `email_logs`
+-- 转存表中的数据 `email_logs`
 --
 
 INSERT INTO `email_logs` (`Email_ID`, `To_Email`, `Title`, `Content`, `Status`, `Sent_At`, `Created_At`) VALUES
@@ -348,35 +393,7 @@ INSERT INTO `email_logs` (`Email_ID`, `To_Email`, `Title`, `Content`, `Status`, 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `expenses`
---
-
-CREATE TABLE `expenses` (
-  `Expense_ID` int(11) NOT NULL,
-  `Expense_Title` varchar(255) NOT NULL,
-  `Expense_Description` text DEFAULT NULL,
-  `Expense_Amount` decimal(10,2) NOT NULL,
-  `Expense_Category` varchar(50) NOT NULL,
-  `Claimant_Type` enum('Admin','Staff') NOT NULL,
-  `Claimant_ID` int(11) NOT NULL,
-  `Expense_Date` datetime NOT NULL DEFAULT current_timestamp(),
-  `Expense_Status` varchar(50) NOT NULL DEFAULT 'Pending',
-  `Recorded_By_Admin_ID` int(11) NOT NULL,
-  `Expense_Proof` text DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `expenses`
---
-
-INSERT INTO `expenses` (`Expense_ID`, `Expense_Title`, `Expense_Description`, `Expense_Amount`, `Expense_Category`, `Claimant_Type`, `Claimant_ID`, `Expense_Date`, `Expense_Status`, `Recorded_By_Admin_ID`, `Expense_Proof`) VALUES
-(1, 'Oil', 'cooking ol', 100.00, 'Reimbursement', 'Admin', 2, '2026-01-04 00:18:27', 'Approved', 2, '[\"uploads\\/expenses\\/receipt_1767457107_695941539eabe_0.jpg\"]'),
-(2, 'Oil', 'cooking ol', 100.00, 'Reimbursement', 'Admin', 2, '2026-01-04 00:24:35', 'Approved', 2, '[\"uploads\\/expenses\\/receipt_1767457475_695942c3c9dc9_0.jpg\"]');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `headquarters`
+-- 表的结构 `headquarters`
 --
 
 CREATE TABLE `headquarters` (
@@ -394,7 +411,7 @@ CREATE TABLE `headquarters` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `headquarters`
+-- 转存表中的数据 `headquarters`
 --
 
 INSERT INTO `headquarters` (`HQ_ID`, `HQ_Name`, `HQ_ContactNumber`, `HQ_Email`, `HQ_Address`, `HQ_Description`, `HQ_Story`, `HQ_FoundingDate`, `HQ_Image`, `Updated_At`, `Headquarters_State`) VALUES
@@ -403,7 +420,7 @@ INSERT INTO `headquarters` (`HQ_ID`, `HQ_Name`, `HQ_ContactNumber`, `HQ_Email`, 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `item_donation`
+-- 表的结构 `item_donation`
 --
 
 CREATE TABLE `item_donation` (
@@ -428,10 +445,30 @@ CREATE TABLE `item_donation` (
   `Activity_ID` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- 触发器 `item_donation`
+--
+DELIMITER $$
+CREATE TRIGGER `notify_item_insert` AFTER INSERT ON `item_donation` FOR EACH ROW BEGIN
+    INSERT INTO `admin_notifications` (`Message`, `Type`, `Is_Read`, `Created_At`) 
+    VALUES (CONCAT('New Item Donation: ', NEW.Item_Name, ' (Qty: ', NEW.Item_Quantity, ')'), 'Donation', 0, NOW());
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `notify_item_update` AFTER UPDATE ON `item_donation` FOR EACH ROW BEGIN
+    IF OLD.Item_Status != NEW.Item_Status THEN
+        INSERT INTO `admin_notifications` (`Message`, `Type`, `Is_Read`, `Created_At`) 
+        VALUES (CONCAT('Item Donation Status Updated: ', NEW.Item_Name), 'Update', 0, NOW());
+    END IF;
+END
+$$
+DELIMITER ;
+
 -- --------------------------------------------------------
 
 --
--- Table structure for table `login_attempts`
+-- 表的结构 `login_attempts`
 --
 
 CREATE TABLE `login_attempts` (
@@ -445,7 +482,7 @@ CREATE TABLE `login_attempts` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `notifications`
+-- 表的结构 `notifications`
 --
 
 CREATE TABLE `notifications` (
@@ -459,7 +496,7 @@ CREATE TABLE `notifications` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `orders`
+-- 表的结构 `orders`
 --
 
 CREATE TABLE `orders` (
@@ -489,24 +526,37 @@ CREATE TABLE `orders` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `orders`
+-- 转存表中的数据 `orders`
 --
 
 INSERT INTO `orders` (`Order_ID`, `Order_Name`, `Order_ContactNumber`, `Order_ICNumber`, `Order_Email`, `Order_Amount`, `Order_Points_Earned`, `Order_Currency`, `Order_PaymentMethod`, `Order_PaymentStatus`, `Order_Admin_Status`, `Order_TXN_Ref`, `Order_Type`, `Order_Status`, `Tax_Receipt_Status`, `Is_Deleted`, `Order_Created_At`, `Order_Updated_At`, `Donor_ID`, `Payment_ID`, `Branch_ID`, `Activity_ID`, `Case_ID`) VALUES
 (1, 'RONALD TAN BIN HONG', '012-7212535', '030404011183', 'abc@gmail.com', 100.00, 0, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-20251215222806', 'Recurring', 'Completed', 'Not_Requested', 0, '2025-12-15 22:28:06', '2025-12-15 22:28:06', 2, 1, NULL, NULL, 3),
-(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', 1000.00, 100, 'MYR', 'Cash', 'Success', 'Completed', 'MAN-IN-20260104001033-858', 'One-Time', 'Completed', 'Not_Requested', 0, '2026-01-04 00:10:33', '2026-01-04 00:10:33', 3, 3, NULL, NULL, NULL),
-(3, 'LIM WEN QIN', '011-12345678', '543252336857', 'lll8694798586@gmail.com', 20.00, 0, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-20260106133546', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-06 13:35:46', '2026-01-06 13:35:46', 4, 4, 3, NULL, NULL),
-(4, 'LIM WEN QIN', '011-12345678', '543252336857', 'lll8694798586@gmail.com', 20.00, 0, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-20260106133604', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-06 13:36:04', '2026-01-06 13:36:04', 4, 5, 3, NULL, NULL);
+(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', 1000.00, 100, 'MYR', 'Cash', 'Success', 'Completed', 'MAN-IN-20260104001033-858', 'One-Time', 'Completed', 'Not_Requested', 0, '2026-01-04 00:10:33', '2026-01-04 00:10:33', 3, 3, NULL, NULL, NULL);
 
 --
--- Triggers `orders`
+-- 触发器 `orders`
 --
 DELIMITER $$
 CREATE TRIGGER `after_tax_receipt_request` AFTER UPDATE ON `orders` FOR EACH ROW BEGIN
-
     IF NEW.Tax_Receipt_Status = 'Requested' AND OLD.Tax_Receipt_Status != 'Requested' THEN
-        INSERT INTO admin_notifications (Message, Type, Is_Read, Created_At)
-        VALUES (CONCAT('New Tax Receipt Request: ', NEW.Order_TXN_Ref), 'receipt_request', 0, NOW());
+        INSERT INTO admin_notifications (Message, Type, `Link`, Is_Read, Created_At)
+        VALUES (CONCAT('New Tax Receipt Request: ', NEW.Order_TXN_Ref), 'receipt_request', 'admin_receipts.php', 0, NOW());
+    END IF;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `notify_order_insert` AFTER INSERT ON `orders` FOR EACH ROW BEGIN
+    INSERT INTO `admin_notifications` (`Message`, `Type`, `Link`, `Is_Read`, `Created_At`) 
+    VALUES (CONCAT('New Donation: ', NEW.Order_Currency, ' ', NEW.Order_Amount, ' from ', NEW.Order_Name), 'Donation', 'payment_management.php', 0, NOW());
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `notify_order_update` AFTER UPDATE ON `orders` FOR EACH ROW BEGIN
+    IF OLD.Order_Status != NEW.Order_Status THEN
+        INSERT INTO `admin_notifications` (`Message`, `Type`, `Is_Read`, `Created_At`) 
+        VALUES (CONCAT('Order #', NEW.Order_ID, ' Status Changed to ', NEW.Order_Status), 'Update', 0, NOW());
     END IF;
 END
 $$
@@ -515,7 +565,7 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
--- Table structure for table `password_resets`
+-- 表的结构 `password_resets`
 --
 
 CREATE TABLE `password_resets` (
@@ -527,7 +577,7 @@ CREATE TABLE `password_resets` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `password_resets`
+-- 转存表中的数据 `password_resets`
 --
 
 INSERT INTO `password_resets` (`id`, `email`, `token`, `expires_at`, `created_at`) VALUES
@@ -537,7 +587,7 @@ INSERT INTO `password_resets` (`id`, `email`, `token`, `expires_at`, `created_at
 -- --------------------------------------------------------
 
 --
--- Table structure for table `payment`
+-- 表的结构 `payment`
 --
 
 CREATE TABLE `payment` (
@@ -554,19 +604,17 @@ CREATE TABLE `payment` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `payment`
+-- 转存表中的数据 `payment`
 --
 
 INSERT INTO `payment` (`Payment_ID`, `Payment_Method`, `Payment_Status`, `Payment_TXN_Ref`, `Payment_Amount`, `Payment_Paid_At`, `Payment_Bank_Name`, `Payment_Bank_Masked`, `Payment_Proof`, `Payment_Created_At`) VALUES
 (1, 'TNG eWallet', 'Success', 'TXN-20251215222806', 100.00, '2025-12-15 22:28:06', 'TNG eWallet', 'QR Payment', NULL, '2025-12-15 22:28:06'),
-(3, 'Cash', 'Success', 'MAN-IN-20260104001033-858', 1000.00, '2026-01-04 00:10:33', 'Manual Entry', 'N/A', NULL, '2026-01-04 00:10:33'),
-(4, 'TNG eWallet', 'Success', 'TXN-20260106133546', 20.00, '2026-01-06 13:35:46', 'TNG eWallet', 'QR Payment', NULL, '2026-01-06 13:35:46'),
-(5, 'TNG eWallet', 'Success', 'TXN-20260106133604', 20.00, '2026-01-06 13:36:04', 'TNG eWallet', 'QR Payment', NULL, '2026-01-06 13:36:04');
+(3, 'Cash', 'Success', 'MAN-IN-20260104001033-858', 1000.00, '2026-01-04 00:10:33', 'Manual Entry', 'N/A', NULL, '2026-01-04 00:10:33');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `point`
+-- 表的结构 `point`
 --
 
 CREATE TABLE `point` (
@@ -578,18 +626,19 @@ CREATE TABLE `point` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `point`
+-- 转存表中的数据 `point`
 --
 
 INSERT INTO `point` (`Points_ID`, `Points_Earned`, `Points_Total`, `Points_Updated_At`, `Donor_ID`) VALUES
 (1, 10, 10, '2025-12-15 22:28:06', 2),
 (2, 100, 65, '2026-01-04 23:11:46', 3),
-(3, 4, 4, '2026-01-06 13:36:09', 4);
+(3, 0, 0, '2026-01-08 10:17:29', 4),
+(4, 0, 0, '2026-01-11 01:09:57', 5);
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `policy_acceptances`
+-- 表的结构 `policy_acceptances`
 --
 
 CREATE TABLE `policy_acceptances` (
@@ -605,7 +654,7 @@ CREATE TABLE `policy_acceptances` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `privacy_policy`
+-- 表的结构 `privacy_policy`
 --
 
 CREATE TABLE `privacy_policy` (
@@ -618,7 +667,7 @@ CREATE TABLE `privacy_policy` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `privacy_policy`
+-- 转存表中的数据 `privacy_policy`
 --
 
 INSERT INTO `privacy_policy` (`id`, `version`, `content`, `effective_date`, `created_at`, `is_active`) VALUES
@@ -627,7 +676,7 @@ INSERT INTO `privacy_policy` (`id`, `version`, `content`, `effective_date`, `cre
 -- --------------------------------------------------------
 
 --
--- Table structure for table `receipt`
+-- 表的结构 `receipt`
 --
 
 CREATE TABLE `receipt` (
@@ -642,7 +691,7 @@ CREATE TABLE `receipt` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `recurring_donation`
+-- 表的结构 `recurring_donation`
 --
 
 CREATE TABLE `recurring_donation` (
@@ -663,16 +712,27 @@ CREATE TABLE `recurring_donation` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `recurring_donation`
+-- 转存表中的数据 `recurring_donation`
 --
 
 INSERT INTO `recurring_donation` (`Recurring_ID`, `Recurring_Amount`, `Recurring_Payment_Method`, `Recurring_StartDate`, `Recurring_EndDate`, `Recurring_Deduction_Date`, `Last_Payment_Date`, `Recurring_Status`, `Recurring_Created_At`, `Recurring_Updated_At`, `Donor_ID`, `Branch_ID`, `Activity_ID`, `Case_ID`) VALUES
 (2, 100.00, 'TNG eWallet', '2025-12-15', NULL, '2026-01-01', NULL, 'Cancelled', '2025-12-15 22:28:06', '2025-12-15 22:28:51', 2, NULL, NULL, 3);
 
+--
+-- 触发器 `recurring_donation`
+--
+DELIMITER $$
+CREATE TRIGGER `notify_recurring_insert` AFTER INSERT ON `recurring_donation` FOR EACH ROW BEGIN
+    INSERT INTO `admin_notifications` (`Message`, `Type`, `Is_Read`, `Created_At`) 
+    VALUES (CONCAT('New Recurring Donation Setup: RM', NEW.Recurring_Amount), 'Donation', 0, NOW());
+END
+$$
+DELIMITER ;
+
 -- --------------------------------------------------------
 
 --
--- Table structure for table `redemption_order`
+-- 表的结构 `redemption_order`
 --
 
 CREATE TABLE `redemption_order` (
@@ -690,21 +750,44 @@ CREATE TABLE `redemption_order` (
   `Redemption_TrackingNumber` varchar(50) DEFAULT NULL,
   `Redemption_Updated_At` datetime NOT NULL,
   `Donor_ID` int(11) NOT NULL,
-  `Reward_ID` int(11) NOT NULL
+  `Reward_ID` int(11) NOT NULL,
+  `Redemption_Shipped_At` datetime DEFAULT NULL,
+  `Redemption_Est_Delivery_Date` date DEFAULT NULL,
+  `Redemption_FollowUp_Sent` tinyint(1) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `redemption_order`
+-- 转存表中的数据 `redemption_order`
 --
 
-INSERT INTO `redemption_order` (`Redemption_ID`, `Redemption_Address1`, `Redemption_Address2`, `Redemption_Address3`, `Redemption_City`, `Redemption_State`, `Redemption_PostalCode`, `Redemption_Country`, `Redemption_ContactNumber`, `Redemption_PointsSpent`, `Redemption_Status`, `Redemption_TrackingNumber`, `Redemption_Updated_At`, `Donor_ID`, `Reward_ID`) VALUES
-(1, '11， jalan  silat lincah 10', NULL, NULL, 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-11190233', 35, 'Cancelled', NULL, '2026-01-04 23:03:56', 3, 2),
-(2, 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-11190233', 35, 'Shipped', 'JNT-123654798', '2026-01-05 12:37:08', 3, 2);
+INSERT INTO `redemption_order` (`Redemption_ID`, `Redemption_Address1`, `Redemption_Address2`, `Redemption_Address3`, `Redemption_City`, `Redemption_State`, `Redemption_PostalCode`, `Redemption_Country`, `Redemption_ContactNumber`, `Redemption_PointsSpent`, `Redemption_Status`, `Redemption_TrackingNumber`, `Redemption_Updated_At`, `Donor_ID`, `Reward_ID`, `Redemption_Shipped_At`, `Redemption_Est_Delivery_Date`, `Redemption_FollowUp_Sent`) VALUES
+(1, '11， jalan  silat lincah 10', NULL, NULL, 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-11190233', 35, 'Cancelled', NULL, '2026-01-04 23:03:56', 3, 2, NULL, NULL, 0),
+(2, 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-11190233', 35, 'Shipped', 'JNT-123654798', '2026-01-05 12:37:08', 3, 2, NULL, NULL, 0);
+
+--
+-- 触发器 `redemption_order`
+--
+DELIMITER $$
+CREATE TRIGGER `notify_redemption_insert` AFTER INSERT ON `redemption_order` FOR EACH ROW BEGIN
+    INSERT INTO `admin_notifications` (`Message`, `Type`, `Link`, `Is_Read`, `Created_At`) 
+    VALUES (CONCAT('New Reward Redemption Order #', NEW.Redemption_ID), 'Target', 'redemption_order_management.php', 0, NOW());
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `notify_redemption_update` AFTER UPDATE ON `redemption_order` FOR EACH ROW BEGIN
+    IF OLD.Redemption_Status != NEW.Redemption_Status THEN
+        INSERT INTO `admin_notifications` (`Message`, `Type`, `Is_Read`, `Created_At`) 
+        VALUES (CONCAT('Redemption Order #', NEW.Redemption_ID, ' is now ', NEW.Redemption_Status), 'Update', 0, NOW());
+    END IF;
+END
+$$
+DELIMITER ;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `reward_item`
+-- 表的结构 `reward_item`
 --
 
 CREATE TABLE `reward_item` (
@@ -722,7 +805,7 @@ CREATE TABLE `reward_item` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `reward_item`
+-- 转存表中的数据 `reward_item`
 --
 
 INSERT INTO `reward_item` (`Reward_ID`, `Reward_Code`, `Reward_ItemName`, `Reward_Category`, `Reward_Description`, `Reward_RequiredPoint`, `Reward_Supplier`, `Reward_Stock`, `Reward_ExpiryDate`, `Reward_Status`, `Reward_PhotoPath`) VALUES
@@ -750,7 +833,7 @@ INSERT INTO `reward_item` (`Reward_ID`, `Reward_Code`, `Reward_ItemName`, `Rewar
 -- --------------------------------------------------------
 
 --
--- Table structure for table `reward_logs`
+-- 表的结构 `reward_logs`
 --
 
 CREATE TABLE `reward_logs` (
@@ -765,14 +848,15 @@ CREATE TABLE `reward_logs` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `special_case`
+-- 表的结构 `special_case`
 --
 
 CREATE TABLE `special_case` (
   `Case_ID` int(11) NOT NULL,
   `Case_Title` varchar(100) NOT NULL,
+  `Case_Venue` varchar(255) DEFAULT NULL,
   `Case_Description` text DEFAULT NULL,
-  `Case_Image` varchar(255) DEFAULT NULL,
+  `Case_Images` longtext DEFAULT NULL,
   `Target_Amount` decimal(10,2) NOT NULL,
   `Raised_Amount` decimal(10,2) DEFAULT 0.00,
   `Case_Status` varchar(50) DEFAULT 'Active',
@@ -780,27 +864,60 @@ CREATE TABLE `special_case` (
   `Completed_At` datetime DEFAULT NULL,
   `Created_At` datetime DEFAULT current_timestamp(),
   `Start_Date` date DEFAULT NULL,
-  `Case_Category` enum('medical','daily_needs') DEFAULT 'medical',
+  `End_Date` date DEFAULT NULL,
+  `Case_Category` enum('Medical','Disability Support','Emergency Relief','Elderly Care','Children Support','Other Cases') NOT NULL DEFAULT 'Medical',
+  `Case_Other_Category` varchar(255) DEFAULT NULL,
   `Urgency` enum('low','medium','high') DEFAULT 'medium',
   `Donor_Count` int(11) DEFAULT 0,
-  `Case_Deadline` date DEFAULT NULL
+  `Case_Deadline` date DEFAULT NULL,
+  `Case_Organizer` varchar(100) DEFAULT NULL,
+  `Contact_Name` varchar(100) DEFAULT NULL,
+  `Contact_Number` varchar(20) DEFAULT NULL,
+  `Contact_Email` varchar(100) DEFAULT NULL,
+  `Case_Address1` varchar(255) NOT NULL,
+  `Case_Address2` varchar(255) DEFAULT NULL,
+  `Case_Address3` varchar(255) DEFAULT NULL,
+  `Case_City` varchar(100) NOT NULL,
+  `Case_State` varchar(100) NOT NULL,
+  `Case_PostalCode` varchar(20) NOT NULL,
+  `Case_Country` varchar(100) DEFAULT 'Malaysia'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `special_case`
+-- 转存表中的数据 `special_case`
 --
 
-INSERT INTO `special_case` (`Case_ID`, `Case_Title`, `Case_Description`, `Case_Image`, `Target_Amount`, `Raised_Amount`, `Case_Status`, `Cancel_Reason`, `Completed_At`, `Created_At`, `Start_Date`, `Case_Category`, `Urgency`, `Donor_Count`, `Case_Deadline`) VALUES
-(1, 'Urgent Heart Surgery for Baby Ali', 'Baby Ali was born with a hole in his heart and requires immediate surgery to survive. The family cannot afford the medical bills.', NULL, 45000.00, 15000.00, 'Active', NULL, NULL, '2025-12-01 10:00:00', NULL, 'medical', 'medium', 0, NULL),
-(2, 'Rebuilding Pak Abu\'s Burnt House', 'A tragic fire destroyed Pak Abu\'s wooden house in the village. He needs funds to buy materials for reconstruction.', NULL, 25000.00, 25000.00, 'Completed', NULL, NULL, '2025-11-15 09:30:00', NULL, 'medical', 'medium', 0, NULL),
-(3, 'Education Fund for Siti', 'Siti is a brilliant student who got offered a place in university but cannot afford the registration fees and laptop.', 'uploads/cases/case_1765863532_6940f06c6a99c.jpg', 5000.00, 1300.00, 'Active', NULL, NULL, '2025-12-05 14:20:00', NULL, 'medical', 'medium', 0, NULL),
-(4, 'Emergency Kidney Dialysis Aid', 'Uncle Wong needs dialysis 3 times a week. His savings have been depleted. Seeking public support for 3 months of treatment.', NULL, 12000.00, 8000.00, 'Cancelled', NULL, NULL, '2025-11-20 11:00:00', NULL, 'medical', 'medium', 0, NULL),
-(5, 'Animal Shelter Food Crisis', 'The Happy Paws shelter is running out of kibbles for 150 dogs due to supplier issues and lack of funds.', NULL, 3000.00, 3000.00, 'Completed', NULL, NULL, '2025-10-10 16:45:00', NULL, 'medical', 'medium', 0, NULL);
+INSERT INTO `special_case` (`Case_ID`, `Case_Title`, `Case_Venue`, `Case_Description`, `Case_Images`, `Target_Amount`, `Raised_Amount`, `Case_Status`, `Cancel_Reason`, `Completed_At`, `Created_At`, `Start_Date`, `End_Date`, `Case_Category`, `Case_Other_Category`, `Urgency`, `Donor_Count`, `Case_Deadline`, `Case_Organizer`, `Contact_Name`, `Contact_Number`, `Contact_Email`, `Case_Address1`, `Case_Address2`, `Case_Address3`, `Case_City`, `Case_State`, `Case_PostalCode`, `Case_Country`) VALUES
+(1, 'Urgent Heart Surgery for Baby Ali', NULL, 'Baby Ali was born with a hole in his heart and requires immediate surgery to survive. The family cannot afford the medical bills.', NULL, 45000.00, 15000.00, 'Active', NULL, NULL, '2025-12-01 10:00:00', NULL, NULL, 'Medical', NULL, 'medium', 0, NULL, NULL, NULL, NULL, NULL, '', NULL, NULL, '', '', '', 'Malaysia'),
+(2, 'Rebuilding Pak Abu\'s Burnt House', NULL, 'A tragic fire destroyed Pak Abu\'s wooden house in the village. He needs funds to buy materials for reconstruction.', NULL, 25000.00, 25000.00, 'Completed', NULL, NULL, '2025-11-15 09:30:00', NULL, NULL, 'Medical', NULL, 'medium', 0, NULL, NULL, NULL, NULL, NULL, '', NULL, NULL, '', '', '', 'Malaysia'),
+(3, 'Education Fund for Siti', 'thong', 'Siti is a brilliant student who got offered a place in university but cannot afford the registration fees and laptop.', '[\"uploads\\/cases\\/case_1768026208_6961f060eaca4_0.png\",\"uploads\\/cases\\/case_1768026208_6961f060eae5e_1.png\",\"uploads\\/cases\\/case_1768026208_6961f060eb1a8_2.png\"]', 5000.00, 1300.00, 'Active', '', NULL, '2025-12-05 14:20:00', NULL, NULL, 'Medical', NULL, 'medium', 0, NULL, 'thong', 'wq', '6011-11190233', 'thongyuenzhen@gmail.com', 'thong', '', '', 'jb', 'johor', '81300', 'Malaysia'),
+(4, 'Emergency Kidney Dialysis Aid', NULL, 'Uncle Wong needs dialysis 3 times a week. His savings have been depleted. Seeking public support for 3 months of treatment.', NULL, 12000.00, 8000.00, 'Cancelled', NULL, NULL, '2025-11-20 11:00:00', NULL, NULL, 'Medical', NULL, 'medium', 0, NULL, NULL, NULL, NULL, NULL, '', NULL, NULL, '', '', '', 'Malaysia'),
+(5, 'Animal Shelter Food Crisis', NULL, 'The Happy Paws shelter is running out of kibbles for 150 dogs due to supplier issues and lack of funds.', NULL, 3000.00, 3000.00, 'Completed', NULL, NULL, '2025-10-10 16:45:00', NULL, NULL, 'Medical', NULL, 'medium', 0, NULL, NULL, NULL, NULL, NULL, '', NULL, NULL, '', '', '', 'Malaysia');
+
+--
+-- 触发器 `special_case`
+--
+DELIMITER $$
+CREATE TRIGGER `notify_case_insert` AFTER INSERT ON `special_case` FOR EACH ROW BEGIN
+    INSERT INTO `admin_notifications` (`Message`, `Type`, `Is_Read`, `Created_At`) 
+    VALUES (CONCAT('New Fundraising Case: ', NEW.Case_Title), 'Target', 0, NOW());
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `notify_case_update` AFTER UPDATE ON `special_case` FOR EACH ROW BEGIN
+    IF OLD.Raised_Amount != NEW.Raised_Amount THEN
+       INSERT INTO `admin_notifications` (`Message`, `Type`, `Is_Read`, `Created_At`) 
+       VALUES (CONCAT('Case Update: ', NEW.Case_Title, ' raised RM', NEW.Raised_Amount), 'Donation', 0, NOW());
+    END IF;
+END
+$$
+DELIMITER ;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `staff`
+-- 表的结构 `staff`
 --
 
 CREATE TABLE `staff` (
@@ -809,7 +926,7 @@ CREATE TABLE `staff` (
   `Staff_ContactNumber` varchar(20) NOT NULL,
   `Staff_ICNumber` varchar(20) NOT NULL,
   `Staff_Email` varchar(100) NOT NULL,
-  `Staff_Password` varchar(15) NOT NULL,
+  `Staff_Password` varchar(255) DEFAULT NULL,
   `Staff_DOB` date NOT NULL,
   `Staff_Address1` varchar(255) NOT NULL,
   `Staff_Address2` varchar(255) DEFAULT NULL,
@@ -825,20 +942,35 @@ CREATE TABLE `staff` (
   `Staff_JoinDate` date DEFAULT current_timestamp(),
   `Staff_ProfilePicture` varchar(255) DEFAULT NULL,
   `Admin_ID` int(11) NOT NULL,
-  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted'
+  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted',
+  `Staff_IsFirstLogin` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `staff`
+-- 转存表中的数据 `staff`
 --
 
-INSERT INTO `staff` (`Staff_ID`, `Staff_FullName`, `Staff_ContactNumber`, `Staff_ICNumber`, `Staff_Email`, `Staff_Password`, `Staff_DOB`, `Staff_Address1`, `Staff_Address2`, `Staff_Address3`, `Staff_City`, `Staff_State`, `Staff_PostalCode`, `Staff_Country`, `Staff_Comment`, `Staff_Role`, `Staff_Status`, `Branch_ID`, `Staff_JoinDate`, `Staff_ProfilePicture`, `Admin_ID`, `Is_Deleted`) VALUES
-(1, 'Lim Wen Qin', '+6011-11190233', '030303-01-0303', 'lim.wen.qin@student.mmu.edu.my', '$2y$10$wI3ynrr3', '2003-03-03', '19, jalan bukit beruang utama 6', 'taman buklit beruang utama', '', 'melaka', 'Melaka', '75450', 'Malaysia', '', 'Staff', 'Active', NULL, '2025-12-07', 'uploads/staff_profiles/staff_1765123541_6935a5d520873.png', 2, 0);
+INSERT INTO `staff` (`Staff_ID`, `Staff_FullName`, `Staff_ContactNumber`, `Staff_ICNumber`, `Staff_Email`, `Staff_Password`, `Staff_DOB`, `Staff_Address1`, `Staff_Address2`, `Staff_Address3`, `Staff_City`, `Staff_State`, `Staff_PostalCode`, `Staff_Country`, `Staff_Comment`, `Staff_Role`, `Staff_Status`, `Branch_ID`, `Staff_JoinDate`, `Staff_ProfilePicture`, `Admin_ID`, `Is_Deleted`, `Staff_IsFirstLogin`) VALUES
+(1, 'Lim Wen Qin', '+6011-11190233', '030303-01-0303', 'lim.wen.qin@student.mmu.edu.my', '$2y$10$wI3ynrr3', '2003-03-03', '19, jalan bukit beruang utama 6', 'taman buklit beruang utama', '', 'melaka', 'Melaka', '75450', 'Malaysia', '', 'Staff', 'Active', NULL, '2025-12-07', 'uploads/staff_profiles/staff_1765123541_6935a5d520873.png', 2, 0, 1),
+(4, 'steve', '+6012-34567898', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$s4PtchL9.Lhy9dcKmrf0.eCM1qrxynsrSq4cLqR.c2XypF7q7F7w2', '2003-05-17', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-08', NULL, 2, 0, 1),
+(6, 'john', '+6012-3456789', '010203-04-0506', 'johndoe123@gmail.com', '$2y$10$FAwwBFD1hIOcrWPKJlvJbOLod5Za.bTjk1l5YsaTUbaRAAWs74tDy', '2001-02-03', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-08', NULL, 2, 0, 1),
+(8, 'ronald tan bin hong', '+6012-7212535', '010203-04-0506', 'ronaldtan0404@gmail.com', '$2y$10$n.Y6jwngCWE/KxeYcAX6ouE6vwq63ZhL1bHHfbtXhxY5ihQa7O8WK', '2001-02-06', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-09', NULL, 2, 0, 0);
+
+--
+-- 触发器 `staff`
+--
+DELIMITER $$
+CREATE TRIGGER `notify_staff_insert` AFTER INSERT ON `staff` FOR EACH ROW BEGIN
+    INSERT INTO `admin_notifications` (`Message`, `Type`, `Link`, `Is_Read`, `Created_At`) 
+    VALUES (CONCAT('New Staff Member Added: ', NEW.Staff_FullName), 'New_Staff', 'staff_management_page.php', 0, NOW());
+END
+$$
+DELIMITER ;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `staff_activity`
+-- 表的结构 `staff_activity`
 --
 
 CREATE TABLE `staff_activity` (
@@ -851,7 +983,7 @@ CREATE TABLE `staff_activity` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `story`
+-- 表的结构 `story`
 --
 
 CREATE TABLE `story` (
@@ -868,7 +1000,7 @@ CREATE TABLE `story` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `story`
+-- 转存表中的数据 `story`
 --
 
 INSERT INTO `story` (`Story_ID`, `Story_Date`, `Story_Title`, `Story_Author`, `Story_Category`, `Story_Description`, `Story_Image`, `Story_Status`, `Created_At`, `Updated_At`) VALUES
@@ -877,7 +1009,7 @@ INSERT INTO `story` (`Story_ID`, `Story_Date`, `Story_Title`, `Story_Author`, `S
 -- --------------------------------------------------------
 
 --
--- Table structure for table `system_pages`
+-- 表的结构 `system_pages`
 --
 
 CREATE TABLE `system_pages` (
@@ -889,7 +1021,7 @@ CREATE TABLE `system_pages` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `system_pages`
+-- 转存表中的数据 `system_pages`
 --
 
 INSERT INTO `system_pages` (`Page_ID`, `Page_Key`, `Page_Title`, `Page_Content`, `Last_Updated`) VALUES
@@ -901,7 +1033,7 @@ INSERT INTO `system_pages` (`Page_ID`, `Page_Key`, `Page_Title`, `Page_Content`,
 -- --------------------------------------------------------
 
 --
--- Table structure for table `terms_conditions`
+-- 表的结构 `terms_conditions`
 --
 
 CREATE TABLE `terms_conditions` (
@@ -914,70 +1046,63 @@ CREATE TABLE `terms_conditions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `terms_conditions`
+-- 转存表中的数据 `terms_conditions`
 --
 
 INSERT INTO `terms_conditions` (`id`, `version`, `content`, `effective_date`, `created_at`, `is_active`) VALUES
 (1, '1.0', '<h2>Love Bridge Donation Platform - Terms & Conditions</h2>\r\n<p><strong>Effective Date:</strong> [CURRENT_DATE]</p>\r\n\r\n<h3>1. Acceptance of Terms</h3>\r\n<p>By accessing and using the Love Bridge donation platform, you accept and agree to be bound by the terms and provision of this agreement.</p>\r\n\r\n<h3>2. Donation Policy</h3>\r\n<p>All donations made through Love Bridge are voluntary and non-refundable. Donations are used to support our charitable programs as described on our website.</p>\r\n\r\n<h3>3. User Responsibilities</h3>\r\n<p>Users must provide accurate information when making donations and agree not to use the platform for any unlawful purpose.</p>\r\n\r\n<h3>4. Privacy</h3>\r\n<p>Your privacy is important to us. Please review our Privacy Policy to understand how we collect and use your information.</p>\r\n\r\n<h3>5. Modifications</h3>\r\n<p>Love Bridge reserves the right to modify these terms at any time. Continued use of the platform after changes constitutes acceptance.</p>\r\n\r\n<h3>6. Contact Information</h3>\r\n<p>For questions about these Terms & Conditions, please contact us at terms@lovebridge.org.</p>', '2026-01-06', '2026-01-05 17:01:32', 1);
 
 --
--- Indexes for dumped tables
+-- 转储表的索引
 --
 
 --
--- Indexes for table `achievement`
+-- 表的索引 `achievement`
 --
 ALTER TABLE `achievement`
   ADD PRIMARY KEY (`Achievement_ID`);
 
 --
--- Indexes for table `activity`
+-- 表的索引 `activity`
 --
 ALTER TABLE `activity`
   ADD PRIMARY KEY (`Activity_ID`),
   ADD KEY `Activity_BrANCH_ID_FK` (`Branch_ID`);
 
 --
--- Indexes for table `admin`
+-- 表的索引 `admin`
 --
 ALTER TABLE `admin`
   ADD PRIMARY KEY (`Admin_ID`);
 
 --
--- Indexes for table `admin_notifications`
+-- 表的索引 `admin_notifications`
 --
 ALTER TABLE `admin_notifications`
   ADD PRIMARY KEY (`AdminNotification_ID`),
   ADD KEY `Contact_ID` (`Contact_ID`);
 
 --
--- Indexes for table `branch`
+-- 表的索引 `branch`
 --
 ALTER TABLE `branch`
   ADD PRIMARY KEY (`Branch_ID`),
   ADD KEY `branch_admin_id_fk` (`Admin_ID`);
 
 --
--- Indexes for table `contact_messages`
+-- 表的索引 `contact_messages`
 --
 ALTER TABLE `contact_messages`
   ADD PRIMARY KEY (`Contact_ID`);
 
 --
--- Indexes for table `donations`
---
-ALTER TABLE `donations`
-  ADD PRIMARY KEY (`Donation_ID`),
-  ADD KEY `Donor_ID` (`Donor_ID`);
-
---
--- Indexes for table `donor`
+-- 表的索引 `donor`
 --
 ALTER TABLE `donor`
   ADD PRIMARY KEY (`Donor_ID`);
 
 --
--- Indexes for table `donor_achievement`
+-- 表的索引 `donor_achievement`
 --
 ALTER TABLE `donor_achievement`
   ADD PRIMARY KEY (`DonorAchievement_ID`),
@@ -985,54 +1110,40 @@ ALTER TABLE `donor_achievement`
   ADD KEY `DonorAchievement_Achievement_ID_FK` (`Achievement_ID`);
 
 --
--- Indexes for table `donor_password_history`
+-- 表的索引 `donor_login_attempts`
 --
-ALTER TABLE `donor_password_history`
-  ADD PRIMARY KEY (`history_id`),
-  ADD KEY `idx_donor_history` (`donor_id`,`change_timestamp`);
+ALTER TABLE `donor_login_attempts`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `email` (`email`),
+  ADD KEY `attempt_time` (`attempt_time`);
 
 --
--- Indexes for table `donor_password_reset`
+-- 表的索引 `donor_password_reset`
 --
 ALTER TABLE `donor_password_reset`
   ADD PRIMARY KEY (`reset_id`),
-  ADD UNIQUE KEY `unique_active_token` (`donor_id`,`reset_used`,`reset_status`),
-  ADD KEY `idx_reset_token` (`reset_token`),
-  ADD KEY `idx_donor_id` (`donor_id`),
-  ADD KEY `idx_reset_email` (`reset_email`),
-  ADD KEY `idx_reset_expires` (`reset_expires`),
-  ADD KEY `idx_reset_status` (`reset_status`),
-  ADD KEY `idx_reset_used` (`reset_used`);
+  ADD KEY `donor_id` (`donor_id`);
 
 --
--- Indexes for table `donor_security_logs`
+-- 表的索引 `donor_security_logs`
 --
 ALTER TABLE `donor_security_logs`
-  ADD PRIMARY KEY (`log_id`),
-  ADD KEY `idx_donor_logs` (`donor_id`,`log_type`),
-  ADD KEY `idx_log_timestamp` (`log_timestamp`),
-  ADD KEY `idx_log_action` (`log_action`);
+  ADD PRIMARY KEY (`log_id`);
 
 --
--- Indexes for table `email_logs`
+-- 表的索引 `email_logs`
 --
 ALTER TABLE `email_logs`
   ADD PRIMARY KEY (`Email_ID`);
 
 --
--- Indexes for table `expenses`
---
-ALTER TABLE `expenses`
-  ADD PRIMARY KEY (`Expense_ID`);
-
---
--- Indexes for table `headquarters`
+-- 表的索引 `headquarters`
 --
 ALTER TABLE `headquarters`
   ADD PRIMARY KEY (`HQ_ID`);
 
 --
--- Indexes for table `item_donation`
+-- 表的索引 `item_donation`
 --
 ALTER TABLE `item_donation`
   ADD PRIMARY KEY (`Item_ID`),
@@ -1040,7 +1151,7 @@ ALTER TABLE `item_donation`
   ADD KEY `Item_Activity_ID_FK` (`Activity_ID`);
 
 --
--- Indexes for table `login_attempts`
+-- 表的索引 `login_attempts`
 --
 ALTER TABLE `login_attempts`
   ADD PRIMARY KEY (`id`),
@@ -1048,14 +1159,14 @@ ALTER TABLE `login_attempts`
   ADD KEY `idx_ip_time` (`ip_address`,`attempt_time`);
 
 --
--- Indexes for table `notifications`
+-- 表的索引 `notifications`
 --
 ALTER TABLE `notifications`
   ADD PRIMARY KEY (`Notification_ID`),
   ADD KEY `Notification_Donor_ID_FK` (`Donor_ID`);
 
 --
--- Indexes for table `orders`
+-- 表的索引 `orders`
 --
 ALTER TABLE `orders`
   ADD PRIMARY KEY (`Order_ID`),
@@ -1066,7 +1177,7 @@ ALTER TABLE `orders`
   ADD KEY `Order_Branch_ID_FK` (`Branch_ID`);
 
 --
--- Indexes for table `password_resets`
+-- 表的索引 `password_resets`
 --
 ALTER TABLE `password_resets`
   ADD PRIMARY KEY (`id`),
@@ -1074,20 +1185,20 @@ ALTER TABLE `password_resets`
   ADD KEY `idx_token` (`token`);
 
 --
--- Indexes for table `payment`
+-- 表的索引 `payment`
 --
 ALTER TABLE `payment`
   ADD PRIMARY KEY (`Payment_ID`);
 
 --
--- Indexes for table `point`
+-- 表的索引 `point`
 --
 ALTER TABLE `point`
   ADD PRIMARY KEY (`Points_ID`),
   ADD KEY `Point_Donor_ID_FK` (`Donor_ID`);
 
 --
--- Indexes for table `policy_acceptances`
+-- 表的索引 `policy_acceptances`
 --
 ALTER TABLE `policy_acceptances`
   ADD PRIMARY KEY (`id`),
@@ -1097,7 +1208,7 @@ ALTER TABLE `policy_acceptances`
   ADD KEY `idx_session` (`session_id`);
 
 --
--- Indexes for table `privacy_policy`
+-- 表的索引 `privacy_policy`
 --
 ALTER TABLE `privacy_policy`
   ADD PRIMARY KEY (`id`),
@@ -1105,7 +1216,7 @@ ALTER TABLE `privacy_policy`
   ADD KEY `idx_effective_date` (`effective_date`);
 
 --
--- Indexes for table `receipt`
+-- 表的索引 `receipt`
 --
 ALTER TABLE `receipt`
   ADD PRIMARY KEY (`Receipt_ID`),
@@ -1114,7 +1225,7 @@ ALTER TABLE `receipt`
   ADD KEY `Receipt_Order_ID_FK` (`Order_ID`);
 
 --
--- Indexes for table `recurring_donation`
+-- 表的索引 `recurring_donation`
 --
 ALTER TABLE `recurring_donation`
   ADD PRIMARY KEY (`Recurring_ID`),
@@ -1124,7 +1235,7 @@ ALTER TABLE `recurring_donation`
   ADD KEY `RecurringDonation_Case_ID_FK` (`Case_ID`);
 
 --
--- Indexes for table `redemption_order`
+-- 表的索引 `redemption_order`
 --
 ALTER TABLE `redemption_order`
   ADD PRIMARY KEY (`Redemption_ID`),
@@ -1132,14 +1243,14 @@ ALTER TABLE `redemption_order`
   ADD KEY `RedemptionOrder_Reward_ID_FK` (`Reward_ID`);
 
 --
--- Indexes for table `reward_item`
+-- 表的索引 `reward_item`
 --
 ALTER TABLE `reward_item`
   ADD PRIMARY KEY (`Reward_ID`),
   ADD KEY `Reward_Code` (`Reward_Code`);
 
 --
--- Indexes for table `reward_logs`
+-- 表的索引 `reward_logs`
 --
 ALTER TABLE `reward_logs`
   ADD PRIMARY KEY (`Log_ID`),
@@ -1147,13 +1258,13 @@ ALTER TABLE `reward_logs`
   ADD KEY `Log_Admin_FK` (`Admin_ID`);
 
 --
--- Indexes for table `special_case`
+-- 表的索引 `special_case`
 --
 ALTER TABLE `special_case`
   ADD PRIMARY KEY (`Case_ID`);
 
 --
--- Indexes for table `staff`
+-- 表的索引 `staff`
 --
 ALTER TABLE `staff`
   ADD PRIMARY KEY (`Staff_ID`),
@@ -1161,7 +1272,7 @@ ALTER TABLE `staff`
   ADD KEY `staff_branch_id_fk` (`Branch_ID`);
 
 --
--- Indexes for table `staff_activity`
+-- 表的索引 `staff_activity`
 --
 ALTER TABLE `staff_activity`
   ADD PRIMARY KEY (`StaffActivity_ID`),
@@ -1169,20 +1280,20 @@ ALTER TABLE `staff_activity`
   ADD KEY `StaffActivity_Activity_ID_FK` (`Activity_ID`);
 
 --
--- Indexes for table `story`
+-- 表的索引 `story`
 --
 ALTER TABLE `story`
   ADD PRIMARY KEY (`Story_ID`);
 
 --
--- Indexes for table `system_pages`
+-- 表的索引 `system_pages`
 --
 ALTER TABLE `system_pages`
   ADD PRIMARY KEY (`Page_ID`),
   ADD UNIQUE KEY `Page_Key` (`Page_Key`);
 
 --
--- Indexes for table `terms_conditions`
+-- 表的索引 `terms_conditions`
 --
 ALTER TABLE `terms_conditions`
   ADD PRIMARY KEY (`id`),
@@ -1190,287 +1301,245 @@ ALTER TABLE `terms_conditions`
   ADD KEY `idx_effective_date` (`effective_date`);
 
 --
--- AUTO_INCREMENT for dumped tables
+-- 在导出的表使用AUTO_INCREMENT
 --
 
 --
--- AUTO_INCREMENT for table `achievement`
+-- 使用表AUTO_INCREMENT `achievement`
 --
 ALTER TABLE `achievement`
   MODIFY `Achievement_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `activity`
+-- 使用表AUTO_INCREMENT `activity`
 --
 ALTER TABLE `activity`
   MODIFY `Activity_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
--- AUTO_INCREMENT for table `admin`
+-- 使用表AUTO_INCREMENT `admin`
 --
 ALTER TABLE `admin`
-  MODIFY `Admin_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `Admin_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
--- AUTO_INCREMENT for table `admin_notifications`
+-- 使用表AUTO_INCREMENT `admin_notifications`
 --
 ALTER TABLE `admin_notifications`
-  MODIFY `AdminNotification_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `AdminNotification_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
--- AUTO_INCREMENT for table `branch`
+-- 使用表AUTO_INCREMENT `branch`
 --
 ALTER TABLE `branch`
   MODIFY `Branch_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
--- AUTO_INCREMENT for table `contact_messages`
+-- 使用表AUTO_INCREMENT `contact_messages`
 --
 ALTER TABLE `contact_messages`
   MODIFY `Contact_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
--- AUTO_INCREMENT for table `donations`
---
-ALTER TABLE `donations`
-  MODIFY `Donation_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `donor`
+-- 使用表AUTO_INCREMENT `donor`
 --
 ALTER TABLE `donor`
-  MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
--- AUTO_INCREMENT for table `donor_achievement`
+-- 使用表AUTO_INCREMENT `donor_achievement`
 --
 ALTER TABLE `donor_achievement`
   MODIFY `DonorAchievement_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `donor_password_history`
+-- 使用表AUTO_INCREMENT `donor_login_attempts`
 --
-ALTER TABLE `donor_password_history`
-  MODIFY `history_id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `donor_login_attempts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `donor_password_reset`
+-- 使用表AUTO_INCREMENT `donor_password_reset`
 --
 ALTER TABLE `donor_password_reset`
   MODIFY `reset_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `donor_security_logs`
+-- 使用表AUTO_INCREMENT `donor_security_logs`
 --
 ALTER TABLE `donor_security_logs`
   MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `email_logs`
+-- 使用表AUTO_INCREMENT `email_logs`
 --
 ALTER TABLE `email_logs`
   MODIFY `Email_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
--- AUTO_INCREMENT for table `expenses`
---
-ALTER TABLE `expenses`
-  MODIFY `Expense_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
--- AUTO_INCREMENT for table `headquarters`
+-- 使用表AUTO_INCREMENT `headquarters`
 --
 ALTER TABLE `headquarters`
   MODIFY `HQ_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
--- AUTO_INCREMENT for table `item_donation`
+-- 使用表AUTO_INCREMENT `item_donation`
 --
 ALTER TABLE `item_donation`
   MODIFY `Item_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `login_attempts`
+-- 使用表AUTO_INCREMENT `login_attempts`
 --
 ALTER TABLE `login_attempts`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `notifications`
+-- 使用表AUTO_INCREMENT `notifications`
 --
 ALTER TABLE `notifications`
   MODIFY `Notification_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `orders`
+-- 使用表AUTO_INCREMENT `orders`
 --
 ALTER TABLE `orders`
-  MODIFY `Order_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `Order_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
--- AUTO_INCREMENT for table `password_resets`
+-- 使用表AUTO_INCREMENT `password_resets`
 --
 ALTER TABLE `password_resets`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
--- AUTO_INCREMENT for table `payment`
+-- 使用表AUTO_INCREMENT `payment`
 --
 ALTER TABLE `payment`
-  MODIFY `Payment_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `Payment_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
--- AUTO_INCREMENT for table `point`
+-- 使用表AUTO_INCREMENT `point`
 --
 ALTER TABLE `point`
-  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
--- AUTO_INCREMENT for table `policy_acceptances`
+-- 使用表AUTO_INCREMENT `policy_acceptances`
 --
 ALTER TABLE `policy_acceptances`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `privacy_policy`
+-- 使用表AUTO_INCREMENT `privacy_policy`
 --
 ALTER TABLE `privacy_policy`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
--- AUTO_INCREMENT for table `receipt`
+-- 使用表AUTO_INCREMENT `receipt`
 --
 ALTER TABLE `receipt`
   MODIFY `Receipt_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `recurring_donation`
+-- 使用表AUTO_INCREMENT `recurring_donation`
 --
 ALTER TABLE `recurring_donation`
   MODIFY `Recurring_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
--- AUTO_INCREMENT for table `redemption_order`
+-- 使用表AUTO_INCREMENT `redemption_order`
 --
 ALTER TABLE `redemption_order`
   MODIFY `Redemption_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
--- AUTO_INCREMENT for table `reward_item`
+-- 使用表AUTO_INCREMENT `reward_item`
 --
 ALTER TABLE `reward_item`
   MODIFY `Reward_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
--- AUTO_INCREMENT for table `reward_logs`
+-- 使用表AUTO_INCREMENT `reward_logs`
 --
 ALTER TABLE `reward_logs`
   MODIFY `Log_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `special_case`
+-- 使用表AUTO_INCREMENT `special_case`
 --
 ALTER TABLE `special_case`
   MODIFY `Case_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
--- AUTO_INCREMENT for table `staff`
+-- 使用表AUTO_INCREMENT `staff`
 --
 ALTER TABLE `staff`
-  MODIFY `Staff_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `Staff_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
--- AUTO_INCREMENT for table `staff_activity`
+-- 使用表AUTO_INCREMENT `staff_activity`
 --
 ALTER TABLE `staff_activity`
   MODIFY `StaffActivity_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `story`
+-- 使用表AUTO_INCREMENT `story`
 --
 ALTER TABLE `story`
   MODIFY `Story_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
--- AUTO_INCREMENT for table `system_pages`
+-- 使用表AUTO_INCREMENT `system_pages`
 --
 ALTER TABLE `system_pages`
   MODIFY `Page_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
--- AUTO_INCREMENT for table `terms_conditions`
+-- 使用表AUTO_INCREMENT `terms_conditions`
 --
 ALTER TABLE `terms_conditions`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
--- Constraints for dumped tables
+-- 限制导出的表
 --
 
 --
--- Constraints for table `activity`
+-- 限制表 `activity`
 --
 ALTER TABLE `activity`
   ADD CONSTRAINT `Activity_BrANCH_ID_FK` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`);
 
 --
--- Constraints for table `admin_notifications`
---
-ALTER TABLE `admin_notifications`
-  ADD CONSTRAINT `fk_admin_notifications_contact` FOREIGN KEY (`Contact_ID`) REFERENCES `contact_messages` (`Contact_ID`) ON DELETE CASCADE;
-
---
--- Constraints for table `branch`
+-- 限制表 `branch`
 --
 ALTER TABLE `branch`
   ADD CONSTRAINT `branch_admin_id_fk` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`);
 
 --
--- Constraints for table `donations`
---
-ALTER TABLE `donations`
-  ADD CONSTRAINT `donations_ibfk_1` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`) ON DELETE CASCADE;
-
---
--- Constraints for table `donor_achievement`
+-- 限制表 `donor_achievement`
 --
 ALTER TABLE `donor_achievement`
   ADD CONSTRAINT `DonorAchievement_Achievement_ID_FK` FOREIGN KEY (`Achievement_ID`) REFERENCES `achievement` (`Achievement_ID`),
   ADD CONSTRAINT `DonorAchievement_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 --
--- Constraints for table `donor_password_history`
---
-ALTER TABLE `donor_password_history`
-  ADD CONSTRAINT `donor_password_history_ibfk_1` FOREIGN KEY (`donor_id`) REFERENCES `donor` (`Donor_ID`) ON DELETE CASCADE;
-
---
--- Constraints for table `donor_password_reset`
---
-ALTER TABLE `donor_password_reset`
-  ADD CONSTRAINT `donor_password_reset_ibfk_1` FOREIGN KEY (`donor_id`) REFERENCES `donor` (`Donor_ID`) ON DELETE CASCADE;
-
---
--- Constraints for table `donor_security_logs`
---
-ALTER TABLE `donor_security_logs`
-  ADD CONSTRAINT `donor_security_logs_ibfk_1` FOREIGN KEY (`donor_id`) REFERENCES `donor` (`Donor_ID`) ON DELETE SET NULL;
-
---
--- Constraints for table `item_donation`
+-- 限制表 `item_donation`
 --
 ALTER TABLE `item_donation`
   ADD CONSTRAINT `Item_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
   ADD CONSTRAINT `Item_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 --
--- Constraints for table `notifications`
+-- 限制表 `notifications`
 --
 ALTER TABLE `notifications`
   ADD CONSTRAINT `Notification_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 --
--- Constraints for table `orders`
+-- 限制表 `orders`
 --
 ALTER TABLE `orders`
   ADD CONSTRAINT `Order_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
@@ -1480,27 +1549,27 @@ ALTER TABLE `orders`
   ADD CONSTRAINT `Order_Payment_ID_FK` FOREIGN KEY (`Payment_ID`) REFERENCES `payment` (`Payment_ID`);
 
 --
--- Constraints for table `point`
+-- 限制表 `point`
 --
 ALTER TABLE `point`
   ADD CONSTRAINT `Point_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 --
--- Constraints for table `policy_acceptances`
+-- 限制表 `policy_acceptances`
 --
 ALTER TABLE `policy_acceptances`
   ADD CONSTRAINT `policy_acceptances_ibfk_1` FOREIGN KEY (`terms_version_id`) REFERENCES `terms_conditions` (`id`),
   ADD CONSTRAINT `policy_acceptances_ibfk_2` FOREIGN KEY (`privacy_version_id`) REFERENCES `privacy_policy` (`id`);
 
 --
--- Constraints for table `receipt`
+-- 限制表 `receipt`
 --
 ALTER TABLE `receipt`
   ADD CONSTRAINT `Receipt_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`),
   ADD CONSTRAINT `Receipt_Order_ID_FK` FOREIGN KEY (`Order_ID`) REFERENCES `orders` (`Order_ID`);
 
 --
--- Constraints for table `recurring_donation`
+-- 限制表 `recurring_donation`
 --
 ALTER TABLE `recurring_donation`
   ADD CONSTRAINT `RecurringDonation_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
@@ -1509,28 +1578,28 @@ ALTER TABLE `recurring_donation`
   ADD CONSTRAINT `RecurringDonation_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 --
--- Constraints for table `redemption_order`
+-- 限制表 `redemption_order`
 --
 ALTER TABLE `redemption_order`
   ADD CONSTRAINT `RedemptionOrder_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`),
   ADD CONSTRAINT `RedemptionOrder_Reward_ID_FK` FOREIGN KEY (`Reward_ID`) REFERENCES `reward_item` (`Reward_ID`);
 
 --
--- Constraints for table `reward_logs`
+-- 限制表 `reward_logs`
 --
 ALTER TABLE `reward_logs`
   ADD CONSTRAINT `Log_Admin_FK` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`),
   ADD CONSTRAINT `Log_Reward_FK` FOREIGN KEY (`Reward_ID`) REFERENCES `reward_item` (`Reward_ID`) ON DELETE CASCADE;
 
 --
--- Constraints for table `staff`
+-- 限制表 `staff`
 --
 ALTER TABLE `staff`
   ADD CONSTRAINT `staff_admin_id_fk` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`),
   ADD CONSTRAINT `staff_branch_id_fk` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`);
 
 --
--- Constraints for table `staff_activity`
+-- 限制表 `staff_activity`
 --
 ALTER TABLE `staff_activity`
   ADD CONSTRAINT `StaffActivity_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),

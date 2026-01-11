@@ -57,7 +57,7 @@ include 'header_UI.php';
             --white: #FFFFFF;
             --light-bg: #fef7f7;
             --text: #212121;
-           
+            
             --shadow: rgba(229, 57, 53, 0.1);
             --shadow-dark: rgba(0, 0, 0, 0.1);
             --progress-bg: #e0e0e0;
@@ -861,13 +861,26 @@ include 'header_UI.php';
                     // 获取捐助者数量
                     $donor_count = isset($case['Donor_Count']) ? $case['Donor_Count'] : 0;
                     
-                    // 设置默认图片
+                    // --- 修复开始: JSON 图片解析逻辑 ---
                     $default_image = 'images/case-default.jpg';
-                    if (isset($case['Case_Image']) && !empty($case['Case_Image'])) {
-                        $image_path = $case['Case_Image'];
-                    } else {
-                        $image_path = $default_image;
+                    $image_path = $default_image; // 先设置默认值
+
+                    // 检查是否存在 Case_Images 字段 (注意是复数)
+                    if (isset($case['Case_Images']) && !empty($case['Case_Images'])) {
+                        
+                        // 尝试解码 JSON
+                        $decoded_images = json_decode($case['Case_Images'], true);
+
+                        // 如果是有效的 JSON 数组，取第一张图
+                        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded_images) && count($decoded_images) > 0) {
+                            $image_path = $decoded_images[0];
+                        } 
+                        // 如果不是 JSON 数组，但有内容，直接作为路径使用 (兼容旧数据)
+                        else {
+                            $image_path = $case['Case_Images'];
+                        }
                     }
+                    // --- 修复结束 ---
                 ?>
                     <div class="case-card">
                         <div class="case-image-container">

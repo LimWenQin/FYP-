@@ -53,14 +53,12 @@ include 'header_UI.php';
         
         /* Header Styles */
         .stories-header {
-  
             background: url('https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80'); 
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
-            
             color: white;
-          padding: 160px 20px;
+            padding: 160px 20px;
             text-align: center;
             position: relative;
             overflow: hidden;
@@ -72,13 +70,18 @@ include 'header_UI.php';
             position: absolute;
             top: 0;
             left: 0;
-    width: 120%;      /* 原本 100% */
-    height: 120%;     /* 原本 100% */
+            width: 120%;      /* 原本 100% */
+            height: 120%;     /* 原本 100% */
             right: 0;
             bottom: 0;
             /* 黑色遮罩，确保文字在复杂背景上清晰可见 */
             background-color: rgba(0, 0, 0, 0.5); 
             background-size: 120px;
+        }
+        
+        .page-header-content {
+            position: relative;
+            z-index: 2;
         }
         
         .page-title {
@@ -411,8 +414,10 @@ include 'header_UI.php';
 <body>
     <div class="stories-fullpage">
         <div class="stories-header">
-            <h1 class="page-title">News & Stories</h1>
-            <p class="page-description">Discover inspiring stories of hope, resilience, and transformation from our community. Each story represents a life touched by generosity.</p>
+            <div class="page-header-content">
+                <h1 class="page-title">News & Stories</h1>
+                <p class="page-description">Discover inspiring stories of hope, resilience, and transformation from our community. Each story represents a life touched by generosity.</p>
+            </div>
         </div>
 
         <div class="stories-container">
@@ -420,7 +425,25 @@ include 'header_UI.php';
                 <?php if ($totalStories > 0): 
                     while($story = $result->fetch_assoc()): 
                         $storyDate = date('F d, Y', strtotime($story['Story_Date']));
-                        $imagePath = !empty($story['Story_Image']) ? $story['Story_Image'] : 'images/story-default.jpg';
+                        
+                        // --- 修复开始：图片路径处理 ---
+                        $defaultImage = 'images/story-default.jpg';
+                        $imagePath = $defaultImage; // 默认值
+                        
+                        if (!empty($story['Story_Image'])) {
+                            // 尝试 JSON 解码（兼容旧数据可能存为JSON数组的情况）
+                            $decoded = json_decode($story['Story_Image'], true);
+                            
+                            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded) && count($decoded) > 0) {
+                                // 如果是JSON数组，取第一张
+                                $imagePath = $decoded[0];
+                            } else {
+                                // 如果不是JSON，则作为普通字符串路径使用
+                                $imagePath = $story['Story_Image'];
+                            }
+                        }
+                        // --- 修复结束 ---
+
                         $title = !empty($story['Story_Title']) ? $story['Story_Title'] : "Story #" . $story['Story_ID'];
                         $author = !empty($story['Story_Author']) ? $story['Story_Author'] : "Anonymous";
                         $category = !empty($story['Story_Category']) ? $story['Story_Category'] : "General";
@@ -432,10 +455,10 @@ include 'header_UI.php';
                 ?>
                     <div class="story-card">
                         <div class="story-image-container">
-                            <img src="<?php echo $imagePath; ?>" 
+                            <img src="<?php echo htmlspecialchars($imagePath); ?>" 
                                  alt="<?php echo htmlspecialchars($title); ?>" 
                                  class="story-image"
-                                 onerror="this.src='images/story-default.jpg'">
+                                 onerror="this.onerror=null; this.src='<?php echo $defaultImage; ?>';">
                             <span class="story-badge"><?php echo htmlspecialchars($category); ?></span>
                         </div>
                         
