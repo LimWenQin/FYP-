@@ -2,32 +2,58 @@
 // branch_management_page.php
 session_start();
 
-// Check if user is logged in
-if (!isset($_SESSION['admin_id'])) {
+// --- 修改 1: 检查是否登录 (Admin 或 Staff 均可) ---
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
 }
 
 include 'dataconnection.php';
 
-// Get admin information
-$adminId = $_SESSION['admin_id'];
-$sql = "SELECT Admin_ProfilePicture, Admin_Role, Admin_Name FROM admin WHERE Admin_ID = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $adminId);
-$stmt->execute();
-$result = $stmt->get_result();
-if ($result && $result->num_rows > 0) {
-    $row = $result->fetch_assoc();
-    $adminName = $row['Admin_Name'];
-    $adminProfilePicture = $row['Admin_ProfilePicture'];
-    $adminPosition = !empty($row['Admin_Role']) ? $row['Admin_Role'] : "Admin";
-} else {
-    $adminName = "Admin";
-    $adminPosition = "Admin";
-    $adminProfilePicture = null;
+// --- 修改 2: 获取当前用户信息 (支持 Admin 和 Staff) ---
+$adminName = "User";
+$adminPosition = "Role";
+$adminProfilePicture = null;
+$adminId = 0; // 初始化 adminId，防止 Staff 登录时未定义报错
+
+if (isset($_SESSION['admin_id'])) {
+    // === 如果是 Admin 登录 ===
+    $adminId = $_SESSION['admin_id'];
+    $sql = "SELECT Admin_ProfilePicture, Admin_Role, Admin_Name FROM admin WHERE Admin_ID = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $adminId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $adminName = $row['Admin_Name'];
+        $adminProfilePicture = $row['Admin_ProfilePicture'];
+        $adminPosition = !empty($row['Admin_Role']) ? $row['Admin_Role'] : "Admin";
+    }
+    $stmt->close();
+    
+} elseif (isset($_SESSION['staff_id'])) {
+    // === 如果是 Staff 登录 ===
+    $currentStaffId = $_SESSION['staff_id'];
+    // 注意：添加 Branch 的 SQL 语句中使用了 $adminId。
+    // 如果 Staff 添加 Branch，这里暂时将 Staff ID 赋值给 $adminId 以保证代码不报错。
+    $adminId = $currentStaffId; 
+    
+    $sql = "SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role FROM staff WHERE Staff_ID = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $currentStaffId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $adminName = $row['Staff_FullName'];
+        $adminProfilePicture = $row['Staff_ProfilePicture'];
+        $adminPosition = $row['Staff_Role'];
+    }
+    $stmt->close();
 }
-$stmt->close();
 
 // --- AJAX: Get Branch Payment History ---
 if (isset($_GET['action']) && $_GET['action'] == 'get_payment_history' && isset($_GET['branch_id'])) {

@@ -2,8 +2,8 @@
 // special_case_management.php
 session_start();
 
-// Check if user is logged in
-if (!isset($_SESSION['admin_id'])) {
+// --- 修改 1: 检查是否登录 (Admin 或 Staff 均可) ---
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
 }
@@ -46,20 +46,32 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_case_donations' && isset($
     exit();
 }
 
-// --- 获取当前管理员信息 ---
-$currentAdminId = $_SESSION['admin_id'];
-$adminSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $currentAdminId";
-$adminResult = $conn->query($adminSql);
+// --- 修改 2: 获取当前管理员/Staff信息 ---
+$adminName = "User";
+$adminPosition = "Role";
+$adminProfilePicture = null;
+$currentAdminId = 0;
 
-if ($adminResult && $adminResult->num_rows > 0) {
-    $adminData = $adminResult->fetch_assoc();
-    $adminName = $adminData['Admin_Name'];
-    $adminPosition = $adminData['Admin_Role']; 
-    $adminProfilePicture = $adminData['Admin_ProfilePicture']; 
-} else {
-    $adminName = $_SESSION['admin_name'] ?? 'Admin';
-    $adminPosition = "System Administrator";
-    $adminProfilePicture = null;
+if (isset($_SESSION['admin_id'])) {
+    $currentAdminId = $_SESSION['admin_id'];
+    $sql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $currentAdminId";
+    $result = $conn->query($sql);
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $adminName = $row['Admin_Name'];
+        $adminPosition = $row['Admin_Role']; 
+        $adminProfilePicture = $row['Admin_ProfilePicture']; 
+    }
+} elseif (isset($_SESSION['staff_id'])) {
+    $currentAdminId = $_SESSION['staff_id'];
+    $sql = "SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role FROM staff WHERE Staff_ID = $currentAdminId";
+    $result = $conn->query($sql);
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $adminName = $row['Staff_FullName'];
+        $adminPosition = $row['Staff_Role'];
+        $adminProfilePicture = $row['Staff_ProfilePicture'];
+    }
 }
 
 // --- FILTER & SEARCH PREPARATION ---

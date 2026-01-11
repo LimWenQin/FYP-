@@ -2,27 +2,42 @@
 // reward_item_management.php
 session_start();
 
-// 1. Check Login
-if (!isset($_SESSION['admin_id'])) {
+// 1. Check Login (Modified to allow Staff)
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
 }
 
 include 'dataconnection.php';
 
-// --- GET ADMIN INFO ---
-$currentAdminId = $_SESSION['admin_id'];
-$adminSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $currentAdminId";
-$adminResult = $conn->query($adminSql);
+// --- GET ADMIN/STAFF INFO ---
+$adminName = "User";
+$adminPosition = "Role";
+$adminProfilePicture = null;
+$currentAdminId = 0;
 
-if ($adminResult && $adminResult->num_rows > 0) {
-    $adminData = $adminResult->fetch_assoc();
-    $adminName = $adminData['Admin_Name'];
-    $adminPosition = $adminData['Admin_Role']; 
-    $adminProfilePicture = $adminData['Admin_ProfilePicture']; 
-} else {
-    $adminName = "Admin";
-    $adminPosition = "System Administrator";
+if (isset($_SESSION['admin_id'])) {
+    $currentAdminId = $_SESSION['admin_id'];
+    $adminSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $currentAdminId";
+    $adminResult = $conn->query($adminSql);
+
+    if ($adminResult && $adminResult->num_rows > 0) {
+        $adminData = $adminResult->fetch_assoc();
+        $adminName = $adminData['Admin_Name'];
+        $adminPosition = $adminData['Admin_Role']; 
+        $adminProfilePicture = $adminData['Admin_ProfilePicture']; 
+    }
+} elseif (isset($_SESSION['staff_id'])) {
+    $currentAdminId = $_SESSION['staff_id'];
+    $staffSql = "SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role FROM staff WHERE Staff_ID = $currentAdminId";
+    $staffResult = $conn->query($staffSql);
+
+    if ($staffResult && $staffResult->num_rows > 0) {
+        $staffData = $staffResult->fetch_assoc();
+        $adminName = $staffData['Staff_FullName'];
+        $adminPosition = $staffData['Staff_Role'];
+        $adminProfilePicture = $staffData['Staff_ProfilePicture'];
+    }
 }
 
 // --- CONFIG: CATEGORY ID PREFIXES ---

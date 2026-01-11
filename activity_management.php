@@ -2,8 +2,8 @@
 // activity_management.php
 session_start();
 
-// Check if user is logged in
-if (!isset($_SESSION['admin_id'])) {
+// --- 修改 1: 检查是否登录 (Admin 或 Staff 均可) ---
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
 }
@@ -96,20 +96,34 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
     exit();
 }
 
-// --- ADMIN INFO ---
-$adminId = $_SESSION['admin_id'];
-$adminSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $adminId";
-$adminResult = $conn->query($adminSql);
+// --- 修改 2: 获取当前用户信息 (支持 Admin 和 Staff) ---
+$adminName = "User";
+$adminPosition = "Role";
+$adminProfilePicture = null;
+$adminId = 0;
 
-if ($adminResult && $adminResult->num_rows > 0) {
-    $adminData = $adminResult->fetch_assoc();
-    $adminName = $adminData['Admin_Name'];
-    $adminPosition = $adminData['Admin_Role']; 
-    $adminProfilePicture = $adminData['Admin_ProfilePicture']; 
-} else {
-    $adminName = "Admin";
-    $adminPosition = "Administrator";
-    $adminProfilePicture = null;
+if (isset($_SESSION['admin_id'])) {
+    $adminId = $_SESSION['admin_id'];
+    $adminSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $adminId";
+    $adminResult = $conn->query($adminSql);
+
+    if ($adminResult && $adminResult->num_rows > 0) {
+        $adminData = $adminResult->fetch_assoc();
+        $adminName = $adminData['Admin_Name'];
+        $adminPosition = $adminData['Admin_Role']; 
+        $adminProfilePicture = $adminData['Admin_ProfilePicture']; 
+    }
+} elseif (isset($_SESSION['staff_id'])) {
+    $adminId = $_SESSION['staff_id'];
+    $staffSql = "SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role FROM staff WHERE Staff_ID = $adminId";
+    $staffResult = $conn->query($staffSql);
+
+    if ($staffResult && $staffResult->num_rows > 0) {
+        $staffData = $staffResult->fetch_assoc();
+        $adminName = $staffData['Staff_FullName'];
+        $adminPosition = $staffData['Staff_Role'];
+        $adminProfilePicture = $staffData['Staff_ProfilePicture'];
+    }
 }
 
 // --- MULTI FILE UPLOAD HELPER ---

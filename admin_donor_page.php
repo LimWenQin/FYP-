@@ -2,8 +2,8 @@
 // admin_donor_page.php
 session_start();
 
-// Check if user is logged in
-if (!isset($_SESSION['admin_id'])) {
+// --- 修改 1: 检查是否登录 (Admin 或 Staff 均可) ---
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
 }
@@ -19,20 +19,39 @@ require 'PHPMailer/Exception.php';
 require 'PHPMailer/PHPMailer.php';
 require 'PHPMailer/SMTP.php';
 
-// --- 获取当前管理员信息 ---
-$currentAdminId = $_SESSION['admin_id'];
-$adminSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $currentAdminId";
-$adminResult = $conn->query($adminSql);
+// --- 修改 2: 获取当前用户信息 (支持 Admin 和 Staff) ---
+$adminName = "User";
+$adminPosition = "Role";
+$adminProfilePicture = null;
+$currentAdminId = 0; // 初始化变量
 
-if ($adminResult && $adminResult->num_rows > 0) {
-    $adminData = $adminResult->fetch_assoc();
-    $adminName = $adminData['Admin_Name'];
-    $adminPosition = $adminData['Admin_Role']; 
-    $adminProfilePicture = $adminData['Admin_ProfilePicture']; 
-} else {
-    $adminName = $_SESSION['admin_name'];
-    $adminPosition = "System Administrator";
-    $adminProfilePicture = null;
+if (isset($_SESSION['admin_id'])) {
+    // === 如果是 Admin 登录 ===
+    $currentAdminId = $_SESSION['admin_id'];
+    $sql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $currentAdminId";
+    $result = $conn->query($sql);
+    
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $adminName = $row['Admin_Name'];
+        $adminPosition = $row['Admin_Role']; 
+        $adminProfilePicture = $row['Admin_ProfilePicture']; 
+    }
+} elseif (isset($_SESSION['staff_id'])) {
+    // === 如果是 Staff 登录 ===
+    $currentStaffId = $_SESSION['staff_id'];
+    // 兼容代码：某些逻辑如果需要 currentAdminId，可以暂时用 staffId，或者保持为0
+    $currentAdminId = $currentStaffId; 
+    
+    $sql = "SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role FROM staff WHERE Staff_ID = $currentStaffId";
+    $result = $conn->query($sql);
+    
+    if ($result && $result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $adminName = $row['Staff_FullName'];
+        $adminPosition = $row['Staff_Role'];
+        $adminProfilePicture = $row['Staff_ProfilePicture'];
+    }
 }
 
 // --- SEARCH & FILTER PREPARATION ---

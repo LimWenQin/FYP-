@@ -10,8 +10,8 @@ require 'PHPMailer/Exception.php';
 require 'PHPMailer/PHPMailer.php';
 require 'PHPMailer/SMTP.php';
 
-// Check if user is logged in
-if (!isset($_SESSION['admin_id'])) {
+// --- 修改 1: 检查是否登录 (Admin 或 Staff 均可) ---
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
 }
@@ -116,20 +116,34 @@ if (isset($_GET['export']) && $_GET['export'] == 'excel') {
     exit(); 
 }
 
-// --- GET CURRENT ADMIN INFO ---
-$currentAdminId = $_SESSION['admin_id'];
-$adminSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $currentAdminId";
-$adminResult = $conn->query($adminSql);
+// --- 修改 2: 获取当前管理员/Staff信息 ---
+$adminName = "User";
+$adminPosition = "Role";
+$adminProfilePicture = null;
+$currentAdminId = 0;
 
-if ($adminResult && $adminResult->num_rows > 0) {
-    $adminData = $adminResult->fetch_assoc();
-    $adminName = $adminData['Admin_Name'];
-    $adminPosition = $adminData['Admin_Role'];
-    $adminProfilePicture = $adminData['Admin_ProfilePicture'];
-} else {
-    $adminName = "Admin";
-    $adminPosition = "System Administrator";
-    $adminProfilePicture = null;
+if (isset($_SESSION['admin_id'])) {
+    $currentAdminId = $_SESSION['admin_id'];
+    $adminSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $currentAdminId";
+    $adminResult = $conn->query($adminSql);
+
+    if ($adminResult && $adminResult->num_rows > 0) {
+        $adminData = $adminResult->fetch_assoc();
+        $adminName = $adminData['Admin_Name'];
+        $adminPosition = $adminData['Admin_Role']; 
+        $adminProfilePicture = $adminData['Admin_ProfilePicture']; 
+    }
+} elseif (isset($_SESSION['staff_id'])) {
+    $currentAdminId = $_SESSION['staff_id'];
+    $staffSql = "SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role FROM staff WHERE Staff_ID = $currentAdminId";
+    $staffResult = $conn->query($staffSql);
+
+    if ($staffResult && $staffResult->num_rows > 0) {
+        $staffData = $staffResult->fetch_assoc();
+        $adminName = $staffData['Staff_FullName'];
+        $adminPosition = $staffData['Staff_Role'];
+        $adminProfilePicture = $staffData['Staff_ProfilePicture'];
+    }
 }
 
 // --- SEARCH & FILTER ---
