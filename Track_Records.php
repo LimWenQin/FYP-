@@ -43,7 +43,7 @@ if (isset($_POST['update_profile'])) {
     }
 }
 
-// B. 处理：申请报税收据 (保持原逻辑)
+// B. 处理：申请报税收据
 if (isset($_POST['request_receipt'])) {
     $order_id = $_POST['order_id'];
     
@@ -93,78 +93,38 @@ $filter_status = isset($_GET['status']) ? $_GET['status'] : 'All';
 
 $records = [];
 
-// A. 获取现金捐款记录
-$is_cash_related = ($filter_type == 'All' || $filter_type == 'TNG eWallet' || $filter_type == 'Credit/Debit Card' || $filter_type == 'Cash' || $filter_type == 'E-Wallet'); 
+// 获取捐款记录 (移除了对 item_donation 表的查询)
+$sql_orders = "SELECT Order_ID, Order_TXN_Ref, Order_Amount, Order_Status, Order_Created_At, Order_PaymentMethod, Tax_Receipt_Status, 'Cash' as Record_Type 
+               FROM orders 
+               WHERE Donor_ID = ? AND Order_Status != 'Failed'";
 
-if ($is_cash_related) {
-    $sql_orders = "SELECT Order_ID, Order_TXN_Ref, Order_Amount, Order_Status, Order_Created_At, Order_PaymentMethod, Tax_Receipt_Status, 'Cash' as Record_Type 
-                   FROM orders 
-                   WHERE Donor_ID = ? AND Order_Status != 'Failed'";
-    
-    if ($filter_type != 'All') {
-        $sql_orders .= " AND Order_PaymentMethod LIKE '%$filter_type%'";
-    }
-    if ($filter_status != 'All') {
-        $sql_orders .= " AND Order_Status LIKE '%$filter_status%'";
-    }
-
-    $stmt = $conn->prepare($sql_orders);
-    $stmt->bind_param("i", $current_donor_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $records[] = [
-            'id' => $row['Order_ID'],
-            'ref' => $row['Order_TXN_Ref'],
-            'type' => 'Cash',
-            'method' => $row['Order_PaymentMethod'],
-            'details' => 'RM ' . number_format($row['Order_Amount'], 2),
-            'date' => $row['Order_Created_At'],
-            'status' => $row['Order_Status'],
-            'raw_amount' => $row['Order_Amount'],
-            'tax_status' => $row['Tax_Receipt_Status']
-        ];
-    }
-    $stmt->close();
+if ($filter_type != 'All' && $filter_type != 'Item') {
+    $sql_orders .= " AND Order_PaymentMethod LIKE '%$filter_type%'";
+}
+if ($filter_status != 'All') {
+    $sql_orders .= " AND Order_Status LIKE '%$filter_status%'";
 }
 
-// B. 获取物品捐赠记录
-if ($filter_type == 'All' || $filter_type == 'Item') {
-    $sql_items = "SELECT Item_ID, Item_Name, Item_Quantity, Item_Status, Item_Updated_At, Item_DropOff_Method, 'Item' as Record_Type 
-                  FROM item_donation 
-                  WHERE Donor_ID = ?";
-    
-    if ($filter_status != 'All') {
-        $sql_items .= " AND Item_Status LIKE '%$filter_status%'";
-    }
-
-    $stmt = $conn->prepare($sql_items);
-    $stmt->bind_param("i", $current_donor_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $method_str = "Item";
-        if (!empty($row['Item_DropOff_Method'])) {
-            $method_str .= " (" . $row['Item_DropOff_Method'] . ")";
-        }
-
-        $records[] = [
-            'id' => $row['Item_ID'],
-            'ref' => 'ITEM-' . str_pad($row['Item_ID'], 6, '0', STR_PAD_LEFT),
-            'type' => 'Item',
-            'method' => $method_str,
-            'details' => $row['Item_Name'] . ' (x' . $row['Item_Quantity'] . ')',
-            'date' => $row['Item_Updated_At'],
-            'status' => $row['Item_Status'],
-            'raw_item_name' => $row['Item_Name'],
-            'raw_quantity' => $row['Item_Quantity'],
-            'tax_status' => 'N/A'
-        ];
-    }
-    $stmt->close();
+$stmt = $conn->prepare($sql_orders);
+$stmt->bind_param("i", $current_donor_id);
+$stmt->execute();
+$result = $stmt->get_result();
+while ($row = $result->fetch_assoc()) {
+    $records[] = [
+        'id' => $row['Order_ID'],
+        'ref' => $row['Order_TXN_Ref'],
+        'type' => 'Cash',
+        'method' => $row['Order_PaymentMethod'],
+        'details' => 'RM ' . number_format($row['Order_Amount'], 2),
+        'date' => $row['Order_Created_At'],
+        'status' => $row['Order_Status'],
+        'raw_amount' => $row['Order_Amount'],
+        'tax_status' => $row['Tax_Receipt_Status']
+    ];
 }
+$stmt->close();
 
-// C. 排序
+// 排序
 usort($records, function($a, $b) {
     return strtotime($b['date']) - strtotime($a['date']);
 });
@@ -178,7 +138,6 @@ usort($records, function($a, $b) {
     <title>Track Records - Love Bridge</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* 样式保持不变，略去 ... */
         :root { --primary-red: #dc2626; --dark-red: #b91c1c; --light-red: #fee2e2; --white: #ffffff; --light-gray: #f5f5f5; --medium-gray: #737373; --dark-gray: #262626; --text-dark: #171717; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--light-gray); color: var(--text-dark); margin: 0; padding: 0; }
         .main-container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; min-height: 80vh; }
@@ -204,11 +163,9 @@ usort($records, function($a, $b) {
         .status-failed, .status-rejected { background-color: #fee2e2; color: #991b1b; }
         .status-not_requested { background-color: #f3f4f6; color: #9ca3af; } 
         
-        /* [修改] 按钮样式 - 去掉 View 按钮的 JS 相关样式，保留外观 */
         .btn-action { padding: 6px 12px; border-radius: 5px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border: none; transition: 0.2s; text-decoration: none; display: inline-block; }
         .btn-view { background: white; border: 1px solid var(--primary-red); color: var(--primary-red); }
         .btn-view:hover { background: var(--primary-red); color: white; text-decoration: none; }
-        
         .btn-tax { background: var(--primary-red); color: white; border: 1px solid var(--primary-red); }
         .btn-tax:hover { background: var(--dark-red); }
         .btn-processing { background: #fbbf24; color: white; cursor: default; }
@@ -221,7 +178,6 @@ usort($records, function($a, $b) {
         .form-group { margin-bottom: 15px; text-align: left; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; color: #333; }
         .form-control { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        .form-control:focus { border-color: var(--primary-red); outline: none; }
 
         @media (max-width: 768px) {
             .styled-table thead { display: none; }
@@ -251,7 +207,6 @@ usort($records, function($a, $b) {
                     <option value="TNG eWallet" <?php echo $filter_type=='TNG eWallet'?'selected':''; ?>>TNG eWallet</option>
                     <option value="Credit/Debit Card" <?php echo $filter_type=='Credit/Debit Card'?'selected':''; ?>>Credit/Debit Card</option>
                     <option value="Cash" <?php echo $filter_type=='Cash'?'selected':''; ?>>Cash / Manual</option>
-                    <option value="Item" <?php echo $filter_type=='Item'?'selected':''; ?>>Item Donation</option>
                 </select>
             </div>
             <div>
@@ -272,7 +227,7 @@ usort($records, function($a, $b) {
                 <tr>
                     <th>Ref ID</th>
                     <th>Payment Method</th>
-                    <th>Amount / Item</th>
+                    <th>Amount</th>
                     <th>Date</th>
                     <th>Status</th>
                     <th>Tax Receipt</th>
@@ -288,16 +243,12 @@ usort($records, function($a, $b) {
                             <td data-label="Method">
                                 <?php 
                                     $m = $rec['method'];
-                                    $icon = 'fa-money-bill'; // Default
-                                    
+                                    $icon = 'fa-money-bill';
                                     if (stripos($m, 'TNG') !== false) { $icon = 'fa-wallet'; }
                                     elseif (stripos($m, 'Card') !== false) { $icon = 'fa-credit-card'; }
-                                    elseif (stripos($m, 'E-Wallet') !== false) { $icon = 'fa-wallet'; } // E-Wallet 绿色钱包
-                                    elseif (stripos($m, 'Item') !== false) { $icon = 'fa-box-open'; }
+                                    elseif (stripos($m, 'E-Wallet') !== false) { $icon = 'fa-wallet'; }
 
-                                    if (empty($m) && $rec['type'] == 'Cash') {
-                                        $m = "Top-up / Unknown";
-                                    }
+                                    if (empty($m)) { $m = "Top-up / Unknown"; }
                                 ?>
                                 <i class="fas <?php echo $icon; ?>" style="margin-right:5px; color:#777;"></i>
                                 <?php echo htmlspecialchars($m); ?>
@@ -315,27 +266,18 @@ usort($records, function($a, $b) {
                             </td>
 
                             <td data-label="Tax Receipt">
-                                <?php if ($rec['type'] == 'Item'): ?>
-                                    <span style="color:#999; font-size:0.85rem;">N/A (Item)</span>
-                                
+                                <?php if ($rec['raw_amount'] < 30): ?>
+                                    <span class="status-badge status-not_requested">Min RM30</span>
+                                <?php elseif ($rec['tax_status'] == 'Requested'): ?>
+                                    <button class="btn-action btn-processing" disabled><i class="fas fa-clock"></i> Processing</button>
+                                <?php elseif ($rec['tax_status'] == 'Generated'): ?>
+                                    <span class="status-badge status-generated">
+                                        <i class="fas fa-envelope"></i> Sent via Email
+                                    </span>
+                                <?php elseif ($rec['tax_status'] == 'Rejected'): ?>
+                                    <span class="status-badge status-rejected">Rejected</span>
                                 <?php else: ?>
-                                    <?php if ($rec['raw_amount'] < 30): ?>
-                                        <span class="status-badge status-not_requested">Min RM30</span>
-                                    
-                                    <?php elseif ($rec['tax_status'] == 'Requested'): ?>
-                                        <button class="btn-action btn-processing" disabled><i class="fas fa-clock"></i> Processing</button>
-                                    
-                                    <?php elseif ($rec['tax_status'] == 'Generated'): ?>
-                                        <span class="status-badge status-generated">
-                                            <i class="fas fa-envelope"></i> Sent via Email
-                                        </span>
-
-                                    <?php elseif ($rec['tax_status'] == 'Rejected'): ?>
-                                        <span class="status-badge status-rejected">Rejected</span>
-
-                                    <?php else: ?>
-                                        <button onclick="handleRequest(<?php echo $rec['id']; ?>)" class="btn-action btn-tax">Request</button>
-                                    <?php endif; ?>
+                                    <button onclick="handleRequest(<?php echo $rec['id']; ?>)" class="btn-action btn-tax">Request</button>
                                 <?php endif; ?>
                             </td>
                             
@@ -358,70 +300,25 @@ usort($records, function($a, $b) {
     <div class="modal-box">
         <div class="modal-title">Complete Your Profile</div>
         <button class="close-btn" onclick="closeProfileModal()">&times;</button>
-        
-        <p style="margin-bottom: 20px; color: #666; font-size: 0.9rem;">
-            To issue a valid Tax Exemption Receipt (LHDN requirement), we need your IC Number and Full Address.
-        </p>
-        
-        <form method="POST" action="Track_Records.php">
+        <p style="margin-bottom: 20px; color: #666; font-size: 0.9rem;">To issue a valid Tax Exemption Receipt (LHDN requirement), we need your IC Number and Full Address.</p>
+        <form method="POST">
             <input type="hidden" name="update_profile" value="1">
-
             <div class="form-group">
                 <label>IC Number (MyKad) <span style="color:red">*</span></label>
-                <input type="text" name="ic_number" class="form-control" required 
-                       placeholder="e.g. 990101-01-1234"
-                       value="<?php echo htmlspecialchars($user_data['Donor_ICNumber'] ?? ''); ?>">
+                <input type="text" name="ic_number" class="form-control" required value="<?php echo htmlspecialchars($user_data['Donor_ICNumber'] ?? ''); ?>">
             </div>
-
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-
             <div class="form-group">
                 <label>Address Line 1 <span style="color:red">*</span></label>
-                <input type="text" name="addr1" class="form-control" required 
-                       placeholder="House No, Street Name"
-                       value="<?php echo htmlspecialchars($user_data['Donor_Address1'] ?? ''); ?>">
+                <input type="text" name="addr1" class="form-control" required value="<?php echo htmlspecialchars($user_data['Donor_Address1'] ?? ''); ?>">
             </div>
-
-            <div class="form-group">
-                <label>Address Line 2 (Optional)</label>
-                <input type="text" name="addr2" class="form-control" 
-                       placeholder="Apartment, Suite, Unit, etc."
-                       value="<?php echo htmlspecialchars($user_data['Donor_Address2'] ?? ''); ?>">
-            </div>
-
-            <div class="form-group">
-                <label>Address Line 3 (Optional)</label>
-                <input type="text" name="addr3" class="form-control" 
-                       placeholder="Landmark / Additional Info"
-                       value="<?php echo htmlspecialchars($user_data['Donor_Address3'] ?? ''); ?>">
-            </div>
-
             <div style="display: flex; gap: 15px;">
-                <div class="form-group" style="flex:1">
-                    <label>City <span style="color:red">*</span></label>
-                    <input type="text" name="city" class="form-control" required 
-                           value="<?php echo htmlspecialchars($user_data['Donor_City'] ?? ''); ?>">
-                </div>
-                <div class="form-group" style="flex:1">
-                    <label>State <span style="color:red">*</span></label>
-                    <input type="text" name="state" class="form-control" required 
-                           value="<?php echo htmlspecialchars($user_data['Donor_State'] ?? ''); ?>">
-                </div>
+                <div class="form-group" style="flex:1"><label>City <span style="color:red">*</span></label><input type="text" name="city" class="form-control" required value="<?php echo htmlspecialchars($user_data['Donor_City'] ?? ''); ?>"></div>
+                <div class="form-group" style="flex:1"><label>State <span style="color:red">*</span></label><input type="text" name="state" class="form-control" required value="<?php echo htmlspecialchars($user_data['Donor_State'] ?? ''); ?>"></div>
             </div>
-
             <div style="display: flex; gap: 15px;">
-                <div class="form-group" style="flex:1">
-                    <label>Postal Code <span style="color:red">*</span></label>
-                    <input type="text" name="zip" class="form-control" required 
-                           value="<?php echo htmlspecialchars($user_data['Donor_PostalCode'] ?? ''); ?>">
-                </div>
-                <div class="form-group" style="flex:1">
-                    <label>Country <span style="color:red">*</span></label>
-                    <input type="text" name="country" class="form-control" required 
-                           value="<?php echo htmlspecialchars($user_data['Donor_Country'] ?? 'Malaysia'); ?>">
-                </div>
+                <div class="form-group" style="flex:1"><label>Postal Code <span style="color:red">*</span></label><input type="text" name="zip" class="form-control" required value="<?php echo htmlspecialchars($user_data['Donor_PostalCode'] ?? ''); ?>"></div>
+                <div class="form-group" style="flex:1"><label>Country <span style="color:red">*</span></label><input type="text" name="country" class="form-control" required value="<?php echo htmlspecialchars($user_data['Donor_Country'] ?? 'Malaysia'); ?>"></div>
             </div>
-
             <button type="submit" class="btn-filter" style="width:100%; margin-top: 10px;">Save & Continue</button>
         </form>
     </div>
@@ -436,7 +333,6 @@ usort($records, function($a, $b) {
 
 <script>
     const isProfileComplete = <?php echo $is_profile_complete; ?>;
-    
     function handleRequest(orderId) {
         if (isProfileComplete) {
             if(confirm("Request Tax Receipt for this donation?")) {
@@ -447,13 +343,8 @@ usort($records, function($a, $b) {
             document.getElementById('profileModal').style.display = 'flex';
         }
     }
-    
     function closeProfileModal() { document.getElementById('profileModal').style.display = 'none'; }
-    
-    window.onclick = function(e) {
-        if(e.target == document.getElementById('profileModal')) closeProfileModal();
-    }
+    window.onclick = function(e) { if(e.target == document.getElementById('profileModal')) closeProfileModal(); }
 </script>
-
 </body>
 </html>
