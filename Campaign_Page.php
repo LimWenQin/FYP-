@@ -22,6 +22,9 @@ include 'header_UI.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Campaigns - Donation Platform</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         :root {
             --primary-red: #e53935;
@@ -215,7 +218,7 @@ include 'header_UI.php';
             transform: translateY(20px);
             visibility: hidden;
             pointer-events: none;
-            position: absolute; /* 防止隐藏后占用空间 */
+            position: absolute;
         }
 
         .campaign-card:hover {
@@ -387,7 +390,7 @@ include 'header_UI.php';
             grid-column: 1 / -1;
             text-align: center;
             padding: 60px 20px;
-            display: none; /* 默认隐藏 */
+            display: none; 
         }
         
         .no-campaigns i {
@@ -527,28 +530,20 @@ include 'header_UI.php';
                     <div class="campaign-card" data-status="<?php echo $campaignStatus; ?>">
                         <div style="position: relative;">
                             <?php 
-                            // --- 修改开始：JSON 图片处理逻辑 ---
+                            // JSON 图片处理
                             $defaultImage = 'images/campaign-default.jpg';
                             $imagePath = $defaultImage;
                             
-                            // 优先读取 Activity_Images (数据库实际存 JSON 的列)
-                            // 备用读取 Activity_Picture (兼容旧代码可能的列名)
                             $dbImage = isset($campaign['Activity_Images']) ? $campaign['Activity_Images'] : (isset($campaign['Activity_Picture']) ? $campaign['Activity_Picture'] : '');
 
                             if (!empty($dbImage)) {
-                                // 尝试解码 JSON
                                 $decoded = json_decode($dbImage, true);
-                                
-                                // 如果是有效的数组且不为空，取第一张
                                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded) && count($decoded) > 0) {
                                     $imagePath = $decoded[0];
-                                } 
-                                // 否则如果是字符串（旧数据），直接使用
-                                else {
+                                } else {
                                     $imagePath = $dbImage;
                                 }
                             }
-                            // --- 修改结束 ---
                             ?>
                             <img src="<?php echo htmlspecialchars($imagePath); ?>" 
                                  alt="<?php echo htmlspecialchars($campaign['Activity_Name']); ?>" 
@@ -572,7 +567,7 @@ include 'header_UI.php';
                             
                             <h3 class="campaign-title"><?php echo htmlspecialchars($campaign['Activity_Name']); ?></h3>
                             
-                            <p class="campaign-details"><?php echo htmlspecialchars($campaign['Activity_Description']); // 注意：数据库通常是 Description 不是 Details ?></p>
+                            <p class="campaign-details"><?php echo htmlspecialchars($campaign['Activity_Description']); ?></p>
                             
                             <div class="campaign-location">
                                 <i class="fas fa-map-marker-alt"></i>
@@ -600,7 +595,9 @@ include 'header_UI.php';
                             </div>
                             
                             <div class="campaign-actions">
-                                <a href="S_C_Payment_Page.php?activity_id=<?php echo $campaign['Activity_ID']; ?>" class="btn-donate">
+                                <a href="S_C_Payment_Page.php?activity_id=<?php echo $campaign['Activity_ID']; ?>" 
+                                   class="btn-donate"
+                                   onclick="return checkLogin(event, this.href)">
                                     <i class="fas fa-heart"></i> Donate Now
                                 </a>
                                 
@@ -702,6 +699,36 @@ include 'header_UI.php';
                 if (progress < 1) window.requestAnimationFrame(step);
             };
             window.requestAnimationFrame(step);
+        }
+
+        // --- 核心修改：Login Check Function with SweetAlert2 ---
+        function checkLogin(event, url) {
+            // PHP 会在这里注入登录状态 (true 或 false)
+            const isLoggedIn = <?php echo isset($_SESSION['Donor_ID']) || isset($_SESSION['donor_id']) ? 'true' : 'false'; ?>;
+
+            if (!isLoggedIn) {
+                event.preventDefault(); // 阻止默认的跳转
+                
+                // 使用 SweetAlert2 显示漂亮的弹窗
+                Swal.fire({
+                    title: 'Login Required',
+                    text: "You need to login to make a donation.",
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonColor: '#e53935', // 使用你的主题红色
+                    cancelButtonColor: '#757575',
+                    confirmButtonText: 'Login Now',
+                    cancelButtonText: 'Cancel'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // 用户点击了 Login，跳转到登录页面
+                        window.location.href = 'donor_login.php'; 
+                    }
+                });
+                return false;
+            }
+            // 如果已登录，什么都不做，让链接正常跳转
+            return true;
         }
     </script>
 </body>
