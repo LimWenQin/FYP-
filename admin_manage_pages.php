@@ -1,46 +1,74 @@
 <?php
+// admin_manage_pages.php
 session_start();
-include 'dataconnection.php'; 
 
-if (!isset($_SESSION['admin_id'])) {
+// --- 修改 1: 检查是否登录 (Admin 或 Staff 均可) ---
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
 }
 
-// 获取管理员信息
-$adminId = $_SESSION['admin_id'];
-$adminName = $_SESSION['admin_name'] ?? 'Admin';
-$adminProfilePicture = $_SESSION['admin_pic'] ?? '';
-$adminPosition = 'Admin';
+include 'dataconnection.php';
 
-// 同步 Header 信息
-$stmt = $conn->prepare("SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = ?");
-$stmt->bind_param("i", $adminId);
-$stmt->execute();
-$res = $stmt->get_result();
-if ($row = $res->fetch_assoc()) {
-    $adminName = $row['Admin_Name'];
-    $adminProfilePicture = $row['Admin_ProfilePicture'];
-    $adminPosition = $row['Admin_Role'];
+// --- 修改 2: 获取当前用户信息 (支持 Admin 和 Staff) ---
+$adminName = "User";
+$adminPosition = "Role";
+$adminProfilePicture = null;
+
+if (isset($_SESSION['admin_id'])) {
+    $currentId = $_SESSION['admin_id'];
+    $stmt = $conn->prepare("SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = ?");
+    $stmt->bind_param("i", $currentId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
+        $adminName = $row['Admin_Name'];
+        $adminProfilePicture = $row['Admin_ProfilePicture'];
+        $adminPosition = $row['Admin_Role'];
+    }
+    $stmt->close();
+} elseif (isset($_SESSION['staff_id'])) {
+    $currentId = $_SESSION['staff_id'];
+    $stmt = $conn->prepare("SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role FROM staff WHERE Staff_ID = ?");
+    $stmt->bind_param("i", $currentId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
+        $adminName = $row['Staff_FullName'];
+        $adminProfilePicture = $row['Staff_ProfilePicture'];
+        $adminPosition = $row['Staff_Role'];
+    }
+    $stmt->close();
 }
 
 // 获取页面类型
 $pageKey = isset($_GET['type']) ? $_GET['type'] : 'about_us';
-$message = "";
+
+// --- 逻辑：格式化标题 (例如 terms_conditions -> Terms & Conditions) ---
+$displayTitle = ucwords(str_replace('_', ' ', $pageKey));
+if (strtolower($pageKey) == 'terms_conditions') {
+    $displayTitle = "Terms & Conditions";
+} elseif (strtolower($pageKey) == 'about_us') {
+    $displayTitle = "About Us";
+} elseif (strtolower($pageKey) == 'contact_us') {
+    $displayTitle = "Contact Us";
+}
+
+$successMsg = "";
+$errorMsg = "";
 
 // 处理保存
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $content = $_POST['content'];
     $key = $_POST['page_key'];
 
-    // 假设表 system_pages 存在，且有 Page_Key, Page_Content, Last_Updated
     $stmt = $conn->prepare("UPDATE system_pages SET Page_Content = ?, Last_Updated = NOW() WHERE Page_Key = ?");
     $stmt->bind_param("ss", $content, $key);
     
     if ($stmt->execute()) {
-        $message = "<div class='alert alert-success'><i class='fas fa-check-circle'></i> Page content updated successfully!</div>";
+        $successMsg = "Page content updated successfully!";
     } else {
-        $message = "<div class='alert alert-danger'><i class='fas fa-exclamation-circle'></i> Error updating content.</div>";
+        $errorMsg = "Error updating content: " . $conn->error;
     }
 }
 
@@ -52,8 +80,8 @@ $result = $stmt->get_result();
 $pageData = $result->fetch_assoc();
 
 if (!$pageData) {
-    // 简单的错误处理，为了不破坏页面结构
-    $pageData = ['Page_Title' => 'Unknown Page', 'Page_Content' => '', 'Last_Updated' => 'Never'];
+    // 默认数据，防止报错
+    $pageData = ['Page_Title' => $displayTitle, 'Page_Content' => '', 'Last_Updated' => 'Never'];
 }
 ?>
 
@@ -62,8 +90,9 @@ if (!$pageData) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Page - <?php echo htmlspecialchars($pageData['Page_Title']); ?></title>
+    <title>Edit Page - <?php echo htmlspecialchars($displayTitle); ?></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="admin_common.css">
     <style>
         /* 页面特定样式 */
@@ -81,7 +110,7 @@ if (!$pageData) {
             padding: 20px; 
             border: 1px solid #ddd; 
             border-radius: 8px; 
-            font-family: 'Courier New', Courier, monospace; /* 让代码或文本编辑更有感觉 */
+            font-family: 'Courier New', Courier, monospace; 
             font-size: 14px; 
             line-height: 1.6;
             resize: vertical;
@@ -120,12 +149,8 @@ if (!$pageData) {
             font-weight: 500;
         }
         .btn-cancel:hover { background: #e2e6ea; }
-
-        .alert { padding: 15px; margin-bottom: 25px; border-radius: 8px; display: flex; align-items: center; gap: 10px; max-width: 1000px; margin-left: auto; margin-right: auto;}
-        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
         
-        /* 顶部 Tab 模拟 (可选，如果你想让用户知道他在编辑哪个页面) */
+        /* 顶部 Tab 模拟 */
         .page-badge {
             background: var(--primary-light);
             color: var(--dark);
@@ -137,9 +162,25 @@ if (!$pageData) {
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+
+        /* Floating Alert Styles */
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; max-width: 400px; display: none; animation: slideIn 0.3s; }
+        .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
+        .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
 </head>
 <body>
+
+    <div class="floating-alert floating-alert-success" id="floatingSuccess" style="display: <?php echo !empty($successMsg) ? 'flex' : 'none'; ?>">
+        <i class="fas fa-check-circle"></i>
+        <div id="floatingSuccessText"><?php echo $successMsg; ?></div>
+    </div>
+
+    <div class="floating-alert floating-alert-danger" id="floatingError" style="display: <?php echo !empty($errorMsg) ? 'flex' : 'none'; ?>">
+        <i class="fas fa-exclamation-circle"></i>
+        <div id="floatingErrorText"><?php echo $errorMsg; ?></div>
+    </div>
 
     <?php include 'admin_sidebar.php'; ?>
 
@@ -151,14 +192,12 @@ if (!$pageData) {
             
             <div class="page-header" style="max-width: 1000px; margin: 0 auto 20px auto;">
                 <div>
-                    <h2>Edit Page Content <span class="page-badge"><?php echo htmlspecialchars($pageKey); ?></span></h2>
+                    <h2>Edit Page Content <span class="page-badge"><?php echo htmlspecialchars($displayTitle); ?></span></h2>
                 </div>
                 <div class="last-updated">
                     <i class="far fa-clock"></i> Last updated: <strong><?php echo $pageData['Last_Updated']; ?></strong>
                 </div>
             </div>
-
-            <?php echo $message; ?>
 
             <div class="editor-card">
                 <form method="POST" action="">
@@ -180,6 +219,16 @@ if (!$pageData) {
             </div>
         </div>
     </div>
+
+    <script>
+        // Auto Hide Alerts
+        setTimeout(function() {
+            const success = document.getElementById('floatingSuccess');
+            const error = document.getElementById('floatingError');
+            if (success) success.style.display = 'none';
+            if (error) error.style.display = 'none';
+        }, 5000);
+    </script>
 
 </body>
 </html>

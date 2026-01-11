@@ -237,14 +237,14 @@ function getRecentDonations($conn) {
     return $donations;
 }
 
-// 8. Get Recent Redemptions (Limit 5)
+// 8. Get Recent Redemptions (Limit 3)
 function getRecentRedemptions($conn) {
     $sql = "SELECT r.Redemption_Updated_At, d.Donor_Name, i.Reward_ItemName, r.Redemption_PointsSpent, r.Redemption_Status 
             FROM redemption_order r 
             JOIN donor d ON r.Donor_ID = d.Donor_ID
             JOIN reward_item i ON r.Reward_ID = i.Reward_ID
             ORDER BY r.Redemption_Updated_At DESC 
-            LIMIT 5"; 
+            LIMIT 3";
     $result = $conn->query($sql);
     $redemptions = [];
     if ($result && $result->num_rows > 0) {
@@ -269,6 +269,21 @@ function getDynamicDonationTrends($conn) {
         $total = ($result && $row = $result->fetch_assoc()) ? (float)$row['total'] : 0;
         $labels[] = $displayDate;
         $data[] = $total;
+    }
+    return ['labels' => $labels, 'data' => $data];
+}
+
+// 10. Get Special Case Category Stats (Pie Chart)
+function getCaseCategoryStats($conn) {
+    $sql = "SELECT Case_Category, COUNT(*) as count FROM special_case GROUP BY Case_Category";
+    $result = $conn->query($sql);
+    $labels = [];
+    $data = [];
+    if ($result) {
+        while($row = $result->fetch_assoc()) {
+            $labels[] = $row['Case_Category'];
+            $data[] = $row['count'];
+        }
     }
     return ['labels' => $labels, 'data' => $data];
 }
@@ -300,6 +315,7 @@ $branchGrowth = 0;
 $recentDonations = getRecentDonations($conn); 
 $recentRedemptions = getRecentRedemptions($conn); 
 $chartData = getDynamicDonationTrends($conn); 
+$caseCategoryStats = getCaseCategoryStats($conn); // Pie Chart Data
 
 ?>
 <!DOCTYPE html>
@@ -332,7 +348,24 @@ $chartData = getDynamicDonationTrends($conn);
         .stat-card:nth-child(3) .stat-icon { background: rgba(23, 162, 184, 0.2); color: var(--info); }
         .stat-card:nth-child(4) .stat-icon { background: rgba(255, 193, 7, 0.2); color: var(--warning); }
         
-        .charts-tables { display: grid; grid-template-columns: 2fr 1.2fr; gap: 20px; margin-bottom: 30px; }
+        /* --- Modified Layout Styles --- */
+        
+        /* Row 1: Donation Trends (6) : Recent Donations (4) */
+        .charts-row-top { 
+            display: grid; 
+            grid-template-columns: 6fr 4fr; 
+            gap: 20px; 
+            margin-bottom: 30px; 
+        }
+
+        /* Row 2: Special Case (4) : Recent Redemptions (6) */
+        .charts-row-bottom { 
+            display: grid; 
+            grid-template-columns: 4fr 6fr; 
+            gap: 20px; 
+            margin-bottom: 30px; 
+        }
+
         .chart-container, .recent-list { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; flex-direction: column; }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .section-header h2 { font-size: 18px; font-weight: 600; margin: 0; }
@@ -382,13 +415,6 @@ $chartData = getDynamicDonationTrends($conn);
         .status-cancelled { background: #f8d7da; color: #721c24; }
         .status-failed { background: #ffe6e6; color: #dc3545; }
         
-        .quick-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
-        .action-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); text-align: center; cursor: pointer; transition: all 0.3s; }
-        .action-card:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1); }
-        .action-icon { width: 50px; height: 50px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 20px; background: rgba(242, 133, 133, 0.1); color: var(--primary); }
-        .action-card h3 { font-size: 15px; margin-bottom: 5px; color: #333; }
-        .action-card p { font-size: 13px; color: #888; margin: 0; }
-
         /* Modal Styles */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 1200; justify-content: center; align-items: center; }
         .modal-content { background-color: white; border-radius: 10px; width: 90%; max-width: 600px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
@@ -399,7 +425,6 @@ $chartData = getDynamicDonationTrends($conn);
         .modal-close { position: absolute; top: 15px; right: 15px; cursor: pointer; font-size: 20px; color: #aaa; }
         .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray); float: right; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .modal-header h2 { margin: 0; font-size: 18px; }
         .modal-body { padding: 10px 0; }
 
         /* Form Styles */
@@ -525,8 +550,10 @@ $chartData = getDynamicDonationTrends($conn);
             display: block; margin-bottom: 15px; font-size: 14px; font-weight: 500; 
         }
 
-        @media (max-width: 1024px) { .charts-tables { grid-template-columns: 1fr; } }
-        @media (max-width: 768px) { .stats-cards, .quick-actions { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 1024px) { 
+            .charts-row-top, .charts-row-bottom { grid-template-columns: 1fr; } 
+        }
+        @media (max-width: 768px) { .stats-cards { grid-template-columns: repeat(2, 1fr); } }
     </style>
 </head>
 <body>
@@ -594,7 +621,7 @@ $chartData = getDynamicDonationTrends($conn);
                 </div>
             </div>
 
-            <div class="charts-tables">
+            <div class="charts-row-top">
                 
                 <div class="chart-container">
                     <div class="section-header">
@@ -655,10 +682,21 @@ $chartData = getDynamicDonationTrends($conn);
                         </tbody>
                     </table>
                 </div>
+            </div>
 
-                <div class="recent-list" style="grid-column: 1 / -1;">
+            <div class="charts-row-bottom">
+                
+                <div class="chart-container">
                     <div class="section-header">
-                        <h2>Recent Redemptions (Recurring Order)</h2>
+                        <h2>Special Case Distribution</h2>
+                        <button onclick="exportPieChartData()" title="Generate Excel"><i class="fas fa-file-excel"></i> Export Data</button>
+                    </div>
+                    <div class="chart-wrapper"><canvas id="casePieChart"></canvas></div>
+                </div>
+
+                <div class="recent-list">
+                    <div class="section-header">
+                        <h2>Recent Redemptions</h2>
                         <a href="redemption_order_management.php">View All</a>
                     </div>
                     <table class="redemption-table">
@@ -702,29 +740,9 @@ $chartData = getDynamicDonationTrends($conn);
                         </tbody>
                     </table>
                 </div>
+
             </div>
 
-            <div class="quick-actions">
-                <div class="action-card"><div class="action-icon"><i class="fas fa-file-alt"></i></div><h3>Download Report</h3><p>Generate summary</p></div>
-                
-                <div class="action-card" onclick="openDonationModal()">
-                    <div class="action-icon"><i class="fas fa-plus-circle"></i></div>
-                    <h3>New Donation</h3>
-                    <p>Record manual entry</p>
-                </div>
-                
-                <div class="action-card" onclick="openAddDonorModal()">
-                    <div class="action-icon"><i class="fas fa-user-plus"></i></div>
-                    <h3>Add Donor</h3>
-                    <p>Register new donor</p>
-                </div>
-                
-                <div class="action-card" onclick="openActivitySelectionModal()">
-                    <div class="action-icon"><i class="fas fa-calendar-plus"></i></div>
-                    <h3>Schedule Activity</h3>
-                    <p>Create new event</p>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -879,7 +897,7 @@ $chartData = getDynamicDonationTrends($conn);
      </div>
 
     <script>
-        // --- CHART JS ---
+        // --- CHART JS (Donation Trends) ---
         const ctx = document.getElementById('donationChart');
         const chartDataRaw = <?php echo json_encode($chartData); ?>;
 
@@ -910,6 +928,32 @@ $chartData = getDynamicDonationTrends($conn);
             });
         }
 
+        // --- CHART JS (Special Case Pie Chart) ---
+        const ctxPie = document.getElementById('casePieChart');
+        if(ctxPie) {
+            new Chart(ctxPie.getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels: <?php echo json_encode($caseCategoryStats['labels']); ?>,
+                    datasets: [{
+                        data: <?php echo json_encode($caseCategoryStats['data']); ?>,
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', 
+                            '#FF9F40', '#8d6e63', '#26a69a', '#78909c', '#ec407a'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+        }
+
         function exportChartData() {
             let csvContent = "data:text/csv;charset=utf-8,Date,Amount (RM)\n";
             chartDataRaw.labels.forEach((label, index) => {
@@ -920,6 +964,23 @@ $chartData = getDynamicDonationTrends($conn);
             var link = document.createElement("a");
             link.setAttribute("href", encodedUri);
             link.setAttribute("download", "donation_trends.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- EXPORT PIE CHART DATA FUNCTION ---
+        function exportPieChartData() {
+            const caseStatsRaw = <?php echo json_encode($caseCategoryStats); ?>;
+            let csvContent = "data:text/csv;charset=utf-8,Category,Count\n";
+            caseStatsRaw.labels.forEach((label, index) => {
+                let row = label + "," + caseStatsRaw.data[index];
+                csvContent += row + "\r\n";
+            });
+            var encodedUri = encodeURI(csvContent);
+            var link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "special_case_distribution.csv");
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
