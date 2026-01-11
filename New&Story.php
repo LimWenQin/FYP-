@@ -53,16 +53,14 @@ include 'header_UI.php';
         
         /* Header Styles */
         .stories-header {
-            /* 修改部分：更换为 AI 生成的温馨图片背景 */
-            background: url('https://images.unsplash.com/photo-1529156069898-49953e39b3ac?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80'); 
-            /* 注意：如果 AI 图片无法直接链接，建议下载后上传到你的 images 文件夹并替换路径，例如 'images/news-header-bg.jpg' */
-            
+  
+            background: url('https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80'); 
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
             
             color: white;
-            padding: 180px 0 60px;
+          padding: 160px 20px;
             text-align: center;
             position: relative;
             overflow: hidden;
@@ -74,11 +72,12 @@ include 'header_UI.php';
             position: absolute;
             top: 0;
             left: 0;
+    width: 120%;      /* 原本 100% */
+    height: 120%;     /* 原本 100% */
             right: 0;
             bottom: 0;
             /* 黑色遮罩，确保文字在复杂背景上清晰可见 */
             background-color: rgba(0, 0, 0, 0.5); 
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><path d="M50,0 C77.6,0 100,22.4 100,50 C100,77.6 77.6,100 50,100 C22.4,100 0,77.6 0,50 C0,22.4 22.4,0 50,0 Z" fill="white" fill-opacity="0.05"/></svg>');
             background-size: 120px;
         }
         

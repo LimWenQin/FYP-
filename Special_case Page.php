@@ -80,13 +80,13 @@ include 'header_UI.php';
         /* Full Width Page Header */
         .page-header {
             width: 100%; /* 宽度占满整个页面 */
-            background: url('https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80');
+            background: url('https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
             text-align: center;
             position: relative;
-            padding: 120px 20px; /* 增加上下内边距 */
+            padding: 160px 20px; /* 增加上下内边距 */
             color: white;
             border-radius: 0; /* 移除圆角 */
             margin-bottom: 0; /* 移除底部外边距，让统计数据紧贴 */

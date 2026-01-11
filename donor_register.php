@@ -5,7 +5,7 @@ include 'header_function.php';
 $error_message = "";
 $success_message = "";
 
-// Initialize variables to empty to avoid "undefined variable" warnings on first load
+// Initialize variables
 $name = $contact = $email = $dob = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -16,7 +16,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
     $dob = $_POST['dob'];
-    
 
     // Validation
     $required_fields = ['name', 'contact', 'email', 'password', 'confirm_password', 'dob'];
@@ -37,45 +36,77 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_message = "Please enter a valid email address.";
     } else {
-        // Check if email already exists
-        $check_query = "SELECT Donor_ID FROM donor WHERE Donor_Email = ?";
+        
+        // --- 修改开始：检查 Email 和 Is_Deleted 状态 ---
+        
+        // 1. 查询该 Email 是否存在，同时获取 ID 和 Is_Deleted 状态
+        $check_query = "SELECT Donor_ID, Is_Deleted FROM donor WHERE Donor_Email = ?";
         $stmt = $conn->prepare($check_query);
         $stmt->bind_param("s", $email);
         $stmt->execute();
         $result = $stmt->get_result();
         
+        $account_exists = false;
+        $is_deleted_account = false;
+        $existing_id = null;
+
         if ($result->num_rows > 0) {
-            $error_message = "Email already exists.";
-        } else {
-            // Hash password using bcrypt
-            $hashed_password = password_hash($password, PASSWORD_BCRYPT);
+            $row = $result->fetch_assoc();
+            $existing_id = $row['Donor_ID'];
             
-            // Insert into database
-            $insert_query = "INSERT INTO donor (Donor_Name, Donor_ContactNumber, Donor_Email, 
-                            Donor_Password, Donor_DOB) 
-                            VALUES (?, ?, ?, ?, ?)";
-            
-            $stmt = $conn->prepare($insert_query);
-            $stmt->bind_param("sssss", 
-                $name, $contact, $email, $hashed_password, $dob
-            );
-            
-            if ($stmt->execute()) {
-                // --- 修改开始：成功后不跳转，显示消息和链接 ---
-                $success_message = "Registration successful! <a href='donor_login.php' class='login-link'>Click here to Login Now <i class='fas fa-arrow-right'></i></a>";
-                
-                // Clear form data so inputs are empty
-                $name = $contact = $email = $dob = "";
-                $_POST = array(); 
-                // --- 修改结束 ---
-                
+            // 如果 Is_Deleted 是 0，说明账号正在使用中，不能注册
+            if ($row['Is_Deleted'] == 0) {
+                $account_exists = true;
             } else {
-                $error_message = "Error: " . $stmt->error;
+                // 如果 Is_Deleted 是 1，说明是旧账号，标记为“已删除账号”
+                $is_deleted_account = true;
             }
         }
+
+        if ($account_exists) {
+            $error_message = "Email already exists.";
+        } else {
+            // Hash password
+            $hashed_password = password_hash($password, PASSWORD_BCRYPT);
+            $stmt_action = null;
+
+            if ($is_deleted_account) {
+                // --- 情况 A: 账号存在但被删除了 (Is_Deleted = 1) ---
+                // 执行 UPDATE 操作：更新资料并将 Is_Deleted 设回 0 (复活账号)
+                $update_query = "UPDATE donor SET 
+                                 Donor_Name = ?, 
+                                 Donor_ContactNumber = ?, 
+                                 Donor_Password = ?, 
+                                 Donor_DOB = ?, 
+                                 Is_Deleted = 0 
+                                 WHERE Donor_ID = ?";
+                $stmt_action = $conn->prepare($update_query);
+                $stmt_action->bind_param("ssssi", $name, $contact, $hashed_password, $dob, $existing_id);
+
+            } else {
+               
+                $insert_query = "INSERT INTO donor (Donor_Name, Donor_ContactNumber, Donor_Email, 
+                                 Donor_Password, Donor_DOB, Is_Deleted) 
+                                 VALUES (?, ?, ?, ?, ?, 0)";
+                $stmt_action = $conn->prepare($insert_query);
+                $stmt_action->bind_param("sssss", $name, $contact, $email, $hashed_password, $dob);
+            }
+            
+         
+            if ($stmt_action->execute()) {
+                $success_message = "Registration successful! <a href='donor_login.php' class='login-link'>Click here to Login Now <i class='fas fa-arrow-right'></i></a>";
+                
+                // Clear form data
+                $name = $contact = $email = $dob = "";
+                $_POST = array();
+            } else {
+                $error_message = "Error: " . $stmt_action->error;
+            }
+            $stmt_action->close();
+        }
         $stmt->close();
-    }
-}
+        
+}}
 include 'header_UI.php';
 ?>
 

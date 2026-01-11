@@ -1,13 +1,12 @@
 <?php
 include 'dataconnection.php';
-// Assuming header_function.php is still needed to start the session, etc.
 include 'header_function.php'; 
 
-$error_message = ""; // 通用错误信息
-$email_error = ""; // 邮箱验证错误信息
-$password_error = ""; // 密码验证错误信息
-$email_value = ""; // 用于存储在表单中回填的邮箱值
-$lockout_error = ""; // 专门用于锁定账户的错误信息
+$error_message = ""; 
+$email_error = ""; 
+$password_error = ""; 
+$email_value = ""; 
+$lockout_error = ""; 
 
 // Start session if not already started
 if (session_status() == PHP_SESSION_NONE) {
@@ -23,7 +22,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // 0. 检查是否已被锁定 (Check Lockout)
     // -----------------------------------------------------------------
     if (!empty($email) && isset($conn)) {
-        // 检查过去 15 分钟内的失败次数
         $check_stmt = $conn->prepare("SELECT COUNT(*) as fail_count FROM donor_login_attempts WHERE email = ? AND attempt_time > (NOW() - INTERVAL 15 MINUTE)");
         $check_stmt->bind_param("s", $email);
         $check_stmt->execute();
@@ -38,44 +36,33 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     // 如果被锁定，阻止后续逻辑
     if (!empty($lockout_error)) {
-        // 保留邮箱显示，方便用户知道是哪个账号被锁
         $email_value = htmlspecialchars($email);
     } 
     // -----------------------------------------------------------------
-    // 1. 检查是否为空字段 (通用错误)
+    // 1. 检查是否为空字段
     // -----------------------------------------------------------------
     elseif (empty($email) || empty($password)) {
-        if (empty($email)) {
-            $email_error = "Please enter your email address.";
-        }
-        if (empty($password)) {
-            $password_error = "Please enter your password.";
-        }
+        if (empty($email)) { $email_error = "Please enter your email address."; }
+        if (empty($password)) { $password_error = "Please enter your password."; }
         $error_message = "Please enter both email and password.";
-        
-        if ($remember && !empty($email)) {
-            $email_value = htmlspecialchars($email);
-        }
+        if ($remember && !empty($email)) { $email_value = htmlspecialchars($email); }
     } else {
         // -----------------------------------------------------------------
-        // 2. 执行登录验证
+        // 2. 执行登录验证 (核心修改部分)
         // -----------------------------------------------------------------
         
         if (!isset($conn)) {
              $error_message = "Database connection error.";
-             if ($remember) {
-                $email_value = htmlspecialchars($email);
-             }
+             if ($remember) { $email_value = htmlspecialchars($email); }
         } else {
+            // --- 关键逻辑：只查找 Is_Deleted = 0 (未删除) 的用户 ---
             $query = "SELECT Donor_ID, Donor_Name, Donor_Password FROM donor WHERE Donor_Email = ? AND Is_Deleted = 0";
             $stmt = $conn->prepare($query);
             $stmt->bind_param("s", $email);
             $stmt->execute();
             $result = $stmt->get_result();
             
-            // 默认登录状态为失败
             $login_success = false;
-            $fail_reason = ""; 
 
             if ($result->num_rows == 1) {
                 $user = $result->fetch_assoc();
@@ -84,38 +71,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 if (password_verify($password, $user['Donor_Password'])) {
                     $login_success = true;
 
-                    // --- 登录成功：清除该邮箱之前的失败记录 ---
+                    // A. 登录成功：清除失败记录
                     $clear_stmt = $conn->prepare("DELETE FROM donor_login_attempts WHERE email = ?");
                     $clear_stmt->bind_param("s", $email);
                     $clear_stmt->execute();
                     $clear_stmt->close();
 
-                    // 设置 Session
+                    // B. 设置 Session
                     $_SESSION['donor_id'] = $user['Donor_ID'];
                     $_SESSION['donor_name'] = $user['Donor_Name'];
                     $_SESSION['logged_in'] = true;
                     
-                    // 更新最后登录时间 (可选，根据 donor 表结构)
-                    $update_login = $conn->prepare("UPDATE donor SET Donor_LastLogin = NOW() WHERE Donor_ID = ?");
-                    $update_login->bind_param("i", $user['Donor_ID']);
-                    $update_login->execute();
-
+                    // C. 跳转
                     header("Location: homepage.php");
                     exit();
                 } else {
                     $password_error = "Incorrect password."; 
                 }
             } else {
+                // 如果 Is_Deleted = 1，这里也会查不到，也会显示 Email not found
+                // 这会引导用户去重新注册（从而触发复活逻辑）
                 $email_error = "Email address not found.";
             }
             $stmt->close();
 
             // -----------------------------------------------------------------
-            // 3. 记录失败尝试 (Log Failed Attempt)
+            // 3. 记录失败尝试
             // -----------------------------------------------------------------
             if (!$login_success) {
-                // 只要登录没成功（密码错 或 邮箱找不到），都记录一次失败
-                // 记录 IP 地址
                 $ip_address = $_SERVER['REMOTE_ADDR'];
                 
                 $log_stmt = $conn->prepare("INSERT INTO donor_login_attempts (email, ip_address, attempt_time, status) VALUES (?, ?, NOW(), 'failed')");
@@ -123,7 +106,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $log_stmt->execute();
                 $log_stmt->close();
 
-                // 再次检查是否刚刚达到 5 次，以便立即显示锁定信息
+                // 立即检查是否达到锁定阈值
                 $check_stmt_after = $conn->prepare("SELECT COUNT(*) as fail_count FROM donor_login_attempts WHERE email = ? AND attempt_time > (NOW() - INTERVAL 15 MINUTE)");
                 $check_stmt_after->bind_param("s", $email);
                 $check_stmt_after->execute();
@@ -132,13 +115,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 if ($row_after['fail_count'] >= 5) {
                     $lockout_error = "Too many failed login attempts. Please try again in 15 minutes.";
-                    // 清除具体的密码/邮箱错误，只显示锁定信息（为了安全）
                     $password_error = "";
                     $email_error = "";
                 }
                 $check_stmt_after->close();
 
-                // 登录失败，处理回填值
                 if ($remember) {
                     $email_value = htmlspecialchars($email);
                 } else {
@@ -158,7 +139,6 @@ include 'header_UI.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Donor Login - Love Bridge</title>
     <style>
-        /* CSS 样式保持不变 */
         :root {
             --primary-red: #dc2626;
             --dark-red: #b91c1c;

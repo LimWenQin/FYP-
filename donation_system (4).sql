@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- 主机： 127.0.0.1
--- 生成日期： 2026-01-06 06:19:37
+-- 生成日期： 2026-01-10 06:38:49
 -- 服务器版本： 10.4.32-MariaDB
 -- PHP 版本： 8.2.12
 
@@ -44,11 +44,17 @@ CREATE TABLE `achievement` (
 CREATE TABLE `activity` (
   `Activity_ID` int(11) NOT NULL,
   `Activity_Name` varchar(255) NOT NULL DEFAULT 'Default Activity Name',
+  `Activity_Venue` varchar(255) DEFAULT NULL,
   `Activity_Date` date DEFAULT NULL,
   `Activity_StartDate` date DEFAULT NULL,
   `Activity_EndDate` date DEFAULT NULL,
-  `Activity_Details` text NOT NULL,
-  `Activity_Picture` varchar(255) DEFAULT NULL,
+  `Activity_Description` text DEFAULT NULL,
+  `Activity_Organizer` varchar(100) DEFAULT NULL,
+  `Activity_Contact_Name` varchar(100) DEFAULT NULL,
+  `Activity_Contact_Number` varchar(20) DEFAULT NULL,
+  `Activity_Contact_Email` varchar(100) DEFAULT NULL,
+  `Activity_Max_Participants` int(11) DEFAULT 0,
+  `Activity_Images` longtext DEFAULT NULL,
   `Activity_Status` varchar(50) NOT NULL,
   `Activity_GetAmount` decimal(10,2) NOT NULL,
   `Activity_TargetAmount` decimal(10,2) DEFAULT 0.00,
@@ -66,12 +72,12 @@ CREATE TABLE `activity` (
 -- 转存表中的数据 `activity`
 --
 
-INSERT INTO `activity` (`Activity_ID`, `Activity_Name`, `Activity_Date`, `Activity_StartDate`, `Activity_EndDate`, `Activity_Details`, `Activity_Picture`, `Activity_Status`, `Activity_GetAmount`, `Activity_TargetAmount`, `Activity_Address1`, `Activity_Address2`, `Activity_Address3`, `Activity_City`, `Activity_State`, `Activity_PostalCode`, `Activity_Country`, `Branch_ID`) VALUES
-(1, 'Charity Fun Run 2025', NULL, '2025-12-20', '2025-12-25', 'A 5km run to raise funds for local orphanages. Join us for a healthy morning!', NULL, 'Cancelled', 12500.00, 50000.00, 'Dataran Merdeka', '', '', 'Kuala Lumpur', 'Kuala Lumpur', '50050', 'Malaysia', 1),
-(2, 'Beach Cleanup Drive', NULL, '2025-11-01', '2025-11-02', 'Cleaning up Batu Ferringhi beach to protect marine life. Volunteers needed.', NULL, 'Completed', 5000.00, 5000.00, 'Batu Ferringhi Public Beach', NULL, NULL, 'Batu Ferringhi', 'Penang', '11100', 'Malaysia', 2),
-(3, 'Soup Kitchen Weekly', NULL, '2026-01-10', '2026-01-10', 'Distributing warm meals to the homeless community in Chow Kit area.', NULL, 'Active', 0.00, 2000.00, 'Jalan Chow Kit', NULL, NULL, 'Kuala Lumpur', 'Kuala Lumpur', '50300', 'Malaysia', 1),
-(4, 'Flood Relief Mission', NULL, '2025-10-15', '2025-10-20', 'Emergency relief for flood victims in the East Coast. Collecting dry food and clothes.', NULL, 'Completed', 85000.00, 100000.00, 'Community Hall', NULL, NULL, 'Kuantan', 'Pahang', '25000', 'Malaysia', 1),
-(5, 'Senior Care Visit', NULL, '2025-12-15', '2025-12-18', 'Spending time with the elderly, playing games, and providing medical checkups.', NULL, 'Active', 4500.00, 8000.00, 'Rumah Kasih Sayang', NULL, NULL, 'Petaling Jaya', 'Selangor', '46000', 'Malaysia', 1);
+INSERT INTO `activity` (`Activity_ID`, `Activity_Name`, `Activity_Venue`, `Activity_Date`, `Activity_StartDate`, `Activity_EndDate`, `Activity_Description`, `Activity_Organizer`, `Activity_Contact_Name`, `Activity_Contact_Number`, `Activity_Contact_Email`, `Activity_Max_Participants`, `Activity_Images`, `Activity_Status`, `Activity_GetAmount`, `Activity_TargetAmount`, `Activity_Address1`, `Activity_Address2`, `Activity_Address3`, `Activity_City`, `Activity_State`, `Activity_PostalCode`, `Activity_Country`, `Branch_ID`) VALUES
+(1, 'Charity Fun Run 2025', NULL, NULL, '2025-12-20', '2025-12-25', 'A 5km run to raise funds for local orphanages. Join us for a healthy morning!', NULL, NULL, NULL, NULL, 0, NULL, 'Cancelled', 12500.00, 50000.00, 'Dataran Merdeka', '', '', 'Kuala Lumpur', 'Kuala Lumpur', '50050', 'Malaysia', 1),
+(2, 'Beach Cleanup Drive', NULL, NULL, '2025-11-01', '2025-11-02', 'Cleaning up Batu Ferringhi beach to protect marine life. Volunteers needed.', NULL, NULL, NULL, NULL, 0, NULL, 'Completed', 5000.00, 5000.00, 'Batu Ferringhi Public Beach', NULL, NULL, 'Batu Ferringhi', 'Penang', '11100', 'Malaysia', 2),
+(3, 'Soup Kitchen Weekly', NULL, NULL, '2026-01-10', '2026-01-10', 'Distributing warm meals to the homeless community in Chow Kit area.', NULL, NULL, NULL, NULL, 0, '[\"uploads\\/activities\\/act_1767981044_69613ff450bc2_0.png\",\"uploads\\/activities\\/act_1767981044_69613ff450dba_1.png\",\"uploads\\/activities\\/act_1767981044_69613ff451081_2.png\",\"uploads\\/activities\\/act_1767981044_69613ff4513e4_3.png\"]', 'Active', 0.00, 2000.00, 'Jalan Chow Kit', '', '', 'Kuala Lumpur', 'Kuala Lumpur', '50300', 'Malaysia', 1),
+(4, 'Flood Relief Mission', NULL, NULL, '2025-10-15', '2025-10-20', 'Emergency relief for flood victims in the East Coast. Collecting dry food and clothes.', NULL, NULL, NULL, NULL, 0, NULL, 'Completed', 85000.00, 100000.00, 'Community Hall', NULL, NULL, 'Kuantan', 'Pahang', '25000', 'Malaysia', 1),
+(5, 'Senior Care Visit', NULL, NULL, '2025-12-15', '2025-12-18', 'Spending time with the elderly, playing games, and providing medical checkups.', NULL, NULL, NULL, NULL, 0, NULL, 'Active', 4500.00, 8000.00, 'Rumah Kasih Sayang', NULL, NULL, 'Petaling Jaya', 'Selangor', '46000', 'Malaysia', 1);
 
 --
 -- 触发器 `activity`
@@ -103,7 +109,7 @@ CREATE TABLE `admin` (
   `Admin_ContactNumber` varchar(20) NOT NULL,
   `Admin_ICNUMBER` varchar(20) NOT NULL,
   `Admin_Email` varchar(100) NOT NULL,
-  `Admin_Password` varchar(255) NOT NULL,
+  `Admin_Password` varchar(255) DEFAULT NULL,
   `Admin_DOB` date NOT NULL,
   `Admin_Address1` varchar(255) NOT NULL,
   `Admin_Address2` varchar(255) DEFAULT NULL,
@@ -121,17 +127,19 @@ CREATE TABLE `admin` (
   `Admin_Comment` text NOT NULL,
   `Admin_LoginAttempts` int(11) DEFAULT 0,
   `Admin_LastFailedLogin` datetime DEFAULT NULL,
-  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted'
+  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted',
+  `Admin_IsFirstLogin` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- 转存表中的数据 `admin`
 --
 
-INSERT INTO `admin` (`Admin_ID`, `Admin_Name`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address1`, `Admin_Address2`, `Admin_Address3`, `Admin_City`, `Admin_State`, `Admin_PostalCode`, `Admin_Country`, `Admin_ProfilePicture`, `Admin_Role`, `Admin_Status`, `Admin_LastLogin`, `Admin_CreatedAt`, `Admin_UpdatedAt`, `Admin_Comment`, `Admin_LoginAttempts`, `Admin_LastFailedLogin`, `Is_Deleted`) VALUES
-(1, 'Super Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Level 12', 'Menara Love Bridge', 'Jalan Charity', 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', '2025-12-06 20:35:49', '2025-11-28 12:00:00', '2025-12-10 21:15:44', 'System Super Administrator', 5, '2025-12-10 21:15:44', 0),
-(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$bL3GDvE//gV.k149JNo6rejq/rwqubykoY3eMULa9vrndOYWFMjq.', '2003-05-17', '11， jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', 'uploads/admins/admin_1765013470_6933f7de52098.jpg', 'Super Admin', 'Active', '2026-01-05 21:44:14', '2025-12-06 17:31:10', '2026-01-05 21:44:14', 'Added via admin management system', 0, '2026-01-05 19:43:25', 0),
-(3, 'Tan Choo Yee', '+6019-9878299', '010203-05-1234', 'ujintan218@gmail.com', '$2y$10$5zA9gCym9VbjQDdR0XcxK.de.K7M8mtKAh92m7r2IgOsJ..2Z2MVa', '2001-02-03', 'Blk 914Jurong West Street 91', 'taman bukit beruang utama', '', 'Melaka', 'Melaka', '75450', 'Malaysia', NULL, 'Admin', 'Active', '2025-12-10 21:17:38', '2025-12-07 20:35:18', '2025-12-10 21:17:38', 'Added via admin management system', 0, NULL, 0);
+INSERT INTO `admin` (`Admin_ID`, `Admin_Name`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address1`, `Admin_Address2`, `Admin_Address3`, `Admin_City`, `Admin_State`, `Admin_PostalCode`, `Admin_Country`, `Admin_ProfilePicture`, `Admin_Role`, `Admin_Status`, `Admin_LastLogin`, `Admin_CreatedAt`, `Admin_UpdatedAt`, `Admin_Comment`, `Admin_LoginAttempts`, `Admin_LastFailedLogin`, `Is_Deleted`, `Admin_IsFirstLogin`) VALUES
+(1, 'Super Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Level 12', 'Menara Love Bridge', 'Jalan Charity', 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', '2025-12-06 20:35:49', '2025-11-28 12:00:00', '2025-12-10 21:15:44', 'System Super Administrator', 5, '2025-12-10 21:15:44', 0, 1),
+(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$yRnaaAeLqift7YsGSVjF8.70L7.tQMHtDFrLkD7gbeapVr4KLfHR2', '2003-05-17', '11， jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', 'uploads/profiles/admin_2_1767838052.jpg', 'Super Admin', 'Active', '2026-01-10 13:36:20', '2025-12-06 17:31:10', '2026-01-10 13:36:20', 'Added via admin management system', 0, '2026-01-09 12:17:06', 0, 0),
+(5, 'ujin', '+6019-9878299', '050218-05-1234', 'ujintan218@gmail.com', '$2y$10$1BvJVRIgBpkgfPOpeiXBOulnxttZFxJKfHEOtMyImfaLzjSUvkJhO', '2005-02-18', '', '', '', '', '', '', 'Malaysia', NULL, 'Admin', 'Active', '2026-01-08 22:00:05', '2026-01-08 21:55:12', '2026-01-08 23:33:10', '', 0, NULL, 0, 0),
+(6, 'Lim Wen Qin', '+6011-19848732', '060504-03-0201', 'qinwenlin989@gmail.com', '$2y$10$CpJi2tClyKoRBpDt4sR4B.QRW/yTjENkBVnKLReWKaGGts1eAKAUy', '2006-05-04', '', '', '', '', '', '', 'Malaysia', NULL, 'Admin', 'Active', '2026-01-09 13:47:37', '2026-01-09 13:44:39', '2026-01-09 13:47:57', '', 0, NULL, 0, 0);
 
 -- --------------------------------------------------------
 
@@ -154,9 +162,18 @@ CREATE TABLE `admin_notifications` (
 --
 
 INSERT INTO `admin_notifications` (`AdminNotification_ID`, `Message`, `Contact_ID`, `Type`, `Is_Read`, `Is_Deleted`, `Created_At`) VALUES
-(7, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 1, 0, '2026-01-06 00:46:27'),
-(8, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 1, 0, '2026-01-06 00:46:27'),
-(9, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 1, 0, '2026-01-06 00:46:27');
+(7, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 1, 1, '2026-01-06 00:46:27'),
+(8, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 1, 1, '2026-01-06 00:46:27'),
+(9, 'New contact form submission from LIM WEN QIN', 17, 'New_Contact', 1, 1, '2026-01-06 00:46:27'),
+(10, 'New Staff Member Added: john', NULL, 'User', 1, 1, '2026-01-08 10:17:06'),
+(11, 'New Donor Registered: johndoe', NULL, 'User', 1, 1, '2026-01-08 10:17:29'),
+(12, 'New Staff Member Added: john', NULL, 'User', 1, 1, '2026-01-08 11:39:50'),
+(13, 'New Staff Member Added: steve', NULL, 'User', 1, 1, '2026-01-08 15:12:17'),
+(14, 'New Staff Member Added: ujin', NULL, 'User', 1, 1, '2026-01-08 15:16:40'),
+(15, 'New Staff Member Added: john', NULL, 'User', 1, 0, '2026-01-08 21:57:06'),
+(16, 'New Staff Member Added: ronald tan bin hong', NULL, 'User', 1, 0, '2026-01-09 13:43:36'),
+(17, 'New Staff Member Added: ronald tan bin hong', NULL, 'User', 1, 0, '2026-01-09 14:05:30'),
+(18, 'Activity Updated: Soup Kitchen Weekly', NULL, 'Update', 1, 0, '2026-01-10 01:50:44');
 
 -- --------------------------------------------------------
 
@@ -167,7 +184,12 @@ INSERT INTO `admin_notifications` (`AdminNotification_ID`, `Message`, `Contact_I
 CREATE TABLE `branch` (
   `Branch_ID` int(11) NOT NULL,
   `Branch_Name` varchar(100) NOT NULL,
-  `Branch_Type` varchar(50) NOT NULL,
+  `Branch_Head` varchar(100) NOT NULL,
+  `Branch_Head_Contact` varchar(20) DEFAULT NULL,
+  `Branch_Head_Email` varchar(100) DEFAULT NULL,
+  `Branch_Type` enum('Old Folks Home','Orphanage','Disabled Care Center') NOT NULL,
+  `Branch_Capacity` int(11) NOT NULL DEFAULT 0,
+  `Branch_EstablishedDate` date DEFAULT NULL,
   `Branch_Address1` varchar(255) NOT NULL,
   `Branch_Address2` varchar(255) DEFAULT NULL,
   `Branch_Address3` varchar(255) DEFAULT NULL,
@@ -178,10 +200,9 @@ CREATE TABLE `branch` (
   `Branch_ContactNumber` varchar(20) NOT NULL,
   `Branch_Email` varchar(100) NOT NULL,
   `Branch_Description` text NOT NULL,
+  `Branch_Images` text DEFAULT NULL,
   `Admin_ID` int(11) NOT NULL,
-  `Branch_ProfilePicture` varchar(255) DEFAULT NULL,
   `Branch_OperationalStatus` enum('Open','Closed') DEFAULT 'Open',
-  `Branch_TargetAmount` decimal(10,2) DEFAULT 10000.00,
   `Branch_CreatedAt` datetime DEFAULT current_timestamp(),
   `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -190,10 +211,10 @@ CREATE TABLE `branch` (
 -- 转存表中的数据 `branch`
 --
 
-INSERT INTO `branch` (`Branch_ID`, `Branch_Name`, `Branch_Type`, `Branch_Address1`, `Branch_Address2`, `Branch_Address3`, `Branch_City`, `Branch_State`, `Branch_PostalCode`, `Branch_Country`, `Branch_ContactNumber`, `Branch_Email`, `Branch_Description`, `Admin_ID`, `Branch_ProfilePicture`, `Branch_OperationalStatus`, `Branch_TargetAmount`, `Branch_CreatedAt`, `Is_Deleted`) VALUES
-(1, 'fourace', 'Orphanage', 'Blk 914Jurong West Street 91', '', '', 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-1190233', '', '', 2, NULL, 'Open', 200000.00, '2025-12-15 23:02:23', 0),
-(2, 'KL Main Branch', 'Headquarters', 'Level 12, Menara Love Bridge', '', '', 'Kuala Lumpur', 'Kuala Lumpur', '50450', 'Malaysia', '+6011-12345633', 'admin@donationsystem.com', 'Main operating center for central region.', 1, NULL, 'Open', 10000.00, '2025-12-15 23:02:23', 0),
-(3, 'Penang Outreach', 'Regional Center', '15, Jalan Georgetown', NULL, NULL, 'Georgetown', 'Penang', '10200', 'Malaysia', '04-2223333', '', 'Northern region support center.', 1, NULL, 'Open', 10000.00, '2025-12-15 23:02:23', 0);
+INSERT INTO `branch` (`Branch_ID`, `Branch_Name`, `Branch_Head`, `Branch_Head_Contact`, `Branch_Head_Email`, `Branch_Type`, `Branch_Capacity`, `Branch_EstablishedDate`, `Branch_Address1`, `Branch_Address2`, `Branch_Address3`, `Branch_City`, `Branch_State`, `Branch_PostalCode`, `Branch_Country`, `Branch_ContactNumber`, `Branch_Email`, `Branch_Description`, `Branch_Images`, `Admin_ID`, `Branch_OperationalStatus`, `Branch_CreatedAt`, `Is_Deleted`) VALUES
+(1, 'fourace', '', NULL, NULL, 'Orphanage', 0, NULL, 'Blk 914Jurong West Street 91', '', '', 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-1190233', '', '', NULL, 2, 'Open', '2025-12-15 23:02:23', 0),
+(2, 'KL Main Branch', '', NULL, NULL, '', 0, NULL, 'Level 12, Menara Love Bridge', '', '', 'Kuala Lumpur', 'Kuala Lumpur', '50450', 'Malaysia', '+6011-12345633', 'admin@donationsystem.com', 'Main operating center for central region.', NULL, 1, 'Open', '2025-12-15 23:02:23', 0),
+(3, 'Penang Outreach', 'ronald', '+6011-11190223', '', 'Old Folks Home', 32, '2026-01-09', '15, Jalan Georgetown', '', '', 'Georgetown', 'Penang', '10200', 'Malaysia', '+6011-11190233', 'admin@donationsystem.com', 'Northern region support center.', '[\"uploads/branches/br_1767960081_6960ee113ef84_0.jpg\",\"uploads/branches/br_1767960081_6960ee113f17b_1.png\",\"uploads/branches/br_1767960081_6960ee113f331_2.png\",\"uploads/branches/br_1767960081_6960ee113f713_3.png\"]', 1, 'Open', '2025-12-15 23:02:23', 0);
 
 -- --------------------------------------------------------
 
@@ -233,23 +254,6 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
--- 表的结构 `donations`
---
-
-CREATE TABLE `donations` (
-  `Donation_ID` int(11) NOT NULL,
-  `Donor_ID` int(11) NOT NULL,
-  `Project_Name` varchar(255) DEFAULT 'General Donation',
-  `Donation_Amount` decimal(10,2) NOT NULL,
-  `Donation_Date` datetime DEFAULT current_timestamp(),
-  `Payment_Status` enum('pending','completed','failed') DEFAULT 'completed',
-  `Payment_Method` varchar(50) DEFAULT NULL,
-  `Transaction_ID` varchar(100) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
 -- 表的结构 `donor`
 --
 
@@ -259,7 +263,8 @@ CREATE TABLE `donor` (
   `Donor_ContactNumber` varchar(20) NOT NULL,
   `Donor_ICNumber` varchar(20) NOT NULL,
   `Donor_Email` varchar(100) NOT NULL,
-  `Donor_Password` varchar(255) NOT NULL,
+  `Donor_Password` varchar(255) DEFAULT NULL,
+  `Donor_Wallet` decimal(10,2) NOT NULL DEFAULT 0.00,
   `Donor_Address1` varchar(255) NOT NULL,
   `Donor_Address2` varchar(255) DEFAULT NULL,
   `Donor_Address3` varchar(255) DEFAULT NULL,
@@ -272,16 +277,19 @@ CREATE TABLE `donor` (
   `Donor_RegisteredAt` datetime DEFAULT current_timestamp(),
   `Donor_LastLogin` datetime DEFAULT NULL,
   `Donor_ProfilePicture` varchar(255) DEFAULT NULL,
-  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted'
+  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted',
+  `donor_reset_count` int(11) DEFAULT 0,
+  `donor_last_reset_request` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- 转存表中的数据 `donor`
 --
 
-INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_ContactNumber`, `Donor_ICNumber`, `Donor_Email`, `Donor_Password`, `Donor_Address1`, `Donor_Address2`, `Donor_Address3`, `Donor_City`, `Donor_State`, `Donor_PostalCode`, `Donor_Country`, `Donor_DOB`, `Donor_Description`, `Donor_RegisteredAt`, `Donor_LastLogin`, `Donor_ProfilePicture`, `Is_Deleted`) VALUES
-(2, 'RONALD TAN BIN HONG', '012-7212535', '030404011183', 'abc@gmail.com', '$2y$10$3hsuDLLcdM4mr9bqhvJekOZqH80/6aF.7GR2vLxXHbcgWT.RjOe.O', 'No19.jalan melawati 19, taman melawati', '', '', 'Johor Bahru', 'Johor', '81300', 'Malaysia', '2003-04-04', '', '2025-12-15 22:27:40', NULL, NULL, 0),
-(3, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$PNOaF1e8KP0y9i404VCz9OWhn3XVyLHx8roawWiJjvPR0hyRunfeW', 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '2003-05-17', '', '2026-01-03 21:43:26', NULL, 'uploads/donors/donor_1767447806_69591cfe10e76.jpg', 0);
+INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_ContactNumber`, `Donor_ICNumber`, `Donor_Email`, `Donor_Password`, `Donor_Wallet`, `Donor_Address1`, `Donor_Address2`, `Donor_Address3`, `Donor_City`, `Donor_State`, `Donor_PostalCode`, `Donor_Country`, `Donor_DOB`, `Donor_Description`, `Donor_RegisteredAt`, `Donor_LastLogin`, `Donor_ProfilePicture`, `Is_Deleted`, `donor_reset_count`, `donor_last_reset_request`) VALUES
+(2, 'RONALD TAN BIN HONG', '012-7212535', '030404011183', 'abc@gmail.com', '$2y$10$3hsuDLLcdM4mr9bqhvJekOZqH80/6aF.7GR2vLxXHbcgWT.RjOe.O', 0.00, 'No19.jalan melawati 19, taman melawati', '', '', 'Johor Bahru', 'Johor', '81300', 'Malaysia', '2003-04-04', '', '2025-12-15 22:27:40', NULL, NULL, 0, 0, NULL),
+(3, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$PNOaF1e8KP0y9i404VCz9OWhn3XVyLHx8roawWiJjvPR0hyRunfeW', 0.00, 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '2003-05-17', '', '2026-01-03 21:43:26', NULL, 'uploads/donors/donor_1767879100_695fb1bc6d8e7.png', 0, 0, NULL),
+(4, 'johndoe', '+6011-11190233', '', 'admin@donationsystem.com', NULL, 0.00, '', '', '', '', '', '', 'Malaysia', '0000-00-00', '', '2026-01-08 10:17:29', NULL, NULL, 0, 0, NULL);
 
 --
 -- 触发器 `donor`
@@ -319,6 +327,57 @@ CREATE TABLE `donor_achievement` (
 -- --------------------------------------------------------
 
 --
+-- 表的结构 `donor_login_attempts`
+--
+
+CREATE TABLE `donor_login_attempts` (
+  `id` int(11) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `attempt_time` datetime NOT NULL DEFAULT current_timestamp(),
+  `status` enum('failed','success') NOT NULL DEFAULT 'failed'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `donor_password_reset`
+--
+
+CREATE TABLE `donor_password_reset` (
+  `reset_id` int(11) NOT NULL,
+  `donor_id` int(11) NOT NULL,
+  `reset_token` varchar(255) NOT NULL,
+  `reset_email` varchar(255) NOT NULL,
+  `reset_expires` datetime NOT NULL,
+  `reset_created` datetime NOT NULL DEFAULT current_timestamp(),
+  `reset_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `reset_status` enum('pending','used','expired','invalidated') NOT NULL DEFAULT 'pending',
+  `reset_used` tinyint(1) NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `donor_security_logs`
+--
+
+CREATE TABLE `donor_security_logs` (
+  `log_id` int(11) NOT NULL,
+  `donor_id` int(11) DEFAULT NULL,
+  `log_type` varchar(50) NOT NULL,
+  `log_action` varchar(50) NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `log_details` text DEFAULT NULL,
+  `log_date` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- 表的结构 `email_logs`
 --
 
@@ -339,54 +398,6 @@ CREATE TABLE `email_logs` (
 INSERT INTO `email_logs` (`Email_ID`, `To_Email`, `Title`, `Content`, `Status`, `Sent_At`, `Created_At`) VALUES
 (1, 'admin@lovebridge.org.my', 'New Contact Form Submission: a', 'A new contact form has been submitted:\n\nName: LIM WEN QIN\nEmail: lll8694798586@gmail.com\nPhone: 011-12345678\nTitle: a\nMessage:\nqw\n\nLogin to admin panel to view details.', 'Sent', '2026-01-06 00:44:13', '2026-01-06 00:44:13'),
 (2, 'admin@lovebridge.org.my', 'New Contact Form Submission: a', 'A new contact form has been submitted:\n\nName: LIM WEN QIN\nEmail: lll8694798586@gmail.com\nPhone: 011-12345678\nTitle: a\nMessage:\nqw\n\nLogin to admin panel to view details.', 'Sent', '2026-01-06 00:46:27', '2026-01-06 00:46:27');
-
--- --------------------------------------------------------
-
---
--- 表的结构 `expenses`
---
-
-CREATE TABLE `expenses` (
-  `Expense_ID` int(11) NOT NULL,
-  `Expense_Title` varchar(255) NOT NULL,
-  `Expense_Description` text DEFAULT NULL,
-  `Expense_Amount` decimal(10,2) NOT NULL,
-  `Expense_Category` varchar(50) NOT NULL,
-  `Claimant_Type` enum('Admin','Staff') NOT NULL,
-  `Claimant_ID` int(11) NOT NULL,
-  `Expense_Date` datetime NOT NULL DEFAULT current_timestamp(),
-  `Expense_Status` varchar(50) NOT NULL DEFAULT 'Pending',
-  `Recorded_By_Admin_ID` int(11) NOT NULL,
-  `Expense_Proof` text DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- 转存表中的数据 `expenses`
---
-
-INSERT INTO `expenses` (`Expense_ID`, `Expense_Title`, `Expense_Description`, `Expense_Amount`, `Expense_Category`, `Claimant_Type`, `Claimant_ID`, `Expense_Date`, `Expense_Status`, `Recorded_By_Admin_ID`, `Expense_Proof`) VALUES
-(1, 'Oil', 'cooking ol', 100.00, 'Reimbursement', 'Admin', 2, '2026-01-04 00:18:27', 'Approved', 2, '[\"uploads\\/expenses\\/receipt_1767457107_695941539eabe_0.jpg\"]'),
-(2, 'Oil', 'cooking ol', 100.00, 'Reimbursement', 'Admin', 2, '2026-01-04 00:24:35', 'Approved', 2, '[\"uploads\\/expenses\\/receipt_1767457475_695942c3c9dc9_0.jpg\"]');
-
---
--- 触发器 `expenses`
---
-DELIMITER $$
-CREATE TRIGGER `notify_expense_insert` AFTER INSERT ON `expenses` FOR EACH ROW BEGIN
-    INSERT INTO `admin_notifications` (`Message`, `Type`, `Is_Read`, `Created_At`) 
-    VALUES (CONCAT('New Expense Claim: ', NEW.Expense_Title, ' (RM', NEW.Expense_Amount, ')'), 'Target', 0, NOW());
-END
-$$
-DELIMITER ;
-DELIMITER $$
-CREATE TRIGGER `notify_expense_update` AFTER UPDATE ON `expenses` FOR EACH ROW BEGIN
-    IF OLD.Expense_Status != NEW.Expense_Status THEN
-        INSERT INTO `admin_notifications` (`Message`, `Type`, `Is_Read`, `Created_At`) 
-        VALUES (CONCAT('Expense #', NEW.Expense_ID, ' Status Updated to ', NEW.Expense_Status), 'Update', 0, NOW());
-    END IF;
-END
-$$
-DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -630,7 +641,8 @@ CREATE TABLE `point` (
 
 INSERT INTO `point` (`Points_ID`, `Points_Earned`, `Points_Total`, `Points_Updated_At`, `Donor_ID`) VALUES
 (1, 10, 10, '2025-12-15 22:28:06', 2),
-(2, 100, 65, '2026-01-04 23:11:46', 3);
+(2, 100, 65, '2026-01-04 23:11:46', 3),
+(3, 0, 0, '2026-01-08 10:17:29', 4);
 
 -- --------------------------------------------------------
 
@@ -906,7 +918,7 @@ CREATE TABLE `staff` (
   `Staff_ContactNumber` varchar(20) NOT NULL,
   `Staff_ICNumber` varchar(20) NOT NULL,
   `Staff_Email` varchar(100) NOT NULL,
-  `Staff_Password` varchar(15) NOT NULL,
+  `Staff_Password` varchar(255) DEFAULT NULL,
   `Staff_DOB` date NOT NULL,
   `Staff_Address1` varchar(255) NOT NULL,
   `Staff_Address2` varchar(255) DEFAULT NULL,
@@ -922,15 +934,19 @@ CREATE TABLE `staff` (
   `Staff_JoinDate` date DEFAULT current_timestamp(),
   `Staff_ProfilePicture` varchar(255) DEFAULT NULL,
   `Admin_ID` int(11) NOT NULL,
-  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted'
+  `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted',
+  `Staff_IsFirstLogin` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- 转存表中的数据 `staff`
 --
 
-INSERT INTO `staff` (`Staff_ID`, `Staff_FullName`, `Staff_ContactNumber`, `Staff_ICNumber`, `Staff_Email`, `Staff_Password`, `Staff_DOB`, `Staff_Address1`, `Staff_Address2`, `Staff_Address3`, `Staff_City`, `Staff_State`, `Staff_PostalCode`, `Staff_Country`, `Staff_Comment`, `Staff_Role`, `Staff_Status`, `Branch_ID`, `Staff_JoinDate`, `Staff_ProfilePicture`, `Admin_ID`, `Is_Deleted`) VALUES
-(1, 'Lim Wen Qin', '+6011-11190233', '030303-01-0303', 'lim.wen.qin@student.mmu.edu.my', '$2y$10$wI3ynrr3', '2003-03-03', '19, jalan bukit beruang utama 6', 'taman buklit beruang utama', '', 'melaka', 'Melaka', '75450', 'Malaysia', '', 'Staff', 'Active', NULL, '2025-12-07', 'uploads/staff_profiles/staff_1765123541_6935a5d520873.png', 2, 0);
+INSERT INTO `staff` (`Staff_ID`, `Staff_FullName`, `Staff_ContactNumber`, `Staff_ICNumber`, `Staff_Email`, `Staff_Password`, `Staff_DOB`, `Staff_Address1`, `Staff_Address2`, `Staff_Address3`, `Staff_City`, `Staff_State`, `Staff_PostalCode`, `Staff_Country`, `Staff_Comment`, `Staff_Role`, `Staff_Status`, `Branch_ID`, `Staff_JoinDate`, `Staff_ProfilePicture`, `Admin_ID`, `Is_Deleted`, `Staff_IsFirstLogin`) VALUES
+(1, 'Lim Wen Qin', '+6011-11190233', '030303-01-0303', 'lim.wen.qin@student.mmu.edu.my', '$2y$10$wI3ynrr3', '2003-03-03', '19, jalan bukit beruang utama 6', 'taman buklit beruang utama', '', 'melaka', 'Melaka', '75450', 'Malaysia', '', 'Staff', 'Active', NULL, '2025-12-07', 'uploads/staff_profiles/staff_1765123541_6935a5d520873.png', 2, 0, 1),
+(4, 'steve', '+6012-34567898', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$s4PtchL9.Lhy9dcKmrf0.eCM1qrxynsrSq4cLqR.c2XypF7q7F7w2', '2003-05-17', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-08', NULL, 2, 0, 1),
+(6, 'john', '+6012-3456789', '010203-04-0506', 'johndoe123@gmail.com', '$2y$10$FAwwBFD1hIOcrWPKJlvJbOLod5Za.bTjk1l5YsaTUbaRAAWs74tDy', '2001-02-03', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-08', NULL, 2, 0, 1),
+(8, 'ronald tan bin hong', '+6012-7212535', '010203-04-0506', 'ronaldtan0404@gmail.com', '$2y$10$n.Y6jwngCWE/KxeYcAX6ouE6vwq63ZhL1bHHfbtXhxY5ihQa7O8WK', '2001-02-06', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-09', NULL, 2, 0, 0);
 
 --
 -- 触发器 `staff`
@@ -1072,13 +1088,6 @@ ALTER TABLE `contact_messages`
   ADD PRIMARY KEY (`Contact_ID`);
 
 --
--- 表的索引 `donations`
---
-ALTER TABLE `donations`
-  ADD PRIMARY KEY (`Donation_ID`),
-  ADD KEY `Donor_ID` (`Donor_ID`);
-
---
 -- 表的索引 `donor`
 --
 ALTER TABLE `donor`
@@ -1093,16 +1102,31 @@ ALTER TABLE `donor_achievement`
   ADD KEY `DonorAchievement_Achievement_ID_FK` (`Achievement_ID`);
 
 --
+-- 表的索引 `donor_login_attempts`
+--
+ALTER TABLE `donor_login_attempts`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `email` (`email`),
+  ADD KEY `attempt_time` (`attempt_time`);
+
+--
+-- 表的索引 `donor_password_reset`
+--
+ALTER TABLE `donor_password_reset`
+  ADD PRIMARY KEY (`reset_id`),
+  ADD KEY `donor_id` (`donor_id`);
+
+--
+-- 表的索引 `donor_security_logs`
+--
+ALTER TABLE `donor_security_logs`
+  ADD PRIMARY KEY (`log_id`);
+
+--
 -- 表的索引 `email_logs`
 --
 ALTER TABLE `email_logs`
   ADD PRIMARY KEY (`Email_ID`);
-
---
--- 表的索引 `expenses`
---
-ALTER TABLE `expenses`
-  ADD PRIMARY KEY (`Expense_ID`);
 
 --
 -- 表的索引 `headquarters`
@@ -1288,13 +1312,13 @@ ALTER TABLE `activity`
 -- 使用表AUTO_INCREMENT `admin`
 --
 ALTER TABLE `admin`
-  MODIFY `Admin_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `Admin_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- 使用表AUTO_INCREMENT `admin_notifications`
 --
 ALTER TABLE `admin_notifications`
-  MODIFY `AdminNotification_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `AdminNotification_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- 使用表AUTO_INCREMENT `branch`
@@ -1309,16 +1333,10 @@ ALTER TABLE `contact_messages`
   MODIFY `Contact_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
--- 使用表AUTO_INCREMENT `donations`
---
-ALTER TABLE `donations`
-  MODIFY `Donation_ID` int(11) NOT NULL AUTO_INCREMENT;
-
---
 -- 使用表AUTO_INCREMENT `donor`
 --
 ALTER TABLE `donor`
-  MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- 使用表AUTO_INCREMENT `donor_achievement`
@@ -1327,16 +1345,28 @@ ALTER TABLE `donor_achievement`
   MODIFY `DonorAchievement_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- 使用表AUTO_INCREMENT `donor_login_attempts`
+--
+ALTER TABLE `donor_login_attempts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- 使用表AUTO_INCREMENT `donor_password_reset`
+--
+ALTER TABLE `donor_password_reset`
+  MODIFY `reset_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- 使用表AUTO_INCREMENT `donor_security_logs`
+--
+ALTER TABLE `donor_security_logs`
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- 使用表AUTO_INCREMENT `email_logs`
 --
 ALTER TABLE `email_logs`
   MODIFY `Email_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
-
---
--- 使用表AUTO_INCREMENT `expenses`
---
-ALTER TABLE `expenses`
-  MODIFY `Expense_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- 使用表AUTO_INCREMENT `headquarters`
@@ -1384,7 +1414,7 @@ ALTER TABLE `payment`
 -- 使用表AUTO_INCREMENT `point`
 --
 ALTER TABLE `point`
-  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- 使用表AUTO_INCREMENT `policy_acceptances`
@@ -1438,7 +1468,7 @@ ALTER TABLE `special_case`
 -- 使用表AUTO_INCREMENT `staff`
 --
 ALTER TABLE `staff`
-  MODIFY `Staff_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `Staff_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- 使用表AUTO_INCREMENT `staff_activity`
@@ -1485,12 +1515,6 @@ ALTER TABLE `admin_notifications`
 --
 ALTER TABLE `branch`
   ADD CONSTRAINT `branch_admin_id_fk` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`);
-
---
--- 限制表 `donations`
---
-ALTER TABLE `donations`
-  ADD CONSTRAINT `donations_ibfk_1` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`) ON DELETE CASCADE;
 
 --
 -- 限制表 `donor_achievement`
