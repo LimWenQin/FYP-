@@ -397,6 +397,7 @@ $caseCategoryStats = getCaseCategoryStats($conn); // Pie Chart Data
         .d-year { font-size: 12px; font-weight: bold; color: #333; }
         .d-month { font-size: 11px; text-transform: uppercase; margin: 2px 0; }
         .d-day { font-size: 14px; font-weight: bold; color: #333; }
+        .d-time { font-size: 10px; color: #999; margin-top: 2px; font-weight: 500; } /* 新增的时间样式 */
         
         .amount-right { text-align: right; }
         .redemption-table th, .redemption-table td { text-align: center !important; }
@@ -649,8 +650,17 @@ $caseCategoryStats = getCaseCategoryStats($conn); // Pie Chart Data
                             <?php if (count($recentDonations) > 0): ?>
                                 <?php foreach($recentDonations as $d): 
                                     $statusClass = 'status-pending';
-                                    if ($d['status'] == 'Success' || $d['status'] == 'Completed') $statusClass = 'status-success';
-                                    elseif ($d['status'] == 'Failed') $statusClass = 'status-failed';
+                                    $displayStatus = $d['status']; 
+                                    
+                                    // 修复逻辑：如果状态为空或实际上为Pending，强制显示 "Pending" 文字
+                                    if (empty($displayStatus) || $displayStatus == 'Pending') {
+                                        $displayStatus = 'Pending';
+                                        $statusClass = 'status-pending';
+                                    } elseif ($displayStatus == 'Success' || $displayStatus == 'Completed') {
+                                        $statusClass = 'status-success';
+                                    } elseif ($displayStatus == 'Failed') {
+                                        $statusClass = 'status-failed';
+                                    }
                                     
                                     $dateObj = new DateTime($d['Order_Created_At']);
                                 ?>
@@ -665,13 +675,13 @@ $caseCategoryStats = getCaseCategoryStats($conn); // Pie Chart Data
                                             <div class="text-info"><h4><?php echo htmlspecialchars($d['Donor_Name']); ?></h4></div>
                                         </div>
                                     </td>
-                                    <td><span class="status-badge <?php echo $statusClass; ?>"><?php echo $d['status']; ?></span></td>
+                                    <td><span class="status-badge <?php echo $statusClass; ?>"><?php echo $displayStatus; ?></span></td>
                                     <td>
                                         <div class="date-box">
                                             <span class="d-year"><?php echo $dateObj->format('Y'); ?></span>
                                             <span class="d-month"><?php echo $dateObj->format('M'); ?></span>
                                             <span class="d-day"><?php echo $dateObj->format('d'); ?></span>
-                                        </div>
+                                            <span class="d-time"><?php echo $dateObj->format('h:i A'); ?></span> </div>
                                     </td>
                                     <td class="amount-right"><?php echo number_format($d['Order_Amount'], 2); ?></td>
                                 </tr>
@@ -726,7 +736,7 @@ $caseCategoryStats = getCaseCategoryStats($conn); // Pie Chart Data
                                             <span class="d-year"><?php echo $rDate->format('Y'); ?></span>
                                             <span class="d-month"><?php echo $rDate->format('M'); ?></span>
                                             <span class="d-day"><?php echo $rDate->format('d'); ?></span>
-                                        </div>
+                                            <span class="d-time"><?php echo $rDate->format('h:i A'); ?></span> </div>
                                     </td>
                                     <td><strong><?php echo htmlspecialchars($r['Donor_Name']); ?></strong></td>
                                     <td><?php echo htmlspecialchars($r['Reward_ItemName']); ?></td>

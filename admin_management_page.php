@@ -28,7 +28,7 @@ if ($headerResult && $headerResult->num_rows > 0) {
     $headerRow = $headerResult->fetch_assoc();
     $adminName = $headerRow['Admin_Name'];          
     $adminProfilePicture = $headerRow['Admin_ProfilePicture'];
-    $adminPosition = $headerRow['Admin_Role'];
+    $adminPosition = $headerRow['Admin_Role']; // Ensure this variable is set for permission checks
 } else {
     $adminName = "Admin";
     $adminProfilePicture = null;
@@ -386,22 +386,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
 
 // --- HANDLE BLOCK ADMIN ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['block_admin'])) {
-    $blockId = intval($_POST['block_admin_id']);
-    if ($blockId == $_SESSION['admin_id']) {
-        $errorMessage = "You cannot block your own account!";
-        header("Location: admin_management_page.php?error=" . urlencode($errorMessage));
-        exit();
-    } else {
-        $blockSql = "UPDATE admin SET Is_Deleted = 1 WHERE Admin_ID = $blockId";
-        if ($conn->query($blockSql)) {
-            $successMessage = "Admin blocked successfully!";
-            header("Location: admin_management_page.php?success=" . urlencode($successMessage));
-            exit();
-        } else {
-            $errorMessage = "Error blocking admin: " . $conn->error;
+    if ($adminPosition === 'Super Admin') {
+        $blockId = intval($_POST['block_admin_id']);
+        if ($blockId == $_SESSION['admin_id']) {
+            $errorMessage = "You cannot block your own account!";
             header("Location: admin_management_page.php?error=" . urlencode($errorMessage));
             exit();
+        } else {
+            $blockSql = "UPDATE admin SET Is_Deleted = 1 WHERE Admin_ID = $blockId";
+            if ($conn->query($blockSql)) {
+                $successMessage = "Admin blocked successfully!";
+                header("Location: admin_management_page.php?success=" . urlencode($successMessage));
+                exit();
+            } else {
+                $errorMessage = "Error blocking admin: " . $conn->error;
+                header("Location: admin_management_page.php?error=" . urlencode($errorMessage));
+                exit();
+            }
         }
+    } else {
+        $errorMessage = "Permission Denied. Only Super Admin can block.";
+        header("Location: admin_management_page.php?error=" . urlencode($errorMessage));
+        exit();
     }
 }
 
@@ -417,6 +423,7 @@ $filterValue = "";
 
 $conditions = [];
 $conditions[] = "Is_Deleted = 0";
+$orderClause = "ORDER BY Admin_CreatedAt DESC"; 
 
 if (!empty($searchTerm)) {
     $conditions[] = "(Admin_Name LIKE '%$searchTerm%' 
@@ -432,6 +439,25 @@ if (!empty($filterType)) {
     elseif ($filterType == 'status' && !empty($_GET['filter_val_status'])) {
         $filterValue = mysqli_real_escape_string($conn, $_GET['filter_val_status']);
         $conditions[] = "Admin_Status = '$filterValue'";
+    }
+    // New Filters
+    elseif ($filterType == 'name_sort' && isset($_GET['filter_val_name']) && !empty($_GET['filter_val_name'])) {
+        $filterValue = $_GET['filter_val_name'];
+        if ($filterValue == 'asc') $orderClause = "ORDER BY Admin_Name ASC";
+        elseif ($filterValue == 'desc') $orderClause = "ORDER BY Admin_Name DESC";
+    }
+    elseif ($filterType == 'id_sort' && isset($_GET['filter_val_id']) && !empty($_GET['filter_val_id'])) {
+        $filterValue = $_GET['filter_val_id'];
+        if ($filterValue == 'asc') $orderClause = "ORDER BY Admin_ID ASC";
+        elseif ($filterValue == 'desc') $orderClause = "ORDER BY Admin_ID DESC";
+    }
+    elseif ($filterType == 'phone' && isset($_GET['filter_val_phone']) && !empty($_GET['filter_val_phone'])) {
+        $filterValue = mysqli_real_escape_string($conn, $_GET['filter_val_phone']);
+        $conditions[] = "Admin_ContactNumber LIKE '%$filterValue%'";
+    }
+    elseif ($filterType == 'city' && isset($_GET['filter_val_city']) && !empty($_GET['filter_val_city'])) {
+        $filterValue = mysqli_real_escape_string($conn, $_GET['filter_val_city']);
+        $conditions[] = "Admin_City = '$filterValue'";
     }
 }
 
@@ -449,27 +475,14 @@ if ($count_result && $count_result->num_rows > 0) {
 }
 
 $total_pages = ceil($total_admins / $results_per_page);
+if ($page > $total_pages && $total_pages > 0) { $page = $total_pages; $start_from = ($page - 1) * $results_per_page; }
 
-$sql = "SELECT * FROM admin $whereClause ORDER BY Admin_CreatedAt DESC LIMIT $start_from, $results_per_page";
+$sql = "SELECT * FROM admin $whereClause $orderClause LIMIT $start_from, $results_per_page";
 $result = $conn->query($sql);
 $admins = [];
 if ($result && $result->num_rows > 0) {
     while($row = $result->fetch_assoc()) {
         $admins[] = $row;
-    }
-}
-
-// --- PREPARE GALLERY DATA (Only for those with valid images) ---
-$galleryData = [];
-$galleryMap = []; // Map Admin_ID to Gallery Index
-foreach ($admins as $admin) {
-    if (!empty($admin['Admin_ProfilePicture']) && file_exists($admin['Admin_ProfilePicture'])) {
-        $galleryData[] = [
-            'src' => $admin['Admin_ProfilePicture'],
-            'title' => $admin['Admin_Name'] // Used for caption
-        ];
-        // Store the index of this image in the gallery array
-        $galleryMap[$admin['Admin_ID']] = count($galleryData) - 1;
     }
 }
 
@@ -479,11 +492,16 @@ $end_record = min($page * $results_per_page, $total_admins);
 $totalAdminsCount = $conn->query("SELECT COUNT(*) as total FROM admin WHERE Is_Deleted = 0")->fetch_assoc()['total'];
 $activeAdminsCount = $conn->query("SELECT COUNT(*) as total FROM admin WHERE Admin_Status = 'Active' AND Is_Deleted = 0")->fetch_assoc()['total'];
 
-$malaysiaStates = [
-    'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 
-    'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'
-];
+$malaysiaStates = [ 'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu' ];
+$phonePrefixes = ['010', '011', '012', '013', '014', '015', '016', '017', '018', '019'];
 
+// Get distinct cities for filter
+$cities = [];
+$cityQ = $conn->query("SELECT DISTINCT Admin_City FROM admin WHERE Is_Deleted = 0 AND Admin_City != '' ORDER BY Admin_City ASC");
+if($cityQ) while($c = $cityQ->fetch_assoc()) $cities[] = $c['Admin_City'];
+
+// Default placeholder for lightbox
+$defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Profile+Picture";
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -494,16 +512,14 @@ $malaysiaStates = [
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin_common.css">
     <style>
-        /* Specific Styles for Admin Management Page */
+        /* Specific Styles */
         .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-5px); }
         .stat-info h3 { font-size: 14px; color: var(--gray); margin-bottom: 5px; }
         .stat-info h2 { font-size: 24px; font-weight: 600; margin-bottom: 5px; }
         .stat-desc { font-size: 12px; display: flex; align-items: center; gap: 5px; font-weight: 500; }
-        .stat-desc.text-success { color: #28a745; }
-        .stat-desc.text-muted { color: #6c757d; }
-        .stat-icon { width: 60px; height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .stat-desc.text-success { color: #28a745; } .stat-icon { width: 60px; height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
         .stat-card:nth-child(1) .stat-icon { background: rgba(242, 133, 133, 0.2); color: var(--primary); }
         .stat-card:nth-child(2) .stat-icon { background: rgba(40, 167, 69, 0.2); color: var(--success); }
 
@@ -526,21 +542,17 @@ $malaysiaStates = [
         .secondary-filter.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* GRID / CARD VIEW STYLES */
+        /* Grid */
         .staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; }
         .staff-card { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; transition: transform 0.3s, box-shadow 0.3s; position: relative; display: flex; flex-direction: column; border: 1px solid #eee; }
         .staff-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-color: #F28585; }
         .card-header-actions { position: absolute; top: 15px; right: 15px; z-index: 10; }
         .card-body { padding: 25px 20px 20px; text-align: center; flex: 1; }
         
-        /* Updated Card Avatar with Hover Effect */
-        .card-avatar { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 15px; background: #ffe5e5; color: #F28585; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 28px; object-fit: cover; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); overflow: hidden; transition: transform 0.3s; position: relative; }
-        .card-avatar.has-image { cursor: pointer; }
-        .card-avatar.has-image:hover { transform: scale(1.05); border-color: var(--primary); }
-        .card-avatar.has-image::after { content: '\f00e'; font-family: "Font Awesome 6 Free"; font-weight: 900; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); color: white; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; font-size: 20px; }
-        .card-avatar.has-image:hover::after { opacity: 1; }
-        
+        .card-avatar { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 15px; background: #ffe5e5; color: #F28585; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 28px; object-fit: cover; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); overflow: hidden; transition: transform 0.3s; position: relative; cursor: pointer; }
+        .card-avatar:hover { transform: scale(1.05); border-color: var(--primary); }
         .card-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        
         .card-name { font-size: 18px; font-weight: 700; color: #333; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .card-role { font-size: 14px; color: #666; margin-bottom: 12px; display: inline-block; background: #f8f9fa; padding: 4px 12px; border-radius: 20px; font-weight: 500; }
         .card-status { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 12px; letter-spacing: 0.3px; margin-bottom: 15px; }
@@ -550,10 +562,9 @@ $malaysiaStates = [
         .contact-item { display: flex; align-items: center; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .contact-item i { width: 20px; color: #aaa; text-align: center; margin-right: 8px; }
 
-        /* Action Menu */
         .action-menu { position: relative; display: inline-block; }
         .menu-btn { width: 32px; height: 32px; border-radius: 50%; background: white; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: #777; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 14px; }
-        .menu-btn:hover { background: #f8f9fa; color: var(--primary); border-color: #ddd; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .menu-btn:hover { background: #f8f9fa; color: var(--primary); border-color: #ddd; transform: translateY(-1px); }
         .dropdown-content { display: none; position: absolute; right: 0; top: 40px; background-color: white; min-width: 180px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); z-index: 100; border-radius: 8px; overflow: hidden; border: 1px solid #eee; text-align: left; }
         .dropdown-content div, .dropdown-content a { color: #333; padding: 12px 16px; text-decoration: none; display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; }
         .dropdown-content div:hover, .dropdown-content a:hover { background-color: #f8f9fa; color: var(--primary); }
@@ -565,14 +576,10 @@ $malaysiaStates = [
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--gray-light); }
         .modal-header h2 { font-size: 18px; font-weight: 600; margin: 0; }
         .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray); }
-        .close-btn:hover { color: var(--danger); }
         .modal-body { padding: 20px; }
 
-        .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
-        .form-row .form-group { flex: 1; margin-bottom: 0; }
-        .form-group { margin-bottom: 15px; }
-        .form-label { display: block; margin-bottom: 5px; font-weight: 500; color: var(--dark); font-size: 14px; }
-        
+        .form-row { display: flex; gap: 15px; margin-bottom: 15px; } .form-row .form-group { flex: 1; margin-bottom: 0; }
+        .form-group { margin-bottom: 15px; } .form-label { display: block; margin-bottom: 5px; font-weight: 500; color: var(--dark); font-size: 14px; }
         .form-input, .form-select, .form-textarea { width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; transition: 0.3s; }
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
         .form-input:read-only, .form-textarea:read-only { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; }
@@ -589,7 +596,6 @@ $malaysiaStates = [
         .file-remove { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 14px; padding: 0 5px; }
 
         .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
-        
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
         .required { color: red; margin-left: 3px; font-weight: bold; }
 
@@ -597,35 +603,26 @@ $malaysiaStates = [
         .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid var(--gray-light); border-right: none; border-radius: 5px 0 0 5px; color: var(--gray); font-weight: bold; }
         .phone-input { border-radius: 0 5px 5px 0 !important; }
 
-        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s;}
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; animation: slideIn 0.3s;}
+        .floating-alert div { line-height: 1.6; }
+        .floating-alert i { margin-top: 4px; }
         .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-        .pagination-container { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding: 15px 0; border-top: 1px solid var(--gray-light); }
+        .pagination-container { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding: 15px 0; border-top: 1px solid #eee; }
         .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; transition: all 0.3s; }
         .pagination-btn.active { background-color: #F28585; color: white; border-color: #F28585; cursor: default; }
         .pagination-btn.disabled { color: #ccc; cursor: not-allowed; background-color: #f8f9fa; }
 
-        /* --- NEW: GALLERY OVERLAY STYLES --- */
-        .gallery-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); z-index: 2000; align-items: center; justify-content: center; flex-direction: column; }
-        .gallery-container { position: relative; max-width: 90%; max-height: 90%; display: flex; flex-direction: column; align-items: center; }
-        .gallery-img { max-height: 80vh; max-width: 90vw; border: 5px solid white; border-radius: 4px; box-shadow: 0 0 20px rgba(0,0,0,0.5); object-fit: contain; }
-        .gallery-caption { color: white; margin-top: 15px; font-size: 18px; font-weight: 500; text-align: center; }
-        
-        .gallery-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.1); border: none; color: white; font-size: 30px; cursor: pointer; padding: 15px; transition: 0.3s; border-radius: 50%; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; }
-        .gallery-btn:hover { background: rgba(255,255,255,0.3); color: var(--primary); transform: translateY(-50%) scale(1.1); }
-        
-        .gallery-prev { left: -80px; }
-        .gallery-next { right: -80px; }
-        
-        .gallery-close { position: absolute; top: 20px; right: 30px; background: none; border: none; color: #ddd; font-size: 40px; cursor: pointer; transition: 0.3s; z-index: 2001; }
-        .gallery-close:hover { color: var(--primary); transform: rotate(90deg); }
+        /* Lightbox - Simple No Arrows */
+        .lightbox-modal { display: none; position: fixed; z-index: 2000; padding-top: 50px; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; background-color: rgba(0, 0, 0, 0.9); flex-direction: column; justify-content: center; align-items: center; }
+        .lightbox-content { margin: auto; display: block; max-width: 90%; max-height: 80vh; border-radius: 5px; box-shadow: 0 0 20px rgba(255,255,255,0.1); object-fit: contain; animation: zoomIn 0.3s; }
+        @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
+        .close-lightbox { position: absolute; top: 20px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; z-index: 2002; }
+        .close-lightbox:hover { color: #bbb; text-decoration: none; }
 
         @media (max-width: 768px) {
-            .gallery-prev { left: 10px; top: unset; bottom: -60px; transform: none; }
-            .gallery-next { right: 10px; top: unset; bottom: -60px; transform: none; }
-            .gallery-btn:hover { transform: scale(1.1); }
             .form-row { flex-direction: column; gap: 0; }
         }
     </style>
@@ -634,12 +631,12 @@ $malaysiaStates = [
     
     <div class="floating-alert floating-alert-success" id="floatingSuccess" style="display: <?php echo isset($_GET['success']) ? 'flex' : 'none'; ?>">
         <i class="fas fa-check-circle"></i>
-        <span id="floatingSuccessText"><?php echo isset($_GET['success']) ? htmlspecialchars($_GET['success']) : ''; ?></span>
+        <div id="floatingSuccessText"><?php echo isset($_GET['success']) ? htmlspecialchars($_GET['success']) : ''; ?></div>
     </div>
 
     <div class="floating-alert floating-alert-danger" id="floatingError" style="display: <?php echo isset($_GET['error']) ? 'flex' : 'none'; ?>">
         <i class="fas fa-exclamation-circle"></i>
-        <span id="floatingErrorText"><?php echo isset($_GET['error']) ? htmlspecialchars($_GET['error']) : ''; ?></span>
+        <div id="floatingErrorText"><?php echo isset($_GET['error']) ? htmlspecialchars($_GET['error']) : ''; ?></div>
     </div>
 
     <?php include 'admin_sidebar.php'; ?>
@@ -672,24 +669,19 @@ $malaysiaStates = [
                             <option value="">Filter By...</option>
                             <option value="role" <?php echo ($filterType == 'role') ? 'selected' : ''; ?>>Role</option>
                             <option value="status" <?php echo ($filterType == 'status') ? 'selected' : ''; ?>>Status</option>
+                            <option value="name_sort" <?php echo ($filterType == 'name_sort') ? 'selected' : ''; ?>>Name Sorting</option>
+                            <option value="id_sort" <?php echo ($filterType == 'id_sort') ? 'selected' : ''; ?>>Admin ID</option>
+                            <option value="phone" <?php echo ($filterType == 'phone') ? 'selected' : ''; ?>>Phone Prefix</option>
+                            <option value="city" <?php echo ($filterType == 'city') ? 'selected' : ''; ?>>City</option>
                         </select>
                     </div>
 
-                    <div id="filter_role_container" class="secondary-filter">
-                        <select name="filter_val_role" class="filter-select">
-                            <option value="">Select Role...</option>
-                            <option value="Admin" <?php if($filterType == 'role' && $filterValue == 'Admin') echo 'selected'; ?>>Admin</option>
-                            <option value="Super Admin" <?php if($filterType == 'role' && $filterValue == 'Super Admin') echo 'selected'; ?>>Super Admin</option>
-                            </select>
-                    </div>
-
-                    <div id="filter_status_container" class="secondary-filter">
-                        <select name="filter_val_status" class="filter-select">
-                            <option value="">Select Status...</option>
-                            <option value="Active" <?php if($filterType == 'status' && $filterValue == 'Active') echo 'selected'; ?>>Active</option>
-                            <option value="Inactive" <?php if($filterType == 'status' && $filterValue == 'Inactive') echo 'selected'; ?>>Inactive</option>
-                        </select>
-                    </div>
+                    <div id="filter_role_container" class="secondary-filter"><select name="filter_val_role" class="filter-select"><option value="">Select Role...</option><option value="Admin" <?php if($filterType == 'role' && $filterValue == 'Admin') echo 'selected'; ?>>Admin</option><option value="Super Admin" <?php if($filterType == 'role' && $filterValue == 'Super Admin') echo 'selected'; ?>>Super Admin</option></select></div>
+                    <div id="filter_status_container" class="secondary-filter"><select name="filter_val_status" class="filter-select"><option value="">Select Status...</option><option value="Active" <?php if($filterType == 'status' && $filterValue == 'Active') echo 'selected'; ?>>Active</option><option value="Inactive" <?php if($filterType == 'status' && $filterValue == 'Inactive') echo 'selected'; ?>>Inactive</option></select></div>
+                    <div id="filter_name_container" class="secondary-filter"><select name="filter_val_name" class="filter-select"><option value="">Select Order...</option><option value="asc" <?php if($filterValue == 'asc') echo 'selected'; ?>>Name (A-Z)</option><option value="desc" <?php if($filterValue == 'desc') echo 'selected'; ?>>Name (Z-A)</option></select></div>
+                    <div id="filter_id_container" class="secondary-filter"><select name="filter_val_id" class="filter-select"><option value="">Select Order...</option><option value="asc" <?php if($filterValue == 'asc') echo 'selected'; ?>>ID (Ascending)</option><option value="desc" <?php if($filterValue == 'desc') echo 'selected'; ?>>ID (Descending)</option></select></div>
+                    <div id="filter_phone_container" class="secondary-filter"><select name="filter_val_phone" class="filter-select"><option value="">Select Prefix...</option><?php foreach($phonePrefixes as $pp): ?><option value="<?php echo $pp; ?>" <?php if($filterValue == $pp) echo 'selected'; ?>>+6<?php echo $pp; ?></option><?php endforeach; ?></select></div>
+                    <div id="filter_city_container" class="secondary-filter"><select name="filter_val_city" class="filter-select"><option value="">Select City...</option><?php foreach($cities as $c): ?><option value="<?php echo $c; ?>" <?php if($filterValue == $c) echo 'selected'; ?>><?php echo $c; ?></option><?php endforeach; ?></select></div>
 
                     <input type="text" name="search" class="search-input" placeholder="Search by Name, ID or Email..." value="<?php echo htmlspecialchars($searchTerm); ?>">
                     <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
@@ -710,19 +702,19 @@ $malaysiaStates = [
                                     <div onclick="openViewAdminModal(<?php echo htmlspecialchars(json_encode($admin)); ?>)"><i class="fas fa-eye"></i> View Details</div>
                                     <div onclick='openEditAdminModal(<?php echo json_encode($admin); ?>)'><i class="fas fa-edit"></i> Edit Details</div>
                                     
+                                    <?php if ($adminPosition === 'Super Admin'): ?>
                                     <div onclick="openBlockAdminModal(<?php echo $admin['Admin_ID']; ?>, '<?php echo htmlspecialchars($admin['Admin_Name'], ENT_QUOTES); ?>')" class="text-delete"><i class="fas fa-ban"></i> Block Admin</div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
 
                         <div class="card-body">
                             <?php 
-                                $hasImage = !empty($admin['Admin_ProfilePicture']) && file_exists($admin['Admin_ProfilePicture']);
-                                $galleryIndexAttr = isset($galleryMap[$admin['Admin_ID']]) ? 'onclick="openGallery(' . $galleryMap[$admin['Admin_ID']] . ')"' : '';
-                                $avatarClass = $hasImage ? 'has-image' : '';
+                                $lightboxSrc = !empty($admin['Admin_ProfilePicture']) && file_exists($admin['Admin_ProfilePicture']) ? $admin['Admin_ProfilePicture'] : $defaultAvatarPlaceholder;
                             ?>
-                            <div class="card-avatar <?php echo $avatarClass; ?>" <?php echo $galleryIndexAttr; ?>>
-                                <?php if ($hasImage): ?>
+                            <div class="card-avatar" onclick="openLightbox('<?php echo $lightboxSrc; ?>')">
+                                <?php if (!empty($admin['Admin_ProfilePicture']) && file_exists($admin['Admin_ProfilePicture'])): ?>
                                     <img src="<?php echo htmlspecialchars($admin['Admin_ProfilePicture']); ?>" alt="Profile">
                                 <?php else: ?>
                                     <?php echo substr($admin['Admin_Name'], 0, 1); ?>
@@ -757,6 +749,7 @@ $malaysiaStates = [
                     </div>
                     <?php endif; ?>
                 </div>
+                
                 <div class="pagination-container">
                     <div class="pagination-info">Showing <?php echo $start_record; ?> to <?php echo $end_record; ?> of <?php echo $total_admins; ?> results</div>
                     <div class="pagination-controls">
@@ -767,29 +760,29 @@ $malaysiaStates = [
                             $queryParams['filter_type'] = $filterType;
                             if ($filterType == 'role' && !empty($filterValue)) $queryParams['filter_val_role'] = $filterValue;
                             if ($filterType == 'status' && !empty($filterValue)) $queryParams['filter_val_status'] = $filterValue;
+                            if ($filterType == 'name_sort' && !empty($filterValue)) $queryParams['filter_val_name'] = $filterValue;
+                            if ($filterType == 'id_sort' && !empty($filterValue)) $queryParams['filter_val_id'] = $filterValue;
+                            if ($filterType == 'phone' && !empty($filterValue)) $queryParams['filter_val_phone'] = $filterValue;
+                            if ($filterType == 'city' && !empty($filterValue)) $queryParams['filter_val_city'] = $filterValue;
                         }
                         $search_query = !empty($queryParams) ? '&' . http_build_query($queryParams) : '';
                         
-                        if ($page > 1): 
+                        if ($page > 1) echo '<a href="?page=' . ($page - 1) . $search_query . '" class="pagination-btn">Previous</a>';
+                        else echo '<span class="pagination-btn disabled">Previous</span>';
+                        
+                        $start_window = max(1, $page - 1);
+                        $end_window = min($total_pages, $page + 1);
+                        if ($page == 1) $end_window = min($total_pages, 3);
+                        if ($page == $total_pages) $start_window = max(1, $total_pages - 2);
+
+                        for ($i = $start_window; $i <= $end_window; $i++) {
+                            if ($i == $page) echo '<span class="pagination-btn active">' . $i . '</span>';
+                            else echo '<a href="?page=' . $i . $search_query . '" class="pagination-btn">' . $i . '</a>';
+                        }
+                        
+                        if ($page < $total_pages) echo '<a href="?page=' . ($page + 1) . $search_query . '" class="pagination-btn">Next</a>';
+                        else echo '<span class="pagination-btn disabled">Next</span>';
                         ?>
-                            <a href="?page=<?php echo $page - 1 . $search_query; ?>" class="pagination-btn">Previous</a>
-                        <?php else: ?>
-                            <span class="pagination-btn disabled">Previous</span>
-                        <?php endif; ?>
-                        
-                        <?php for ($i = 1; $i <= $total_pages; $i++): 
-                            if ($i == $page): ?>
-                                <span class="pagination-btn active"><?php echo $i; ?></span>
-                            <?php else: ?>
-                                <a href="?page=<?php echo $i . $search_query; ?>" class="pagination-btn"><?php echo $i; ?></a>
-                            <?php endif; 
-                        endfor; ?>
-                        
-                        <?php if ($page < $total_pages): ?>
-                            <a href="?page=<?php echo $page + 1 . $search_query; ?>" class="pagination-btn">Next</a>
-                        <?php else: ?>
-                            <span class="pagination-btn disabled">Next</span>
-                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -811,6 +804,7 @@ $malaysiaStates = [
                             <input type="file" id="add_profile_picture" name="profile_picture" accept="image/*" onchange="previewImage(this, 'add-preview-container', 'add-file-info', 'add-file-name')">
                             <div id="add-file-info" class="file-info"><span id="add-file-name" class="file-name"></span><button type="button" class="file-remove" onclick="removeImage('add_profile_picture', 'add-preview-container', 'add-file-info')"><i class="fas fa-times"></i></button></div>
                         </div>
+                        <span class="form-guide" style="display:block; text-align:center;">Upload a clear photo (JPG/PNG).</span>
                     </div>
                     
                     <div class="form-group">
@@ -823,7 +817,7 @@ $malaysiaStates = [
                         <div class="form-group">
                             <label class="form-label">Email <span class="required">*</span></label>
                             <input type="email" id="email" name="email" class="form-input" required onblur="validateEmail('email', 'emailError')" placeholder="e.g. admin@example.com">
-                            <span class="form-guide">Valid email address (e.g. name@domain.com).</span>
+                            <span class="form-guide">Valid email address for login.</span>
                             <div id="emailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
@@ -832,7 +826,7 @@ $malaysiaStates = [
                                 <span class="phone-prefix">+60</span>
                                 <input type="text" id="add_contact" name="contact" class="form-input phone-input" required maxlength="11" placeholder="12-3456789">
                             </div>
-                            <span class="form-guide">Format: 12-3456789 or 11-23456789 (No need for +60).</span>
+                            <span class="form-guide">Format: 12-3456789 (No need for +60).</span>
                         </div>
                     </div>
                     
@@ -845,6 +839,7 @@ $malaysiaStates = [
                         <div class="form-group">
                             <label class="form-label">Date of Birth <span class="required">*</span></label>
                             <input type="date" id="dob" name="dob" class="form-input" required onchange="validateAge('dob', 'ageError')">
+                            <span class="form-guide">Select birth date from calendar.</span>
                             <div id="ageError" class="error-message">Must be at least 18 years old.</div>
                         </div>
                     </div>
@@ -864,12 +859,14 @@ $malaysiaStates = [
                     <div class="form-group">
                         <label class="form-label">Address Line 3</label>
                         <input type="text" name="address3" class="form-input" placeholder="Address Line 3 (Optional)">
+                        <span class="form-guide">Additional address info.</span>
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">City</label>
                             <input type="text" name="city" class="form-input" placeholder="e.g. Kuala Lumpur">
+                            <span class="form-guide">City or district name.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">State</label>
@@ -877,6 +874,7 @@ $malaysiaStates = [
                                 <option value="">Select State</option>
                                 <?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?>
                             </select>
+                            <span class="form-guide">Select state from dropdown.</span>
                         </div>
                     </div>
 
@@ -889,18 +887,27 @@ $malaysiaStates = [
                         <div class="form-group">
                             <label class="form-label">Country</label>
                             <input type="text" name="country" class="form-input" value="Malaysia" readonly>
+                            <span class="form-guide">Default country is Malaysia.</span>
                         </div>
                     </div>
                     
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Role <span class="required">*</span></label><select name="role" class="form-select" required><option value="Admin">Admin</option><option value="Super Admin">Super Admin</option></select></div>
-                        <div class="form-group"><label class="form-label">Status <span class="required">*</span></label><select name="status" class="form-select" required><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+                        <div class="form-group">
+                            <label class="form-label">Role <span class="required">*</span></label>
+                            <select name="role" class="form-select" required><option value="Admin">Admin</option><option value="Super Admin">Super Admin</option></select>
+                            <span class="form-guide">Access Level.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Status <span class="required">*</span></label>
+                            <select name="status" class="form-select" required><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
+                            <span class="form-guide">Account Status.</span>
+                        </div>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Description / Comment</label>
-                        <textarea name="comment" class="form-textarea" rows="2" placeholder="Optional notes..."></textarea>
-                        <span class="form-guide">Optional notes (e.g., department details).</span>
+                        <textarea name="comment" class="form-textarea" rows="2" placeholder="e.g. Department details..."></textarea>
+                        <span class="form-guide">Optional internal notes.</span>
                     </div>
                     
                     <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Admin</button></div>
@@ -925,6 +932,7 @@ $malaysiaStates = [
                             <input type="file" id="edit_profile_picture" name="profile_picture" accept="image/*" onchange="previewImage(this, 'edit-preview-container', 'edit-file-info', 'edit-file-name')">
                             <div id="edit-file-info" class="file-info"><span id="edit-file-name" class="file-name"></span><button type="button" class="file-remove" onclick="removeImage('edit_profile_picture', 'edit-preview-container', 'edit-file-info')"><i class="fas fa-times"></i></button></div>
                         </div>
+                        <span class="form-guide" style="display:block; text-align:center;">Update photo if necessary.</span>
                     </div>
                     
                     <div class="form-group">
@@ -937,7 +945,7 @@ $malaysiaStates = [
                         <div class="form-group">
                             <label class="form-label">Email <span class="required">*</span></label>
                             <input type="email" id="edit_email" name="email" class="form-input" required placeholder="e.g. admin@example.com" onblur="validateEmail('edit_email', 'editEmailError')">
-                            <span class="form-guide">Valid email address (e.g. name@domain.com).</span>
+                            <span class="form-guide">Valid email address for login.</span>
                             <div id="editEmailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
@@ -959,6 +967,7 @@ $malaysiaStates = [
                         <div class="form-group">
                             <label class="form-label">Date of Birth <span class="required">*</span></label>
                             <input type="date" id="edit_dob" name="dob" class="form-input" required onchange="validateAge('edit_dob', 'editAgeError')">
+                            <span class="form-guide">Select birth date from calendar.</span>
                             <div id="editAgeError" class="error-message">Must be at least 18 years old.</div>
                         </div>
                     </div>
@@ -976,12 +985,14 @@ $malaysiaStates = [
                     <div class="form-group">
                         <label class="form-label">Address Line 3</label>
                         <input type="text" id="edit_address3" name="address3" class="form-input" placeholder="Address Line 3 (Optional)">
+                        <span class="form-guide">Additional address info.</span>
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">City</label>
                             <input type="text" id="edit_city" name="city" class="form-input" placeholder="e.g. Kuala Lumpur">
+                            <span class="form-guide">City or district name.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">State</label>
@@ -989,6 +1000,7 @@ $malaysiaStates = [
                                 <option value="">Select State</option>
                                 <?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?>
                             </select>
+                            <span class="form-guide">Select state from dropdown.</span>
                         </div>
                     </div>
                     
@@ -1001,18 +1013,27 @@ $malaysiaStates = [
                         <div class="form-group">
                             <label class="form-label">Country</label>
                             <input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly>
+                            <span class="form-guide">Default country is Malaysia.</span>
                         </div>
                     </div>
                     
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Role <span class="required">*</span></label><select id="edit_role" name="role" class="form-select" required><option value="Admin">Admin</option><option value="Super Admin">Super Admin</option></select></div>
-                        <div class="form-group"><label class="form-label">Status <span class="required">*</span></label><select id="edit_status" name="status" class="form-select" required><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+                        <div class="form-group">
+                            <label class="form-label">Role <span class="required">*</span></label>
+                            <select id="edit_role" name="role" class="form-select" required><option value="Admin">Admin</option><option value="Super Admin">Super Admin</option></select>
+                            <span class="form-guide">Access Level.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Status <span class="required">*</span></label>
+                            <select id="edit_status" name="status" class="form-select" required><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
+                            <span class="form-guide">Account Status.</span>
+                        </div>
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label">Description / Comment</label>
-                        <textarea id="edit_comment" name="comment" class="form-textarea" rows="2" placeholder="Optional notes..."></textarea>
-                        <span class="form-guide">Optional notes.</span>
+                        <textarea id="edit_comment" name="comment" class="form-textarea" rows="2" placeholder="e.g. Department details..."></textarea>
+                        <span class="form-guide">Optional internal notes.</span>
                     </div>
 
                     <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Update Info</button></div>
@@ -1067,14 +1088,9 @@ $malaysiaStates = [
         </div>
     </div>
 
-    <div class="gallery-overlay" id="galleryModal">
-        <button class="gallery-close" onclick="closeGallery()">&times;</button>
-        <div class="gallery-container">
-            <button class="gallery-btn gallery-prev" onclick="changeGalleryImage(-1)"><i class="fas fa-chevron-left"></i></button>
-            <img src="" id="galleryImage" class="gallery-img" alt="Gallery">
-            <div id="galleryCaption" class="gallery-caption"></div>
-            <button class="gallery-btn gallery-next" onclick="changeGalleryImage(1)"><i class="fas fa-chevron-right"></i></button>
-        </div>
+    <div id="imageLightbox" class="lightbox-modal">
+        <span class="close-lightbox" onclick="closeLightbox()">&times;</span>
+        <img class="lightbox-content" id="lightboxImage">
     </div>
     
     <script>
@@ -1093,15 +1109,31 @@ $malaysiaStates = [
                 const el = document.getElementById('filter_status_container');
                 el.classList.add('active');
                 if(el.querySelector('select')) el.querySelector('select').disabled = false;
+            } else if (type === 'name_sort') {
+                const el = document.getElementById('filter_name_container');
+                el.classList.add('active');
+                if(el.querySelector('select')) el.querySelector('select').disabled = false;
+            } else if (type === 'id_sort') {
+                const el = document.getElementById('filter_id_container');
+                el.classList.add('active');
+                if(el.querySelector('select')) el.querySelector('select').disabled = false;
+            } else if (type === 'phone') {
+                const el = document.getElementById('filter_phone_container');
+                el.classList.add('active');
+                if(el.querySelector('select')) el.querySelector('select').disabled = false;
+            } else if (type === 'city') {
+                const el = document.getElementById('filter_city_container');
+                el.classList.add('active');
+                if(el.querySelector('select')) el.querySelector('select').disabled = false;
             }
         }
 
         // --- NEW: SYSTEM ALERT FUNCTION ---
-        function showSystemError(message) {
+        function showSystemError(messageHTML) {
             const errorBox = document.getElementById('floatingError');
             const errorText = document.getElementById('floatingErrorText');
             if(errorBox && errorText) {
-                errorText.innerText = message;
+                errorText.innerHTML = messageHTML;
                 errorBox.style.display = 'flex';
                 // Auto hide after 5 seconds
                 setTimeout(() => { 
@@ -1128,17 +1160,11 @@ $malaysiaStates = [
                     document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); 
                 } 
                 if (e.target.classList.contains('modal')) e.target.style.display = "none"; 
-                // Close gallery if clicked outside
-                if (e.target.classList.contains('gallery-overlay')) closeGallery();
+                if (e.target.id == 'imageLightbox') closeLightbox();
             }
 
-            // Keyboard navigation for gallery
-            document.addEventListener('keydown', function(e) {
-                if (document.getElementById('galleryModal').style.display === 'flex') {
-                    if (e.key === 'ArrowLeft') changeGalleryImage(-1);
-                    if (e.key === 'ArrowRight') changeGalleryImage(1);
-                    if (e.key === 'Escape') closeGallery();
-                }
+            document.addEventListener('keydown', function(event) {
+                if (event.key === "Escape" && document.getElementById('imageLightbox').style.display === "flex") { closeLightbox(); }
             });
         });
 
@@ -1259,45 +1285,14 @@ $malaysiaStates = [
         }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-        // --- NEW: GALLERY FUNCTIONS ---
-        // Load gallery data from PHP
-        const galleryData = <?php echo json_encode($galleryData); ?>;
-        let currentGalleryIndex = 0;
-
-        function openGallery(index) {
-            if (galleryData.length === 0) return;
-            currentGalleryIndex = index;
-            updateGalleryImage();
-            document.getElementById('galleryModal').style.display = 'flex';
+        // --- NEW: LIGHTBOX FUNCTIONS ---
+        function openLightbox(imageSrc) { 
+            if (!imageSrc) return; 
+            document.getElementById('lightboxImage').src = imageSrc; 
+            document.getElementById('imageLightbox').style.display = "flex"; 
         }
-
-        function closeGallery() {
-            document.getElementById('galleryModal').style.display = 'none';
-        }
-
-        function changeGalleryImage(direction) {
-            currentGalleryIndex += direction;
-            if (currentGalleryIndex >= galleryData.length) {
-                currentGalleryIndex = 0; // Loop back to start
-            } else if (currentGalleryIndex < 0) {
-                currentGalleryIndex = galleryData.length - 1; // Loop to end
-            }
-            updateGalleryImage();
-        }
-
-        function updateGalleryImage() {
-            const img = document.getElementById('galleryImage');
-            const caption = document.getElementById('galleryCaption');
-            const data = galleryData[currentGalleryIndex];
-            
-            // Fade out
-            img.style.opacity = '0.5';
-            
-            setTimeout(() => {
-                img.src = data.src;
-                caption.textContent = data.title;
-                img.style.opacity = '1';
-            }, 100);
+        function closeLightbox() { 
+            document.getElementById('imageLightbox').style.display = "none"; 
         }
 
         // --- Helper Functions (Formatting & Validation) ---
@@ -1478,7 +1473,7 @@ $malaysiaStates = [
 
             if (errors.length > 0) {
                 // Modified: Use showSystemError instead of alert
-                showSystemError("Please correct errors: " + errors.join(" "));
+                showSystemError("Please correct errors:<br>" + errors.join("<br>"));
                 return false; 
             }
             return true; 

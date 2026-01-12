@@ -14,7 +14,7 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 
 $orderId = intval($_GET['id']);
 
-// --- 修改：关联 Branch, Activity, Case 表以获取 Target 信息 ---
+// 获取 Order, Donor, Payment, Target 信息
 $sql = "SELECT o.*, d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber, 
         p.Payment_Method as Actual_Method, p.Payment_Status as Pay_Status, p.Payment_Bank_Name,
         b.Branch_Name, a.Activity_Name, s.Case_Title
@@ -34,13 +34,13 @@ if ($result->num_rows == 0) {
 
 $order = $result->fetch_assoc();
 
-// Determine Status Color
+// --- 逻辑处理：状态颜色 ---
 $statusClass = 'text-warning';
 $statusLower = strtolower($order['Order_Status']);
 if($statusLower == 'completed' || $statusLower == 'success') $statusClass = 'text-success';
 if($statusLower == 'failed' || $statusLower == 'cancelled') $statusClass = 'text-danger';
 
-// --- Determine Donation Target ---
+// --- 逻辑处理：捐赠目标 (Target) ---
 $targetLabel = "General Fund";
 $targetName = "-";
 
@@ -55,6 +55,17 @@ if (!empty($order['Branch_Name'])) {
     $targetName = $order['Case_Title'];
 }
 
+// --- 逻辑处理：处理 Payment Method 为空的情况 ---
+$displayPaymentMethod = $order['Order_PaymentMethod'];
+
+if (empty($displayPaymentMethod) && !empty($order['Actual_Method'])) {
+    $displayPaymentMethod = $order['Actual_Method'];
+}
+
+if (empty($displayPaymentMethod)) {
+    $displayPaymentMethod = "System E-Wallet";
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -67,7 +78,7 @@ if (!empty($order['Branch_Name'])) {
     <style>
         body { background: #f4f6f9; padding: 40px; font-family: 'Poppins', sans-serif; }
         
-        /* 容器宽度 - 保持你的原始设计 1100px */
+        /* 容器宽度 */
         .details-container { 
             max-width: 1100px; 
             margin: 0 auto; 
@@ -77,14 +88,17 @@ if (!empty($order['Branch_Name'])) {
             overflow: hidden; 
         }
 
-        .details-header { background: var(--primary); color: white; padding: 25px 40px; display: flex; justify-content: space-between; align-items: center; }
+        /* [MODIFIED] Header Background changed to Pink #F28585 */
+        .details-header { background: #F28585; color: white; padding: 25px 40px; display: flex; justify-content: space-between; align-items: center; }
         .details-header h2 { margin: 0; font-size: 24px; }
         
         .details-body { padding: 40px; }
         
         .info-group { margin-bottom: 35px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
-        .info-group:last-child { border-bottom: none; }
-        .info-group h3 { font-size: 18px; color: #555; margin-bottom: 20px; border-left: 5px solid var(--primary); padding-left: 15px; }
+        .info-group:last-child { border-bottom: none; margin-bottom: 0; }
+        
+        /* [MODIFIED] Left Border Color changed to Pink #F28585 */
+        .info-group h3 { font-size: 18px; color: #555; margin-bottom: 20px; border-left: 5px solid #F28585; padding-left: 15px; }
         
         /* 列表布局 */
         .info-list {
@@ -100,7 +114,7 @@ if (!empty($order['Branch_Name'])) {
             padding: 12px 0; 
         }
         
-        /* Label & Colon & Value - 保持你的原始宽度设置 */
+        /* Label & Colon & Value */
         .label { 
             width: 220px; 
             min-width: 220px; 
@@ -124,7 +138,8 @@ if (!empty($order['Branch_Name'])) {
             flex-grow: 1; 
         }
         
-        .amount-display { font-size: 32px; color: var(--primary); font-weight: bold; text-align: center; margin: 10px 0 40px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; }
+        /* [MODIFIED] Amount Text Color changed to Pink #F28585 */
+        .amount-display { font-size: 32px; color: #F28585; font-weight: bold; text-align: center; margin: 10px 0 40px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; }
         
         .text-success { color: #28a745; } .text-danger { color: #dc3545; } .text-warning { color: #856404; }
 
@@ -135,8 +150,9 @@ if (!empty($order['Branch_Name'])) {
             align-items: center;
         }
 
+        /* [MODIFIED] Print Button Background changed to Pink #F28585 */
         .btn-print { 
-            background: #007bff; 
+            background: #F28585; 
             color: white; 
             border: none; 
             padding: 12px 25px; 
@@ -149,15 +165,15 @@ if (!empty($order['Branch_Name'])) {
             gap: 8px;
             transition: background 0.3s;
         }
-        .btn-print:hover { background: #0056b3; }
+        .btn-print:hover { background: #e07070; } /* Slightly darker pink on hover */
 
         .btn-back {
             background: #6c757d;
             color: white;
             border: none;
             padding: 12px 25px;
-            border-radius: 6px;
-            cursor: pointer;
+            border-radius: 6px; 
+            cursor: pointer; 
             font-size: 14px;
             font-weight: 500;
             display: flex;
@@ -214,7 +230,7 @@ if (!empty($order['Branch_Name'])) {
                     <div class="info-item">
                         <span class="label">Payment Method</span>
                         <span class="colon">:</span>
-                        <span class="value"><?php echo $order['Order_PaymentMethod']; ?></span>
+                        <span class="value"><?php echo htmlspecialchars($displayPaymentMethod); ?></span>
                     </div>
                     <div class="info-item">
                         <span class="label">Payment Status</span>

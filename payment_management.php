@@ -106,8 +106,9 @@ if (isset($_GET['export']) && $_GET['export'] == 'ewallet') {
             
     $res = $conn->query($sql);
     while($row = $res->fetch_assoc()) {
+        $txnID = $row['Wallet_Trans_ID'];
         echo "<tr>
-            <td>{$row['id']}</td>
+            <td>{$txnID}</td>
             <td>{$row['Created_At']}</td>
             <td>{$row['Donor_ID']}</td>
             <td>{$row['Donor_Name']}</td>
@@ -127,7 +128,10 @@ if (isset($_GET['export']) && $_GET['export'] == 'ewallet') {
 // --- Stats Functions ---
 $totalRevenue = $conn->query("SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus IN ('Completed', 'Success')")->fetch_assoc()['total'] ?? 0;
 $recurringRevenue = $conn->query("SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus IN ('Completed', 'Success') AND Order_Type = 'Recurring'")->fetch_assoc()['total'] ?? 0;
-$totalPoints = floor($totalRevenue / 10);
+
+// System Wallet Total Balance
+$totalWalletBalance = $conn->query("SELECT SUM(Donor_Wallet) as total FROM donor")->fetch_assoc()['total'] ?? 0;
+
 $pendingCount = $conn->query("SELECT COUNT(*) as count FROM orders WHERE Order_PaymentStatus = 'Pending'")->fetch_assoc()['count'];
 
 // ==========================================
@@ -147,7 +151,6 @@ $filter_method_tx = isset($_GET['filter_method_tx']) ? $_GET['filter_method_tx']
 // Build Query
 $where_tx = "WHERE 1=1";
 
-// 1. Filter Logic based on Type
 if (!empty($filter_type_tx)) {
     if ($filter_type_tx == 'date' && !empty($filter_date_tx)) {
         $where_tx .= " AND DATE(o.Order_Created_At) = '$filter_date_tx'";
@@ -168,7 +171,6 @@ if (!empty($filter_type_tx)) {
         $where_tx .= " AND o.Order_PaymentMethod = '$filter_method_tx'";
     }
 } else {
-    // Global Search if no filter selected
     if (!empty($search_tx)) {
         $where_tx .= " AND (o.Order_TXN_Ref LIKE '%$search_tx%' OR d.Donor_Name LIKE '%$search_tx%' OR d.Donor_Email LIKE '%$search_tx%' OR o.Order_PaymentMethod LIKE '%$search_tx%')";
     }
@@ -427,10 +429,16 @@ $chartData = getMonthlyRevenueChartData($conn);
                     <div class="stat-info"><h3>RECURRING</h3><h2>RM <?php echo number_format($recurringRevenue, 2); ?></h2><p class="text-info">Recurring</p></div>
                     <div class="stat-icon" style="background: rgba(23, 162, 184, 0.2); color: #17a2b8;"><i class="fas fa-sync"></i></div>
                 </div>
+                
                 <div class="stat-card">
-                    <div class="stat-info"><h3>POINTS ISSUED</h3><h2><?php echo number_format($totalPoints); ?></h2><p class="text-warning">RM 10 = 1 Point</p></div>
-                    <div class="stat-icon" style="background: rgba(255, 193, 7, 0.2); color: #ffc107;"><i class="fas fa-star"></i></div>
+                    <div class="stat-info">
+                        <h3>SYSTEM WALLET FUNDS</h3>
+                        <h2>RM <?php echo number_format($totalWalletBalance, 2); ?></h2>
+                        <p class="text-warning">User Holdings</p>
+                    </div>
+                    <div class="stat-icon" style="background: rgba(255, 193, 7, 0.2); color: #ffc107;"><i class="fas fa-coins"></i></div>
                 </div>
+
                 <div class="stat-card">
                     <div class="stat-info"><h3>PENDING</h3><h2><?php echo $pendingCount; ?></h2><p class="text-danger">Needs Action</p></div>
                     <div class="stat-icon" style="background: rgba(220, 53, 69, 0.2); color: #dc3545;"><i class="fas fa-exclamation"></i></div>
@@ -553,7 +561,24 @@ $chartData = getMonthlyRevenueChartData($conn);
                                 <span class="pagination-btn disabled">Previous</span>
                             <?php endif; ?>
 
-                            <?php for($i=1; $i<=$total_pages_tx; $i++): $pgParams['page_tx'] = $i; ?>
+                            <?php 
+                            $tx_range_start = max(1, $page_tx - 1);
+                            $tx_range_end = min($total_pages_tx, $page_tx + 1);
+                            
+                            if($total_pages_tx >= 3) {
+                                if($page_tx == 1) {
+                                    $tx_range_end = 3;
+                                } elseif($page_tx == $total_pages_tx) {
+                                    $tx_range_start = $total_pages_tx - 2;
+                                }
+                            } else {
+                                $tx_range_start = 1;
+                                $tx_range_end = $total_pages_tx;
+                            }
+
+                            for($i = $tx_range_start; $i <= $tx_range_end; $i++): 
+                                $pgParams['page_tx'] = $i; 
+                            ?>
                                 <a href="?<?php echo http_build_query($pgParams); ?>" class="pagination-btn <?php echo ($i==$page_tx)?'active':''; ?>"><?php echo $i; ?></a>
                             <?php endfor; ?>
 
@@ -622,7 +647,8 @@ $chartData = getMonthlyRevenueChartData($conn);
                         <table class="custom-table">
                             <thead>
                                 <tr>
-                                    <th>Donor / Date</th>
+                                    <th>Donor</th>
+                                    <th>Transaction Details</th> 
                                     <th>Type</th>
                                     <th>Amount</th>
                                     <th>Action</th>
@@ -632,39 +658,57 @@ $chartData = getMonthlyRevenueChartData($conn);
                                 <?php if($walletTransactions && $walletTransactions->num_rows > 0): ?>
                                     <?php while($wt = $walletTransactions->fetch_assoc()): 
                                          $wtTime = new DateTime($wt['Created_At']);
-                                         $wtDateStr = $wtTime->format('M d');
+                                         $wtDateStr = $wtTime->format('M d, Y');
                                          $wtTimeStr = $wtTime->format('h:i A');
                                          $isCredit = ($wt['Transaction_Type'] == 'Credit');
+                                         $txnID = $wt['Wallet_Trans_ID'];
+                                         $desc = !empty($wt['Description']) ? $wt['Description'] : '-';
                                     ?>
                                     <tr>
                                         <td>
-                                            <div style="display: flex; align-items: center; margin-bottom:3px;">
+                                            <div style="display: flex; align-items: center; margin-bottom:5px;">
                                                 <?php if($wt['Donor_ProfilePicture']): ?>
-                                                    <img src="<?php echo $wt['Donor_ProfilePicture']; ?>" style="width:30px; height:30px; border-radius:50%; margin-right:8px; object-fit:cover;">
+                                                    <img src="<?php echo $wt['Donor_ProfilePicture']; ?>" style="width:35px; height:35px; border-radius:50%; margin-right:10px; object-fit:cover;">
                                                 <?php else: ?>
-                                                    <div style="width:30px; height:30px; border-radius:50%; background:#eee; margin-right:8px; font-size:12px; display:flex; align-items:center; justify-content:center;"><i class="fas fa-user"></i></div>
+                                                    <div style="width:35px; height:35px; border-radius:50%; background:#eee; margin-right:10px; font-size:14px; display:flex; align-items:center; justify-content:center; color:#888;"><i class="fas fa-user"></i></div>
                                                 <?php endif; ?>
-                                                <span style="font-weight:600; font-size:14px;"><?php echo htmlspecialchars($wt['Donor_Name']); ?></span>
+                                                <div>
+                                                    <div style="font-weight:600; font-size:14px; color:#333;"><?php echo htmlspecialchars($wt['Donor_Name']); ?></div>
+                                                    <div style="font-size:12px; color:#777; margin-top:2px;"><?php echo htmlspecialchars($wt['Donor_Email']); ?></div>
+                                                </div>
                                             </div>
-                                            <div style="font-size:12px; color:#888; margin-left:38px;"><?php echo $wtDateStr . ' | ' . $wtTimeStr; ?></div>
                                         </td>
+                                        
+                                        <td>
+                                            <div style="font-weight:500; font-size:13px; color:#333; margin-bottom:3px;">
+                                                <?php echo htmlspecialchars($desc); ?>
+                                            </div>
+                                            <div style="font-size:12px; color:#888;">
+                                                <i class="far fa-clock" style="font-size:11px; margin-right:4px;"></i> <?php echo $wtDateStr . ' ' . $wtTimeStr; ?>
+                                                <span style="color:#ddd; margin:0 8px;">|</span>
+                                                Ref: #<?php echo $txnID; ?>
+                                            </div>
+                                        </td>
+
                                         <td>
                                             <span class="badge <?php echo $isCredit ? 'badge-credit' : 'badge-debit'; ?>">
                                                 <?php echo $isCredit ? 'Credit' : 'Debit'; ?>
                                             </span>
                                         </td>
+
                                         <td style="font-weight:700; color: <?php echo $isCredit ? '#28a745' : '#dc3545'; ?>; font-size:14px;">
                                             <?php echo $isCredit ? '+' : '-'; ?> RM <?php echo number_format($wt['Amount'], 2); ?>
                                         </td>
+
                                         <td>
-                                            <a href="admin_ewallet_details.php?id=<?php echo $wt['id']; ?>" class="btn-action" target="_blank" title="View Wallet Details">
+                                            <a href="admin_ewallet_details.php?id=<?php echo $txnID; ?>" class="btn-action" target="_blank" title="View Wallet Details">
                                                 <i class="fas fa-eye"></i>
                                             </a>
                                         </td>
                                     </tr>
                                     <?php endwhile; ?>
                                 <?php else: ?>
-                                    <tr><td colspan="4" style="text-align:center; padding:30px; color:#999;">No wallet activity found.</td></tr>
+                                    <tr><td colspan="5" style="text-align:center; padding:30px; color:#999;">No wallet activity found.</td></tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
@@ -680,7 +724,24 @@ $chartData = getMonthlyRevenueChartData($conn);
                                 <span class="pagination-btn disabled">Previous</span>
                             <?php endif; ?>
 
-                            <?php for($i=1; $i<=$total_pages_wl; $i++): $wlParams['page_wl'] = $i; ?>
+                            <?php 
+                            $wl_range_start = max(1, $page_wl - 1);
+                            $wl_range_end = min($total_pages_wl, $page_wl + 1);
+                            
+                            if($total_pages_wl >= 3) {
+                                if($page_wl == 1) {
+                                    $wl_range_end = 3;
+                                } elseif($page_wl == $total_pages_wl) {
+                                    $wl_range_start = $total_pages_wl - 2;
+                                }
+                            } else {
+                                $wl_range_start = 1;
+                                $wl_range_end = $total_pages_wl;
+                            }
+
+                            for($i = $wl_range_start; $i <= $wl_range_end; $i++): 
+                                $wlParams['page_wl'] = $i; 
+                            ?>
                                 <a href="?<?php echo http_build_query($wlParams); ?>" class="pagination-btn <?php echo ($i==$page_wl)?'active':''; ?>"><?php echo $i; ?></a>
                             <?php endfor; ?>
 
@@ -703,7 +764,6 @@ $chartData = getMonthlyRevenueChartData($conn);
     </div>
 
     <script>
-        // Chart Config
         const ctx = document.getElementById('revenueChart').getContext('2d');
         new Chart(ctx, {
             type: 'line',
@@ -719,15 +779,12 @@ $chartData = getMonthlyRevenueChartData($conn);
             options: { responsive: true, maintainAspectRatio: false }
         });
 
-        // Toggle Logic for Transaction Filters
         function toggleTxFilters() {
             const type = document.getElementById('filterTypeTx').value;
-            // Hide all inputs
             document.querySelectorAll('#filter_date_tx, #filter_method_tx, #filter_text_tx').forEach(el => {
                 el.classList.remove('active');
             });
             
-            // Enable global text input by default
             const textInput = document.getElementById('filter_text_tx');
             const dateInput = document.getElementById('filter_date_tx');
             const methodInput = document.getElementById('filter_method_tx');
@@ -737,17 +794,13 @@ $chartData = getMonthlyRevenueChartData($conn);
             } else if (type === 'method') {
                 methodInput.classList.add('active');
             } else {
-                // For All, Donor, Email, Target, Amount -> Use Text Input
                 textInput.classList.add('active');
             }
         }
-        // Run on load
         toggleTxFilters();
 
-        // Toggle Logic for Wallet Filters
         function toggleWlFilters() {
             const type = document.getElementById('filterTypeWl').value;
-            
             document.querySelectorAll('#filter_date_wl, #filter_type_wl_select, #filter_text_wl').forEach(el => {
                 el.classList.remove('active');
             });
@@ -766,7 +819,6 @@ $chartData = getMonthlyRevenueChartData($conn);
         }
         toggleWlFilters();
 
-        // Auto hide floating alert after 5 seconds
         setTimeout(() => {
             const success = document.getElementById('floatingSuccess');
             const error = document.getElementById('floatingError');

@@ -2,7 +2,7 @@
 // branch_management_page.php
 session_start();
 
-// --- 修改 1: 检查是否登录 (Admin 或 Staff 均可) ---
+// Check if user is logged in
 if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
@@ -10,44 +10,34 @@ if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
 
 include 'dataconnection.php';
 
-// --- 修改 2: 获取当前用户信息 (支持 Admin 和 Staff) ---
+// --- Get Current User Info ---
 $adminName = "User";
 $adminPosition = "Role";
 $adminProfilePicture = null;
-$adminId = 0; // 初始化 adminId，防止 Staff 登录时未定义报错
+$adminId = 0;
 
 if (isset($_SESSION['admin_id'])) {
-    // === 如果是 Admin 登录 ===
     $adminId = $_SESSION['admin_id'];
     $sql = "SELECT Admin_ProfilePicture, Admin_Role, Admin_Name FROM admin WHERE Admin_ID = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $adminId);
     $stmt->execute();
     $result = $stmt->get_result();
-    
-    if ($result && $result->num_rows > 0) {
-        $row = $result->fetch_assoc();
+    if ($result && $row = $result->fetch_assoc()) {
         $adminName = $row['Admin_Name'];
         $adminProfilePicture = $row['Admin_ProfilePicture'];
         $adminPosition = !empty($row['Admin_Role']) ? $row['Admin_Role'] : "Admin";
     }
     $stmt->close();
-    
 } elseif (isset($_SESSION['staff_id'])) {
-    // === 如果是 Staff 登录 ===
     $currentStaffId = $_SESSION['staff_id'];
-    // 注意：添加 Branch 的 SQL 语句中使用了 $adminId。
-    // 如果 Staff 添加 Branch，这里暂时将 Staff ID 赋值给 $adminId 以保证代码不报错。
     $adminId = $currentStaffId; 
-    
     $sql = "SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role FROM staff WHERE Staff_ID = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $currentStaffId);
     $stmt->execute();
     $result = $stmt->get_result();
-    
-    if ($result && $result->num_rows > 0) {
-        $row = $result->fetch_assoc();
+    if ($result && $row = $result->fetch_assoc()) {
         $adminName = $row['Staff_FullName'];
         $adminProfilePicture = $row['Staff_ProfilePicture'];
         $adminPosition = $row['Staff_Role'];
@@ -74,7 +64,76 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_payment_history' && isset(
     exit();
 }
 
-// --- EXPORT TO EXCEL HANDLER ---
+// --- SEARCH & FILTER PREPARATION ---
+$search = "";
+$filterType = "";
+$filterValue = "";
+$conditions = ["Is_Deleted = 0"];
+$orderClause = "ORDER BY Branch_ID DESC"; // Default Sort
+
+// 1. Keyword Search
+if (isset($_GET['search']) && !empty($_GET['search'])) {
+    $search = $conn->real_escape_string($_GET['search']);
+    $conditions[] = "(Branch_Name LIKE '%$search%' OR Branch_City LIKE '%$search%' OR Branch_ID LIKE '%$search%')";
+}
+
+// 2. Dynamic Filters
+if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
+    $filterType = $_GET['filter_type'];
+    
+    // Category Filter
+    if ($filterType == 'category' && !empty($_GET['filter_val_category'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_category']);
+        $conditions[] = "Branch_Type = '$filterValue'";
+    }
+    // State Filter
+    elseif ($filterType == 'state' && !empty($_GET['filter_val_state'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_state']);
+        $conditions[] = "Branch_State = '$filterValue'";
+    }
+    // Status Filter
+    elseif ($filterType == 'status' && !empty($_GET['filter_val_status'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_status']);
+        $conditions[] = "Branch_OperationalStatus = '$filterValue'";
+    }
+    // Name Sorting (A-Z, Z-A)
+    elseif ($filterType == 'name_sort' && !empty($_GET['filter_val_name'])) {
+        $filterValue = $_GET['filter_val_name'];
+        if ($filterValue == 'asc') $orderClause = "ORDER BY Branch_Name ASC";
+        elseif ($filterValue == 'desc') $orderClause = "ORDER BY Branch_Name DESC";
+    }
+    // ID Sorting
+    elseif ($filterType == 'id_sort' && !empty($_GET['filter_val_id'])) {
+        $filterValue = $_GET['filter_val_id'];
+        if ($filterValue == 'asc') $orderClause = "ORDER BY Branch_ID ASC";
+        elseif ($filterValue == 'desc') $orderClause = "ORDER BY Branch_ID DESC";
+    }
+    // Phone Prefix Filter
+    elseif ($filterType == 'phone' && !empty($_GET['filter_val_phone'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_phone']);
+        $conditions[] = "Branch_ContactNumber LIKE '%$filterValue%'";
+    }
+    // City Filter
+    elseif ($filterType == 'city' && !empty($_GET['filter_val_city'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_city']);
+        $conditions[] = "Branch_City = '$filterValue'";
+    }
+    // Capacity Filter
+    elseif ($filterType == 'capacity' && !empty($_GET['filter_val_capacity'])) {
+        $filterValue = $_GET['filter_val_capacity'];
+        if ($filterValue == 'below_100') {
+            $conditions[] = "Branch_Capacity < 100";
+        } elseif ($filterValue == '100_500') {
+            $conditions[] = "Branch_Capacity BETWEEN 100 AND 500";
+        } elseif ($filterValue == 'above_500') {
+            $conditions[] = "Branch_Capacity > 500";
+        }
+    }
+}
+
+$whereClause = "WHERE " . implode(" AND ", $conditions);
+
+// --- EXPORT TO EXCEL ---
 if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
     $filename = "branch_list_" . date('Ymd') . ".xls";
     
@@ -85,11 +144,11 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
 
     $exportSql = "SELECT b.*, 
                   COALESCE((SELECT SUM(Order_Amount) FROM orders o WHERE o.Branch_ID = b.Branch_ID AND (o.Order_Status = 'Success' OR o.Order_Status = 'Completed')), 0) as TotalRaised 
-                  FROM branch b WHERE b.Is_Deleted = 0 ORDER BY b.Branch_ID DESC";
+                  FROM branch b $whereClause $orderClause";
     $res = $conn->query($exportSql);
 
     echo '<table border="1">';
-    echo '<tr><th>ID</th><th>Category</th><th>Name</th><th>Branch Contact</th><th>Branch Email</th><th>PIC Name</th><th>PIC Contact</th><th>PIC Email</th><th>Capacity</th><th>Total Raised (RM)</th><th>Address</th></tr>';
+    echo '<tr><th>ID</th><th>Category</th><th>Name</th><th>Branch Contact</th><th>Branch Email</th><th>PIC Name</th><th>PIC Contact</th><th>PIC Email</th><th>Capacity</th><th>Total Raised (RM)</th><th>Address</th><th>Status</th></tr>';
     
     if ($res && $res->num_rows > 0) {
         while($row = $res->fetch_assoc()) {
@@ -106,10 +165,9 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
                 <td>{$row['Branch_Capacity']}</td>
                 <td>{$row['TotalRaised']}</td>
                 <td>{$addr}</td>
+                <td>{$row['Branch_OperationalStatus']}</td>
             </tr>";
         }
-    } else {
-        echo '<tr><td colspan="11">No records found</td></tr>';
     }
     echo '</table>';
     exit();
@@ -126,9 +184,7 @@ function getBranchStats($conn) {
     if($checkCol && $checkCol->num_rows > 0) {
         $sqlTotalLast = "SELECT COUNT(*) as total FROM branch WHERE Is_Deleted = 0 AND Branch_CreatedAt <= '$endOfLastMonth'"; 
         $totalBranchesLast = isset($conn->query($sqlTotalLast)->fetch_assoc()['total']) ? $conn->query($sqlTotalLast)->fetch_assoc()['total'] : 0;
-    } else {
-        $totalBranchesLast = 0;
-    }
+    } else { $totalBranchesLast = 0; }
 
     $branchPercentChange = ($totalBranchesLast > 0) ? (($totalBranchesNow - $totalBranchesLast) / $totalBranchesLast) * 100 : ($totalBranchesNow > 0 ? 100 : 0);
 
@@ -138,9 +194,7 @@ function getBranchStats($conn) {
     if($checkCol && $checkCol->num_rows > 0) {
         $sqlActiveLast = "SELECT COUNT(*) as total FROM branch WHERE Branch_OperationalStatus = 'Open' AND Is_Deleted = 0 AND Branch_CreatedAt <= '$endOfLastMonth'";
         $activeBranchesLast = isset($conn->query($sqlActiveLast)->fetch_assoc()['total']) ? $conn->query($sqlActiveLast)->fetch_assoc()['total'] : 0;
-    } else {
-        $activeBranchesLast = 0;
-    }
+    } else { $activeBranchesLast = 0; }
 
     $activePercentChange = ($activeBranchesLast > 0) ? (($activeBranchesNow - $activeBranchesLast) / $activeBranchesLast) * 100 : ($activeBranchesNow > 0 ? 100 : 0);
 
@@ -187,9 +241,15 @@ function handleMultiUpload($files) {
     return $paths;
 }
 
-// --- UPDATED: Added Headquarters and Branch to categories ---
+// --- DATA LISTS ---
 $branchTypes = ['Headquarters', 'Branch', 'Old Folks Home', 'Orphanage', 'Disabled Care Center'];
 $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'];
+$phonePrefixes = ['010', '011', '012', '013', '014', '015', '016', '017', '018', '019'];
+
+// Get distinct cities for filter
+$cities = [];
+$cityQ = $conn->query("SELECT DISTINCT Branch_City FROM branch WHERE Is_Deleted = 0 AND Branch_City != '' ORDER BY Branch_City ASC");
+if($cityQ) while($c = $cityQ->fetch_assoc()) $cities[] = $c['Branch_City'];
 
 // --- ADD BRANCH ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_branch'])) {
@@ -230,22 +290,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_branch'])) {
         if (!empty($uploaded)) $imageJson = json_encode($uploaded);
     }
     
-    // VALIDATION: Strict checks as requested
+    // VALIDATION
     if (empty($branchName) || empty($branchType) || empty($capacity) || empty($estDate) || 
         empty($email) || empty($contactNumber) || 
         empty($branchHead) || empty($headEmail) || empty($headContact) || 
         empty($address1) || empty($city) || empty($state) || empty($postalCode) || empty($description)) {
         $errorMessage = "All fields are mandatory. Please fill in all details.";
-    }
-    // Specific format checks
-    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errorMessage = "Invalid Branch email format.";
-    } 
-    elseif (!filter_var($headEmail, FILTER_VALIDATE_EMAIL)) {
+    } elseif (!filter_var($headEmail, FILTER_VALIDATE_EMAIL)) {
         $errorMessage = "Invalid PIC email format.";
-    } 
-    else {
-        // SQL Insert
+    } else {
         $sql = "INSERT INTO branch (Branch_Name, Branch_Type, Branch_Capacity, Branch_EstablishedDate,
                 Branch_OperationalStatus, Branch_ContactNumber, Branch_Email,
                 Branch_Head, Branch_Head_Contact, Branch_Head_Email,
@@ -269,27 +324,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_branch'])) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_branch'])) {
     $branchId = mysqli_real_escape_string($conn, $_POST['branch_id']);
     
-    // Basic Sanitization
     $branchName = mysqli_real_escape_string($conn, $_POST['branch_name']);
     $branchType = mysqli_real_escape_string($conn, $_POST['branch_type']);
     $capacity = intval($_POST['capacity']);
     $estDate = mysqli_real_escape_string($conn, $_POST['est_date']);
     $operationalStatus = mysqli_real_escape_string($conn, $_POST['operational_status']);
     
-    // Branch Contact
     $email = mysqli_real_escape_string($conn, $_POST['email']);
     $contactRaw = $_POST['contact_number'];
     $contactNumber = (strpos($contactRaw, '+60') === 0) ? $contactRaw : "+60" . $contactRaw;
     $contactNumber = mysqli_real_escape_string($conn, $contactNumber);
 
-    // PIC Info
     $branchHead = mysqli_real_escape_string($conn, $_POST['branch_head']);
     $headEmail = mysqli_real_escape_string($conn, $_POST['branch_head_email']);
     $headContactRaw = $_POST['branch_head_contact'];
     $headContact = (strpos($headContactRaw, '+60') === 0) ? $headContactRaw : "+60" . $headContactRaw;
     $headContact = mysqli_real_escape_string($conn, $headContact);
 
-    // Address & Description
     $address1 = mysqli_real_escape_string($conn, $_POST['address1']);
     $address2 = mysqli_real_escape_string($conn, $_POST['address2']);
     $address3 = mysqli_real_escape_string($conn, $_POST['address3']);
@@ -299,7 +350,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_branch'])) {
     $country = mysqli_real_escape_string($conn, $_POST['country']);
     $description = mysqli_real_escape_string($conn, $_POST['description']);
     
-    // Handle Images
     $remainingExistingImagesJson = $_POST['existing_images_json'];
     $remainingExistingImages = json_decode($remainingExistingImagesJson, true) ?? [];
 
@@ -312,7 +362,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_branch'])) {
     if(count($finalImages) > 10) $finalImages = array_slice($finalImages, 0, 10);
     $finalJson = json_encode($finalImages);
     
-    // VALIDATION: Strict checks
     if (empty($branchName) || empty($branchType) || empty($capacity) || empty($estDate) || 
         empty($email) || empty($contactNumber) || 
         empty($branchHead) || empty($headEmail) || empty($headContact) || 
@@ -329,7 +378,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_branch'])) {
         $errorMessage = "At least one branch image is required.";
     }
     else {
-        // SQL Update
         $sql = "UPDATE branch SET 
                 Branch_Name = '$branchName', Branch_Type = '$branchType', 
                 Branch_Capacity = $capacity, Branch_EstablishedDate = '$estDate', Branch_OperationalStatus = '$operationalStatus',
@@ -356,41 +404,27 @@ if (isset($_GET['delete_id'])) {
     exit();
 }
 
-// --- PAGINATION & FILTERS ---
-$results_per_page = 4;
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$start_from = max(0, ($page - 1) * $results_per_page);
-$searchTerm = ""; $filterType = ""; $filterValue = ""; $whereConditions = ["Is_Deleted = 0"];
+// --- PAGINATION & QUERY ---
+$results_per_page = 6;
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$start_from = ($page - 1) * $results_per_page;
 
-if (isset($_GET['search']) && !empty($_GET['search'])) {
-    $searchTerm = mysqli_real_escape_string($conn, $_GET['search']);
-    $whereConditions[] = "(Branch_Name LIKE '%$searchTerm%' OR Branch_City LIKE '%$searchTerm%')";
-}
-if (isset($_GET['filter_type'])) {
-    $filterType = $_GET['filter_type'];
-    if ($filterType == 'category' && !empty($_GET['filter_val_category'])) {
-        $filterValue = mysqli_real_escape_string($conn, $_GET['filter_val_category']);
-        $whereConditions[] = "Branch_Type = '$filterValue'";
-    } elseif ($filterType == 'state' && !empty($_GET['filter_val_state'])) {
-        $filterValue = mysqli_real_escape_string($conn, $_GET['filter_val_state']);
-        $whereConditions[] = "Branch_State = '$filterValue'";
-    } elseif ($filterType == 'status' && !empty($_GET['filter_val_status'])) {
-        $filterValue = mysqli_real_escape_string($conn, $_GET['filter_val_status']);
-        $whereConditions[] = "Branch_OperationalStatus = '$filterValue'";
-    }
-}
-
-$whereClause = "WHERE " . implode(" AND ", $whereConditions);
-$count_result = $conn->query("SELECT COUNT(*) as total FROM branch $whereClause");
-$total_branches_count = $count_result->fetch_assoc()['total'];
-$total_pages = ceil($total_branches_count / $results_per_page);
+$count_sql = "SELECT COUNT(*) as total FROM branch $whereClause";
+$count_result = $conn->query($count_sql);
+$total_records = ($count_result && $row = $count_result->fetch_assoc()) ? $row['total'] : 0;
+$total_pages = ceil($total_records / $results_per_page);
+if ($page > $total_pages && $total_pages > 0) { $page = $total_pages; $start_from = ($page - 1) * $results_per_page; }
 
 $sql = "SELECT b.*, 
         COALESCE((SELECT SUM(Order_Amount) FROM orders o WHERE o.Branch_ID = b.Branch_ID AND (o.Order_Status = 'Success' OR o.Order_Status = 'Completed')), 0) as TotalDonated 
-        FROM branch b $whereClause ORDER BY b.Branch_ID DESC LIMIT $start_from, $results_per_page";
+        FROM branch b $whereClause $orderClause LIMIT $start_from, $results_per_page";
 $result = $conn->query($sql);
 $branches = [];
 if ($result) { while($row = $result->fetch_assoc()) $branches[] = $row; }
+
+$start_record = ($total_records > 0) ? $start_from + 1 : 0;
+$end_record = min($start_from + $results_per_page, $total_records);
 
 // --- COLLECT IMAGES FOR LIGHTBOX JS ---
 $allBranchImagesMap = [];
@@ -429,11 +463,12 @@ $exportUrl = "?" . http_build_query($exportParams);
         .btn-success { background: var(--success); color: white; }
         .btn-danger { background: var(--danger); color: white; }
         
-        .search-filter-container { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
+        .search-filter-container { margin-bottom: 25px; display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
         .filter-group { display: flex; align-items: center; gap: 8px; }
         .filter-select { padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; outline: none; background-color: white; min-width: 140px; cursor: pointer; }
         .search-input { flex: 1; padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; outline: none; background: white; }
-        .secondary-filter { display: none; } .secondary-filter.active { display: block; animation: fadeIn 0.3s; }
+        .secondary-filter { display: none; animation: fadeIn 0.3s; }
+        .secondary-filter.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
         .branch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 25px; margin-bottom: 30px; }
@@ -441,7 +476,6 @@ $exportUrl = "?" . http_build_query($exportParams);
         .branch-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
         
         .card-image-container { position: relative; height: 200px; background: #f0f0f0; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px; }
-        /* Modified card-img to show clickability */
         .card-img { width: 100%; height: 100%; object-fit: cover; display: none; transition: opacity 0.3s; cursor: zoom-in; }
         .card-img.active { display: block; }
         
@@ -510,7 +544,6 @@ $exportUrl = "?" . http_build_query($exportParams);
         .upload-box i { font-size: 32px; color: #aaa; margin-bottom: 10px; display: block; }
         .upload-box p { margin: 0; font-size: 13px; color: #666; font-weight: 500; }
         
-        /* FIX FOR CLICKING ISSUE: input covers the whole box */
         .upload-box input[type="file"] {
             position: absolute; 
             width: 100%; 
@@ -519,7 +552,7 @@ $exportUrl = "?" . http_build_query($exportParams);
             left: 0; 
             opacity: 0; 
             cursor: pointer;
-            z-index: 10; /* Ensures input is on top of text */
+            z-index: 10;
         }
         
         .preview-grid {
@@ -566,9 +599,10 @@ $exportUrl = "?" . http_build_query($exportParams);
         .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid #ddd; border-right: none; border-radius: 6px 0 0 6px; color: #666; font-size: 14px; font-weight: bold; }
         .phone-input { border-radius: 0 6px 6px 0 !important; }
 
-        .pagination { display: flex; justify-content: center; gap: 5px; margin-top: 20px; }
-        .page-link { padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; text-decoration: none; color: #333; background: white; }
-        .page-link.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .pagination-container { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid #eee; margin-top: 10px; }
+        .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; transition: all 0.3s; display: inline-block; }
+        .pagination-btn.active { background-color: var(--primary); color: white; border-color: var(--primary); cursor: default; }
+        .pagination-btn.disabled { color: #ccc; cursor: not-allowed; background-color: #f8f9fa; border-color: #eee; }
         
         .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
         .history-list { max-height: 400px; overflow-y: auto; }
@@ -579,7 +613,10 @@ $exportUrl = "?" . http_build_query($exportParams);
         .h-right { font-weight: bold; color: #28a745; font-size: 14px; }
         .close-btn { font-size: 24px; cursor: pointer; border:none; background:none; }
 
-        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s; }
+        /* Updated Floating Alert - Top Left Icon Alignment */
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; animation: slideIn 0.3s; }
+        .floating-alert div { line-height: 1.6; }
+        .floating-alert i { margin-top: 4px; }
         .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
@@ -653,6 +690,8 @@ $exportUrl = "?" . http_build_query($exportParams);
         @media (max-width: 768px) {
             .stats-cards { grid-template-columns: 1fr; }
             .form-row { flex-direction: column; gap: 0; }
+            .search-filter-container { flex-direction: column; align-items: stretch; }
+            .filter-select, .search-input { width: 100%; margin-bottom: 5px; }
         }
     </style>
 </head>
@@ -666,12 +705,12 @@ $exportUrl = "?" . http_build_query($exportParams);
         <div class="dashboard-content">
             <div class="floating-alert floating-alert-success" id="floatingSuccess" style="display: <?php echo isset($_GET['success']) ? 'flex' : 'none'; ?>">
                 <i class="fas fa-check-circle"></i>
-                <span id="floatingSuccessText"><?php echo isset($_GET['success']) ? htmlspecialchars($_GET['success']) : ''; ?></span>
+                <div id="floatingSuccessText"><?php echo isset($_GET['success']) ? htmlspecialchars($_GET['success']) : ''; ?></div>
             </div>
 
             <div class="floating-alert floating-alert-danger" id="floatingError" style="display: <?php echo isset($_GET['error']) ? 'flex' : 'none'; ?>">
                 <i class="fas fa-exclamation-circle"></i>
-                <span id="floatingErrorText"><?php echo isset($_GET['error']) ? htmlspecialchars($_GET['error']) : ''; ?></span>
+                <div id="floatingErrorText"><?php echo isset($_GET['error']) ? htmlspecialchars($_GET['error']) : ''; ?></div>
             </div>
 
             <div class="welcome-section"><h1>Branch Management</h1><p>Manage shelter branches, view status, and track donations.</p></div>
@@ -720,17 +759,29 @@ $exportUrl = "?" . http_build_query($exportParams);
                         <i class="fas fa-filter" style="color:#666; margin-right:5px;"></i>
                         <select name="filter_type" id="filterType" class="filter-select" onchange="toggleFilters()">
                             <option value="">Filter By...</option>
+                            <option value="name_sort" <?php echo ($filterType == 'name_sort') ? 'selected' : ''; ?>>Name Sorting</option>
+                            <option value="id_sort" <?php echo ($filterType == 'id_sort') ? 'selected' : ''; ?>>Branch ID</option>
+                            <option value="phone" <?php echo ($filterType == 'phone') ? 'selected' : ''; ?>>Phone Prefix</option>
+                            <option value="city" <?php echo ($filterType == 'city') ? 'selected' : ''; ?>>City</option>
+                            <option value="capacity" <?php echo ($filterType == 'capacity') ? 'selected' : ''; ?>>Capacity</option>
                             <option value="category" <?php echo ($filterType == 'category') ? 'selected' : ''; ?>>Category</option>
                             <option value="state" <?php echo ($filterType == 'state') ? 'selected' : ''; ?>>State</option>
                             <option value="status" <?php echo ($filterType == 'status') ? 'selected' : ''; ?>>Status</option>
                         </select>
                     </div>
-                    <div id="filter_category" class="secondary-filter"><select name="filter_val_category" class="filter-select"><option value="">All Categories</option><?php foreach($branchTypes as $t) echo "<option value='$t'>$t</option>"; ?></select></div>
-                    <div id="filter_state" class="secondary-filter"><select name="filter_val_state" class="filter-select"><option value="">All States</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div>
-                    <div id="filter_status" class="secondary-filter"><select name="filter_val_status" class="filter-select"><option value="Open">Open</option><option value="Closed">Closed</option></select></div>
-                    <input type="text" name="search" class="search-input" placeholder="Search branch name..." value="<?php echo htmlspecialchars($searchTerm); ?>">
+
+                    <div id="filter_name_container" class="secondary-filter"><select name="filter_val_name" class="filter-select"><option value="">Select Order...</option><option value="asc" <?php if($filterValue == 'asc') echo 'selected'; ?>>Name (A-Z)</option><option value="desc" <?php if($filterValue == 'desc') echo 'selected'; ?>>Name (Z-A)</option></select></div>
+                    <div id="filter_id_container" class="secondary-filter"><select name="filter_val_id" class="filter-select"><option value="">Select Order...</option><option value="asc" <?php if($filterValue == 'asc') echo 'selected'; ?>>ID (Ascending)</option><option value="desc" <?php if($filterValue == 'desc') echo 'selected'; ?>>ID (Descending)</option></select></div>
+                    <div id="filter_phone_container" class="secondary-filter"><select name="filter_val_phone" class="filter-select"><option value="">Select Prefix...</option><?php foreach($phonePrefixes as $pp): ?><option value="<?php echo $pp; ?>" <?php if($filterValue == $pp) echo 'selected'; ?>>+6<?php echo $pp; ?></option><?php endforeach; ?></select></div>
+                    <div id="filter_city_container" class="secondary-filter"><select name="filter_val_city" class="filter-select"><option value="">Select City...</option><?php foreach($cities as $c): ?><option value="<?php echo $c; ?>" <?php if($filterValue == $c) echo 'selected'; ?>><?php echo $c; ?></option><?php endforeach; ?></select></div>
+                    <div id="filter_capacity_container" class="secondary-filter"><select name="filter_val_capacity" class="filter-select"><option value="">Select Range...</option><option value="below_100" <?php if($filterValue == 'below_100') echo 'selected'; ?>>Below 100</option><option value="100_500" <?php if($filterValue == '100_500') echo 'selected'; ?>>100 - 500</option><option value="above_500" <?php if($filterValue == 'above_500') echo 'selected'; ?>>Above 500</option></select></div>
+                    <div id="filter_category_container" class="secondary-filter"><select name="filter_val_category" class="filter-select"><option value="">All Categories</option><?php foreach($branchTypes as $t) echo "<option value='$t' ".($filterValue==$t?'selected':'').">$t</option>"; ?></select></div>
+                    <div id="filter_state_container" class="secondary-filter"><select name="filter_val_state" class="filter-select"><option value="">All States</option><?php foreach($malaysiaStates as $s) echo "<option value='$s' ".($filterValue==$s?'selected':'').">$s</option>"; ?></select></div>
+                    <div id="filter_status_container" class="secondary-filter"><select name="filter_val_status" class="filter-select"><option value="Open" <?php if($filterValue == 'Open') echo 'selected'; ?>>Open</option><option value="Closed" <?php if($filterValue == 'Closed') echo 'selected'; ?>>Closed</option></select></div>
+
+                    <input type="text" name="search" class="search-input" placeholder="Search branch name, city..." value="<?php echo htmlspecialchars($search); ?>">
                     <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
-                    <?php if(!empty($searchTerm) || !empty($filterType)): ?><a href="branch_management_page.php" class="btn btn-danger" style="padding: 10px 15px;"><i class="fas fa-times"></i></a><?php endif; ?>
+                    <?php if(!empty($search) || !empty($filterType)): ?><a href="branch_management_page.php" class="btn btn-danger" style="padding: 10px 15px;" title="Clear Filters"><i class="fas fa-times"></i></a><?php endif; ?>
                 </form>
 
                 <div class="branch-grid">
@@ -740,7 +791,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                                 $statusClass = ($b['Branch_OperationalStatus'] == 'Open') ? 'status-open' : 'status-closed';
                                 $images = json_decode($b['Branch_Images'], true);
                                 $hasImages = ($images && !empty($images));
-                                // Collect images for JS Map
                                 if($hasImages) {
                                     $allBranchImagesMap[$b['Branch_ID']] = $images;
                                 }
@@ -822,18 +872,46 @@ $exportUrl = "?" . http_build_query($exportParams);
                     <?php endif; ?>
                 </div>
 
-                <?php if($total_pages > 1): ?>
-                <div class="pagination">
-                    <?php 
-                    $qs = "";
-                    if(!empty($searchTerm)) $qs .= "&search=".urlencode($searchTerm);
-                    if(!empty($filterType)) $qs .= "&filter_type=$filterType&filter_val_category=$filterValue"; 
-                    ?>
-                    <?php if($page > 1): ?><a href="?page=<?php echo $page-1 . $qs; ?>" class="page-link">&laquo; Prev</a><?php endif; ?>
-                    <?php for($i=1; $i<=$total_pages; $i++): ?><a href="?page=<?php echo $i . $qs; ?>" class="page-link <?php echo ($i==$page)?'active':''; ?>"><?php echo $i; ?></a><?php endfor; ?>
-                    <?php if($page < $total_pages): ?><a href="?page=<?php echo $page+1 . $qs; ?>" class="page-link">Next &raquo;</a><?php endif; ?>
+                <div class="pagination-container">
+                    <div class="pagination-info">Showing <?php echo $start_record; ?> to <?php echo $end_record; ?> of <?php echo $total_records; ?> results</div>
+                    <div class="pagination-controls">
+                        <?php 
+                        // Build query string for pagination links
+                        $queryParams = []; 
+                        if(!empty($search)) $queryParams['search'] = $search;
+                        if(!empty($filterType)) {
+                            $queryParams['filter_type'] = $filterType;
+                            if($filterType == 'category' && !empty($filterValue)) $queryParams['filter_val_category'] = $filterValue;
+                            elseif($filterType == 'state' && !empty($filterValue)) $queryParams['filter_val_state'] = $filterValue;
+                            elseif($filterType == 'status' && !empty($filterValue)) $queryParams['filter_val_status'] = $filterValue;
+                            elseif($filterType == 'name_sort' && !empty($filterValue)) $queryParams['filter_val_name'] = $filterValue;
+                            elseif($filterType == 'id_sort' && !empty($filterValue)) $queryParams['filter_val_id'] = $filterValue;
+                            elseif($filterType == 'phone' && !empty($filterValue)) $queryParams['filter_val_phone'] = $filterValue;
+                            elseif($filterType == 'city' && !empty($filterValue)) $queryParams['filter_val_city'] = $filterValue;
+                            elseif($filterType == 'capacity' && !empty($filterValue)) $queryParams['filter_val_capacity'] = $filterValue;
+                        }
+                        $queryString = http_build_query($queryParams);
+                        $paginationUrl = !empty($queryString) ? '&' . $queryString : '';
+
+                        if ($page > 1) echo '<a href="?page=' . ($page - 1) . $paginationUrl . '" class="pagination-btn">Previous</a>';
+                        else echo '<span class="pagination-btn disabled">Previous</span>';
+
+                        $start_window = max(1, $page - 1);
+                        $end_window = min($total_pages, $page + 1);
+                        // Ensure window is at least 3 pages if available
+                        if ($page == 1) $end_window = min($total_pages, 3);
+                        if ($page == $total_pages) $start_window = max(1, $total_pages - 2);
+
+                        for ($i = $start_window; $i <= $end_window; $i++) {
+                            if ($i == $page) echo '<span class="pagination-btn active">' . $i . '</span>';
+                            else echo '<a href="?page=' . $i . $paginationUrl . '" class="pagination-btn">' . $i . '</a>';
+                        }
+
+                        if ($page < $total_pages) echo '<a href="?page=' . ($page + 1) . $paginationUrl . '" class="pagination-btn">Next</a>';
+                        else echo '<span class="pagination-btn disabled">Next</span>';
+                        ?>
+                    </div>
                 </div>
-                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -1180,21 +1258,16 @@ $exportUrl = "?" . http_build_query($exportParams);
     </div>
 
     <script>
-        // --- NEW: SYSTEM ALERT FUNCTION ---
-        function showSystemError(message) {
+        function showSystemError(messageHTML) {
             const errorBox = document.getElementById('floatingError');
             const errorText = document.getElementById('floatingErrorText');
             if(errorBox && errorText) {
-                errorText.innerText = message;
+                errorText.innerHTML = messageHTML;
                 errorBox.style.display = 'flex';
-                // Auto hide after 5 seconds
-                setTimeout(() => { 
-                    errorBox.style.display = 'none'; 
-                }, 5000);
+                setTimeout(() => { errorBox.style.display = 'none'; }, 5000);
             }
         }
 
-        // --- AUTO HIDE FLASH MESSAGES (5 Seconds) ---
         document.addEventListener('DOMContentLoaded', function() {
             const successAlert = document.getElementById('floatingSuccess');
             const errorAlert = document.getElementById('floatingError');
@@ -1210,9 +1283,9 @@ $exportUrl = "?" . http_build_query($exportParams);
         });
 
         // --- MULTI-UPLOAD & PREVIEW LOGIC ---
-        let addFiles = []; // Stores File objects for Add Modal
-        let editNewFiles = []; // Stores File objects for Edit Modal
-        let editExistingImages = []; // Stores paths of existing images for Edit Modal
+        let addFiles = []; 
+        let editNewFiles = []; 
+        let editExistingImages = []; 
 
         function handleFileSelect(event, mode) {
             const input = event.target;
@@ -1276,7 +1349,6 @@ $exportUrl = "?" . http_build_query($exportParams);
             const container = document.getElementById('edit_preview_container');
             container.innerHTML = '';
 
-            // Render Existing Images First
             editExistingImages.forEach((src, index) => {
                 const item = document.createElement('div');
                 item.className = 'preview-item';
@@ -1287,7 +1359,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                 container.appendChild(item);
             });
 
-            // Render New Uploads
             editNewFiles.forEach((file, index) => {
                 const reader = new FileReader();
                 reader.onload = function(e) {
@@ -1303,12 +1374,12 @@ $exportUrl = "?" . http_build_query($exportParams);
             });
         }
 
-        // --- STANDARD LOGIC ---
+        // --- FILTER TOGGLE LOGIC ---
         function toggleFilters() {
             const type = document.getElementById('filterType').value;
             document.querySelectorAll('.secondary-filter').forEach(el => { el.classList.remove('active'); el.querySelector('select').disabled = true; });
             if(type) {
-                const el = document.getElementById('filter_' + type);
+                const el = document.getElementById('filter_' + type + '_container');
                 if(el) { el.classList.add('active'); el.querySelector('select').disabled = false; }
             }
         }
@@ -1322,14 +1393,11 @@ $exportUrl = "?" . http_build_query($exportParams);
 
         window.onclick = function(event) {
             if (!event.target.matches('.menu-btn') && !event.target.matches('.menu-btn *')) document.querySelectorAll('.action-dropdown').forEach(d => d.classList.remove('show'));
-            // Close regular modals if clicked outside
             if (event.target.classList.contains('modal')) event.target.style.display = 'none';
-            // Close lightbox if clicked outside the image
             if (event.target.id == 'imageLightbox') closeLightbox();
         }
 
         function openAddModal() { 
-            // Reset Add Form
             addFiles = [];
             updateFileInput('add_branch_images', []);
             document.getElementById('add_preview_container').innerHTML = '';
@@ -1341,7 +1409,6 @@ $exportUrl = "?" . http_build_query($exportParams);
         function openEditModal(branch) {
             document.querySelectorAll('.action-dropdown').forEach(d => d.classList.remove('show')); 
             
-            // Reset Edit Arrays
             editNewFiles = [];
             updateFileInput('edit_branch_images', []);
             try {
@@ -1351,7 +1418,6 @@ $exportUrl = "?" . http_build_query($exportParams);
             }
             document.getElementById('edit_existing_images_input').value = JSON.stringify(editExistingImages);
 
-            // Populate Fields
             document.getElementById('edit_branch_id').value = branch.Branch_ID;
             document.getElementById('edit_branch_name').value = branch.Branch_Name;
             document.getElementById('edit_branch_type').value = branch.Branch_Type;
@@ -1401,51 +1467,32 @@ $exportUrl = "?" . http_build_query($exportParams);
 
         function openLightbox(branchId, index) {
             if (!allBranchImages[branchId] || allBranchImages[branchId].length === 0) return;
-            
             currentLightboxBranchId = branchId;
             currentLightboxIndex = index;
-            
             updateLightboxImage();
             document.getElementById('imageLightbox').style.display = "flex";
         }
 
-        function closeLightbox() {
-            document.getElementById('imageLightbox').style.display = "none";
-        }
+        function closeLightbox() { document.getElementById('imageLightbox').style.display = "none"; }
 
         function changeLightboxImage(n) {
             if (currentLightboxBranchId === null) return;
-            
             const images = allBranchImages[currentLightboxBranchId];
             currentLightboxIndex += n;
-            
-            if (currentLightboxIndex >= images.length) {
-                currentLightboxIndex = 0;
-            } else if (currentLightboxIndex < 0) {
-                currentLightboxIndex = images.length - 1;
-            }
-            
+            if (currentLightboxIndex >= images.length) currentLightboxIndex = 0;
+            else if (currentLightboxIndex < 0) currentLightboxIndex = images.length - 1;
             updateLightboxImage();
         }
 
         function updateLightboxImage() {
             const images = allBranchImages[currentLightboxBranchId];
-            const imgElement = document.getElementById('lightboxImage');
-            imgElement.src = images[currentLightboxIndex];
-            
-            // Hide arrows if only 1 image
+            document.getElementById('lightboxImage').src = images[currentLightboxIndex];
             const prevBtn = document.querySelector('.lightbox-prev');
             const nextBtn = document.querySelector('.lightbox-next');
-            if (images.length <= 1) {
-                prevBtn.style.display = 'none';
-                nextBtn.style.display = 'none';
-            } else {
-                prevBtn.style.display = 'block';
-                nextBtn.style.display = 'block';
-            }
+            if (images.length <= 1) { prevBtn.style.display = 'none'; nextBtn.style.display = 'none'; }
+            else { prevBtn.style.display = 'block'; nextBtn.style.display = 'block'; }
         }
         
-        // Keyboard support for Lightbox
         document.addEventListener('keydown', function(event) {
             if (document.getElementById('imageLightbox').style.display === "flex") {
                 if (event.key === "Escape") closeLightbox();
@@ -1454,7 +1501,6 @@ $exportUrl = "?" . http_build_query($exportParams);
             }
         });
 
-        // --- PAYMENT & OTHER LOGIC ---
         function openPaymentHistory(branchId) {
             document.querySelectorAll('.action-dropdown').forEach(d => d.classList.remove('show')); 
             document.getElementById('paymentModal').style.display = 'flex';
@@ -1473,7 +1519,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                 });
         }
 
-        // [MODIFIED] Replaced native confirm() with Custom Modal
         function confirmDelete(id) { 
             const link = document.getElementById('confirmDeleteBtn');
             link.href = `branch_management_page.php?delete_id=${id}`;
@@ -1488,15 +1533,13 @@ $exportUrl = "?" . http_build_query($exportParams);
         setupPhoneInput('add_head_contact'); setupPhoneInput('edit_head_contact');
 
         function checkEmail(val) {
-            if(!val) return true; // Let required check handle empty
+            if(!val) return true;
             return /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val);
         }
 
-        // [MODIFIED] Updated Validate Form to use System Error instead of browser popups
         function validateForm(mode) {
             let errors = [];
             
-            // Map IDs for easier checking
             let fields = {
                 name: mode === 'add' ? 'add_branch_name' : 'edit_branch_name',
                 type: mode === 'add' ? 'add_branch_type' : 'edit_branch_type',
@@ -1510,7 +1553,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                 estDate: mode === 'add' ? 'add_est_date' : 'edit_est_date',
                 addr1: mode === 'add' ? 'add_address1' : 'edit_address1',
                 addr2: mode === 'add' ? 'add_address2' : 'edit_address2',
-                addr3: mode === 'add' ? 'add_address3' : 'edit_address3',
                 city: mode === 'add' ? 'add_city' : 'edit_city',
                 state: mode === 'add' ? 'add_state' : 'edit_state',
                 postcode: mode === 'add' ? 'add_postal_code' : 'edit_postal_code',
@@ -1519,47 +1561,35 @@ $exportUrl = "?" . http_build_query($exportParams);
 
             const isEmpty = (id) => { const el = document.getElementById(id); return !el || !el.value.trim(); };
 
-            // Check Required Fields manually because of 'novalidate'
             if (isEmpty(fields.name)) errors.push("Branch Name is required");
             if (isEmpty(fields.type)) errors.push("Category is required");
             if (isEmpty(fields.status)) errors.push("Status is required");
             
-            // Email Checks
             if (isEmpty(fields.email)) errors.push("Branch Email is required");
             else if (!checkEmail(document.getElementById(fields.email).value)) {
                 document.getElementById(mode + 'EmailError').style.display = 'block'; 
                 errors.push("Invalid Branch Email format");
-            } else {
-                document.getElementById(mode + 'EmailError').style.display = 'none'; 
-            }
+            } else { document.getElementById(mode + 'EmailError').style.display = 'none'; }
 
             if (isEmpty(fields.contact)) errors.push("Branch Contact is required");
-            
-            // PIC Checks
             if (isEmpty(fields.head)) errors.push("PIC Name is required");
             
             if (isEmpty(fields.headEmail)) errors.push("PIC Email is required");
             else if (!checkEmail(document.getElementById(fields.headEmail).value)) {
                 document.getElementById(mode + 'HeadEmailError').style.display = 'block'; 
                 errors.push("Invalid PIC Email format");
-            } else {
-                document.getElementById(mode + 'HeadEmailError').style.display = 'none';
-            }
+            } else { document.getElementById(mode + 'HeadEmailError').style.display = 'none'; }
 
             if (isEmpty(fields.headContact)) errors.push("PIC Contact is required");
-
-            // Details Checks
             if (isEmpty(fields.capacity)) errors.push("Capacity is required");
             if (isEmpty(fields.estDate)) errors.push("Est. Date is required");
             if (isEmpty(fields.addr1)) errors.push("Address Line 1 is required");
             if (isEmpty(fields.addr2)) errors.push("Address Line 2 is required");
-            // Address 3 removed from required checks
             if (isEmpty(fields.city)) errors.push("City is required");
             if (isEmpty(fields.state)) errors.push("State is required");
             if (isEmpty(fields.postcode)) errors.push("Postcode is required");
             if (isEmpty(fields.desc)) errors.push("Description is required");
 
-            // Image Check
             if (mode === 'add') {
                 if (addFiles.length === 0) errors.push("At least one image is required");
             } else {
@@ -1569,11 +1599,9 @@ $exportUrl = "?" . http_build_query($exportParams);
             }
 
             if (errors.length > 0) {
-                // Show errors in system popup
-                showSystemError("Validation Error: " + errors.join(". "));
+                showSystemError("Validation Error:<br>" + errors.join("<br>"));
                 return false;
             }
-
             return true;
         }
 
