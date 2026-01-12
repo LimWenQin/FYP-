@@ -206,6 +206,50 @@ include 'header_UI.php';
             border-color: var(--success-green);
         }
         
+        /* --- New CSS for Phone Group (+60) --- */
+        .phone-group {
+            display: flex;
+            align-items: stretch;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .phone-group:focus-within {
+            border-color: var(--primary-red);
+            box-shadow: 0 0 0 3px var(--light-red);
+        }
+
+        .phone-group.error {
+            border-color: var(--primary-red);
+            background-color: #fff5f5;
+        }
+
+        .phone-prefix {
+            background-color: #e5e5e5;
+            color: var(--dark-gray);
+            padding: 0 15px;
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            border-right: 1px solid #d4d4d4;
+            user-select: none;
+        }
+
+        /* Remove border from input inside the group since group has the border */
+        .phone-group .form-control {
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            background-color: transparent;
+        }
+        
+        .phone-group .form-control:focus {
+            box-shadow: none;
+        }
+        /* ------------------------------------- */
+
         .field-error-msg {
             color: var(--error-red);
             font-size: 0.85rem;
@@ -425,11 +469,14 @@ include 'header_UI.php';
                     
                     <div class="form-group">
                         <label for="contact" class="required">Contact Number</label>
-                        <input type="tel" class="form-control" id="contact" name="contact" 
-                               placeholder="012-3456789"
-                               value="<?php echo htmlspecialchars($contact); ?>" 
-                               required>
-                        <span class="form-help">Format: 01X-XXXXXXX</span>
+                        <div class="phone-group" id="phoneGroup">
+                            <div class="phone-prefix">+60</div>
+                            <input type="tel" class="form-control" id="contact" name="contact" 
+                                   placeholder="012-3456789"
+                                   value="<?php echo htmlspecialchars($contact); ?>" 
+                                   required>
+                        </div>
+                        <span class="form-help">Must start with 0 (e.g., 012-XXXXXXX)</span>
                         <div class="field-error-msg" id="contactError">Contact Number is required.</div>
                     </div>
                 </div>
@@ -506,10 +553,24 @@ include 'header_UI.php';
             const dobInput = document.getElementById('dob');
             const nameInput = document.getElementById('name');
             const contactInput = document.getElementById('contact');
+            const phoneGroup = document.getElementById('phoneGroup'); // Parent container
             const termsInput = document.getElementById('terms');
             
             function setFieldState(elementId, isError, message = "") {
                 const el = document.getElementById(elementId);
+                // Handle Contact Input special styling (apply error to the group div)
+                if(elementId === 'contactError') {
+                    if (isError) {
+                        phoneGroup.classList.add('error');
+                        el.classList.add('visible');
+                        if(message) el.innerText = message;
+                    } else {
+                        phoneGroup.classList.remove('error');
+                        el.classList.remove('visible');
+                    }
+                    return;
+                }
+
                 if (isError) {
                     el.classList.add('visible');
                     if(message) el.innerText = message;
@@ -529,16 +590,9 @@ include 'header_UI.php';
                     matchMsg.className = 'field-info-msg';
                     matchMsg.innerText = '';
                     confirmPassword.classList.remove('error', 'success');
-                    
-                    // 【关键修改】不要在这里隐藏 confirmPasswordError
-                    // 让 submit handler 去控制 "Required" 的错误提示
-                    // confirmError.classList.remove('visible');  <-- 删掉这行或让它只在 typing 时生效
-                    // 为了简单起见，这里我们只做清空 matchMsg 的动作
-                    
                     return false;
                 }
 
-                // 如果有输入了，我们才去隐藏 "Required" 的错误，并开始比对
                 confirmError.classList.remove('visible');
 
                 if (pass === confirm) {
@@ -616,14 +670,26 @@ include 'header_UI.php';
             
             function validateContact() {
                  if(!contactInput.value) return true;
-                 if(contactInput.value.length < 10) {
-                     contactInput.classList.add('error');
-                     setFieldState('contactError', true, "Please enter a valid contact number.");
-                     return false;
+                 
+                 // Remove non-digits to check raw number length and start char
+                 const rawValue = contactInput.value.replace(/\D/g, '');
+
+                 // 1. Must start with '0'
+                 if (rawValue.length > 0 && rawValue.charAt(0) !== '0') {
+                      phoneGroup.classList.add('error');
+                      setFieldState('contactError', true, "Malaysia phone number must start with 0.");
+                      return false;
+                 }
+                 
+                 // 2. Check Length (01x-xxxxxxx is usually 10-11 digits)
+                 if(rawValue.length < 10) {
+                      phoneGroup.classList.add('error');
+                      setFieldState('contactError', true, "Please enter a valid Malaysia contact number.");
+                      return false;
                  } else {
-                     contactInput.classList.remove('error');
-                     setFieldState('contactError', false);
-                     return true;
+                      phoneGroup.classList.remove('error');
+                      setFieldState('contactError', false);
+                      return true;
                  }
             }
             contactInput.addEventListener('blur', validateContact);
@@ -687,21 +753,34 @@ include 'header_UI.php';
             }
             
             contactInput.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, '');
+                let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+                
+                // Enforce formatting 01x-xxxxxxx
                 if (value.length > 3) value = value.substring(0, 3) + '-' + value.substring(3);
-                if (value.length > 12) value = value.substring(0, 12);
+                if (value.length > 12) value = value.substring(0, 12); // Limit length
+                
                 e.target.value = value;
+                
+                // Real-time check for "Start with 0"
+                if (value.length > 0 && value.charAt(0) !== '0') {
+                     setFieldState('contactError', true, "Must start with 0.");
+                } else {
+                    // Only clear specific error if format looks ok, but full validation happens on blur/submit
+                    const currentError = document.getElementById('contactError').innerText;
+                    if(currentError === "Must start with 0.") {
+                         setFieldState('contactError', false);
+                    }
+                }
             });
 
             // --- 3. FINAL SUBMISSION HANDLER ---
             form.addEventListener('submit', function(e) {
                 let isValid = true;
                 
-                // A. Check Empty Fields (这里会把 Confirm Password 设为 Error)
+                // A. Check Empty Fields
                 const requiredInputs = [
                     { input: nameInput, errorId: 'nameError', msg: 'Full Name is required.' },
                     { input: dobInput, errorId: 'dobError', msg: 'Date of Birth is required.' },
-                    { input: contactInput, errorId: 'contactError', msg: 'Contact Number is required.' },
                     { input: email, errorId: 'emailError', msg: 'Email Address is required.' },
                     { input: password, errorId: 'passwordError', msg: 'Password is required.' },
                     { input: confirmPassword, errorId: 'confirmPasswordError', msg: 'Please confirm your password.' }
@@ -717,19 +796,24 @@ include 'header_UI.php';
                          setFieldState(item.errorId, false);
                     }
                 });
+                
+                // Special check for Contact (using group logic)
+                if(!contactInput.value.trim()) {
+                    phoneGroup.classList.add('error');
+                    setFieldState('contactError', true, 'Contact Number is required.');
+                    isValid = false;
+                } else {
+                    if(!validateContact()) isValid = false;
+                }
 
                 if (!validateAge()) isValid = false;
                 if (!validateEmail()) isValid = false;
                 if (!validateName()) isValid = false;
                 
-                // 【重点修改】只有当 Confirm Password 不为空时，才进行“匹配检查”
-                // 如果它是空的，上面的 requiredInputs 循环已经报错了，我们不要让 checkPasswordMatch 把它覆盖掉
                 if (confirmPassword.value.trim() !== "") {
                     if (!checkPasswordMatch()) isValid = false;
                 }
                 
-                if (!validateContact()) isValid = false;
-
                 const invalidReqs = document.querySelectorAll('.requirement-item.invalid');
                 if (invalidReqs.length > 0 && password.value) {
                     password.classList.add('error');
