@@ -44,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
 
     if ($amount > 0 && !empty($method)) {
         
+        // 开启数据库事务
         $conn->begin_transaction();
 
         try {
@@ -71,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
             $payment_id = $stmt_pay->insert_id;
             $stmt_pay->close();
 
-            // C. 插入 Order 记录 (类型记为 Top-up)
+            // C. 插入 Order 记录
             $order_type_val = "Top-up"; 
             $sql_insert = "INSERT INTO orders (Donor_ID, Payment_ID, Order_Amount, Order_Status, Order_Type, Order_TXN_Ref, Order_Created_At, Order_Name, Order_PaymentMethod, Order_ContactNumber, Order_ICNumber, Order_Email, Order_Updated_At) VALUES (?, ?, ?, 'Completed', ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt_ord = $conn->prepare($sql_insert);
@@ -84,15 +85,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
             $points_earned = floor($amount / 10);
             if ($points_earned > 0) {
                 $pt_sql = "INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) 
-                           VALUES ($points_earned, $points_earned, NOW(), $current_donor_id) 
+                           VALUES (?, ?, NOW(), ?) 
                            ON DUPLICATE KEY UPDATE 
-                           Points_Earned = $points_earned, 
-                           Points_Total = Points_Total + $points_earned, 
+                           Points_Earned = ?, 
+                           Points_Total = Points_Total + ?, 
                            Points_Updated_At = NOW()";
-                $conn->query($pt_sql);
+                $stmt_pt = $conn->prepare($pt_sql);
+                $stmt_pt->bind_param("iiiii", $points_earned, $points_earned, $current_donor_id, $points_earned, $points_earned);
+                $stmt_pt->execute();
+                $stmt_pt->close();
             }
 
-            // E. 存入 Wallet Transaction 流水表 (记录为 'Credit')
+            // E. 存入 Wallet Transaction 流水表 (Transaction_Type 为 'Credit')
             $description = "Top-up via " . $method;
             $wt_sql = "INSERT INTO wallet_transaction (Donor_ID, Order_ID, Amount, Transaction_Type, Description, Created_At) VALUES (?, ?, ?, 'Credit', ?, NOW())";
             $wt_stmt = $conn->prepare($wt_sql);
@@ -100,15 +104,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
             $wt_stmt->execute();
             $wt_stmt->close();
 
+            // 提交事务
             $conn->commit();
             
             $topup_successful = true;
             $success_amount = $amount;
 
         } catch (Exception $e) {
-            $conn->rollback();
-            echo "Transaction Failed: " . $e->getMessage();
-            exit();
+            // 检查连接是否还在，如果还在则执行回滚
+            if ($conn && $conn->ping()) {
+                $conn->rollback();
+            }
+            // 打印真实的错误原因，帮助调试
+            die("Transaction Error: " . $e->getMessage());
         }
     }
 }
@@ -259,12 +267,10 @@ include 'header_UI.php';
                 const exp = document.getElementById('exp').value;
                 const cvc = document.getElementById('cvc').value;
                 
-                // 验证卡号(16位)、有效期(5位MM/YY)、CVC(3位)
                 if (card.length === 16 && exp.length === 5 && cvc.length === 3) {
                     isValid = true;
                 }
             } else {
-                // TNG 只需要选了金额和方式
                 isValid = true;
             }
         }
@@ -287,7 +293,6 @@ include 'header_UI.php';
         const expInput = document.getElementById('exp');
         const cvcInput = document.getElementById('cvc');
 
-        // 监听所有卡片输入框，实时校验按钮状态
         document.querySelectorAll('.card-input').forEach(input => {
             input.addEventListener('input', checkForm);
         });
@@ -339,7 +344,6 @@ include 'header_UI.php';
             }
         }
         
-        // 初始化按钮状态
         checkForm();
     });
 
