@@ -50,6 +50,7 @@ if (!$user_data) {
 // -------------------------
 $display_project_name = "General Donation"; 
 if ($case_id) {
+    // 注意：请确保你的数据库字段是 Case_Title 还是 Project_Title，这里沿用你之前的代码
     $c_res = $conn->query("SELECT Case_Title FROM special_case WHERE Case_ID = $case_id");
     if ($row = $c_res->fetch_assoc()) $display_project_name = "Case: " . $row['Case_Title'];
 } elseif ($activity_id) {
@@ -65,12 +66,8 @@ if ($case_id) {
 // -------------------------
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 
-    // [FIX 1] 防重检查：防止刷新页面导致金额翻倍
-    if (isset($_SESSION['payment_processed']) && $_SESSION['payment_processed'] === true) {
-        // 如果已经处理过，直接提醒并跳转，不再执行加钱操作
-        echo "<script>alert('Payment already processed. Redirecting...'); window.location.href='Homepage.php';</script>";
-        exit();
-    }
+    // ⭐ 已删除：之前的 "Payment already processed" 检查代码块
+    // 现在无论何时点击确认，都会执行下面的数据库插入
 
     // 生成交易信息
     $payment_method = "TNG eWallet";
@@ -120,7 +117,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         
         $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
-        // [FIX 2] 类型定义改为 'dsssssiiii'
         $stmt->bind_param("dsssssiiii", $amount, $payment_method, $deduction_date, $rec_status, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
         
         if (!$stmt->execute()) {
@@ -129,20 +125,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         $stmt->close();
     }
 
-    // 4️⃣ 更新筹款进度 & 捐赠人数
+    // 4️⃣ 更新筹款进度 & 捐赠人数 (Special Case)
     if ($case_id != null) {
-        // [关键修改] 这里不仅增加了 Raised_Amount，还增加了 Donor_Count
+        // 注意：请确认你的数据库里是 Raised_Amount 还是 Current_Fund，这里沿用你刚才提供的 Raised_Amount
         $conn->query("UPDATE special_case SET Raised_Amount = Raised_Amount + $amount, Donor_Count = Donor_Count + 1 WHERE Case_ID = $case_id");
     }
+    
+    // 5️⃣ 更新 Activity 筹款进度 (Activity)
     if ($activity_id != null) {
-        // Activity 一般没有 donor count 字段，如果有你可以加上
+        // 假设 Activity 表有 Activity_GetAmount 字段
         $conn->query("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + $amount WHERE Activity_ID = $activity_id");
     }
 
-    // [FIX 1 续] 设置 Session 标记
-    $_SESSION['payment_processed'] = true;
-
     // 跳转到结算页
+    // 使用 exit() 确保后续代码不执行
     header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
     exit();
 }
