@@ -80,10 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
             $new_order_id = $stmt_ord->insert_id;
             $stmt_ord->close();
 
-            // D. [修正逻辑] 计算并更新积分 (每 RM 10 = 1 PT)
+            // D. 计算并更新积分 (每 RM 10 = 1 PT)
             $points_earned = floor($amount / 10);
-            
-            // 只有当积分 > 0 时才更新 point 表
             if ($points_earned > 0) {
                 $pt_sql = "INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) 
                            VALUES ($points_earned, $points_earned, NOW(), $current_donor_id) 
@@ -94,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
                 $conn->query($pt_sql);
             }
 
-            // E. [核心修改点] 存入 Wallet Transaction 流水表 (Transaction_Type 修改为数据库允许的 'Credit')
+            // E. 存入 Wallet Transaction 流水表 (记录为 'Credit')
             $description = "Top-up via " . $method;
             $wt_sql = "INSERT INTO wallet_transaction (Donor_ID, Order_ID, Amount, Transaction_Type, Description, Created_At) VALUES (?, ?, ?, 'Credit', ?, NOW())";
             $wt_stmt = $conn->prepare($wt_sql);
@@ -180,7 +178,7 @@ include 'header_UI.php';
                     <div class="method-body" onclick="event.stopPropagation()">
                         <div class="form-group">
                             <label>Card Number</label>
-                            <input type="text" id="card" name="card" class="form-control" maxlength="19" placeholder="0000 0000 0000 0000">
+                            <input type="text" id="card" name="card" class="form-control card-input" maxlength="19" placeholder="0000 0000 0000 0000">
                             <i id="card-brand-icon" class="fas fa-credit-card card-icon"></i>
                         </div>
                         <div class="form-group">
@@ -188,8 +186,14 @@ include 'header_UI.php';
                             <input type="text" id="bank_display" name="bank_display" class="form-control" value="Unknown Card" readonly>
                         </div>
                         <div style="display:flex; gap:15px;">
-                            <div class="form-group" style="flex:1"><label>Expiration (MM/YY)</label><input type="text" id="exp" name="exp" class="form-control" placeholder="MM/YY" maxlength="5"></div>
-                            <div class="form-group" style="flex:1"><label>CVC</label><input type="text" id="cvc" name="cvc" class="form-control" maxlength="3" placeholder="123"></div>
+                            <div class="form-group" style="flex:1">
+                                <label>Expiration (MM/YY)</label>
+                                <input type="text" id="exp" name="exp" class="form-control card-input" placeholder="MM/YY" maxlength="5">
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>CVC</label>
+                                <input type="text" id="cvc" name="cvc" class="form-control card-input" maxlength="3" placeholder="123">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -247,11 +251,32 @@ include 'header_UI.php';
 
     function checkForm() {
         const btn = document.getElementById('btnPay');
+        let isValid = false;
+
         if (selectedAmount > 0 && selectedMethod !== "") {
+            if (selectedMethod === 'Credit/Debit Card') {
+                const card = document.getElementById('card').value.replace(/\s/g, '');
+                const exp = document.getElementById('exp').value;
+                const cvc = document.getElementById('cvc').value;
+                
+                // 验证卡号(16位)、有效期(5位MM/YY)、CVC(3位)
+                if (card.length === 16 && exp.length === 5 && cvc.length === 3) {
+                    isValid = true;
+                }
+            } else {
+                // TNG 只需要选了金额和方式
+                isValid = true;
+            }
+        }
+
+        if (isValid) {
             btn.classList.add('ready');
             btn.innerText = `Pay RM ${parseFloat(selectedAmount).toFixed(2)}`;
+            btn.disabled = false;
         } else {
             btn.classList.remove('ready');
+            btn.innerText = "Pay Now";
+            btn.disabled = true;
         }
     }
 
@@ -260,6 +285,12 @@ include 'header_UI.php';
         const bankDisplay = document.getElementById('bank_display');
         const cardIcon = document.getElementById('card-brand-icon');
         const expInput = document.getElementById('exp');
+        const cvcInput = document.getElementById('cvc');
+
+        // 监听所有卡片输入框，实时校验按钮状态
+        document.querySelectorAll('.card-input').forEach(input => {
+            input.addEventListener('input', checkForm);
+        });
 
         if(cardInput) {
             cardInput.addEventListener('input', function(e) {
@@ -277,8 +308,17 @@ include 'header_UI.php';
         if(expInput) {
             expInput.addEventListener('input', function(e) {
                 let value = e.target.value.replace(/\D/g, '');
-                if (value.length >= 3) e.target.value = value.slice(0, 2) + '/' + value.slice(2, 4);
-                else e.target.value = value;
+                if (value.length >= 2) {
+                    e.target.value = value.slice(0, 2) + '/' + value.slice(2, 4);
+                } else {
+                    e.target.value = value;
+                }
+            });
+        }
+
+        if(cvcInput) {
+            cvcInput.addEventListener('input', function(e) {
+                e.target.value = e.target.value.replace(/\D/g, '');
             });
         }
 
@@ -298,6 +338,9 @@ include 'header_UI.php';
                 cardIcon.style.color = type === 'unknown' ? '#999' : '#0057B7';
             }
         }
+        
+        // 初始化按钮状态
+        checkForm();
     });
 
     <?php if ($topup_successful): ?>
