@@ -24,7 +24,6 @@ $txn_ref = $_GET['txn_ref'];
 // ==========================================
 // 3. 核心查询 (关联 Payment, Orders, Donor 表)
 // ==========================================
-// 注意：这里明确 SELECT 了 o.Order_Type
 $sql = "SELECT 
             p.Payment_TXN_Ref, p.Payment_Status, p.Payment_Paid_At, p.Payment_Method,
             o.Order_ID, o.Order_Amount, o.Order_Type, o.Order_Status, 
@@ -49,28 +48,26 @@ $row = $result->fetch_assoc();
 $stmt->close();
 
 // ==========================================
-// 4. 数据预处理 (防止 Undefined Array Key 报错)
+// 4. 数据预处理
 // ==========================================
-// 使用 ?? 运算符，如果数据库字段不存在或为 NULL，使用默认值
 $donor_name     = $row['Donor_Name'] ?? "Guest";
 $donor_email    = $row['Donor_Email'] ?? "N/A";
 $donor_contact  = $row['Donor_ContactNumber'] ?? "N/A";
-$order_type     = $row['Order_Type'] ?? 'One-time'; // 修复你刚才的报错
+$order_type     = $row['Order_Type'] ?? 'One-time'; 
 $txn_ref_display= $row['Payment_TXN_Ref'] ?? $txn_ref;
 
 $amount_val     = $row['Order_Amount'] ?? 0;
 $amount_fmt     = "RM " . number_format($amount_val, 2);
 
-// 处理日期：优先用支付时间，没有则用创建时间
 $raw_date       = $row['Payment_Paid_At'] ?? $row['Order_Created_At'];
 $payment_date   = date("d M Y, h:i A", strtotime($raw_date));
 
 $payment_method = $row['Payment_Method'] ?? 'Unknown';
 $payment_status = $row['Payment_Status'] ?? 'Completed'; 
 
-// 确定项目名称 (Project Name)
+// 确定项目名称
 $project_type = "General Donation";
-$project_name = "Love Bridge Fund"; // 默认
+$project_name = "Love Bridge Fund"; 
 
 if (!empty($row['Case_ID'])) {
     $res = $conn->query("SELECT Case_Title FROM special_case WHERE Case_ID = " . $row['Case_ID']);
@@ -92,14 +89,16 @@ if (!empty($row['Case_ID'])) {
     }
 }
 
+// 检查支付是否成功
+$is_success_status = (stripos($payment_status, 'Success') !== false || stripos($payment_status, 'Completed') !== false);
+
 // ==========================================
-// 5. 邮件发送逻辑 (防止重复发送)
+// 5. 邮件发送逻辑
 // ==========================================
 $email_msg = "Processing receipt...";
 $sess_key_mail = 'email_sent_' . $txn_ref;
 
-if (!isset($_SESSION[$sess_key_mail])) {
-    // 检查是否有引入 mail_receipt.php 里的函数
+if (!isset($_SESSION[$sess_key_mail]) && $is_success_status) {
     if (function_exists('sendReceiptEmail')) {
         $isSent = sendReceiptEmail($row, $project_name); 
         if ($isSent) {
@@ -109,7 +108,6 @@ if (!isset($_SESSION[$sess_key_mail])) {
             $email_msg = "Receipt generated, but email sending failed.";
         }
     } else {
-        // 如果没有邮件功能，就显示简单成功信息
         $email_msg = "Donation processed successfully.";
     }
 } else {
@@ -119,32 +117,60 @@ if (!isset($_SESSION[$sess_key_mail])) {
 // ==========================================
 // 6. 积分逻辑 (Love Points)
 // ==========================================
-$points_to_add = floor($amount_val / 10); // RM10 = 1 Point
+$points_to_add = floor($amount_val / 10); 
 $sess_key_points = 'points_awarded_' . $txn_ref;
-$is_success_status = (stripos($payment_status, 'Success') !== false || stripos($payment_status, 'Completed') !== false);
 
 if ($points_to_add > 0 && $is_success_status && !isset($_SESSION[$sess_key_points])) {
     $donor_id = $row['Donor_ID'];
-    
-    // 检查该用户是否已有积分记录
     $chk = $conn->query("SELECT Points_ID FROM point WHERE Donor_ID = $donor_id");
     
     if ($chk && $chk->num_rows > 0) {
-        // 更新现有记录
         $upd = $conn->prepare("UPDATE point SET Points_Total = Points_Total + ?, Points_Earned = Points_Earned + ?, Points_Updated_At = NOW() WHERE Donor_ID = ?");
         $upd->bind_param("iii", $points_to_add, $points_to_add, $donor_id);
         $upd->execute();
         $upd->close();
     } else {
-        // 插入新记录
         $ins = $conn->prepare("INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES (?, ?, NOW(), ?)");
         $ins->bind_param("iii", $points_to_add, $points_to_add, $donor_id);
         $ins->execute();
         $ins->close();
     }
-    
-    // 标记 Session 防止刷新重复加分
     $_SESSION[$sess_key_points] = true;
+}
+
+// ==========================================
+// 7. ⭐ 关键新增：更新捐款人数和资金 (Update Fund & Count)
+// ==========================================
+// 使用 Session 锁防止刷新页面重复增加
+$sess_key_fund = 'fund_updated_' . $txn_ref;
+
+if (!isset($_SESSION[$sess_key_fund]) && $is_success_status) {
+
+    // A. 如果是 Special Case
+    if (!empty($row['Case_ID'])) {
+        $case_id = $row['Case_ID'];
+
+$upd_case = $conn->prepare("UPDATE special_case 
+                            SET Raised_Amount = Raised_Amount + ?, 
+                                Donor_Count = Donor_Count + 1 
+                            WHERE Case_ID = ?");
+        $upd_case->bind_param("di", $amount_val, $case_id);
+        $upd_case->execute();
+        $upd_case->close();
+    }
+    
+    // B. 如果是 Activity (如果 Activity 也有筹款额字段)
+    elseif (!empty($row['Activity_ID'])) {
+        $act_id = $row['Activity_ID'];
+        // 假设 Activity 表有 'Activity_GetAmount' 字段，如果没有请注释掉下面三行
+        $upd_act = $conn->prepare("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + ? WHERE Activity_ID = ?");
+        $upd_act->bind_param("di", $amount_val, $act_id);
+        $upd_act->execute();
+        // $upd_act->close();
+    }
+
+    // 标记为已更新
+    $_SESSION[$sess_key_fund] = true;
 }
 
 include 'header_UI.php'; 
