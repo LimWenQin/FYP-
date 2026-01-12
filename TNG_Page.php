@@ -65,7 +65,12 @@ if ($case_id) {
 // -------------------------
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 
-    // [已删除] 这里的 "Payment already processed" 检查代码已被移除
+    // [FIX 1] 防重检查：防止刷新页面导致金额翻倍
+    if (isset($_SESSION['payment_processed']) && $_SESSION['payment_processed'] === true) {
+        // 如果已经处理过，直接提醒并跳转，不再执行加钱操作
+        echo "<script>alert('Payment already processed. Redirecting...'); window.location.href='Homepage.php';</script>";
+        exit();
+    }
 
     // 生成交易信息
     $payment_method = "TNG eWallet";
@@ -115,7 +120,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         
         $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
-        // [保留修复] 这里仍然保留 'dsssssiiii' (10个字符)，防止报错
+        // [FIX 2] 类型定义改为 'dsssssiiii'
         $stmt->bind_param("dsssssiiii", $amount, $payment_method, $deduction_date, $rec_status, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
         
         if (!$stmt->execute()) {
@@ -124,15 +129,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         $stmt->close();
     }
 
-    // 4️⃣ 更新筹款进度
+    // 4️⃣ 更新筹款进度 & 捐赠人数
     if ($case_id != null) {
-        $conn->query("UPDATE special_case SET Raised_Amount = Raised_Amount + $amount WHERE Case_ID = $case_id");
+        // [关键修改] 这里不仅增加了 Raised_Amount，还增加了 Donor_Count
+        $conn->query("UPDATE special_case SET Raised_Amount = Raised_Amount + $amount, Donor_Count = Donor_Count + 1 WHERE Case_ID = $case_id");
     }
     if ($activity_id != null) {
+        // Activity 一般没有 donor count 字段，如果有你可以加上
         $conn->query("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + $amount WHERE Activity_ID = $activity_id");
     }
 
-    // [已删除] 这里的防重标记代码已被移除
+    // [FIX 1 续] 设置 Session 标记
+    $_SESSION['payment_processed'] = true;
 
     // 跳转到结算页
     header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
