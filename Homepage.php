@@ -1,5 +1,5 @@
 <?php
-// 1. 启动 Session
+// 1. 启动 Session (防止重复启动报错)
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -21,12 +21,16 @@ $result_sc = $conn->query($query_sc);
 
 if ($result_sc && $result_sc->num_rows > 0) {
     while ($row = $result_sc->fetch_assoc()) {
-        // Image Handling
+        // Image Handling (支持 JSON 或 单一字符串)
         $image_url = "https://images.unsplash.com/photo-1579684385127-1ef15d508118?ixlib=rb-1.2.1&auto=format&fit=crop&w=1600&q=80"; 
         if (!empty($row['Case_Images'])) {
+            // 尝试解析 JSON
             $decoded = json_decode($row['Case_Images'], true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded) && count($decoded) > 0) {
-                $image_url = $decoded[0];
+                $image_url = $decoded[0]; // 取第一张
+            } else {
+                // 如果不是 JSON，直接使用字符串
+                $image_url = $row['Case_Images'];
             }
         }
 
@@ -127,10 +131,10 @@ if ($logged_in) {
             padding: 0;
         }
 
-        /* --- Special Case Hero Slider (核心修改区域) --- */
+        /* --- Special Case Hero Slider --- */
         .special-case-hero {
             position: relative;
-            height: 85vh; /* 保持大屏占比 */
+            height: 85vh; 
             min-height: 600px;
             overflow: hidden;
             margin-bottom: 60px;
@@ -172,44 +176,52 @@ if ($logged_in) {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            /* [修改] 移除变暗滤镜，让照片清晰 */
-            filter: none; 
+            filter: none; /* 图片保持原亮度 */
         }
 
-        /* [新增] 底部渐变遮罩，确保文字可读，但又不遮挡照片主体 */
+        /* 渐变遮罩：让底部文字清晰可见 */
         .slide-overlay-gradient {
             position: absolute;
             bottom: 0;
             left: 0;
             width: 100%;
-            height: 60%; /* 只遮挡下半部分 */
-            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 50%, transparent 100%);
+            height: 70%; 
+            background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 60%, transparent 100%);
             z-index: 1;
-            pointer-events: none; /* 让点击穿透 */
+            pointer-events: none;
         }
 
-        /* [修改] 内容容器：移到底部 */
+        /* --- [关键修复] 内容容器 --- */
         .special-case-content {
             position: absolute;
-            bottom: 40px; /* 距离底部留出空间 */
+            bottom: 0; /* 贴底布局 */
             left: 50%;
             transform: translateX(-50%);
             z-index: 2;
             width: 90%;
             max-width: 1200px;
-            text-align: left; /* 改为左对齐，通常更易读 */
+            text-align: left;
             color: white;
             display: flex;
-            justify-content: space-between; /* 左右布局 */
-            align-items: flex-end; /* 底部对齐 */
+            justify-content: space-between;
+            align-items: flex-end;
             flex-wrap: wrap;
-            gap: 20px;
+            gap: 30px;
+            /* 增加底部 padding，把 Donate 按钮顶上去，防止被进度条挡住 */
+            padding-bottom: 110px; 
+            height: 100%; /* 占满高度以便布局 */
+            pointer-events: none; /* 让点击穿透空白区域 */
         }
 
-        /* 左侧：标题和描述 */
+        /* 恢复子元素的点击事件 */
+        .special-case-content > * {
+            pointer-events: auto;
+        }
+
         .slide-text-content {
             flex: 1;
             min-width: 300px;
+            margin-bottom: 20px;
         }
 
         .fund-tagline {
@@ -222,7 +234,7 @@ if ($logged_in) {
         }
 
         .fund-title {
-            font-size: 3rem; /* 大标题 */
+            font-size: 3rem; 
             font-weight: 800;
             color: white;
             margin-bottom: 10px;
@@ -238,15 +250,15 @@ if ($logged_in) {
             margin-bottom: 20px;
             text-shadow: 0 1px 3px rgba(0,0,0,0.8);
             display: -webkit-box;
-            -webkit-line-clamp: 2; /* 只显示两行 */
+            -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
 
-        /* 右侧：倒计时和按钮 */
         .slide-action-content {
             text-align: right;
             min-width: 250px;
+            margin-bottom: 20px; /* 额外微调 */
         }
 
         .days-counter {
@@ -259,7 +271,7 @@ if ($logged_in) {
         }
 
         .time-units {
-            font-family: 'Courier New', monospace; /* 更有倒计时感觉 */
+            font-family: 'Courier New', monospace;
             font-size: 1.5rem;
             font-weight: 700;
             color: white;
@@ -272,7 +284,7 @@ if ($logged_in) {
             background: var(--primary-red);
             color: white;
             padding: 12px 35px;
-            border-radius: 5px; /* 稍微方一点更现代 */
+            border-radius: 5px;
             text-decoration: none;
             font-size: 1.1rem;
             font-weight: 700;
@@ -289,45 +301,71 @@ if ($logged_in) {
             transform: translateY(-2px);
         }
 
-        /* 底部进度条 (精简版) */
-        .bottom-progress-bar {
+        /* --- 进度条容器 --- */
+        .bottom-progress-container {
             position: absolute;
-            bottom: 0;
+            bottom: 40px; /* 固定在离底边 40px 处，避开 dots */
             left: 0;
             width: 100%;
-            height: 8px; /* 很细 */
-            background: rgba(255,255,255,0.2);
-            z-index: 3;
+            z-index: 10; /* 确保在最上层 */
+            pointer-events: auto;
         }
 
-        .bottom-progress-fill {
-            height: 100%;
-            background: var(--primary-red); /* 醒目的红色 */
-            position: relative;
-            transition: width 1s ease;
-        }
-
-        /* 悬浮在进度条上的小标签 */
-        .progress-tooltip {
-            position: absolute;
-            right: 0;
-            bottom: 12px;
-            background: var(--primary-red);
+        .progress-stats-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 8px;
             color: white;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
+            font-family: 'Segoe UI', sans-serif;
         }
-        
-        .progress-tooltip::after {
-            content: '';
-            position: absolute;
-            bottom: -4px;
-            right: 10px;
-            border-width: 4px 4px 0;
-            border-style: solid;
-            border-color: var(--primary-red) transparent transparent transparent;
+
+        /* 左侧已筹集金额 - 显眼 */
+        .raised-amount {
+            font-size: 2rem; 
+            font-weight: 800;
+            color: var(--primary-red);
+            line-height: 1;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .raised-label {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.7);
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        /* 右侧目标金额 */
+        .target-amount {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.9);
+            text-align: right;
+        }
+
+        .target-label {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.5);
+            text-transform: uppercase;
+            margin-bottom: 2px;
+            text-align: right;
+        }
+
+        .progress-bar-track {
+            width: 100%;
+            height: 12px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444, #dc2626);
+            border-radius: 6px;
+            position: relative;
+            transition: width 1s ease-out;
         }
 
         /* Navigation Arrows */
@@ -335,7 +373,7 @@ if ($logged_in) {
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
-            color: rgba(255, 255, 255, 0.7);
+            color: rgba(255, 255, 255, 0.5);
             font-size: 30px;
             cursor: pointer;
             z-index: 3;
@@ -346,7 +384,7 @@ if ($logged_in) {
 
         .nav-arrow:hover {
             color: white;
-            background: rgba(0,0,0,0.3); /* 鼠标移上去才显现背景 */
+            background: rgba(0,0,0,0.3);
             border-radius: 5px;
         }
 
@@ -356,16 +394,16 @@ if ($logged_in) {
         /* Slider Dots */
         .slider-controls {
             position: absolute;
-            bottom: 15px; /* 贴近底部 */
+            bottom: 15px; /* 放在最底部 */
             left: 50%;
             transform: translateX(-50%);
-            z-index: 4;
+            z-index: 20;
         }
 
         .slider-dots { display: flex; gap: 8px; }
         
         .slider-dot {
-            width: 30px; /* 线条型圆点 */
+            width: 30px;
             height: 4px;
             background: rgba(255, 255, 255, 0.4);
             cursor: pointer;
@@ -375,184 +413,47 @@ if ($logged_in) {
 
         .slider-dot.active {
             background: white;
-            width: 45px; /* 激活时变长 */
+            width: 45px;
         }
 
-        /* --- Vision & Mission Section (保持原样) --- */
-        .vision-mission-section {
-            padding: 80px 40px;
-            background: var(--light-gray);
-        }
-
-        .section-title {
-            text-align: center;
-            font-size: 2.5rem;
-            color: var(--primary-red);
-            margin-bottom: 50px;
-            position: relative;
-            font-weight: 800;
-        }
-
-        .section-title::after {
-            content: '';
-            position: absolute;
-            bottom: -15px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80px;
-            height: 4px;
-            background: var(--primary-red);
-        }
-
-        .vm-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr); 
-            gap: 50px;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .vm-card {
-            background: var(--white);
-            border-radius: 15px;
-            padding: 50px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-            transition: transform 0.3s ease;
-        }
-
+        /* --- Vision & Mission Section --- */
+        .vision-mission-section { padding: 80px 40px; background: var(--light-gray); }
+        .section-title { text-align: center; font-size: 2.5rem; color: var(--primary-red); margin-bottom: 50px; position: relative; font-weight: 800; }
+        .section-title::after { content: ''; position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); width: 80px; height: 4px; background: var(--primary-red); }
+        .vm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 50px; max-width: 1400px; margin: 0 auto; }
+        .vm-card { background: var(--white); border-radius: 15px; padding: 50px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); transition: transform 0.3s ease; }
         .vm-card:hover { transform: translateY(-10px); }
-
-        .vm-card h3 {
-            font-size: 2rem;
-            color: var(--dark-gray);
-            margin-bottom: 20px;
-            border-left: 5px solid var(--primary-red);
-            padding-left: 15px;
-        }
-
+        .vm-card h3 { font-size: 2rem; color: var(--dark-gray); margin-bottom: 20px; border-left: 5px solid var(--primary-red); padding-left: 15px; }
         .vm-points { list-style: none; padding: 0; }
-        
-        .vm-points li {
-            padding: 10px 0;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 1.05rem;
-        }
-        
+        .vm-points li { padding: 10px 0; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px; font-size: 1.05rem; }
         .point-icon { color: var(--primary-red); }
 
-        /* --- Upcoming Campaigns (Activities) Section --- */
-        .activities-section {
-            padding: 80px 40px;
-            background: var(--white);
-        }
-
-        .activities-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); 
-            gap: 40px;
-            max-width: 1400px;
-            margin: 0 auto;
-            align-items: stretch; 
-        }
-
-        .activity-card {
-            background: var(--white);
-            border: 1px solid #eee;
-            border-radius: 15px;
-            padding: 30px;
-            transition: all 0.3s ease;
-            position: relative;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .activity-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
-            border-color: var(--light-red);
-        }
-
-        .activity-date-badge {
-            background: var(--primary-red);
-            color: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            width: fit-content;
-            margin-bottom: 15px;
-        }
-
-        .activity-title {
-            font-size: 1.4rem;
-            color: var(--text-dark);
-            margin-bottom: 15px;
-            font-weight: 700;
-        }
-
-        .activity-meta {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 20px;
-            color: var(--medium-gray);
-            font-size: 0.95rem;
-        }
-
-        .meta-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
+        /* --- Activities Section --- */
+        .activities-section { padding: 80px 40px; background: var(--white); }
+        .activities-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 40px; max-width: 1400px; margin: 0 auto; align-items: stretch; }
+        .activity-card { background: var(--white); border: 1px solid #eee; border-radius: 15px; padding: 30px; transition: all 0.3s ease; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; }
+        .activity-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.1); border-color: var(--light-red); }
+        .activity-date-badge { background: var(--primary-red); color: white; padding: 5px 15px; border-radius: 20px; font-weight: 600; font-size: 0.9rem; width: fit-content; margin-bottom: 15px; }
+        .activity-title { font-size: 1.4rem; color: var(--text-dark); margin-bottom: 15px; font-weight: 700; }
+        .activity-meta { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; color: var(--medium-gray); font-size: 0.95rem; }
+        .meta-item { display: flex; align-items: center; gap: 10px; }
         .meta-item i { color: var(--primary-red); width: 20px; text-align: center; }
-
-        .activity-desc {
-            color: var(--medium-gray);
-            line-height: 1.5;
-            font-size: 1rem;
-        }
+        .activity-desc { color: var(--medium-gray); line-height: 1.5; font-size: 1rem; }
 
         /* --- CTA Section --- */
-        .cta-section {
-            padding: 100px 20px;
-            background: linear-gradient(rgba(220, 38, 38, 0.9), rgba(185, 28, 28, 0.9)), url('https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            text-align: center;
-            color: white;
-        }
-
+        .cta-section { padding: 100px 20px; background: linear-gradient(rgba(220, 38, 38, 0.9), rgba(185, 28, 28, 0.9)), url('https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80'); background-size: cover; background-position: center; background-attachment: fixed; text-align: center; color: white; }
         .cta-content h2 { font-size: 3rem; margin-bottom: 20px; font-weight: 800; }
         .cta-content p { font-size: 1.3rem; margin-bottom: 40px; max-width: 800px; margin-left: auto; margin-right: auto; }
-
-        .btn {
-            padding: 15px 40px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: 700;
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
-            display: inline-block;
-            margin: 10px;
-        }
-
+        .btn { padding: 15px 40px; border-radius: 5px; text-decoration: none; font-weight: 700; font-size: 1.1rem; transition: all 0.3s ease; display: inline-block; margin: 10px; }
         .btn-primary { background: white; color: var(--primary-red); }
         .btn-primary:hover { background: #f0f0f0; transform: translateY(-3px); }
-
         .btn-secondary { border: 2px solid white; color: white; background: transparent; }
         .btn-secondary:hover { background: rgba(255,255,255,0.1); transform: translateY(-3px); }
 
         /* Responsive */
         @media (max-width: 1024px) {
             .vm-grid { grid-template-columns: 1fr; }
-            .special-case-hero { height: auto; min-height: 600px; }
+            .special-case-hero { height: auto; min-height: 700px; }
             .fund-title { font-size: 2.5rem; }
         }
 
@@ -560,15 +461,32 @@ if ($logged_in) {
             .special-case-content {
                 flex-direction: column;
                 align-items: flex-start;
-                bottom: 80px; /* 给进度条留位置 */
+                justify-content: flex-end; /* 沉底 */
+                padding-bottom: 140px; /* 移动端增加更多底部留白 */
             }
             .slide-text-content, .slide-action-content {
                 width: 100%;
                 text-align: left;
+                margin-bottom: 10px;
             }
-            .slide-action-content { margin-top: 20px; }
+            .slide-action-content { 
+                margin-top: 0; 
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .donate-btn {
+                width: 100%; /* 全宽按钮更好点 */
+                text-align: center;
+            }
             .fund-title { font-size: 2rem; }
-            .nav-arrow { display: none; } /* 移动端隐藏箭头 */
+            .nav-arrow { display: none; }
+            /* 移动端字体微调 */
+            .raised-amount { font-size: 1.5rem; }
+            .target-amount { font-size: 1rem; }
+            .bottom-progress-container {
+                bottom: 50px; /* 稍微抬高一点 */
+            }
         }
     </style>
 </head>
@@ -581,6 +499,7 @@ if ($logged_in) {
                 <?php if (count($special_cases) > 0): ?>
                     <?php foreach ($special_cases as $index => $case): 
                         $percentage = ($case['goal'] > 0) ? round(($case['raised'] / $case['goal']) * 100) : 0;
+                        $display_percentage = min($percentage, 100);
                     ?>
                     <div class="special-case-slide <?php echo $index === 0 ? 'active' : ''; ?>" 
                          data-index="<?php echo $index; ?>"
@@ -609,16 +528,24 @@ if ($logged_in) {
                                     Donate Now
                                 </button>
                             </div>
-                        </div>
-                        
-                        <div class="bottom-progress-bar">
-                            <div class="bottom-progress-fill" style="width: <?php echo $percentage; ?>%">
-                                <div class="progress-tooltip">
-                                    RM <?php echo number_format($case['raised']); ?> / <?php echo number_format($case['goal']); ?> (<?php echo $percentage; ?>%)
+
+                            <div class="bottom-progress-container">
+                                <div class="progress-stats-row">
+                                    <div>
+                                        <div class="raised-label">RAISED</div>
+                                        <div class="raised-amount">RM <?php echo number_format($case['raised']); ?></div>
+                                    </div>
+                                    <div>
+                                        <div class="target-label">TARGET</div>
+                                        <div class="target-amount">RM <?php echo number_format($case['goal']); ?></div>
+                                    </div>
+                                </div>
+                                <div class="progress-bar-track">
+                                    <div class="progress-bar-fill" style="width: <?php echo $display_percentage; ?>%"></div>
                                 </div>
                             </div>
-                        </div>
 
+                        </div>
                     </div>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -783,7 +710,6 @@ if ($logged_in) {
                 const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
                 const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
-                // 简化倒计时显示，适合放在侧边
                 timerDisplay.innerHTML = `${days}d ${hours}h ${minutes}m ${seconds}s`;
             });
         }

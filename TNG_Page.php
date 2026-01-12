@@ -24,12 +24,10 @@ $sess_data = $_SESSION['donation_data'];
 $amount = $sess_data['amount'];
 $donation_type = $sess_data['type'];
 
-// [FIX START] 关键修复：处理外键 ID
-// 如果 Session 里的 ID 是 0，必须转为 null，否则会触发 Foreign Key 报错
+// 处理外键 ID (把 0 或 空值 转为 null)
 $branch_id = !empty($sess_data['branch_id']) ? $sess_data['branch_id'] : null;
 $case_id = !empty($sess_data['case_id']) ? $sess_data['case_id'] : null;
 $activity_id = !empty($sess_data['activity_id']) ? $sess_data['activity_id'] : null;
-// [FIX END]
 
 $source = $sess_data['source'] ?? 'standard'; // 来源标记
 
@@ -48,7 +46,7 @@ if (!$user_data) {
 }
 
 // -------------------------
-// 5. 显示逻辑：查询项目名字 (用于右侧 Summary 显示)
+// 5. 显示逻辑：查询项目名字
 // -------------------------
 $display_project_name = "General Donation"; 
 if ($case_id) {
@@ -67,11 +65,13 @@ if ($case_id) {
 // -------------------------
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 
+    // [已删除] 这里的 "Payment already processed" 检查代码已被移除
+
     // 生成交易信息
     $payment_method = "TNG eWallet";
     $txn_ref = "TXN-" . date("YmdHis") . "-" . rand(100, 999);
     $now = date("Y-m-d H:i:s");
-    $status = "Success"; // TNG 模拟成功
+    $status = "Success"; 
     $bank_name = "TNG eWallet";
     $masked = "QR Payment";
 
@@ -85,8 +85,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     // 2️⃣ 插入 orders 表
     $order_type = ($donation_type == "monthly") ? "Recurring" : "One-time";
     $order_status = "Completed";
-    
-    // 决定报税状态
     $tax_status = (isset($sess_data['tax_receipt']) && $sess_data['tax_receipt'] == 1) ? 'Requested' : 'Not_Requested';
 
     $stmt = $conn->prepare("INSERT INTO orders 
@@ -96,7 +94,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
          Donor_ID, Payment_ID, Branch_ID, Activity_ID, Case_ID)
         VALUES (?, ?, ?, ?, ?, 'MYR', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    // 注意：bind_param 遇到 null 会正确处理为 SQL NULL
     $stmt->bind_param("ssssdssssssssiiiii", 
         $user_data['Donor_Name'], 
         $user_data['Donor_ContactNumber'], 
@@ -107,7 +104,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     );
     
     if (!$stmt->execute()) {
-        // 调试用：如果报错显示具体信息
         die("Error inserting order: " . $stmt->error);
     }
     $stmt->close();
@@ -116,9 +112,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     if ($donation_type == "monthly") {
         $deduction_date = date("Y-m-d", strtotime("+1 month"));
         $rec_status = 'Active';
+        
         $stmt = $conn->prepare("INSERT INTO recurring_donation (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("dssssiiii", $amount, $payment_method, $deduction_date, $rec_status, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
-        $stmt->execute();
+        
+        // [保留修复] 这里仍然保留 'dsssssiiii' (10个字符)，防止报错
+        $stmt->bind_param("dsssssiiii", $amount, $payment_method, $deduction_date, $rec_status, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
+        
+        if (!$stmt->execute()) {
+             die("Error inserting recurring: " . $stmt->error);
+        }
         $stmt->close();
     }
 
@@ -129,6 +131,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     if ($activity_id != null) {
         $conn->query("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + $amount WHERE Activity_ID = $activity_id");
     }
+
+    // [已删除] 这里的防重标记代码已被移除
 
     // 跳转到结算页
     header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
