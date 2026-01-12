@@ -330,6 +330,7 @@ include 'header_UI.php';
             height: 100%;
             object-fit: cover;
             transition: transform 0.5s ease;
+            cursor: zoom-in; /* 【修改】添加鼠标手势，提示可点击 */
         }
         
         .case-card:hover .case-image {
@@ -343,6 +344,7 @@ include 'header_UI.php';
             display: flex;
             flex-direction: column;
             gap: 8px;
+            pointer-events: none; /* 防止遮挡图片点击 */
         }
         
         .case-badge {
@@ -744,6 +746,7 @@ include 'header_UI.php';
                             <img src="<?php echo htmlspecialchars($image_path); ?>" 
                                  alt="<?php echo htmlspecialchars($case['Case_Title']); ?>" 
                                  class="case-image"
+                                 onclick="showImage(this.src, '<?php echo htmlspecialchars(addslashes($case['Case_Title'])); ?>')"
                                  onerror="this.src='<?php echo $default_image; ?>'">
                             
                             <div class="case-badges">
@@ -862,6 +865,21 @@ include 'header_UI.php';
     <?php include 'footer.php'; ?>
 
     <script>
+        // 【新增】图片点击放大函数
+        function showImage(src, title) {
+            Swal.fire({
+                imageUrl: src,
+                imageAlt: title,
+                title: title,
+                width: 600, // 弹窗宽度
+                padding: '1em',
+                background: '#fff',
+                showConfirmButton: false, // 隐藏确认按钮
+                showCloseButton: true,    // 显示右上角关闭X
+                backdrop: `rgba(0,0,0,0.8)` // 背景变黑
+            });
+        }
+
         // Toggle description expand/collapse
         function toggleDescription(caseId) {
             const description = document.getElementById(`desc-${caseId}`);
