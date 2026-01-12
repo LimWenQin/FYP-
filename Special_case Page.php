@@ -2,43 +2,44 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-// --- 1. 定义分类配置 ---
+// --- 1. 定义分类配置 (已修改颜色) ---
 $categories = [
+    'emergency' => [
+        'db_name' => 'Emergency Relief', 
+        'name' => 'Emergency Relief', 
+        'icon' => 'fas fa-first-aid', 
+        'color' => '#d32f2f' // 红色 (重点)
+    ],
     'medical' => [
         'db_name' => 'Medical', 
         'name' => 'Medical Aid', 
         'icon' => 'fas fa-heartbeat', 
-        'color' => '#4CAF50'
+        'color' => '#f57c00' // 橙色
     ],
     'disability' => [
         'db_name' => 'Disability Support', 
         'name' => 'Disability Support', 
         'icon' => 'fas fa-wheelchair', 
-        'color' => '#2196F3'
+        'color' => '#f57c00' // 橙色
     ],
-    'emergency' => [
-        'db_name' => 'Emergency Relief', 
-        'name' => 'Emergency Relief', 
-        'icon' => 'fas fa-first-aid', 
-        'color' => '#FF5722'
-    ],
+    
     'elderly' => [
         'db_name' => 'Elderly Care', 
         'name' => 'Elderly Care', 
         'icon' => 'fas fa-user-friends', 
-        'color' => '#795548'
+        'color' => '#f57c00' // 橙色
     ],
     'children' => [
         'db_name' => 'Children Support', 
         'name' => 'Children Support', 
         'icon' => 'fas fa-child', 
-        'color' => '#FF9800'
+        'color' => '#f57c00' // 橙色
     ],
     'other' => [
         'db_name' => 'Other Cases', 
         'name' => 'Other Cases', 
         'icon' => 'fas fa-hand-holding-heart', 
-        'color' => '#9C27B0'
+        'color' => '#f57c00' // 橙色
     ]
 ];
 
@@ -91,7 +92,8 @@ include 'header_UI.php';
 
     <style>
         :root {
-            --primary-red: #e53935;
+            /* 保持基础红色用于页面标题等通用元素 */
+            --primary-red: #e53935; 
             --dark-red: #c62828;
             --light-red: #ff5252;
             --lighter-red: #ffcdd2;
@@ -99,8 +101,7 @@ include 'header_UI.php';
             --light-bg: #fef7f7;
             --text: #212121;
             
-            --shadow: rgba(229, 57, 53, 0.1);
-            --shadow-dark: rgba(0, 0, 0, 0.1);
+            --shadow: rgba(0, 0, 0, 0.1);
             --progress-bg: #e0e0e0;
         }
         
@@ -208,7 +209,7 @@ include 'header_UI.php';
             border-radius: 15px;
             text-align: center;
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border: 1px solid var(--lighter-red);
+            border: 1px solid #eee;
             transition: transform 0.3s ease;
         }
         
@@ -257,7 +258,7 @@ include 'header_UI.php';
         
         .category-item {
             background: var(--white);
-            border: 2px solid var(--lighter-red);
+            border: 2px solid #eee;
             border-radius: 10px;
             padding: 20px 15px;
             text-align: center;
@@ -270,16 +271,14 @@ include 'header_UI.php';
         
         .category-item:hover {
             transform: translateY(-5px);
-            box-shadow: 0 5px 15px var(--shadow);
-            border-color: var(--primary-red);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
         
+        /* Active 状态由 PHP 动态控制颜色，这里只保留基础样式 */
         .category-item.active {
-            background: var(--primary-red);
             color: white;
-            border-color: var(--primary-red);
             transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(229, 57, 53, 0.3);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
         }
         
         .category-icon {
@@ -306,9 +305,9 @@ include 'header_UI.php';
             background: var(--white);
             border-radius: 15px;
             overflow: hidden;
-            box-shadow: 0 8px 25px var(--shadow);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.05);
             transition: all 0.3s ease;
-            border: 1px solid var(--lighter-red);
+            border: 1px solid #eee;
             position: relative;
             display: flex;
             flex-direction: column;
@@ -317,7 +316,7 @@ include 'header_UI.php';
         
         .case-card:hover {
             transform: translateY(-10px);
-            box-shadow: 0 15px 35px rgba(229, 57, 53, 0.15);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
         }
         
         .case-image-container {
@@ -358,7 +357,7 @@ include 'header_UI.php';
         }
         
         .badge-urgent {
-            background: #ff5252;
+            background: #d32f2f; /* 统一使用深红色 */
         }
         
         .case-content {
@@ -413,7 +412,7 @@ include 'header_UI.php';
         .show-more-btn {
             background: none;
             border: none;
-            color: var(--primary-red);
+            color: #888; 
             cursor: pointer;
             font-weight: 600;
             margin-top: 10px;
@@ -426,6 +425,7 @@ include 'header_UI.php';
         
         .show-more-btn:hover {
             text-decoration: underline;
+            color: var(--text);
         }
         
         /* Progress Bar */
@@ -487,7 +487,7 @@ include 'header_UI.php';
             justify-content: space-between;
             margin-bottom: 25px;
             padding-bottom: 20px;
-            border-bottom: 1px solid var(--lighter-red);
+            border-bottom: 1px solid #eee;
         }
         
         .detail-item {
@@ -544,12 +544,12 @@ include 'header_UI.php';
             padding: 80px 20px;
             background: var(--white);
             border-radius: 15px;
-            box-shadow: 0 5px 20px var(--shadow);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
         }
         
         .no-cases i {
             font-size: 60px;
-            color: var(--lighter-red);
+            color: #ccc;
             margin-bottom: 20px;
         }
         
@@ -649,7 +649,9 @@ include 'header_UI.php';
             $total_result = $conn->query($total_query);
             $stats = $total_result->fetch_assoc();
             
-            $urgent_count_query = "SELECT COUNT(*) as count FROM special_case WHERE Case_Status = 'Active' AND Urgency = 'high'";
+            // --- [修改] 统计 Emergency Relief 的数量 ---
+            // 之前是 Urgency = 'high'，现在改为 Case_Category = 'Emergency Relief'
+            $urgent_count_query = "SELECT COUNT(*) as count FROM special_case WHERE Case_Status = 'Active' AND Case_Category = 'Emergency Relief'";
             $urgent_result = $conn->query($urgent_count_query);
             $urgent_count = $urgent_result->fetch_assoc()['count'];
             
@@ -668,7 +670,7 @@ include 'header_UI.php';
             </div>
             <div class="stat-box">
                 <span class="stat-number"><?php echo $urgent_count; ?></span>
-                <span class="stat-label">Urgent Cases</span>
+                <span class="stat-label">Emergency Cases</span>
             </div>
             <div class="stat-box">
                 <span class="stat-number"><?php echo $total_donors; ?></span>
@@ -681,13 +683,18 @@ include 'header_UI.php';
                 <i class="fas fa-list-alt"></i> Case Categories
             </h2>
             <div class="categories-grid">
-                <a href="?category=all&page=1" class="category-item <?php echo $category_filter == 'all' ? 'active' : ''; ?>">
-                    <i class="fas fa-layer-group category-icon"></i>
+                <a href="?category=all&page=1" class="category-item <?php echo $category_filter == 'all' ? 'active' : ''; ?>" style="<?php echo $category_filter == 'all' ? 'background: #e53935; border-color: #e53935;' : ''; ?>">
+                    <i class="fas fa-layer-group category-icon" style="<?php echo $category_filter == 'all' ? 'color: white;' : 'color: #e53935;'; ?>"></i>
                     <span class="category-name">All Cases</span>
                 </a>
                 <?php foreach($categories as $key => $category): ?>
-                    <a href="?category=<?php echo $key; ?>&page=1" class="category-item <?php echo $category_filter == $key ? 'active' : ''; ?>" style="border-color: <?php echo $category['color']; ?>">
-                        <i class="<?php echo $category['icon']; ?> category-icon" style="color: <?php echo $category['color']; ?>"></i>
+                    <?php 
+                        $isActive = ($category_filter == $key);
+                        $bgStyle = $isActive ? "background: {$category['color']}; border-color: {$category['color']};" : "border-color: {$category['color']};";
+                        $iconColor = $isActive ? "white" : $category['color'];
+                    ?>
+                    <a href="?category=<?php echo $key; ?>&page=1" class="category-item <?php echo $isActive ? 'active' : ''; ?>" style="<?php echo $bgStyle; ?>">
+                        <i class="<?php echo $category['icon']; ?> category-icon" style="color: <?php echo $iconColor; ?>"></i>
                         <span class="category-name"><?php echo $category['name']; ?></span>
                     </a>
                 <?php endforeach; ?>
@@ -713,7 +720,7 @@ include 'header_UI.php';
                     }
 
                     $category_name = $current_cat_info['name'];
-                    $category_color = $current_cat_info['color'];
+                    $category_color = $current_cat_info['color']; // 这里的颜色已经是我们修改过的了
                     $category_icon = $current_cat_info['icon'];
                     
                     $is_urgent = isset($case['Urgency']) && $case['Urgency'] === 'high';
@@ -884,35 +891,29 @@ include 'header_UI.php';
         document.addEventListener('DOMContentLoaded', animateProgressBars);
         window.addEventListener('scroll', animateProgressBars);
 
-        // --- 核心修改：Login Check Function with SweetAlert2 ---
+        // Login Check Function with SweetAlert2
         function checkLogin(event, url) {
-            // PHP 会在这里注入登录状态 (true 或 false)
-            // 我假设你的 session 变量名叫 donor_id，如果不同请修改这里
             const isLoggedIn = <?php echo isset($_SESSION['Donor_ID']) || isset($_SESSION['donor_id']) ? 'true' : 'false'; ?>;
 
             if (!isLoggedIn) {
-                event.preventDefault(); // 阻止默认的跳转
+                event.preventDefault(); 
                 
-                // 使用 SweetAlert2 显示漂亮的弹窗
                 Swal.fire({
                     title: 'Login Required',
                     text: "You need to login to make a donation.",
                     icon: 'info',
                     showCancelButton: true,
-                    confirmButtonColor: '#e53935', // 使用你的主题红色
+                    confirmButtonColor: '#e53935', 
                     cancelButtonColor: '#8a8686',
                     confirmButtonText: 'Login Now',
                     cancelButtonText: 'Cancel'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        // 用户点击了 Login，跳转到登录页面
-                        // 注意：如果你的登录页面名字不是 login.php，请在这里修改
                         window.location.href = 'donor_login.php'; 
                     }
                 });
                 return false;
             }
-            // 如果已登录，什么都不做，让链接正常跳转
             return true;
         }
     </script>

@@ -6,46 +6,14 @@ include 'header_function.php';
 
 // 获取总部信息
 $hq = null;
-$result = $conn->query("SELECT * FROM headquarters WHERE HQ_ID = 1");
-if ($result && $result->num_rows > 0) {
-    $hq = $result->fetch_assoc();
+// 确保数据库连接存在再执行查询
+if (isset($conn)) {
+    $result = $conn->query("SELECT * FROM headquarters WHERE HQ_ID = 1");
+    if ($result && $result->num_rows > 0) {
+        $hq = $result->fetch_assoc();
+    }
+    if($result) $result->close();
 }
-$result->close();
-
-// 获取统计数据
-$total_donations = ['total' => 0];
-$total_donors = ['total' => 0];
-$total_cases = ['total' => 0];
-$total_activities = ['total' => 0];
-
-// 总捐款金额
-$result = $conn->query("SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus = 'Success'");
-if ($result && $result->num_rows > 0) {
-    $total_donations = $result->fetch_assoc();
-}
-$result->close();
-
-// 总捐赠者数量
-$result = $conn->query("SELECT COUNT(*) as total FROM donor");
-if ($result && $result->num_rows > 0) {
-    $total_donors = $result->fetch_assoc();
-}
-$result->close();
-
-// 成功案例数量
-$result = $conn->query("SELECT COUNT(*) as total FROM special_case WHERE Case_Status = 'Completed'");
-if ($result && $result->num_rows > 0) {
-    $total_cases = $result->fetch_assoc();
-}
-$result->close();
-
-// 活动数量
-$result = $conn->query("SELECT COUNT(*) as total FROM activity WHERE Activity_Status = 'Completed'");
-if ($result && $result->num_rows > 0) {
-    $total_activities = $result->fetch_assoc();
-}
-$result->close();
-
 include 'header_UI.php';
 ?>
 <!DOCTYPE html>
@@ -97,56 +65,12 @@ include 'header_UI.php';
             opacity: 0.95;
         }
 
-        .btn-primary {
-            background: white;
-            color: #d32f2f;
-            padding: 15px 40px;
-            border: none;
-            border-radius: 50px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .btn-primary:hover {
-            background: #ffebee;
-            transform: translateY(-3px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        }
-
+        /* 统计部分样式 */
         .stats-section {
             background: white;
             padding: 60px 0;
             margin-bottom: 60px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 30px;
-            text-align: center;
-        }
-
-        .stat-item {
-            padding: 30px;
-        }
-
-        .stat-number {
-            font-size: 3rem;
-            font-weight: 700;
-            color: #d32f2f;
-            margin-bottom: 10px;
-        }
-
-        .stat-label {
-            font-size: 1.1rem;
-            color: #666;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
 
         .about-content {
@@ -162,6 +86,8 @@ include 'header_UI.php';
             text-align: center;
         }
 
+        /* --- Vision & Mission 核心样式修改 --- */
+        /* 对应 div class="mission-vision" */
         .mission-vision {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -169,24 +95,48 @@ include 'header_UI.php';
             margin-bottom: 60px;
         }
 
+        /* 对应 div class="mission-box" 和 "vision-box" */
         .mission-box, .vision-box {
             background: white;
             padding: 40px;
             border-radius: 10px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .mission-box:hover, .vision-box:hover {
+            transform: translateY(-5px);
         }
 
         .mission-box h3, .vision-box h3 {
             color: #d32f2f;
             margin-bottom: 20px;
             font-size: 1.8rem;
+            border-bottom: 2px solid #ffcdd2;
+            padding-bottom: 10px;
+            display: inline-block;
         }
 
-        .mission-box .icon, .vision-box .icon {
-            font-size: 3rem;
-            color: #d32f2f;
-            margin-bottom: 20px;
+        /* 新增列表样式，让内容更好看 */
+        .mission-box ul, .vision-box ul {
+            list-style: none;
+            padding-left: 0;
         }
+
+        .mission-box li, .vision-box li {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .point-icon {
+            color: #d32f2f;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 1.2rem;
+            line-height: 1.4;
+        }
+        /* --- End Vision & Mission --- */
 
         .values-section {
             margin-bottom: 60px;
@@ -211,12 +161,6 @@ include 'header_UI.php';
             transform: translateY(-10px);
         }
 
-        .value-icon {
-            font-size: 2.5rem;
-            color: #d32f2f;
-            margin-bottom: 20px;
-        }
-
         .value-item h4 {
             color: #d32f2f;
             margin-bottom: 15px;
@@ -238,12 +182,6 @@ include 'header_UI.php';
 
         .story-content h2 {
             color: #d32f2f;
-            margin-bottom: 30px;
-        }
-
-        .story-content p {
-            font-size: 1.1rem;
-            line-height: 1.8;
             margin-bottom: 30px;
         }
 
@@ -281,11 +219,6 @@ include 'header_UI.php';
             margin-bottom: 10px;
         }
 
-        .team-info p {
-            color: #666;
-            font-style: italic;
-        }
-
         .cta-section {
             background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
             color: white;
@@ -299,50 +232,16 @@ include 'header_UI.php';
             margin-bottom: 20px;
         }
 
-        .cta-section p {
-            font-size: 1.2rem;
-            max-width: 600px;
-            margin: 0 auto 40px;
-            opacity: 0.9;
-        }
-
-        .btn-white {
-            background: white;
-            color: #d32f2f;
-            padding: 15px 40px;
-            border: none;
-            border-radius: 50px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .btn-white:hover {
-            background: #ffebee;
-            transform: translateY(-3px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        }
-
         @media (max-width: 768px) {
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
             .mission-vision {
                 grid-template-columns: 1fr;
             }
-            
             .values-grid {
                 grid-template-columns: 1fr;
             }
-            
             .team-grid {
                 grid-template-columns: 1fr;
             }
-            
             .hero-section h1 {
                 font-size: 2.5rem;
             }
@@ -354,11 +253,8 @@ include 'header_UI.php';
         <div class="container">
             <h1>Building Bridges of Love and Hope</h1>
             <p>Love Bridge Foundation is a non-profit organization dedicated to creating positive change through compassion, care, and community support. Since 2010, we've been connecting generous hearts with those in need.</p>
-           
         </div>
     </div>
-
-   
 
     <div class="container about-content">
         <h2 class="section-title">Our Story</h2>
@@ -371,22 +267,34 @@ include 'header_UI.php';
                 <?php else: ?>
                     <h2>Love Bridge Foundation</h2>
                     <p>Founded in 2010, Love Bridge started as a small community initiative by a group of passionate volunteers who believed in the power of collective kindness. What began as a simple act of helping a few families in need has grown into a nationwide movement touching thousands of lives.</p>
-                    <p>Our journey began when our founder, Dr. Aminah Hassan, witnessed the struggles of underprivileged communities during her medical missions. She realized that while medical help was crucial, what people needed most was a bridge - a connection to resources, support, and most importantly, hope.</p>
                 <?php endif; ?>
             </div>
         </div>
 
+        <h2 class="section-title">Our Purpose</h2>
+        
         <div class="mission-vision">
-            <div class="mission-box">
-                <div class="icon"></div>
-                <h3>Our Mission</h3>
-                <p>To connect compassionate individuals with those in need through sustainable programs that provide immediate relief while creating long-term solutions for underprivileged communities across Malaysia.</p>
+            <div class="vision-box">
+                <h3>Our Vision</h3>
+                <p>To create a world where compassion bridges every gap, and no one is left behind in times of need. We envision communities where every individual has access to basic necessities, healthcare, education, and opportunities for a dignified life.</p>
+                <ul>
+                    <li><span class="point-icon">•</span> Build sustainable support systems for vulnerable communities</li>
+                    <li><span class="point-icon">•</span> Create bridges of hope between donors and recipients</li>
+                    <li><span class="point-icon">•</span> Foster a culture of giving and social responsibility</li>
+                    <li><span class="point-icon">•</span> Ensure every donation creates maximum impact</li>
+                </ul>
             </div>
             
-            <div class="vision-box">
-                <div class="icon"></div>
-                <h3>Our Vision</h3>
-                <p>A Malaysia where no one is left behind, where every individual has access to basic needs, education, healthcare, and opportunities to thrive in a compassionate and supportive community.</p>
+            <div class="mission-box">
+                <h3>Our Mission</h3>
+                <p>To efficiently connect compassionate donors with credible causes through a transparent, secure, and user-friendly platform. We are committed to ensuring that every contribution, big or small, reaches those who need it most.</p>
+                <ul>
+                    <li><span class="point-icon">•</span> Provide immediate relief during emergencies and crises</li>
+                    <li><span class="point-icon">•</span> Support long-term community development projects</li>
+                    <li><span class="point-icon">•</span> Maintain 100% transparency in fund allocation</li>
+                    <li><span class="point-icon">•</span> Engage and empower volunteers in meaningful work</li>
+                    <li><span class="point-icon">•</span> Educate and raise awareness about social issues</li>
+                </ul>
             </div>
         </div>
 
@@ -394,37 +302,31 @@ include 'header_UI.php';
         <div class="values-section">
             <div class="values-grid">
                 <div class="value-item">
-                    <div class="value-icon"></div>
                     <h4>Compassion</h4>
                     <p>We approach every situation with empathy, understanding, and a genuine desire to alleviate suffering.</p>
                 </div>
                 
                 <div class="value-item">
-                    <div class="value-icon"></div>
                     <h4>Integrity</h4>
                     <p>We maintain the highest standards of transparency and accountability in all our operations.</p>
                 </div>
                 
                 <div class="value-item">
-                    <div class="value-icon"></div>
                     <h4>Sustainability</h4>
                     <p>We create programs that provide long-term solutions, not just temporary relief.</p>
                 </div>
                 
                 <div class="value-item">
-                    <div class="value-icon"></div>
                     <h4>Community</h4>
                     <p>We believe in the power of collective action and community-driven solutions.</p>
                 </div>
                 
                 <div class="value-item">
-                    <div class="value-icon"></div>
                     <h4>Innovation</h4>
                     <p>We continuously seek new and better ways to serve and make a lasting impact.</p>
                 </div>
                 
                 <div class="value-item">
-                    <div class="value-icon"></div>
                     <h4>Respect</h4>
                     <p>We honor the dignity of every individual we serve, regardless of their circumstances.</p>
                 </div>
@@ -435,37 +337,31 @@ include 'header_UI.php';
         <div class="values-section">
             <div class="values-grid">
                 <div class="value-item">
-                    <div class="value-icon"></div>
                     <h4>Children & Orphanages</h4>
                     <p>Supporting orphanages, educational programs, nutrition initiatives, and healthcare for underprivileged children.</p>
                 </div>
                 
                 <div class="value-item">
-                    <div class="value-icon"></div>
                     <h4>Elderly Care</h4>
                     <p>Providing companionship, medical support, and basic necessities for senior citizens in need.</p>
                 </div>
                 
                 <div class="value-item">
-                    <div class="value-icon"></div>
-                    <h4>Stary Cat</h4>
-                    <p>Take care of the animal by providing them with food, shelter, and medical care.</p>
+                    <h4>Stray Animals</h4>
+                    <p>Take care of the animals by providing them with food, shelter, and medical care.</p>
                 </div>
                 
                 <div class="value-item">
-                    <div class="value-icon"></div>
                     <h4>Education Support</h4>
                     <p>Scholarships, school supplies, and learning facilities for children from low-income families.</p>
                 </div>
                 
                 <div class="value-item">
-                    <div class="value-icon"></div>
                     <h4>Medical Aid</h4>
                     <p>Assistance with medical bills, surgeries, and essential healthcare services for those who cannot afford them.</p>
                 </div>
                 
                 <div class="value-item">
-                    <div class="value-icon"></div>
                     <h4>Community Development</h4>
                     <p>Empowering communities through skills training, micro-enterprises, and infrastructure projects.</p>
                 </div>
@@ -509,9 +405,8 @@ include 'header_UI.php';
         <div class="container">
             <h2>Be Part of Our Journey</h2>
             <p>Your support can change lives. Whether through donations, volunteering, or spreading awareness, you can help us build more bridges of love and hope.</p>
-          
         </div>
     </div>
-     <?php include 'footer.php'; ?>
+    <?php include 'footer.php'; ?>
 </body>
 </html>
