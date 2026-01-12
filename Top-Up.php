@@ -35,7 +35,7 @@ $d_ic      = $d_row['Donor_ICNumber'];
 $d_email   = $d_row['Donor_Email'];
 
 // ==========================================
-// 3. 处理充值逻辑 (核心修改)
+// 3. 处理充值逻辑
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
     
@@ -44,7 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
 
     if ($amount > 0 && !empty($method)) {
         
-        // 开启数据库事务
         $conn->begin_transaction();
 
         try {
@@ -57,7 +56,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
             // B. 记录 Payment
             $txn_ref = "TXN-TOPUP-" . date("YmdHis") . "-" . rand(100, 999);
             $now = date("Y-m-d H:i:s");
-            $status = "Success";
             
             $bank_name = ($method == 'TNG eWallet') ? 'TNG eWallet' : ($_POST['bank_display'] ?? 'Credit Card');
             $masked = "Top-up Account";
@@ -67,8 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
                 $masked = substr($card_num, 0, 4) . " **** **** " . substr($card_num, -4);
             }
 
-            $stmt_pay = $conn->prepare("INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt_pay->bind_param("sssissss", $method, $status, $txn_ref, $amount, $now, $bank_name, $masked, $now);
+            $stmt_pay = $conn->prepare("INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At) VALUES (?, 'Success', ?, ?, ?, ?, ?, ?)");
+            $stmt_pay->bind_param("sssisss", $method, $txn_ref, $amount, $now, $bank_name, $masked, $now);
             $stmt_pay->execute();
             $payment_id = $stmt_pay->insert_id;
             $stmt_pay->close();
@@ -82,32 +80,37 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
             $new_order_id = $stmt_ord->insert_id;
             $stmt_ord->close();
 
-            // D. [新增逻辑] 计算并更新积分 (1 MYR = 1 PT)
-            $points_earned = floor($amount);
-            $check_pt = $conn->query("SELECT * FROM point WHERE Donor_ID = $current_donor_id");
-            if ($check_pt->num_rows > 0) {
-                $conn->query("UPDATE point SET Points_Total = Points_Total + $points_earned, Points_Updated_At = NOW() WHERE Donor_ID = $current_donor_id");
-            } else {
-                $conn->query("INSERT INTO point (Donor_ID, Points_Total, Points_Created_At, Points_Updated_At) VALUES ($current_donor_id, $points_earned, NOW(), NOW())");
+            // D. [修正逻辑] 计算并更新积分 (每 RM 10 = 1 PT)
+            $points_earned = floor($amount / 10);
+            
+            // 只有当积分 > 0 时才更新 point 表
+            if ($points_earned > 0) {
+                $pt_sql = "INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) 
+                           VALUES ($points_earned, $points_earned, NOW(), $current_donor_id) 
+                           ON DUPLICATE KEY UPDATE 
+                           Points_Earned = $points_earned, 
+                           Points_Total = Points_Total + $points_earned, 
+                           Points_Updated_At = NOW()";
+                $conn->query($pt_sql);
             }
 
-            // E. [新增逻辑] 存入 Wallet Transaction 流水表
-            $wt_sql = "INSERT INTO wallet_transaction (Donor_ID, Order_ID, Transaction_Amount, Transaction_Type, Transaction_Date) VALUES (?, ?, ?, 'Top-up', NOW())";
+            // E. [核心修改点] 存入 Wallet Transaction 流水表 (Transaction_Type 修改为数据库允许的 'Credit')
+            $description = "Top-up via " . $method;
+            $wt_sql = "INSERT INTO wallet_transaction (Donor_ID, Order_ID, Amount, Transaction_Type, Description, Created_At) VALUES (?, ?, ?, 'Credit', ?, NOW())";
             $wt_stmt = $conn->prepare($wt_sql);
-            $wt_stmt->bind_param("iid", $current_donor_id, $new_order_id, $amount);
+            $wt_stmt->bind_param("iids", $current_donor_id, $new_order_id, $amount, $description);
             $wt_stmt->execute();
             $wt_stmt->close();
 
-            // 提交所有事务
             $conn->commit();
             
             $topup_successful = true;
             $success_amount = $amount;
 
         } catch (Exception $e) {
-            // 如果出错，撤回所有改动
             $conn->rollback();
-            echo "<script>alert('System Error: Transaction failed.');</script>";
+            echo "Transaction Failed: " . $e->getMessage();
+            exit();
         }
     }
 }
@@ -137,6 +140,7 @@ include 'header_UI.php';
     .method-container.selected .method-body { display: block; }
     .form-group { margin-bottom: 15px; position: relative; } 
     .form-control { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+    .card-icon { position: absolute; right: 15px; top: 38px; font-size: 24px; color: #999; }
     .btn-submit { width: 100%; padding: 18px; background: #28a745; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 1.2rem; cursor: pointer; margin-top: 30px; transition: 0.3s; opacity: 0.6; pointer-events: none; }
     .btn-submit.ready { opacity: 1; pointer-events: all; }
     .qr-box { text-align: center; }
@@ -177,6 +181,7 @@ include 'header_UI.php';
                         <div class="form-group">
                             <label>Card Number</label>
                             <input type="text" id="card" name="card" class="form-control" maxlength="19" placeholder="0000 0000 0000 0000">
+                            <i id="card-brand-icon" class="fas fa-credit-card card-icon"></i>
                         </div>
                         <div class="form-group">
                             <label>Card Type / Bank</label>
@@ -250,18 +255,58 @@ include 'header_UI.php';
         }
     }
 
-    // 处理卡号格式等 JS 逻辑 (保持原有逻辑)
     document.addEventListener('DOMContentLoaded', function() {
-        // ... (原有的卡号识别和 MM/YY 自动补斜杠逻辑)
+        const cardInput = document.getElementById('card');
+        const bankDisplay = document.getElementById('bank_display');
+        const cardIcon = document.getElementById('card-brand-icon');
+        const expInput = document.getElementById('exp');
+
+        if(cardInput) {
+            cardInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                let formattedValue = '';
+                for (let i = 0; i < value.length; i++) {
+                    if (i > 0 && i % 4 === 0) formattedValue += ' ';
+                    formattedValue += value[i];
+                }
+                e.target.value = formattedValue;
+                identifyCardType(value);
+            });
+        }
+
+        if(expInput) {
+            expInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length >= 3) e.target.value = value.slice(0, 2) + '/' + value.slice(2, 4);
+                else e.target.value = value;
+            });
+        }
+
+        function identifyCardType(number) {
+            const patterns = { visa: /^4/, mastercard: /^5[1-5]/, amex: /^3[47]/ };
+            const icons = { visa: 'fa-cc-visa', mastercard: 'fa-cc-mastercard', amex: 'fa-cc-amex', unknown: 'fa-credit-card' };
+            let type = 'unknown';
+            let bankName = 'Unknown Card';
+
+            if (patterns.visa.test(number)) { type = 'visa'; bankName = 'Visa Card'; } 
+            else if (patterns.mastercard.test(number)) { type = 'mastercard'; bankName = 'MasterCard'; } 
+            else if (patterns.amex.test(number)) { type = 'amex'; bankName = 'American Express'; }
+
+            if(bankDisplay) bankDisplay.value = bankName;
+            if(cardIcon) {
+                cardIcon.className = `fab ${icons[type]} card-icon`;
+                cardIcon.style.color = type === 'unknown' ? '#999' : '#0057B7';
+            }
+        }
     });
 
     <?php if ($topup_successful): ?>
     Swal.fire({
         title: 'Success!',
-        html: `RM <?php echo number_format($success_amount, 2); ?> added.<br><b>+<?php echo floor($success_amount); ?> Points earned!</b>`,
+        html: `RM <?php echo number_format($success_amount, 2); ?> added.<br><b>+<?php echo floor($success_amount / 10); ?> Points earned!</b>`,
         icon: 'success',
         confirmButtonText: 'Great!'
-    }).then(() => { window.location.href = 'Wallet_Page.php'; });
+    }).then(() => { window.location.href = 'E_Wallet.php'; });
     <?php endif; ?>
 </script>
 

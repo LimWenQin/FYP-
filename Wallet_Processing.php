@@ -33,7 +33,7 @@ $case_id = (!empty($sess_data['case_id']) && $sess_data['case_id'] > 0) ? $sess_
 $activity_id = (!empty($sess_data['activity_id']) && $sess_data['activity_id'] > 0) ? $sess_data['activity_id'] : null;
 
 // ==========================================
-// 2. 检查余额 (双重验证)
+// 2. 获取用户资料与余额 (双重验证)
 // ==========================================
 $stmt = $conn->prepare("SELECT Donor_Wallet, Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email FROM donor WHERE Donor_ID = ?");
 $stmt->bind_param("i", $current_donor_id);
@@ -44,7 +44,7 @@ $stmt->close();
 $current_balance = $user_data['Donor_Wallet'] ?? 0.00;
 
 if ($current_balance < $amount) {
-    echo "<script>alert('Insufficient wallet balance. Please top up.'); window.location.href='Wallet_Page.php';</script>";
+    echo "<script>alert('Insufficient wallet balance. Please top up.'); window.location.href='E_Wallet.php';</script>";
     exit();
 }
 
@@ -61,6 +61,16 @@ $masked_card = "Wallet-Spending";
 $order_type = ($donation_type == "monthly") ? "Recurring" : "One-time";
 $order_status = "Completed"; 
 $tax_status = (isset($sess_data['tax_receipt']) && $sess_data['tax_receipt'] == '1') ? 'Requested' : 'Not_Requested';
+
+// 准备 Description 文字 (用于流水账单显示)
+$description = "Donation by E-Wallet";
+if($case_id) {
+    $res = $conn->query("SELECT Case_Title FROM special_case WHERE Case_ID = $case_id");
+    if($row = $res->fetch_assoc()) $description = "Donate to Case: " . $row['Case_Title'];
+} elseif ($activity_id) {
+    $res = $conn->query("SELECT Activity_Name FROM activity WHERE Activity_ID = $activity_id");
+    if($row = $res->fetch_assoc()) $description = "Donate to Activity: " . $row['Activity_Name'];
+}
 
 // ==========================================
 // 4. 执行数据库操作 (使用 ACID 事务)
@@ -99,12 +109,11 @@ try {
     $stmt_ord->execute();
     $new_order_id = $stmt_ord->insert_id;
 
-    // D. 【修正重点】插入 Wallet Transaction 表 (匹配你的数据库字段：Amount, Created_At)
-    // 根据你的反馈，字段名是 Amount 和 Created_At
-    $wt_sql = "INSERT INTO wallet_transaction (Donor_ID, Order_ID, Amount, Transaction_Type, Created_At) 
-               VALUES (?, ?, ?, 'Spending', NOW())";
+    // D. 【修正重点】插入 Wallet Transaction 表 (匹配你的数据库字段：Amount, Created_At, Description, Transaction_Type)
+    $wt_sql = "INSERT INTO wallet_transaction (Donor_ID, Order_ID, Amount, Transaction_Type, Description, Created_At) 
+               VALUES (?, ?, ?, 'Spending', ?, NOW())";
     $stmt_wt = $conn->prepare($wt_sql);
-    $stmt_wt->bind_param("iid", $current_donor_id, $new_order_id, $amount);
+    $stmt_wt->bind_param("iids", $current_donor_id, $new_order_id, $amount, $description);
     $stmt_wt->execute();
 
     // E. 插入 Recurring Donation (如果是月捐)

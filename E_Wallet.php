@@ -18,9 +18,9 @@ $user = $stmt->get_result()->fetch_assoc();
 $balance = $user['Donor_Wallet'] ?? 0.00;
 $stmt->close();
 
-// 3. 获取钱包交易记录 (严格匹配你的字段名)
+// 3. 获取特定的钱包交易记录 (严格匹配你的字段名: Amount, Created_At, Transaction_Type)
 $history_sql = "
-    SELECT wt.Wallet_Trans_ID, wt.Transaction_Type, wt.Amount, wt.Created_At,
+    SELECT wt.Wallet_Trans_ID, wt.Transaction_Type, wt.Amount, wt.Created_At, wt.Description,
            o.Order_Type, sc.Case_Title, act.Activity_Name
     FROM wallet_transaction wt
     LEFT JOIN orders o ON wt.Order_ID = o.Order_ID
@@ -69,18 +69,24 @@ include 'header_UI.php';
         <?php if ($history && $history->num_rows > 0): ?>
             <?php while($row = $history->fetch_assoc()): ?>
                 <?php 
-                    $is_topup = ($row['Transaction_Type'] === 'Top-up');
+                    // ⭐ 关键修改：判断数据库中的 'Credit' (充值) 或 'Debit' (支出)
+                    $is_topup = ($row['Transaction_Type'] === 'Credit');
+                    
                     if ($is_topup) {
                         $icon_cls = 'icon-in'; $icon_nm = 'fa-arrow-down';
                         $amt_sgn = '+'; $amt_cls = 'amt-plus';
                         $title = "Wallet Top-up";
-                        $detail = "Earned Points: " . floor($row['Amount']);
+                        // 积分显示：每10块得1分
+                        $detail = "Earned Points: " . floor($row['Amount'] / 10);
                     } else {
                         $icon_cls = 'icon-out'; $icon_nm = 'fa-arrow-up';
                         $amt_sgn = '-'; $amt_cls = 'amt-minus';
+                        
+                        // 标题逻辑：优先显示项目名
                         if(!empty($row['Case_Title'])) $title = "Donation: " . $row['Case_Title'];
                         elseif(!empty($row['Activity_Name'])) $title = "Donation: " . $row['Activity_Name'];
                         else $title = "General Donation";
+                        
                         $detail = "Spent via E-Wallet";
                     }
                 ?>
