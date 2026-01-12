@@ -14,12 +14,16 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 
 $orderId = intval($_GET['id']);
 
-// Fetch comprehensive order details
+// --- 修改：关联 Branch, Activity, Case 表以获取 Target 信息 ---
 $sql = "SELECT o.*, d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber, 
-        p.Payment_Method as Actual_Method, p.Payment_Status as Pay_Status, p.Payment_Bank_Name
+        p.Payment_Method as Actual_Method, p.Payment_Status as Pay_Status, p.Payment_Bank_Name,
+        b.Branch_Name, a.Activity_Name, s.Case_Title
         FROM orders o
         JOIN donor d ON o.Donor_ID = d.Donor_ID
         LEFT JOIN payment p ON o.Payment_ID = p.Payment_ID
+        LEFT JOIN branch b ON o.Branch_ID = b.Branch_ID
+        LEFT JOIN activity a ON o.Activity_ID = a.Activity_ID
+        LEFT JOIN special_case s ON o.Case_ID = s.Case_ID
         WHERE o.Order_ID = $orderId";
 
 $result = $conn->query($sql);
@@ -36,6 +40,21 @@ $statusLower = strtolower($order['Order_Status']);
 if($statusLower == 'completed' || $statusLower == 'success') $statusClass = 'text-success';
 if($statusLower == 'failed' || $statusLower == 'cancelled') $statusClass = 'text-danger';
 
+// --- Determine Donation Target ---
+$targetLabel = "General Fund";
+$targetName = "-";
+
+if (!empty($order['Branch_Name'])) {
+    $targetLabel = "Branch / Shelter";
+    $targetName = $order['Branch_Name'];
+} elseif (!empty($order['Activity_Name'])) {
+    $targetLabel = "Event / Activity";
+    $targetName = $order['Activity_Name'];
+} elseif (!empty($order['Case_Title'])) {
+    $targetLabel = "Special Case";
+    $targetName = $order['Case_Title'];
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -48,7 +67,7 @@ if($statusLower == 'failed' || $statusLower == 'cancelled') $statusClass = 'text
     <style>
         body { background: #f4f6f9; padding: 40px; font-family: 'Poppins', sans-serif; }
         
-        /* 容器宽度 */
+        /* 容器宽度 - 保持你的原始设计 1100px */
         .details-container { 
             max-width: 1100px; 
             margin: 0 auto; 
@@ -81,27 +100,23 @@ if($statusLower == 'failed' || $statusLower == 'cancelled') $statusClass = 'text
             padding: 12px 0; 
         }
         
-        /* --- 关键修改：对齐逻辑 --- */
-        
-        /* 1. Label: 固定宽度，确保冒号位置统一 */
+        /* Label & Colon & Value - 保持你的原始宽度设置 */
         .label { 
-            width: 220px;       /* 调整此宽度可改变冒号的位置 */
-            min-width: 220px;   
+            width: 220px; 
+            min-width: 220px; 
             color: #888; 
             font-weight: 500; 
             font-size: 15px; 
         }
         
-        /* 2. Colon: 独立的冒号样式，用于视觉分割 */
         .colon {
-            width: 20px;        /* 固定冒号占用空间 */
+            width: 20px;
             text-align: center;
             color: #888;
             font-weight: 500;
-            margin-right: 15px; /* 冒号和数值之间的距离 */
+            margin-right: 15px; 
         }
         
-        /* 3. Value: 占据剩余空间 */
         .value { 
             font-weight: 600; 
             color: #333; 
@@ -120,7 +135,6 @@ if($statusLower == 'failed' || $statusLower == 'cancelled') $statusClass = 'text
             align-items: center;
         }
 
-        /* Print Button */
         .btn-print { 
             background: #007bff; 
             color: white; 
@@ -137,7 +151,6 @@ if($statusLower == 'failed' || $statusLower == 'cancelled') $statusClass = 'text
         }
         .btn-print:hover { background: #0056b3; }
 
-        /* Back Button */
         .btn-back {
             background: #6c757d;
             color: white;
@@ -179,6 +192,15 @@ if($statusLower == 'failed' || $statusLower == 'cancelled') $statusClass = 'text
             <div class="info-group">
                 <h3>Transaction Information</h3>
                 <div class="info-list">
+                    <div class="info-item">
+                        <span class="label">Donation For (Target)</span>
+                        <span class="colon">:</span>
+                        <span class="value">
+                            <?php echo htmlspecialchars($targetName); ?> 
+                            <span style="font-size: 13px; color: #888; font-weight: normal; margin-left: 5px;">(<?php echo $targetLabel; ?>)</span>
+                        </span>
+                    </div>
+
                     <div class="info-item">
                         <span class="label">Reference No</span>
                         <span class="colon">:</span>
@@ -267,7 +289,6 @@ if($statusLower == 'failed' || $statusLower == 'cancelled') $statusClass = 'text
     </div>
 
     <script>
-        // Check if history length suggests we can go back, otherwise close (for new tabs)
         document.querySelector('.btn-back').onclick = function() {
             if (window.history.length > 1 && document.referrer.indexOf(window.location.host) !== -1) {
                 window.history.back();

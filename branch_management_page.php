@@ -187,7 +187,8 @@ function handleMultiUpload($files) {
     return $paths;
 }
 
-$branchTypes = ['Old Folks Home', 'Orphanage', 'Disabled Care Center'];
+// --- UPDATED: Added Headquarters and Branch to categories ---
+$branchTypes = ['Headquarters', 'Branch', 'Old Folks Home', 'Orphanage', 'Disabled Care Center'];
 $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'];
 
 // --- ADD BRANCH ---

@@ -2,19 +2,69 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-// 添加筛选功能
+// --- 1. 定义分类配置 ---
+$categories = [
+    'medical' => [
+        'db_name' => 'Medical', 
+        'name' => 'Medical Aid', 
+        'icon' => 'fas fa-heartbeat', 
+        'color' => '#4CAF50'
+    ],
+    'disability' => [
+        'db_name' => 'Disability Support', 
+        'name' => 'Disability Support', 
+        'icon' => 'fas fa-wheelchair', 
+        'color' => '#2196F3'
+    ],
+    'emergency' => [
+        'db_name' => 'Emergency Relief', 
+        'name' => 'Emergency Relief', 
+        'icon' => 'fas fa-first-aid', 
+        'color' => '#FF5722'
+    ],
+    'elderly' => [
+        'db_name' => 'Elderly Care', 
+        'name' => 'Elderly Care', 
+        'icon' => 'fas fa-user-friends', 
+        'color' => '#795548'
+    ],
+    'children' => [
+        'db_name' => 'Children Support', 
+        'name' => 'Children Support', 
+        'icon' => 'fas fa-child', 
+        'color' => '#FF9800'
+    ],
+    'other' => [
+        'db_name' => 'Other Cases', 
+        'name' => 'Other Cases', 
+        'icon' => 'fas fa-hand-holding-heart', 
+        'color' => '#9C27B0'
+    ]
+];
+
+// --- 2. 创建反向映射 ---
+$db_value_map = [];
+foreach ($categories as $key => $data) {
+    $db_value_map[$data['db_name']] = $data;
+}
+
+// 获取筛选参数
 $category_filter = isset($_GET['category']) ? $_GET['category'] : 'all';
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 
-// 构建查询条件
+// --- 3. 构建查询条件 ---
 $where_conditions = ["Case_Status = 'Active'"];
+
 if ($category_filter !== 'all') {
-    $where_conditions[] = "Case_Category = '$category_filter'";
+    if (isset($categories[$category_filter])) {
+        $db_search_value = $conn->real_escape_string($categories[$category_filter]['db_name']);
+        $where_conditions[] = "Case_Category = '$db_search_value'";
+    }
 }
 $where_clause = implode(' AND ', $where_conditions);
 
 // 分页逻辑
-$cases_per_page = 4; // 每页显示4个案例(2行)
+$cases_per_page = 4;
 $offset = ($page - 1) * $cases_per_page;
 
 // 获取总案例数
@@ -27,18 +77,6 @@ $total_pages = ceil($total_cases / $cases_per_page);
 $query = "SELECT * FROM special_case WHERE $where_clause ORDER BY created_at DESC LIMIT $cases_per_page OFFSET $offset";
 $result = $conn->query($query);
 
-// 定义案例类别
-$categories = [
-    'medical' => ['name' => 'Medical Assistant', 'icon' => 'fas fa-heartbeat', 'color' => '#4CAF50'],
-    'disability' => ['name' => 'Disability Support', 'icon' => 'fas fa-wheelchair', 'color' => '#2196F3'],
-    'emergency' => ['name' => 'Emergency Relief', 'icon' => 'fas fa-first-aid', 'color' => '#FF5722'],
-    'elderly' => ['name' => 'Elderly Care', 'icon' => 'fas fa-user-friends', 'color' => '#795548'],
-    'children' => ['name' => 'Orphan Care', 'icon' => 'fas fa-child', 'color' => '#FF9800'],
-    'other' => ['name' => 'Other Cases', 'icon' => 'fas fa-hand-holding-heart', 'color' => '#9C27B0'],
-    
-];
-
-
 include 'header_UI.php';
 ?>
 
@@ -48,6 +86,9 @@ include 'header_UI.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Special Cases - Love Bridge Foundation</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         :root {
             --primary-red: #e53935;
@@ -74,22 +115,22 @@ include 'header_UI.php';
             background-color: var(--light-bg);
             color: var(--text);
             line-height: 1.6;
-            overflow-x: hidden; /* 防止水平滚动条 */
+            overflow-x: hidden;
         }
         
         /* Full Width Page Header */
         .page-header {
-            width: 100%; /* 宽度占满整个页面 */
+            width: 100%;
             background: url('https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
             text-align: center;
             position: relative;
-            padding: 160px 20px; /* 增加上下内边距 */
+            padding: 160px 20px;
             color: white;
-            border-radius: 0; /* 移除圆角 */
-            margin-bottom: 0; /* 移除底部外边距，让统计数据紧贴 */
+            border-radius: 0;
+            margin-bottom: 0;
         }
         
         .page-header::before {
@@ -106,7 +147,7 @@ include 'header_UI.php';
         .page-header-content {
             position: relative;
             z-index: 2;
-            max-width: 1400px; /* 内容区域保持最大宽度 */
+            max-width: 1400px;
             margin: 0 auto;
         }
         
@@ -141,12 +182,12 @@ include 'header_UI.php';
             font-weight: 500;
         }
         
-        /* Main Container (for content below header) */
+        /* Main Container */
         .case-container {
             max-width: 1400px;
             margin: 0 auto;
             padding: 40px 20px;
-            position: relative; /* 为了让统计数据可以定位 */
+            position: relative;
         }
         
         /* Stats */
@@ -155,7 +196,7 @@ include 'header_UI.php';
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 40px;
-            margin-top: -60px; /* 向上移动，覆盖在 Header 上 */
+            margin-top: -60px;
             position: relative;
             z-index: 3;
             padding: 0 20px;
@@ -250,66 +291,6 @@ include 'header_UI.php';
         .category-name {
             font-size: 14px;
             font-weight: 600;
-        }
-        
-        /* Filters */
-        .filters-container {
-            background: var(--white);
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 40px;
-            box-shadow: 0 5px 20px var(--shadow);
-            border: 1px solid var(--lighter-red);
-        }
-        
-        .filters-title {
-            font-size: 24px;
-            color: var(--primary-red);
-            margin-bottom: 25px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .filters-title i {
-            font-size: 28px;
-        }
-        
-        .filters {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        
-        .filter-btn {
-            background: var(--white);
-            border: 2px solid var(--primary-red);
-            color: var(--primary-red);
-            padding: 12px 28px;
-            border-radius: 50px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .filter-btn i {
-            font-size: 18px;
-        }
-        
-        .filter-btn.active {
-            background: var(--primary-red);
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(229, 57, 53, 0.3);
-        }
-        
-        .filter-btn:hover:not(.active) {
-            background: var(--lighter-red);
-            transform: translateY(-2px);
         }
         
         /* Cases Grid */
@@ -407,10 +388,6 @@ include 'header_UI.php';
             font-size: 14px;
         }
         
-        .case-meta i {
-            color: var(--primary-red);
-        }
-        
         .case-description-container {
             margin-bottom: 20px;
             flex: 1;
@@ -451,10 +428,6 @@ include 'header_UI.php';
             text-decoration: underline;
         }
         
-        .show-more-btn i {
-            font-size: 12px;
-        }
-        
         /* Progress Bar */
         .progress-section {
             margin-bottom: 25px;
@@ -478,7 +451,6 @@ include 'header_UI.php';
         
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--light-red) 0%, var(--primary-red) 100%);
             border-radius: 5px;
             transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
@@ -507,7 +479,6 @@ include 'header_UI.php';
         .progress-percentage {
             text-align: right;
             font-size: 14px;
-            color: var(--primary-red);
             font-weight: 600;
         }
         
@@ -526,7 +497,6 @@ include 'header_UI.php';
         .detail-value {
             font-size: 22px;
             font-weight: 700;
-            color: var(--primary-red);
             display: block;
         }
         
@@ -546,7 +516,6 @@ include 'header_UI.php';
             display: block;
             width: 100%;
             padding: 15px;
-            background: var(--primary-red);
             color: var(--white);
             border: none;
             border-radius: 10px;
@@ -563,17 +532,9 @@ include 'header_UI.php';
         }
         
         .btn-donate:hover {
-            background: var(--dark-red);
+            filter: brightness(0.9);
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(229, 57, 53, 0.3);
-        }
-        
-        .btn-donate:active {
-            transform: translateY(0);
-        }
-        
-        .btn-donate i {
-            font-size: 20px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
         }
         
         /* No Cases */
@@ -645,133 +606,28 @@ include 'header_UI.php';
             cursor: not-allowed;
         }
         
-        /* Responsive Design */
+        /* Responsive */
         @media (max-width: 1200px) {
-            .page-title {
-                font-size: 42px;
-            }
+            .page-title { font-size: 42px; }
         }
-        
         @media (max-width: 992px) {
-            .cases-grid {
-                grid-template-columns: 1fr;
-                gap: 25px;
-            }
-            
-            .case-image-container {
-                height: 220px;
-            }
-            
-            .page-title {
-                font-size: 36px;
-            }
-            
-            .page-description {
-                font-size: 18px;
-                padding: 0 20px;
-            }
-            
-            .categories-grid {
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            }
+            .cases-grid { grid-template-columns: 1fr; gap: 25px; }
+            .case-image-container { height: 220px; }
+            .page-title { font-size: 36px; }
+            .page-description { font-size: 18px; padding: 0 20px; }
+            .categories-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
         }
-        
         @media (max-width: 768px) {
-            .page-header {
-                padding: 80px 20px;
-            }
-            
-            .stats-container {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 15px;
-                margin-top: -40px; /* 调整小屏幕的重叠 */
-            }
-            
-            .stat-box {
-                padding: 20px 15px;
-            }
-            
-            .stat-number {
-                font-size: 28px;
-            }
-            
-            .filters {
-                justify-content: center;
-            }
-            
-            .filter-btn {
-                padding: 10px 20px;
-                font-size: 14px;
-            }
-            
-            .case-title {
-                font-size: 22px;
-            }
-            
-            .case-content {
-                padding: 20px;
-            }
+            .page-header { padding: 80px 20px; }
+            .stats-container { grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: -40px; }
+            .stat-box { padding: 20px 15px; }
+            .stat-number { font-size: 28px; }
         }
-        
         @media (max-width: 576px) {
-            .page-title {
-                font-size: 32px;
-            }
-            
-            .stats-container {
-                grid-template-columns: 1fr;
-            }
-            
-            .stat-box {
-                padding: 25px;
-            }
-            
-            .case-image-container {
-                height: 200px;
-            }
-            
-            .case-badges {
-                top: 10px;
-                right: 10px;
-            }
-            
-            .case-badge {
-                padding: 5px 12px;
-                font-size: 11px;
-            }
-            
-            .pagination a, .pagination span {
-                padding: 8px 14px;
-                font-size: 14px;
-            }
-            
-            .categories-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .page-title {
-                font-size: 28px;
-            }
-            
-            .page-description {
-                font-size: 16px;
-            }
-            
-            .filters-container {
-                padding: 20px;
-            }
-            
-            .case-details {
-                flex-direction: column;
-                gap: 15px;
-                text-align: center;
-            }
-            
-            .categories-grid {
-                grid-template-columns: 1fr;
-            }
+            .page-title { font-size: 32px; }
+            .stats-container { grid-template-columns: 1fr; }
+            .case-image-container { height: 200px; }
+            .categories-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -846,41 +702,35 @@ include 'header_UI.php';
                     $target = isset($case['Target_Amount']) && floatval($case['Target_Amount']) > 0 ? floatval($case['Target_Amount']) : 1;
                     
                     $progress = ($raised / $target) * 100;
-                    $progress = min($progress, 100); // 确保不超过100%
+                    $progress = min($progress, 100);
                     
-                    // 确定案例类型和紧急状态
-                    $category = isset($case['Case_Category']) ? $case['Case_Category'] : 'medical';
+                    // --- 自动匹配数据库样式 ---
+                    $db_category_value = $case['Case_Category'];
+                    $current_cat_info = $categories['other']; // 默认值
+                    
+                    if (isset($db_value_map[$db_category_value])) {
+                        $current_cat_info = $db_value_map[$db_category_value];
+                    }
+
+                    $category_name = $current_cat_info['name'];
+                    $category_color = $current_cat_info['color'];
+                    $category_icon = $current_cat_info['icon'];
+                    
                     $is_urgent = isset($case['Urgency']) && $case['Urgency'] === 'high';
-                    
-                    // 获取类别信息
-                    $category_info = isset($categories[$category]) ? $categories[$category] : $categories['other'];
-                    $category_name = $category_info['name'];
-                    $category_color = $category_info['color'];
-                    $category_icon = $category_info['icon'];
-                    
-                    // 获取捐助者数量
                     $donor_count = isset($case['Donor_Count']) ? $case['Donor_Count'] : 0;
                     
-                    // --- 修复开始: JSON 图片解析逻辑 ---
+                    // JSON 图片处理
                     $default_image = 'images/case-default.jpg';
-                    $image_path = $default_image; // 先设置默认值
+                    $image_path = $default_image;
 
-                    // 检查是否存在 Case_Images 字段 (注意是复数)
                     if (isset($case['Case_Images']) && !empty($case['Case_Images'])) {
-                        
-                        // 尝试解码 JSON
                         $decoded_images = json_decode($case['Case_Images'], true);
-
-                        // 如果是有效的 JSON 数组，取第一张图
                         if (json_last_error() === JSON_ERROR_NONE && is_array($decoded_images) && count($decoded_images) > 0) {
                             $image_path = $decoded_images[0];
-                        } 
-                        // 如果不是 JSON 数组，但有内容，直接作为路径使用 (兼容旧数据)
-                        else {
+                        } else {
                             $image_path = $case['Case_Images'];
                         }
                     }
-                    // --- 修复结束 ---
                 ?>
                     <div class="case-card">
                         <div class="case-image-container">
@@ -904,7 +754,7 @@ include 'header_UI.php';
                                 <h3 class="case-title"><?php echo htmlspecialchars($case['Case_Title']); ?></h3>
                                 <div class="case-meta">
                                     <span><i class="far fa-calendar"></i> Posted: <?php echo date('M d, Y', strtotime($case['Created_At'])); ?></span>
-                                    <span><i class="<?php echo $category_icon; ?>"></i> <?php echo $category_name; ?></span>
+                                    <span><i class="<?php echo $category_icon; ?>" style="color: <?php echo $category_color; ?>"></i> <?php echo $category_name; ?></span>
                                 </div>
                             </div>
                             
@@ -925,26 +775,29 @@ include 'header_UI.php';
                                     <span>Goal: RM <?php echo number_format($target, 2); ?></span>
                                 </div>
                                 <div class="progress-bar">
-                                    <div class="progress-fill" style="width: <?php echo $progress; ?>%"></div>
+                                    <div class="progress-fill" style="width: <?php echo $progress; ?>%; background: linear-gradient(90deg, <?php echo $category_color; ?> 0%, <?php echo $category_color; ?> 100%);"></div>
                                 </div>
-                                <div class="progress-percentage">
+                                <div class="progress-percentage" style="color: <?php echo $category_color; ?>">
                                     <?php echo number_format($progress, 1); ?>% funded
                                 </div>
                             </div>
                             
                             <div class="case-details">
                                 <div class="detail-item">
-                                    <span class="detail-value"><?php echo $donor_count; ?></span>
+                                    <span class="detail-value" style="color: <?php echo $category_color; ?>"><?php echo $donor_count; ?></span>
                                     <span class="detail-label">Donors</span>
                                 </div>
                                 <div class="detail-item">
-                                    <span class="detail-value"><?php echo isset($case['Case_Deadline']) ? date('M j', strtotime($case['Case_Deadline'])) : 'Ongoing'; ?></span>
+                                    <span class="detail-value" style="color: <?php echo $category_color; ?>"><?php echo isset($case['Case_Deadline']) ? date('M j', strtotime($case['Case_Deadline'])) : 'Ongoing'; ?></span>
                                     <span class="detail-label">Deadline</span>
                                 </div>
                             </div>
                             
                             <div class="case-actions">
-                                <a href="S_C_Payment_Page.php?case_id=<?php echo $case['Case_ID']; ?>" class="btn-donate">
+                                <a href="S_C_Payment_Page.php?case_id=<?php echo $case['Case_ID']; ?>" 
+                                   class="btn-donate" 
+                                   style="background: <?php echo $category_color; ?>"
+                                   onclick="return checkLogin(event, this.href)">
                                     <i class="fas fa-heart"></i> Donate Now
                                 </a>
                             </div>
@@ -955,7 +808,7 @@ include 'header_UI.php';
                 <div class="no-cases">
                     <i class="fas fa-search"></i>
                     <h3>No cases found</h3>
-                    <p><?php echo $category_filter !== 'all' ? "No cases in this category at the moment." : "No special cases at the moment." ?></p>
+                    <p><?php echo $category_filter !== 'all' ? "No cases in the '" . $categories[$category_filter]['name'] . "' category." : "No special cases at the moment." ?></p>
                     <?php if ($category_filter !== 'all'): ?>
                         <p style="margin-top: 10px;">Try viewing <a href="?category=all&page=1" style="color: var(--primary-red);">all cases</a> instead.</p>
                     <?php endif; ?>
@@ -1023,17 +876,45 @@ include 'header_UI.php';
             progressBars.forEach(bar => {
                 const rect = bar.getBoundingClientRect();
                 if (rect.top < window.innerHeight - 100) {
-                    // Add animation class when in viewport
                     bar.style.transition = 'width 1s cubic-bezier(0.4, 0, 0.2, 1)';
                 }
             });
         }
         
-        // Initial animation
         document.addEventListener('DOMContentLoaded', animateProgressBars);
-        
-        // Animate on scroll
         window.addEventListener('scroll', animateProgressBars);
+
+        // --- 核心修改：Login Check Function with SweetAlert2 ---
+        function checkLogin(event, url) {
+            // PHP 会在这里注入登录状态 (true 或 false)
+            // 我假设你的 session 变量名叫 donor_id，如果不同请修改这里
+            const isLoggedIn = <?php echo isset($_SESSION['Donor_ID']) || isset($_SESSION['donor_id']) ? 'true' : 'false'; ?>;
+
+            if (!isLoggedIn) {
+                event.preventDefault(); // 阻止默认的跳转
+                
+                // 使用 SweetAlert2 显示漂亮的弹窗
+                Swal.fire({
+                    title: 'Login Required',
+                    text: "You need to login to make a donation.",
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonColor: '#e53935', // 使用你的主题红色
+                    cancelButtonColor: '#8a8686',
+                    confirmButtonText: 'Login Now',
+                    cancelButtonText: 'Cancel'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // 用户点击了 Login，跳转到登录页面
+                        // 注意：如果你的登录页面名字不是 login.php，请在这里修改
+                        window.location.href = 'donor_login.php'; 
+                    }
+                });
+                return false;
+            }
+            // 如果已登录，什么都不做，让链接正常跳转
+            return true;
+        }
     </script>
 </body>
 </html>
