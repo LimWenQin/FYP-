@@ -13,14 +13,17 @@ $wallet_balance = 0.00;
 
 // [新增] 如果已登录，从数据库获取最新余额
 if ($logged_in && isset($_SESSION['donor_id'])) {
-    $stmt = $conn->prepare("SELECT Donor_Wallet FROM donor WHERE Donor_ID = ?");
-    $stmt->bind_param("i", $_SESSION['donor_id']);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    if ($row = $res->fetch_assoc()) {
-        $wallet_balance = $row['Donor_Wallet'];
+    // 确保 $conn 存在防止报错
+    if (isset($conn)) {
+        $stmt = $conn->prepare("SELECT Donor_Wallet FROM donor WHERE Donor_ID = ?");
+        $stmt->bind_param("i", $_SESSION['donor_id']);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if ($row = $res->fetch_assoc()) {
+            $wallet_balance = $row['Donor_Wallet'];
+        }
+        $stmt->close();
     }
-    $stmt->close();
 }
 ?>
 <!DOCTYPE html>
@@ -30,6 +33,8 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Love Bridge</title>
     
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         /* --- 基础重置 --- */
         body { margin: 0; padding: 0; font-family: 'Arial', sans-serif; }
@@ -306,6 +311,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             font-weight: bold;
             margin-left: 15px;
             box-shadow: 0 4px 10px rgba(209, 47, 2, 0.3);
+            cursor: pointer;
         }
         .header-donate-btn:hover {
             background-color: #f79c34ff ;
@@ -417,12 +423,13 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                     <button type="submit">🔍</button>
                 </form>
 
-                <a href="Payment_page.php" class="header-donate-btn">Donate</a>
+                <a href="Payment_page.php" class="header-donate-btn" onclick="checkLogin(event)">Donate</a>
             </div>
         </div>
     </header>
 
     <script>
+        // 1. 下拉菜单逻辑 (保持不变)
         function toggleDropdown() {
             const dropdown = document.getElementById('profileDropdown');
             dropdown.classList.toggle('active');
@@ -437,9 +444,41 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             }
         });
 
-        document.getElementById('profileDropdown').addEventListener('click', function(event) {
+        document.getElementById('profileDropdown')?.addEventListener('click', function(event) {
             event.stopPropagation();
         });
+
+        // 2. [新增] 捐款按钮检查登录状态逻辑
+        function checkLogin(event) {
+            event.preventDefault(); // 阻止默认跳转
+
+            // 获取 PHP 的登录状态
+            var isLoggedIn = <?php echo $logged_in ? 'true' : 'false'; ?>;
+
+            if (isLoggedIn) {
+                // 如果已登录，直接跳转到捐款页
+                window.location.href = "Payment_page.php";
+            } else {
+                // 如果未登录，显示和截图一样的 SweetAlert2 弹窗
+                Swal.fire({
+                    icon: 'info', // 蓝色的 i 图标
+                    title: 'Login Required',
+                    text: 'You need to login to make a donation.',
+                    showCancelButton: true,
+                    confirmButtonColor: '#dc3545', // 红色按钮 (类似 Bootstrap danger red)
+                    cancelButtonColor: '#6c757d', // 灰色按钮 (类似 Bootstrap secondary grey)
+                    confirmButtonText: 'Login Now',
+                    cancelButtonText: 'Cancel',
+                    reverseButtons: false // 确保 Login 在左边（SweetAlert默认Confirm在左）
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // 点击 Login Now，跳转到登录页
+                        window.location.href = "donor_login.php";
+                    }
+                    // 点击 Cancel 什么都不做，留在当前页面
+                });
+            }
+        }
     </script>
 </body>
 </html>
