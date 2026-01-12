@@ -2,10 +2,10 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-// 检查是否已登录
+// --- 1. Login Check with SweetAlert Logic ---
+$show_login_modal = false;
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-    echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
-    exit();
+    $show_login_modal = true;
 }
 
 $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
@@ -48,17 +48,14 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
 }
 
 // --- 处理逻辑：删除账号 (Soft Delete) ---
-$delete_success = false; // 新增变量，用于控制成功弹窗
+$delete_success = false; 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_account'])) {
     $delete_query = "UPDATE donor SET Is_Deleted = 1 WHERE Donor_ID = ?";
     $stmt = $conn->prepare($delete_query);
     $stmt->bind_param("i", $_SESSION['donor_id']);
     
     if ($stmt->execute()) {
-        // 删除成功
         $delete_success = true; 
-        // 注意：这里不再 session_destroy 和 exit，而是让页面继续加载以显示弹窗
-        // 我们会在 JS 中处理跳转
     } else {
         echo "<script>alert('Error deleting account.');</script>";
     }
@@ -70,7 +67,6 @@ $update_success = false;
 $update_message = "";
 $upload_error = "";
 
-// 只有在没有删除成功的情况下才处理更新
 if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && isset($_POST['update_profile'])) {
     
     // 处理头像上传
@@ -112,8 +108,9 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
     $name = $_POST['name'];
     $email = $_POST['email'];
     $contact = $_POST['contact'];
-    $ic_number = $_POST['icnumber']; 
-    $dob = $_POST['dob'];             
+    // [UPDATED] Clean IC Number (remove dashes) before saving to DB
+    $ic_number = str_replace('-', '', $_POST['icnumber']); 
+    $dob = $_POST['dob'];            
     $address1 = $_POST['address1'];
     $address2 = $_POST['address2'];
     $address3 = $_POST['address3'];
@@ -153,10 +150,11 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
         $update_message = "Profile updated successfully!";
         $_SESSION['donor_name'] = $name;
         
+        // Update local array
         $donor['Donor_Name'] = $name;
         $donor['Donor_Email'] = $email;
         $donor['Donor_ContactNumber'] = $contact;
-        $donor['Donor_ICNumber'] = $ic_number;
+        $donor['Donor_ICNumber'] = $ic_number; // This will now be clean digits
         $donor['Donor_DOB'] = $dob;
         $donor['Donor_Address1'] = $address1;
         $donor['Donor_Address2'] = $address2;
@@ -193,6 +191,7 @@ include 'header_UI.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Profile - Love Bridge</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -207,16 +206,17 @@ include 'header_UI.php';
             --dark-gray: #262626;
             --text-dark: #171717;
             --border-color: #e5e5e5;
-            --primary-green: #16a34a; /* Success Green */
+            --primary-green: #16a34a; 
+            --success-bg: #dcfce7;
+            --success-text: #166534;
         }
         
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Arial', sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
         body { background-color: var(--light-gray); color: var(--text-dark); line-height: 1.6; }
         .page-container { padding: 30px; max-width: 1000px; margin: 0 auto; }
         .page-title { text-align: center; margin-bottom: 30px; font-size: 32px; color: var(--dark-red); font-weight: bold; }
         
-        /* Progress Bar Card */
         .completion-card {
             background: linear-gradient(135deg, var(--primary-red), var(--dark-red));
             color: white; border-radius: 12px; padding: 25px;
@@ -228,7 +228,6 @@ include 'header_UI.php';
         .progress-bar-bg { width: 100%; height: 12px; background-color: rgba(255, 255, 255, 0.3); border-radius: 6px; overflow: hidden; margin-bottom: 15px; }
         .progress { height: 100%; background-color: white; border-radius: 6px; width: 0%; transition: width 0.5s ease; }
         
-        /* Profile Form Container */
         .profile-container { background-color: var(--white); border-radius: 12px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08); padding: 30px; border-top: 4px solid var(--primary-red); }
         .profile-header { display: flex; align-items: center; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 2px solid var(--light-red); }
         .profile-avatar-container { margin-right: 20px; text-align: center; }
@@ -239,10 +238,9 @@ include 'header_UI.php';
         .profile-info h2 { font-size: 24px; margin-bottom: 5px; color: var(--dark-gray); }
         .profile-info p { color: var(--medium-gray); }
         
-        /* Form Styling */
         .form-section { margin-bottom: 25px; }
         .form-section h3 { margin-bottom: 15px; color: var(--dark-red); border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
-        .form-group { margin-bottom: 15px; }
+        .form-group { margin-bottom: 15px; position: relative; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: var(--dark-gray); }
         .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 12px 15px; border: 2px solid var(--border-color); border-radius: 6px; font-size: 16px; transition: all 0.3s ease; }
         .form-group input:focus { border-color: var(--primary-red); outline: none; }
@@ -250,26 +248,71 @@ include 'header_UI.php';
         .form-row { display: flex; gap: 15px; }
         .form-row .form-group { flex: 1; }
         
-        /* Buttons */
+        .phone-group {
+            display: flex;
+            align-items: stretch;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .phone-group:focus-within { border-color: var(--primary-red); }
+        .phone-prefix {
+            background-color: #e5e5e5;
+            color: var(--dark-gray);
+            padding: 0 15px;
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            border-right: 1px solid #d4d4d4;
+            user-select: none;
+        }
+        .phone-group input {
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            flex: 1;
+        }
+        .phone-group input:focus { box-shadow: none; }
+
+        .field-error-msg {
+            color: var(--primary-red);
+            font-size: 0.85rem;
+            margin-top: 5px;
+            display: none; 
+            font-weight: bold;
+        }
+        .form-group.error input, .phone-group.error {
+            border-color: var(--primary-red);
+            background-color: #fff5f5;
+        }
+
         .action-buttons { display: flex; gap: 15px; margin-top: 25px; }
         .submit-btn { background: linear-gradient(135deg, #f79c34ff); color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; flex: 1; transition: transform 0.2s; }
         .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
         .delete-btn { background: linear-gradient(135deg, var(--primary-red), var(--dark-red)); color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; flex: 1; transition: transform 0.2s; }
         .delete-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(220,38,38,0.3); }
         
-        /* Link */
         .change-pass-link { display: block; text-align: center; margin-top: 20px; color: var(--medium-gray); font-weight: bold; font-size: 16px; text-decoration: underline; transition: all 0.3s ease; }
         .change-pass-link:hover { color: var(--dark-blue); transform: scale(1.02); }
 
         .tax-note { color: #dc2626; font-size: 12px; font-weight: bold; margin-top: 5px; display: block; }
-        .success-message { background-color: var(--light-red); color: var(--dark-red); padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+        
+        .success-message { 
+            background-color: var(--success-bg); 
+            color: var(--success-text); 
+            padding: 15px; 
+            border-radius: 6px; 
+            margin-bottom: 20px; 
+            font-weight: bold;
+            border: 1px solid #bbf7d0;
+        }
 
-        /* --- Custom Modal Styles --- */
         .modal-overlay {
-            display: none; /* Hidden by default */
+            display: none; 
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
+            background-color: rgba(0, 0, 0, 0.5); 
             z-index: 1000;
             justify-content: center;
             align-items: center;
@@ -286,76 +329,25 @@ include 'header_UI.php';
             animation: fadeIn 0.3s ease;
         }
 
-        .modal-icon {
-            font-size: 48px;
-            margin-bottom: 15px;
-        }
-        
+        .modal-icon { font-size: 48px; margin-bottom: 15px; }
         .modal-icon.warning { color: var(--primary-red); }
         .modal-icon.success { color: var(--primary-green); }
 
-        .modal-title {
-            font-size: 22px;
-            font-weight: bold;
-            color: var(--dark-gray);
-            margin-bottom: 10px;
-        }
+        .modal-title { font-size: 22px; font-weight: bold; color: var(--dark-gray); margin-bottom: 10px; }
+        .modal-text { color: var(--medium-gray); margin-bottom: 25px; font-size: 16px; }
 
-        .modal-text {
-            color: var(--medium-gray);
-            margin-bottom: 25px;
-            font-size: 16px;
-        }
+        .modal-buttons { display: flex; gap: 15px; justify-content: center; }
 
-        .modal-buttons {
-            display: flex;
-            gap: 15px;
-            justify-content: center; /* Center the buttons */
-        }
-
-        .btn-cancel {
-            background-color: #e5e5e5;
-            color: var(--text-dark);
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            flex: 1;
-            transition: background 0.2s;
-        }
+        .btn-cancel { background-color: #e5e5e5; color: var(--text-dark); border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; transition: background 0.2s; }
         .btn-cancel:hover { background-color: #d4d4d4; }
 
-        .btn-confirm-delete {
-            background: linear-gradient(135deg, var(--primary-red), var(--dark-red));
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            flex: 1;
-            transition: transform 0.2s;
-        }
+        .btn-confirm-delete { background: linear-gradient(135deg, var(--primary-red), var(--dark-red)); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; transition: transform 0.2s; }
         .btn-confirm-delete:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(220,38,38,0.3); }
 
-        .btn-ok {
-            background: linear-gradient(135deg, var(--primary-green), #14532d);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            width: 100%; /* Full width for single OK button */
-            transition: transform 0.2s;
-        }
+        .btn-ok { background: linear-gradient(135deg, var(--primary-green), #14532d); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; transition: transform 0.2s; }
         .btn-ok:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(22,163,74,0.3); }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
         
         @media (max-width: 768px) {
             .form-row { flex-direction: column; gap: 0; }
@@ -371,7 +363,9 @@ include 'header_UI.php';
         <h1 class="page-title">My Profile</h1>
         
         <?php if (!empty($update_message)): ?>
-            <div class="success-message"><?php echo $update_message; ?></div>
+            <div class="success-message">
+                <i class="fas fa-check-circle" style="margin-right:8px;"></i> <?php echo $update_message; ?>
+            </div>
         <?php endif; ?>
         
         <div class="completion-card">
@@ -403,7 +397,7 @@ include 'header_UI.php';
                 </div>
             </div>
             
-            <form method="POST" action="profile.php" enctype="multipart/form-data" id="profileForm">
+            <form method="POST" action="profile.php" enctype="multipart/form-data" id="profileForm" novalidate>
                 <input type="hidden" name="update_profile" value="1">
                 <input type="file" id="profile_picture" name="profile_picture" accept="image/*" class="file-input" onchange="previewImage(event)">
                 
@@ -418,19 +412,27 @@ include 'header_UI.php';
                             <label for="email">Email Address</label>
                             <input type="email" id="email" name="email" class="track-field" value="<?php echo htmlspecialchars($donor['Donor_Email']); ?>" required>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" id="contactGroup">
                             <label for="contact">Contact Number</label>
-                            <input type="text" id="contact" name="contact" class="track-field" value="<?php echo htmlspecialchars($donor['Donor_ContactNumber']); ?>" required>
+                            <div class="phone-group">
+                                <div class="phone-prefix">+60</div>
+                                <input type="tel" id="contact" name="contact" class="track-field" 
+                                       placeholder="012-3456789"
+                                       value="<?php echo htmlspecialchars($donor['Donor_ContactNumber']); ?>" required>
+                            </div>
+                            <div class="field-error-msg" id="contactError"></div>
                         </div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group">
+                        <div class="form-group" id="icGroup">
                             <label for="icnumber">IC Number (Optional)</label>
                             <input type="text" id="icnumber" name="icnumber" class="track-field" 
                                    value="<?php echo htmlspecialchars($donor['Donor_ICNumber']); ?>" 
                                    placeholder="Example: 000101-01-1234" 
-                                   oninput="handleICInput(this.value)">
+                                   maxlength="14"
+                                   inputmode="numeric">
                             <span class="tax-note">* Required For Tax Exemption</span>
+                            <div class="field-error-msg" id="icError"></div>
                         </div>
                         <div class="form-group">
                             <label for="dob">Date of Birth</label>
@@ -489,7 +491,7 @@ include 'header_UI.php';
                 </div>
                 
                 <div class="action-buttons">
-                    <button type="submit" class="submit-btn">Update Profile</button>
+                    <button type="submit" class="submit-btn" id="updateBtn">Update Profile</button>
                     <button type="button" class="delete-btn" onclick="openDeleteModal()">Delete Account</button>
                 </div>
                 
@@ -529,7 +531,33 @@ include 'header_UI.php';
     <?php include 'footer.php'; ?>
 
     <script>
-        // --- Modal Logic ---
+        // --- 0. Login Check with SweetAlert2 ---
+        <?php if ($show_login_modal): ?>
+            document.addEventListener('DOMContentLoaded', function() {
+                document.querySelector('.page-container').style.display = 'none';
+
+            
+                Swal.fire({
+                    title: 'Login Required',
+                    text: "You need to login to make a donation.",
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonColor: '#e53935', 
+                    cancelButtonColor: '#757575',
+                    confirmButtonText: 'Login Now',
+                    cancelButtonText: 'Cancel'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = 'donor_login.php'; 
+                    
+                    } else {
+                        window.location.href = 'Homepage.php'; 
+                    }
+                });
+            });
+        <?php endif; ?>
+
+        // --- Modal Logic (Delete) ---
         function openDeleteModal() {
             document.getElementById('deleteModal').style.display = 'flex';
         }
@@ -540,7 +568,6 @@ include 'header_UI.php';
 
         function confirmDelete() {
             const form = document.getElementById('profileForm');
-            // Create hidden input to simulate delete_account button press
             const hiddenInput = document.createElement('input');
             hiddenInput.type = 'hidden';
             hiddenInput.name = 'delete_account';
@@ -549,8 +576,6 @@ include 'header_UI.php';
             form.submit();
         }
 
-        // 处理 PHP 传递过来的成功状态
-        // 这里的逻辑是：如果 PHP 变量 $delete_success 为 true，则在页面加载时直接打开 success modal
         <?php if ($delete_success): ?>
             document.addEventListener("DOMContentLoaded", function() {
                 document.getElementById('successModal').style.display = 'flex';
@@ -558,41 +583,69 @@ include 'header_UI.php';
         <?php endif; ?>
 
         function handleSuccessRedirect() {
-            // 点击 OK 后，跳转到登录页面，并执行 logout 操作
-            // 因为 PHP 里其实还没有 destroy session (为了显示这个页面)，我们可以在这里跳到一个 logout 脚本，或者直接回 login 
-            // 在 PHP 逻辑里，最好有一个专门的 logout.php 来处理 session_destroy()
-            // 或者我们可以用 js 发送请求。
-            
-            // 简单做法：这里跳转到 donor_login.php。
-            // 由于 session 还没销毁，我们可以通过 URL 参数通知 donor_login.php 执行销毁，或者
-            // 在 PHP 头部判断如果 $delete_success，其实可以不必刷新页面直接显示。
-            // 但为了安全和逻辑闭环，我们跳转到一个会销毁 Session 的地方。
-            
-            // 更好的做法：创建一个 logout.php
-            window.location.href = 'donor_logout.php'; // 假设你有 logout 页面
-            // 如果没有 logout.php，可以直接跳回 login，但在 login 页面要做判断清除 session
-            // window.location.href = 'donor_login.php?action=logout'; 
+            window.location.href = 'donor_logout.php';
         }
 
-        // Close modal if user clicks outside of it
         window.onclick = function(event) {
             const deleteModal = document.getElementById('deleteModal');
-            // Success modal should ideally NOT close on outside click, forcing user to click OK
             if (event.target == deleteModal) {
                 closeDeleteModal();
             }
         }
 
-        // --- 1. Auto Detect Date from IC Logic ---
-        function handleICInput(ic) {
-            const cleanIC = ic.replace(/[^0-9]/g, '');
-            const dobInput = document.getElementById('dob');
-            
-            if (cleanIC.length >= 6) {
-                const yearShort = cleanIC.substring(0, 2);
-                const month = cleanIC.substring(2, 4);
-                const day = cleanIC.substring(4, 6);
-                
+        // --- 1. IC Input & Validation Logic ---
+        const icInput = document.getElementById('icnumber');
+        const dobInput = document.getElementById('dob');
+        const icError = document.getElementById('icError');
+        const icGroup = document.getElementById('icGroup');
+
+        // [UPDATED] Auto-format IC with dashes
+        icInput.addEventListener('input', function(e) {
+            // 1. Get numbers only
+            let val = this.value.replace(/\D/g, '');
+            let newVal = '';
+
+            // 2. Limit to 12 digits (raw)
+            if (val.length > 12) val = val.substring(0, 12);
+
+            // 3. Add Dashes logic (XXXXXX-XX-XXXX)
+            if (val.length > 8) {
+                newVal = val.substring(0, 6) + '-' + val.substring(6, 8) + '-' + val.substring(8);
+            } else if (val.length > 6) {
+                newVal = val.substring(0, 6) + '-' + val.substring(6);
+            } else {
+                newVal = val;
+            }
+
+            // 4. Update Input Value
+            this.value = newVal;
+
+            // 5. Run Validation (Logic uses raw numbers)
+            handleICInput(newVal); 
+            updateProgress();
+        });
+
+        function handleICInput(formattedIC) {
+            // [UPDATED] Remove dashes to get clean digits for logic
+            const ic = formattedIC.replace(/[^0-9]/g, '');
+
+            // Reset Date field if IC is cleared or invalid length
+            if (ic.length < 12) {
+                dobInput.removeAttribute('readonly');
+                icError.style.display = 'none';
+                icGroup.classList.remove('error');
+                return;
+            }
+
+            // Valid Length (12 digits)
+            if (ic.length === 12) {
+                // 1. Extract Date
+                const yearShort = ic.substring(0, 2);
+                const month = ic.substring(2, 4);
+                const day = ic.substring(4, 6);
+                const stateCode = ic.substring(6, 8); // Extract State Code
+
+                // Simple date validity check
                 if (month > 0 && month <= 12 && day > 0 && day <= 31) {
                     const currentYearShort = new Date().getFullYear() % 100;
                     let fullYear = '';
@@ -600,15 +653,122 @@ include 'header_UI.php';
                     
                     const dateString = `${fullYear}-${month}-${day}`;
                     dobInput.value = dateString;
-                    dobInput.setAttribute('readonly', true);
+                    dobInput.setAttribute('readonly', true); // User set IC, so they cannot pick date
                 }
-            } else {
-                dobInput.removeAttribute('readonly');
+
+                // 2. Validate State Code
+               const validStateCodes = [
+                 '01', // Johor
+                 '02', // Kedah
+                 '03', // Kelantan
+                 '04', // Melaka
+                 '05', // Negeri Sembilan
+                 '06', // Pahang
+                 '07', // Penang
+                 '08', // Perak
+                 '09', // Perlis
+                '10', // Selangor
+                '11', // Terengganu
+                '12', // Sabah
+                 '13', // Sarawak
+                '14', // Kuala Lumpur
+                '15', // Labuan
+                '16'  // Putrajaya
+                ];
+
+
+                if (!validStateCodes.includes(stateCode)) {
+                    icError.innerText = "Invalid IC Number: State code '" + stateCode + "' does not exist.";
+                    icError.style.display = 'block';
+                    icGroup.classList.add('error');
+                } else {
+                    icError.style.display = 'none';
+                    icGroup.classList.remove('error');
+                }
             }
-            updateProgress();
         }
 
-        // --- 2. Auto Detect State from Postcode Logic ---
+        // --- 2. Contact Input Logic ---
+        const contactInput = document.getElementById('contact');
+        const contactError = document.getElementById('contactError');
+        const contactGroup = document.querySelector('.phone-group');
+
+        contactInput.addEventListener('input', function(e) {
+            let val = e.target.value.replace(/\D/g, ''); 
+            
+            if (val.length > 3) val = val.substring(0, 3) + '-' + val.substring(3);
+            if (val.length > 12) val = val.substring(0, 12);
+            
+            e.target.value = val;
+            updateProgress();
+            
+            if(val.length > 0 && val.charAt(0) === '0') {
+                contactError.style.display = 'none';
+                contactGroup.classList.remove('error');
+            }
+        });
+
+        // --- 3. Form Submission Validation ---
+        document.getElementById('profileForm').addEventListener('submit', function(e) {
+            let isValid = true;
+            
+            // Validate Contact Number
+            const contactVal = contactInput.value.replace(/\D/g, '');
+            if(contactVal.length < 9) { 
+                isValid = false;
+                contactError.innerText = "Please enter a valid Malaysia contact number.";
+                contactError.style.display = 'block';
+                contactGroup.classList.add('error');
+            } else if (contactVal.charAt(0) !== '0') {
+                isValid = false;
+                contactError.innerText = "Contact number must start with 0.";
+                contactError.style.display = 'block';
+                contactGroup.classList.add('error');
+            } else {
+                contactError.style.display = 'none';
+                contactGroup.classList.remove('error');
+            }
+
+            // Validate IC (Only if entered)
+            if (icInput.value.trim() !== '') {
+                // [UPDATED] Check length of clean digits (should be 12)
+                const cleanIC = icInput.value.replace(/[^0-9]/g, '');
+                
+                if (cleanIC.length !== 12) {
+                    isValid = false;
+                    icError.innerText = "IC Number must be exactly 12 digits.";
+                    icError.style.display = 'block';
+                    icGroup.classList.add('error');
+                } else {
+                    const stateCode = cleanIC.substring(6, 8);
+                     const validStateCodes = [
+                        '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', 
+                        '11', '12', '13', '14', '15', '16', 
+                        '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', 
+                        '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', 
+                        '41', '42', '43', '44', '45', '46', '47', '48', '49', '50', 
+                        '51', '52', '53', '54', '55', '56', '57', '58', '59'
+                    ];
+                    if (!validStateCodes.includes(stateCode)) {
+                        isValid = false;
+                        icError.innerText = "Invalid IC Number: Invalid state code.";
+                        icError.style.display = 'block';
+                        icGroup.classList.add('error');
+                    }
+                }
+            }
+
+            if (!isValid) {
+                e.preventDefault();
+                const errorEl = document.querySelector('.field-error-msg[style*="block"]');
+                if(errorEl) {
+                    errorEl.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        });
+
+
+        // --- 4. Auto Detect State from Postcode Logic ---
         function handlePostcodeInput(postcode) {
             const stateInput = document.getElementById('state');
             const pc = parseInt(postcode, 10);
@@ -641,7 +801,7 @@ include 'header_UI.php';
             updateProgress();
         }
 
-        // --- 3. Image Preview Logic ---
+        // --- 5. Image Preview Logic ---
         function previewImage(event) {
             const input = event.target;
             const avatarDisplay = document.getElementById('avatar-display');
@@ -655,7 +815,7 @@ include 'header_UI.php';
             }
         }
 
-        // --- 4. Real-time Progress Bar Logic ---
+        // --- 6. Real-time Progress Bar Logic ---
         function updateProgress() {
             const fields = ['name', 'email', 'contact', 'icnumber', 'dob', 'address1', 'city', 'state', 'postalcode', 'country'];
             let filledCount = 0;
@@ -681,7 +841,16 @@ include 'header_UI.php';
                 input.addEventListener('change', updateProgress);
             });
             const icInput = document.getElementById('icnumber');
-            if (icInput.value.trim() !== '') { handleICInput(icInput.value); }
+            if (icInput.value.trim() !== '') { 
+                // [UPDATED] If exists, re-format existing value with dashes
+                let val = icInput.value.replace(/\D/g, '');
+                if (val.length > 8) {
+                    icInput.value = val.substring(0, 6) + '-' + val.substring(6, 8) + '-' + val.substring(8);
+                } else if (val.length > 6) {
+                    icInput.value = val.substring(0, 6) + '-' + val.substring(6);
+                }
+                handleICInput(icInput.value); 
+            }
             updateProgress();
         });
     </script>

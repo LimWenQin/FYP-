@@ -44,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
 
     if ($amount > 0 && !empty($method)) {
         
+        // 开启数据库事务
         $conn->begin_transaction();
 
         try {
@@ -71,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
             $payment_id = $stmt_pay->insert_id;
             $stmt_pay->close();
 
-            // C. 插入 Order 记录 (类型记为 Top-up)
+            // C. 插入 Order 记录
             $order_type_val = "Top-up"; 
             $sql_insert = "INSERT INTO orders (Donor_ID, Payment_ID, Order_Amount, Order_Status, Order_Type, Order_TXN_Ref, Order_Created_At, Order_Name, Order_PaymentMethod, Order_ContactNumber, Order_ICNumber, Order_Email, Order_Updated_At) VALUES (?, ?, ?, 'Completed', ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt_ord = $conn->prepare($sql_insert);
@@ -80,21 +81,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
             $new_order_id = $stmt_ord->insert_id;
             $stmt_ord->close();
 
-            // D. [修正逻辑] 计算并更新积分 (每 RM 10 = 1 PT)
+            // D. 计算并更新积分 (每 RM 10 = 1 PT)
             $points_earned = floor($amount / 10);
-            
-            // 只有当积分 > 0 时才更新 point 表
             if ($points_earned > 0) {
                 $pt_sql = "INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) 
-                           VALUES ($points_earned, $points_earned, NOW(), $current_donor_id) 
+                           VALUES (?, ?, NOW(), ?) 
                            ON DUPLICATE KEY UPDATE 
-                           Points_Earned = $points_earned, 
-                           Points_Total = Points_Total + $points_earned, 
+                           Points_Earned = ?, 
+                           Points_Total = Points_Total + ?, 
                            Points_Updated_At = NOW()";
-                $conn->query($pt_sql);
+                $stmt_pt = $conn->prepare($pt_sql);
+                $stmt_pt->bind_param("iiiii", $points_earned, $points_earned, $current_donor_id, $points_earned, $points_earned);
+                $stmt_pt->execute();
+                $stmt_pt->close();
             }
 
-            // E. [核心修改点] 存入 Wallet Transaction 流水表 (Transaction_Type 修改为数据库允许的 'Credit')
+            // E. 存入 Wallet Transaction 流水表 (Transaction_Type 为 'Credit')
             $description = "Top-up via " . $method;
             $wt_sql = "INSERT INTO wallet_transaction (Donor_ID, Order_ID, Amount, Transaction_Type, Description, Created_At) VALUES (?, ?, ?, 'Credit', ?, NOW())";
             $wt_stmt = $conn->prepare($wt_sql);
@@ -102,15 +104,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
             $wt_stmt->execute();
             $wt_stmt->close();
 
+            // 提交事务
             $conn->commit();
             
             $topup_successful = true;
             $success_amount = $amount;
 
         } catch (Exception $e) {
-            $conn->rollback();
-            echo "Transaction Failed: " . $e->getMessage();
-            exit();
+            // 检查连接是否还在，如果还在则执行回滚
+            if ($conn && $conn->ping()) {
+                $conn->rollback();
+            }
+            // 打印真实的错误原因，帮助调试
+            die("Transaction Error: " . $e->getMessage());
         }
     }
 }
@@ -180,7 +186,7 @@ include 'header_UI.php';
                     <div class="method-body" onclick="event.stopPropagation()">
                         <div class="form-group">
                             <label>Card Number</label>
-                            <input type="text" id="card" name="card" class="form-control" maxlength="19" placeholder="0000 0000 0000 0000">
+                            <input type="text" id="card" name="card" class="form-control card-input" maxlength="19" placeholder="0000 0000 0000 0000">
                             <i id="card-brand-icon" class="fas fa-credit-card card-icon"></i>
                         </div>
                         <div class="form-group">
@@ -188,8 +194,14 @@ include 'header_UI.php';
                             <input type="text" id="bank_display" name="bank_display" class="form-control" value="Unknown Card" readonly>
                         </div>
                         <div style="display:flex; gap:15px;">
-                            <div class="form-group" style="flex:1"><label>Expiration (MM/YY)</label><input type="text" id="exp" name="exp" class="form-control" placeholder="MM/YY" maxlength="5"></div>
-                            <div class="form-group" style="flex:1"><label>CVC</label><input type="text" id="cvc" name="cvc" class="form-control" maxlength="3" placeholder="123"></div>
+                            <div class="form-group" style="flex:1">
+                                <label>Expiration (MM/YY)</label>
+                                <input type="text" id="exp" name="exp" class="form-control card-input" placeholder="MM/YY" maxlength="5">
+                            </div>
+                            <div class="form-group" style="flex:1">
+                                <label>CVC</label>
+                                <input type="text" id="cvc" name="cvc" class="form-control card-input" maxlength="3" placeholder="123">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -247,11 +259,30 @@ include 'header_UI.php';
 
     function checkForm() {
         const btn = document.getElementById('btnPay');
+        let isValid = false;
+
         if (selectedAmount > 0 && selectedMethod !== "") {
+            if (selectedMethod === 'Credit/Debit Card') {
+                const card = document.getElementById('card').value.replace(/\s/g, '');
+                const exp = document.getElementById('exp').value;
+                const cvc = document.getElementById('cvc').value;
+                
+                if (card.length === 16 && exp.length === 5 && cvc.length === 3) {
+                    isValid = true;
+                }
+            } else {
+                isValid = true;
+            }
+        }
+
+        if (isValid) {
             btn.classList.add('ready');
             btn.innerText = `Pay RM ${parseFloat(selectedAmount).toFixed(2)}`;
+            btn.disabled = false;
         } else {
             btn.classList.remove('ready');
+            btn.innerText = "Pay Now";
+            btn.disabled = true;
         }
     }
 
@@ -260,6 +291,11 @@ include 'header_UI.php';
         const bankDisplay = document.getElementById('bank_display');
         const cardIcon = document.getElementById('card-brand-icon');
         const expInput = document.getElementById('exp');
+        const cvcInput = document.getElementById('cvc');
+
+        document.querySelectorAll('.card-input').forEach(input => {
+            input.addEventListener('input', checkForm);
+        });
 
         if(cardInput) {
             cardInput.addEventListener('input', function(e) {
@@ -277,8 +313,17 @@ include 'header_UI.php';
         if(expInput) {
             expInput.addEventListener('input', function(e) {
                 let value = e.target.value.replace(/\D/g, '');
-                if (value.length >= 3) e.target.value = value.slice(0, 2) + '/' + value.slice(2, 4);
-                else e.target.value = value;
+                if (value.length >= 2) {
+                    e.target.value = value.slice(0, 2) + '/' + value.slice(2, 4);
+                } else {
+                    e.target.value = value;
+                }
+            });
+        }
+
+        if(cvcInput) {
+            cvcInput.addEventListener('input', function(e) {
+                e.target.value = e.target.value.replace(/\D/g, '');
             });
         }
 
@@ -298,6 +343,8 @@ include 'header_UI.php';
                 cardIcon.style.color = type === 'unknown' ? '#999' : '#0057B7';
             }
         }
+        
+        checkForm();
     });
 
     <?php if ($topup_successful): ?>

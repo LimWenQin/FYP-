@@ -102,9 +102,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
         $stmt->close();
     }
 
-    // 4️⃣ 更新进度
+    // 4️⃣ 更新进度 [这里修改了]
     if ($case_id != null) {
-        $conn->query("UPDATE special_case SET Raised_Amount = Raised_Amount + $p_amount WHERE Case_ID = $case_id");
+        // 关键修改：加上 Donor_Count = Donor_Count + 1
+        $conn->query("UPDATE special_case SET Raised_Amount = Raised_Amount + $p_amount, Donor_Count = Donor_Count + 1 WHERE Case_ID = $case_id");
     }
     if ($activity_id != null) {
         $conn->query("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + $p_amount WHERE Activity_ID = $activity_id");

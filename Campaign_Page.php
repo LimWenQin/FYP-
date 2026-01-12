@@ -232,6 +232,7 @@ include 'header_UI.php';
             height: 250px;
             object-fit: cover;
             position: relative;
+            cursor: zoom-in;
         }
         
         .campaign-badge {
@@ -245,6 +246,7 @@ include 'header_UI.php';
             text-transform: uppercase;
             letter-spacing: 1px;
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            pointer-events: none; /* 防止遮挡图片点击 */
         }
         
         .badge-ongoing { background: var(--success); color: white; }
@@ -545,9 +547,11 @@ include 'header_UI.php';
                                 }
                             }
                             ?>
+                            
                             <img src="<?php echo htmlspecialchars($imagePath); ?>" 
                                  alt="<?php echo htmlspecialchars($campaign['Activity_Name']); ?>" 
                                  class="campaign-image"
+                                 onclick="showImage(this.src, '<?php echo htmlspecialchars(addslashes($campaign['Activity_Name'])); ?>')"
                                  onerror="this.onerror=null; this.src='<?php echo $defaultImage; ?>'">
                             
                             <span class="campaign-badge <?php echo $badgeClass; ?>">
@@ -624,6 +628,21 @@ include 'header_UI.php';
     <?php include 'footer.php'; ?>
 
     <script>
+        // 【新增】图片点击放大函数
+        function showImage(src, title) {
+            Swal.fire({
+                imageUrl: src,
+                imageAlt: title,
+                title: title,
+                width: 600,
+                padding: '1em',
+                background: '#fff',
+                showConfirmButton: false,
+                showCloseButton: true,
+                backdrop: `rgba(0,0,0,0.8)`
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             // Stats logic
             const totalCampaigns = <?php echo $totalCount; ?>;
@@ -701,33 +720,29 @@ include 'header_UI.php';
             window.requestAnimationFrame(step);
         }
 
-        // --- 核心修改：Login Check Function with SweetAlert2 ---
+        // Login Check Function
         function checkLogin(event, url) {
-            // PHP 会在这里注入登录状态 (true 或 false)
             const isLoggedIn = <?php echo isset($_SESSION['Donor_ID']) || isset($_SESSION['donor_id']) ? 'true' : 'false'; ?>;
 
             if (!isLoggedIn) {
-                event.preventDefault(); // 阻止默认的跳转
+                event.preventDefault(); 
                 
-                // 使用 SweetAlert2 显示漂亮的弹窗
                 Swal.fire({
                     title: 'Login Required',
                     text: "You need to login to make a donation.",
                     icon: 'info',
                     showCancelButton: true,
-                    confirmButtonColor: '#e53935', // 使用你的主题红色
+                    confirmButtonColor: '#e53935', 
                     cancelButtonColor: '#757575',
                     confirmButtonText: 'Login Now',
                     cancelButtonText: 'Cancel'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        // 用户点击了 Login，跳转到登录页面
                         window.location.href = 'donor_login.php'; 
                     }
                 });
                 return false;
             }
-            // 如果已登录，什么都不做，让链接正常跳转
             return true;
         }
     </script>

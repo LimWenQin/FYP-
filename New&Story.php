@@ -18,6 +18,9 @@ include 'header_UI.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>News & Stories - Love Bridge Foundation</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         :root {
             --primary-red: #e53935;
@@ -148,6 +151,7 @@ include 'header_UI.php';
             height: 100%;
             object-fit: cover;
             transition: transform 0.6s ease;
+            cursor: zoom-in;
         }
         
         .story-card:hover .story-image {
@@ -167,6 +171,7 @@ include 'header_UI.php';
             background: var(--primary-red);
             color: white;
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            pointer-events: none; /* 防止遮挡点击 */
         }
         
         .story-content {
@@ -458,6 +463,7 @@ include 'header_UI.php';
                             <img src="<?php echo htmlspecialchars($imagePath); ?>" 
                                  alt="<?php echo htmlspecialchars($title); ?>" 
                                  class="story-image"
+                                 onclick="showImage(this.src, '<?php echo htmlspecialchars(addslashes($title)); ?>')"
                                  onerror="this.onerror=null; this.src='<?php echo $defaultImage; ?>';">
                             <span class="story-badge"><?php echo htmlspecialchars($category); ?></span>
                         </div>
@@ -505,6 +511,21 @@ include 'header_UI.php';
     </div>
 
     <script>
+        // 【新增】图片点击放大函数
+        function showImage(src, title) {
+            Swal.fire({
+                imageUrl: src,
+                imageAlt: title,
+                title: title,
+                width: 600,
+                padding: '1em',
+                background: '#fff',
+                showConfirmButton: false,
+                showCloseButton: true,
+                backdrop: `rgba(0,0,0,0.8)`
+            });
+        }
+
         // Toggle story description expand/collapse
         function toggleStoryDescription(storyId) {
             const description = document.getElementById(`story-desc-${storyId}`);
