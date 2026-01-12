@@ -65,14 +65,6 @@ include 'header_UI.php';
             opacity: 0.95;
         }
 
-        /* 统计部分样式 */
-        .stats-section {
-            background: white;
-            padding: 60px 0;
-            margin-bottom: 60px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-        }
-
         .about-content {
             margin-bottom: 60px;
         }
@@ -86,8 +78,7 @@ include 'header_UI.php';
             text-align: center;
         }
 
-        /* --- Vision & Mission 核心样式修改 --- */
-        /* 对应 div class="mission-vision" */
+        /* --- Vision & Mission --- */
         .mission-vision {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -95,7 +86,6 @@ include 'header_UI.php';
             margin-bottom: 60px;
         }
 
-        /* 对应 div class="mission-box" 和 "vision-box" */
         .mission-box, .vision-box {
             background: white;
             padding: 40px;
@@ -117,7 +107,6 @@ include 'header_UI.php';
             display: inline-block;
         }
 
-        /* 新增列表样式，让内容更好看 */
         .mission-box ul, .vision-box ul {
             list-style: none;
             padding-left: 0;
@@ -203,11 +192,18 @@ include 'header_UI.php';
             text-align: center;
         }
 
+        /* 修改了 team-img 的样式，让它更适合显示包含图片的容器 */
         .team-img {
             height: 250px;
-            background: #ddd;
-            background-size: cover;
-            background-position: center;
+            background: #ddd; 
+            width: 100%;
+            position: relative;
+        }
+        
+        .team-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* 确保图片填满且不变形 */
         }
 
         .team-info {
@@ -371,32 +367,49 @@ include 'header_UI.php';
         <h2 class="section-title">Our Team</h2>
         <div class="team-section">
             <div class="team-grid">
-                <div class="team-member">
-                    <div class="team-img" style="background-color: #ffcdd2;"></div>
-                    <div class="team-info">
-                        <h4>Mr. Lim Wen Qin</h4>
-                        <p>Founder & Chairperson</p>
-                        <p>Medical doctor with 20+ years of humanitarian experience</p>
-                    </div>
-                </div>
-                
-                <div class="team-member">
-                    <div class="team-img" style="background-color: #ffcdd2;"></div>
-                    <div class="team-info">
-                        <h4>Mr. Thong Yuen Zhen</h4>
-                        <p>Executive Director</p>
-                        <p>Former corporate leader turned full-time humanitarian</p>
-                    </div>
-                </div>
-                
-                <div class="team-member">
-                    <div class="team-img" style="background-color: #ffcdd2;"></div>
-                    <div class="team-info">
-                        <h4>Mr. Ronald Tan Bin Hong</h4>
-                        <p>Program Director</p>
-                        <p>Specialized in community development and disaster response</p>
-                    </div>
-                </div>
+                <?php
+                if (isset($conn)) {
+                    $team_query = "SELECT * FROM team_members";
+                    $team_result = $conn->query($team_query);
+
+                    if ($team_result && $team_result->num_rows > 0) {
+                        while ($member = $team_result->fetch_assoc()) {
+                            // 1. 设置默认图片
+                            $display_image = 'images/default_user.jpg';
+                            
+                            // 2. 解析 JSON 数据
+                            // 如果数据库存的是 ["images/team_lim.jpg"] 这样的格式
+                            if (!empty($member['Images'])) {
+                                $decoded_images = json_decode($member['Images'], true);
+                                
+                                // 检查解析是否成功且是数组，并取出第一个元素
+                                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded_images) && !empty($decoded_images)) {
+                                    $display_image = $decoded_images[0];
+                                }
+                            }
+                            ?>
+                            
+                            <div class="team-member">
+                                <div class="team-img">
+                                    <img src="<?php echo htmlspecialchars($display_image); ?>" 
+                                         alt="<?php echo htmlspecialchars($member['Name']); ?>"
+                                         onerror="this.onerror=null;this.src='images/default_user.jpg';">
+                                </div>
+                                <div class="team-info">
+                                    <h4><?php echo htmlspecialchars($member['Name']); ?></h4>
+                                    <p style="color: #d32f2f; font-weight: bold; margin-bottom: 5px;">
+                                        <?php echo htmlspecialchars($member['Position']); ?>
+                                    </p>
+                                    <p><?php echo htmlspecialchars($member['Description']); ?></p>
+                                </div>
+                            </div>
+                            <?php
+                        }
+                    } else {
+                        echo "<p style='text-align:center; grid-column: 1/-1;'>No team members found in the database.</p>";
+                    }
+                }
+                ?>
             </div>
         </div>
     </div>

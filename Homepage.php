@@ -1,15 +1,13 @@
 <?php
-// 1. 启动 Session (如果 header_UI.php 里没有 session_start，这里必须有)
-// 为了防止重复启动报错，使用这个判断
+// 1. 启动 Session
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-include 'dataconnection.php'; // Ensure database connection
+include 'dataconnection.php'; 
 include 'header_UI.php';
 
 // --- 2. 检查登录状态 ---
-// 请确保你在 donor_login.php 里保存的名字是 'Donor_ID'
 $logged_in = isset($_SESSION['donor_id']) && !empty($_SESSION['donor_id']);
 
 // --- 3. 获取 Special Cases (Emergency Relief) ---
@@ -37,14 +35,11 @@ if ($result_sc && $result_sc->num_rows > 0) {
         $now = new DateTime();
         $interval = $created_date->diff($now);
         
-        // --- 核心逻辑修复 ---
-        // 在这里直接决定按钮的行为
+        // 按钮逻辑
         if ($logged_in) {
-            // 如果已登录：直接跳转到支付页面，并带上 Case ID
             $target_url = "S_C_Payment_Page.php?case_id=" . $row['Case_ID'];
             $btn_onclick = "window.location.href='$target_url';";
         } else {
-            // 如果未登录：触发 JS 弹窗
             $btn_onclick = "checkLogin(event);";
         }
         
@@ -60,7 +55,7 @@ if ($result_sc && $result_sc->num_rows > 0) {
             "start_date" => $row['Start_Date'], 
             "end_date" => $row['End_Date'],     
             "tagline" => "EMERGENCY RELIEF",
-            "btn_action" => $btn_onclick // 将生成的点击动作存入数组
+            "btn_action" => $btn_onclick
         ];
     }
 }
@@ -87,13 +82,12 @@ if ($result_act && $result_act->num_rows > 0) {
 }
 
 // --- Helper: 底部大 CTA 按钮的逻辑 ---
-$cta_url = "Payment_page.php"; // 这里可能也需要参数，视你的逻辑而定
+$cta_url = "Payment_page.php"; 
 if ($logged_in) {
     $cta_onclick = "window.location.href='$cta_url'; return false;";
 } else {
     $cta_onclick = "checkLogin(event)";
 }
-
 ?>
 
 <!DOCTYPE html>
@@ -133,10 +127,10 @@ if ($logged_in) {
             padding: 0;
         }
 
-        /* --- Special Case Hero Slider --- */
+        /* --- Special Case Hero Slider (核心修改区域) --- */
         .special-case-hero {
             position: relative;
-            height: 85vh; 
+            height: 85vh; /* 保持大屏占比 */
             min-height: 600px;
             overflow: hidden;
             margin-bottom: 60px;
@@ -157,9 +151,6 @@ if ($logged_in) {
             height: 100%;
             opacity: 0;
             transition: opacity 1s ease-in-out;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             visibility: hidden; 
         }
 
@@ -181,178 +172,162 @@ if ($logged_in) {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            filter: brightness(0.4);
+            /* [修改] 移除变暗滤镜，让照片清晰 */
+            filter: none; 
         }
 
-        /* Progress Bar Overlay */
-        .image-progress-bar {
+        /* [新增] 底部渐变遮罩，确保文字可读，但又不遮挡照片主体 */
+        .slide-overlay-gradient {
             position: absolute;
             bottom: 0;
             left: 0;
             width: 100%;
-            height: 60px;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            align-items: center;
-            padding: 0 40px;
-            z-index: 2;
-            box-sizing: border-box; 
+            height: 60%; /* 只遮挡下半部分 */
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 50%, transparent 100%);
+            z-index: 1;
+            pointer-events: none; /* 让点击穿透 */
         }
 
-        .progress-stats {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-            color: white;
-        }
-
-        .progress-left, .progress-right {
-            display: flex;
-            flex-direction: column;
-            min-width: 120px;
-        }
-
-        .progress-right {
-            text-align: right;
-        }
-
-        .progress-label {
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.8);
-            margin-bottom: 5px;
-        }
-
-        .progress-amount {
-            font-size: 20px;
-            font-weight: bold;
-            color: white;
-        }
-
-        .progress-bar-track {
-            flex: 1;
-            margin: 0 30px;
-            height: 10px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 5px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #4CAF50, #FF9800, #FF5722);
-            border-radius: 5px;
-            position: relative;
-            width: 0%;
-            transition: width 1s ease;
-        }
-
-        .progress-percentage {
-            position: absolute;
-            top: -30px;
-            right: 0;
-            background: var(--primary-red);
-            color: white;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-            transform: translateX(50%);
-        }
-
-        /* Content inside the Slider */
+        /* [修改] 内容容器：移到底部 */
         .special-case-content {
-            position: relative;
+            position: absolute;
+            bottom: 40px; /* 距离底部留出空间 */
+            left: 50%;
+            transform: translateX(-50%);
             z-index: 2;
-            max-width: 1000px;
-            padding: 0 20px;
-            text-align: center;
+            width: 90%;
+            max-width: 1200px;
+            text-align: left; /* 改为左对齐，通常更易读 */
             color: white;
             display: flex;
-            flex-direction: column;
+            justify-content: space-between; /* 左右布局 */
+            align-items: flex-end; /* 底部对齐 */
+            flex-wrap: wrap;
             gap: 20px;
         }
 
-        .days-counter {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--white);
-            letter-spacing: 1px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-
-        .time-units {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            font-size: 1.2rem;
-            color: #fbbf24; /* Amber color */
-            font-weight: 600;
-            background: rgba(0,0,0,0.5);
-            padding: 10px 20px;
-            border-radius: 50px;
-            width: fit-content;
-            margin: 0 auto;
-        }
-
-        .fund-raised-box {
-            background: rgba(0, 0, 0, 0.6);
-            padding: 40px;
-            border-radius: 15px;
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255,255,255,0.1);
+        /* 左侧：标题和描述 */
+        .slide-text-content {
+            flex: 1;
+            min-width: 300px;
         }
 
         .fund-tagline {
-            font-size: 1.2rem;
+            font-size: 1rem;
             color: var(--primary-red);
-            margin-bottom: 10px;
-            text-transform: uppercase;
             font-weight: 800;
             letter-spacing: 2px;
+            margin-bottom: 5px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
         }
 
         .fund-title {
-            font-size: 2.5rem;
-            color: var(--white);
+            font-size: 3rem; /* 大标题 */
+            font-weight: 800;
+            color: white;
+            margin-bottom: 10px;
+            line-height: 1.1;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+
+        .special-case-description {
+            font-size: 1.1rem;
+            color: rgba(255,255,255,0.9);
+            line-height: 1.5;
+            max-width: 600px;
             margin-bottom: 20px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+            display: -webkit-box;
+            -webkit-line-clamp: 2; /* 只显示两行 */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* 右侧：倒计时和按钮 */
+        .slide-action-content {
+            text-align: right;
+            min-width: 250px;
+        }
+
+        .days-counter {
+            font-size: 0.9rem;
             font-weight: 700;
-            line-height: 1.2;
+            color: #fbbf24;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .time-units {
+            font-family: 'Courier New', monospace; /* 更有倒计时感觉 */
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 15px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
         }
 
         .donate-btn {
             display: inline-block;
             background: var(--primary-red);
             color: white;
-            padding: 15px 50px;
-            border-radius: 30px;
+            padding: 12px 35px;
+            border-radius: 5px; /* 稍微方一点更现代 */
             text-decoration: none;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 1px;
             transition: all 0.3s ease;
             border: none;
             cursor: pointer;
-            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(220, 38, 38, 0.4);
         }
 
         .donate-btn:hover {
             background: var(--dark-red);
-            transform: scale(1.05);
+            transform: translateY(-2px);
         }
 
-        .special-case-description {
-            font-size: 1.1rem;
-            color: rgba(255,255,255,0.9);
-            line-height: 1.6;
-            max-width: 800px;
-            margin: 0 auto;
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+        /* 底部进度条 (精简版) */
+        .bottom-progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 8px; /* 很细 */
+            background: rgba(255,255,255,0.2);
+            z-index: 3;
+        }
+
+        .bottom-progress-fill {
+            height: 100%;
+            background: var(--primary-red); /* 醒目的红色 */
+            position: relative;
+            transition: width 1s ease;
+        }
+
+        /* 悬浮在进度条上的小标签 */
+        .progress-tooltip {
+            position: absolute;
+            right: 0;
+            bottom: 12px;
+            background: var(--primary-red);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .progress-tooltip::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            right: 10px;
+            border-width: 4px 4px 0;
+            border-style: solid;
+            border-color: var(--primary-red) transparent transparent transparent;
         }
 
         /* Navigation Arrows */
@@ -360,57 +335,50 @@ if ($logged_in) {
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.3);
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            font-size: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 30px;
             cursor: pointer;
             z-index: 3;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             transition: all 0.3s ease;
+            padding: 20px;
+            background: transparent;
         }
 
         .nav-arrow:hover {
-            background: var(--primary-red);
-            border-color: var(--primary-red);
+            color: white;
+            background: rgba(0,0,0,0.3); /* 鼠标移上去才显现背景 */
+            border-radius: 5px;
         }
 
-        .nav-arrow.prev { left: 30px; }
-        .nav-arrow.next { right: 30px; }
+        .nav-arrow.prev { left: 10px; }
+        .nav-arrow.next { right: 10px; }
 
         /* Slider Dots */
         .slider-controls {
             position: absolute;
-            bottom: 80px;
-            left: 0;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            z-index: 3;
+            bottom: 15px; /* 贴近底部 */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 4;
         }
 
-        .slider-dots { display: flex; gap: 10px; }
+        .slider-dots { display: flex; gap: 8px; }
         
         .slider-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.5);
+            width: 30px; /* 线条型圆点 */
+            height: 4px;
+            background: rgba(255, 255, 255, 0.4);
             cursor: pointer;
             transition: all 0.3s ease;
+            border-radius: 2px;
         }
 
         .slider-dot.active {
-            background: var(--primary-red);
-            transform: scale(1.2);
+            background: white;
+            width: 45px; /* 激活时变长 */
         }
 
-        /* --- Vision & Mission Section --- */
+        /* --- Vision & Mission Section (保持原样) --- */
         .vision-mission-section {
             padding: 80px 40px;
             background: var(--light-gray);
@@ -584,17 +552,23 @@ if ($logged_in) {
         /* Responsive */
         @media (max-width: 1024px) {
             .vm-grid { grid-template-columns: 1fr; }
-            .special-case-hero { height: auto; min-height: 700px; }
-            .fund-title { font-size: 2rem; }
+            .special-case-hero { height: auto; min-height: 600px; }
+            .fund-title { font-size: 2.5rem; }
         }
 
         @media (max-width: 768px) {
-            .special-case-hero { min-height: 600px; }
-            .fund-raised-box { padding: 25px; margin: 0 10px; }
-            .time-units { font-size: 0.9rem; flex-wrap: wrap; }
-            .image-progress-bar { padding: 0 20px; flex-direction: column; height: auto; padding-bottom: 10px; }
-            .progress-bar-track { margin: 10px 0; width: 100%; }
-            .progress-left, .progress-right { width: 100%; text-align: center; margin: 5px 0; }
+            .special-case-content {
+                flex-direction: column;
+                align-items: flex-start;
+                bottom: 80px; /* 给进度条留位置 */
+            }
+            .slide-text-content, .slide-action-content {
+                width: 100%;
+                text-align: left;
+            }
+            .slide-action-content { margin-top: 20px; }
+            .fund-title { font-size: 2rem; }
+            .nav-arrow { display: none; } /* 移动端隐藏箭头 */
         }
     </style>
 </head>
@@ -614,53 +588,50 @@ if ($logged_in) {
                         
                         <div class="special-case-image-container">
                             <img src="<?php echo htmlspecialchars($case['image']); ?>" alt="Campaign Image" class="special-case-image">
-                            
-                            <div class="image-progress-bar">
-                                <div class="progress-stats">
-                                    <div class="progress-left">
-                                        <div class="progress-label">RAISED</div>
-                                        <div class="progress-amount">RM <?php echo number_format($case['raised'], 2); ?></div>
-                                    </div>
-                                    <div class="progress-bar-track">
-                                        <div class="progress-bar-fill" style="width: <?php echo $percentage; ?>%">
-                                            <div class="progress-percentage"><?php echo $percentage; ?>%</div>
-                                        </div>
-                                    </div>
-                                    <div class="progress-right">
-                                        <div class="progress-label">TARGET</div>
-                                        <div class="progress-amount">RM <?php echo number_format($case['goal'], 2); ?></div>
-                                    </div>
-                                </div>
-                            </div>
+                            <div class="slide-overlay-gradient"></div>
                         </div>
 
                         <div class="special-case-content">
-                            <div class="days-counter">
-                                TIME LEFT TO HELP
-                            </div>
-                            <div class="time-units countdown-timer" id="timer-<?php echo $index; ?>">
-                                <span>-- Days</span> <span>-- Hours</span> <span>-- Mins</span> <span>-- Secs</span>
-                            </div>
-
-                            <div class="fund-raised-box">
+                            <div class="slide-text-content">
                                 <div class="fund-tagline"><?php echo htmlspecialchars($case['tagline']); ?></div>
                                 <div class="fund-title"><?php echo htmlspecialchars($case['title']); ?></div>
-                                
-                                <button type="button" class="donate-btn" onclick="<?php echo $case['btn_action']; ?>">
-                                    DONATE NOW
-                                </button>
-                                
                                 <div class="special-case-description">
                                     <?php echo htmlspecialchars($case['description']); ?>
                                 </div>
                             </div>
+
+                            <div class="slide-action-content">
+                                <div class="days-counter">TIME LEFT</div>
+                                <div class="time-units countdown-timer" id="timer-<?php echo $index; ?>">
+                                    --d --h --m --s
+                                </div>
+                                <button type="button" class="donate-btn" onclick="<?php echo $case['btn_action']; ?>">
+                                    Donate Now
+                                </button>
+                            </div>
                         </div>
+                        
+                        <div class="bottom-progress-bar">
+                            <div class="bottom-progress-fill" style="width: <?php echo $percentage; ?>%">
+                                <div class="progress-tooltip">
+                                    RM <?php echo number_format($case['raised']); ?> / <?php echo number_format($case['goal']); ?> (<?php echo $percentage; ?>%)
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                     <?php endforeach; ?>
                 <?php else: ?>
                     <div class="special-case-slide active">
+                        <div class="special-case-image-container">
+                             <img src="https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?auto=format&fit=crop&q=80" class="special-case-image">
+                             <div class="slide-overlay-gradient"></div>
+                        </div>
                         <div class="special-case-content">
-                            <h2>No Active Emergency Relief Cases.</h2>
+                            <div class="slide-text-content">
+                                <div class="fund-title">No Active Emergency Cases</div>
+                                <div class="special-case-description">Thank you for your support. Please check back later or view our other campaigns.</div>
+                            </div>
                         </div>
                     </div>
                 <?php endif; ?>
@@ -678,7 +649,7 @@ if ($logged_in) {
             </div>
         </section>
 
-       <section class="vision-mission-section">
+        <section class="vision-mission-section">
             <h2 class="section-title">Our Purpose</h2>
             <div class="vm-grid">
                 <div class="vm-card">
@@ -705,7 +676,6 @@ if ($logged_in) {
                 </div>
             </div>
         </section>
-
 
         <section class="activities-section">
             <h2 class="section-title">Upcoming Campaigns</h2>
@@ -779,7 +749,7 @@ if ($logged_in) {
         }
 
         // Auto play slider
-        let slideInterval = setInterval(nextSlide, 6000); // 6 seconds
+        let slideInterval = setInterval(nextSlide, 6000); 
 
         // Event Listeners for Dots
         dots.forEach(dot => {
@@ -804,7 +774,7 @@ if ($logged_in) {
                 const timerDisplay = slide.querySelector('.countdown-timer');
 
                 if (distance < 0) {
-                    timerDisplay.innerHTML = "CAMPAIGN ENDED";
+                    timerDisplay.innerHTML = "ENDED";
                     return;
                 }
 
@@ -813,12 +783,8 @@ if ($logged_in) {
                 const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
                 const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
-                timerDisplay.innerHTML = `
-                    <span>${days} Days</span>
-                    <span>${hours} Hours</span>
-                    <span>${minutes} Mins</span>
-                    <span>${seconds} Secs</span>
-                `;
+                // 简化倒计时显示，适合放在侧边
+                timerDisplay.innerHTML = `${days}d ${hours}h ${minutes}m ${seconds}s`;
             });
         }
 
