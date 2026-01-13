@@ -3,6 +3,11 @@ include 'dataconnection.php';
 // include 'header_function.php'; // 如果不需要可以注释掉
 
 // 获取所有活动，按状态和日期排序
+// 逻辑：
+// 1. 进行中 (Active + 日期范围内) -> 排最前
+// 2. 即将开始 (Active + 未来日期) -> 排第二
+// 3. 已结束 (Completed 或 过期) -> 排最后
+// 4. 然后按开始日期升序排列
 $query = "SELECT * FROM activity ORDER BY 
           CASE 
             WHEN Activity_Status = 'Active' AND Activity_StartDate <= CURDATE() AND Activity_EndDate >= CURDATE() THEN 1
@@ -246,7 +251,7 @@ include 'header_UI.php';
             text-transform: uppercase;
             letter-spacing: 1px;
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-            pointer-events: none; /* 防止遮挡图片点击 */
+            pointer-events: none;
         }
         
         .badge-ongoing { background: var(--success); color: white; }
@@ -599,13 +604,17 @@ include 'header_UI.php';
                             </div>
                             
                             <div class="campaign-actions">
-                                <a href="S_C_Payment_Page.php?activity_id=<?php echo $campaign['Activity_ID']; ?>" 
-                                   class="btn-donate"
-                                   onclick="return checkLogin(event, this.href)">
-                                    <i class="fas fa-heart"></i> Donate Now
-                                </a>
+                                <?php if ($campaignStatus == 'ongoing'): ?>
+                                    <a href="S_C_Payment_Page.php?activity_id=<?php echo $campaign['Activity_ID']; ?>" 
+                                       class="btn-donate"
+                                       onclick="return checkLogin(event, this.href)">
+                                        <i class="fas fa-heart"></i> Donate Now
+                                    </a>
+                                <?php endif; ?>
                                 
-                                <a href="activity_detail.php?id=<?php echo $campaign['Activity_ID']; ?>" class="btn-details">
+                                <a href="activity_detail.php?id=<?php echo $campaign['Activity_ID']; ?>" 
+                                   class="btn-details"
+                                   style="flex: 1; display: flex; justify-content: center; align-items: center;">
                                     Details
                                 </a>
                             </div>
