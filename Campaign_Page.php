@@ -612,7 +612,7 @@ include 'header_UI.php';
                                     </a>
                                 <?php endif; ?>
                                 
-                                <a href="activity_detail.php?id=<?php echo $campaign['Activity_ID']; ?>" 
+                                <a href="donor_campaign_detail.php?id=<?php echo $campaign['Activity_ID']; ?>" 
                                    class="btn-details"
                                    style="flex: 1; display: flex; justify-content: center; align-items: center;">
                                     Details
