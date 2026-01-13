@@ -114,6 +114,29 @@ include 'header_UI.php';
         border-radius: 30px; font-weight: bold; transition: 0.3s; width: 100%; margin-top: auto;
     }
     .payment-option:not(.disabled):hover .btn-pay { background-color: #f79c34ff; transform: scale(1.05); }
+
+    /* 修改后的 Change Details 按钮样式 */
+    .btn-change-details {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background-color: #f8f9fa;
+        color: #333;
+        border: 1px solid #ddd;
+        padding: 10px 20px;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: 0.3s;
+        text-decoration: none !important;
+        margin-top: 20px;
+    }
+    .btn-change-details:hover {
+        background-color: #e2e6ea;
+        color: #dc2626;
+        border-color: #ccc;
+        transform: translateX(-5px);
+    }
 </style>
 
 <div class="hero-wrap">
@@ -149,8 +172,10 @@ include 'header_UI.php';
                         <span class="summary-value summary-total">RM <?php echo number_format($amount, 2); ?></span>
                     </div>
                 </div>
-                <div class="mt-4">
-                    <a href="javascript:history.back()" class="btn-prev"><i class="fas fa-arrow-left"></i> Change Details</a>
+                <div class="text-center">
+                    <a href="javascript:history.back()" class="btn-change-details">
+                        <i class="fas fa-edit"></i> Back to Change Details
+                    </a>
                 </div>
             </div>
 

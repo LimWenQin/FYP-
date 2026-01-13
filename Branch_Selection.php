@@ -35,7 +35,6 @@ $pre_selected_branch = $_SESSION['donation_data']['branch_id'];
 // ==========================================
 // 2. [FIXED] 获取总部 (HQ) 数据
 // ==========================================
-// 直接从 headquarters 表读取，不再混淆 branch 表
 $hq_sql = "SELECT HQ_Name, HQ_Description, HQ_Image, Headquarters_State 
            FROM headquarters 
            WHERE HQ_ID = 1 LIMIT 1";
@@ -45,28 +44,25 @@ $hq_data = $hq_result->fetch_assoc();
 $hq_branch = null;
 
 if ($hq_data) {
-    // 将 HQ 数据格式化为与 Branch 通用的结构，方便下方 HTML 调用
     $hq_branch = [
-        'Branch_ID' => '', // HQ 的 Branch_ID 设为空，表示 General Fund
+        'Branch_ID' => '', 
         'Branch_Name' => $hq_data['HQ_Name'],
-        'Branch_Type' => 'Headquarters', // 显示标签
+        'Branch_Type' => 'Headquarters', 
         'Branch_Description' => $hq_data['HQ_Description'],
-        'Branch_City' => $hq_data['Headquarters_State'], // 对应数据库字段
+        'Branch_City' => $hq_data['Headquarters_State'], 
         'decoded_images' => [] 
     ];
 
-    // 处理图片：如果数据库有图片路径，放入数组；否则用默认图
     if (!empty($hq_data['HQ_Image'])) {
         $hq_branch['decoded_images'][] = $hq_data['HQ_Image'];
     } else {
-        $hq_branch['decoded_images'][] = 'images/hero_3.jpg'; // 默认备用图
+        $hq_branch['decoded_images'][] = 'images/hero_3.jpg'; 
     }
 }
 
 // ==========================================
 // 3. [FIXED] 获取其他分行 (Branches) 数据
 // ==========================================
-// 从 branch 表读取所有开启的分行
 $sql = "SELECT Branch_ID, Branch_Name, Branch_Type, Branch_Description, Branch_Address1, Branch_City, Branch_Images 
         FROM branch 
         WHERE Is_Deleted = 0 AND Branch_OperationalStatus = 'Open'
@@ -77,10 +73,8 @@ $other_branches = [];
 
 if ($result->num_rows > 0) {
     while($row = $result->fetch_assoc()) {
-        // 解码 Branch 表的 JSON 图片路径
         $row['decoded_images'] = !empty($row['Branch_Images']) ? json_decode($row['Branch_Images'], true) : [];
         
-        // 如果解码失败或没有图片，给一个空数组，HTML里会处理显示默认图
         if (!is_array($row['decoded_images'])) {
             $row['decoded_images'] = [];
         }
@@ -107,14 +101,12 @@ include 'header_UI.php';
     .hero-content h1 { font-family: 'Segoe UI', sans-serif; color: #fff; font-size: 3.5rem; margin-bottom: 10px; }
     .hero-content p { font-size: 1.2rem; color: rgba(255, 255, 255, 0.9); }
 
-    /* Branch Container */
     .branch-container {
         display: flex;
         flex-direction: column;
         gap: 30px;
     }
 
-    /* Branch Option Wrapper */
     .branch-option {
         display: block;
         position: relative;
@@ -127,7 +119,6 @@ include 'header_UI.php';
         cursor: pointer;
     }
 
-    /* Branch Card Design */
     .branch-card {
         background: #fff;
         border-radius: 12px;
@@ -139,7 +130,6 @@ include 'header_UI.php';
         height: 280px; 
     }
 
-    /* Hover & Selected States */
     .branch-option:hover .branch-card {
         border-color: #ffcccc;
         box-shadow: 0 8px 25px rgba(220, 38, 38, 0.15);
@@ -151,7 +141,6 @@ include 'header_UI.php';
         background-color: #fffafa;
     }
 
-    /* Left Side: Image Carousel */
     .branch-carousel {
         width: 40%; 
         position: relative;
@@ -179,7 +168,6 @@ include 'header_UI.php';
         opacity: 1;
     }
 
-    /* Right Side: Information */
     .branch-info {
         width: 60%;
         padding: 25px;
@@ -201,7 +189,6 @@ include 'header_UI.php';
         font-size: 0.8rem; font-weight: 600; 
         white-space: nowrap;
     }
-    /* Special color for HQ tag */
     .type-hq { background: #fef3c7; color: #d97706; }
 
     .branch-desc {
@@ -223,6 +210,11 @@ include 'header_UI.php';
     }
     .branch-location { font-size: 0.9rem; color: #888; display: flex; align-items: center; gap: 5px; }
     
+    .btn-group-actions {
+        display: flex;
+        gap: 10px;
+    }
+
     .select-btn {
         background: #fff;
         border: 2px solid #ccc;
@@ -232,6 +224,25 @@ include 'header_UI.php';
         font-weight: 600;
         transition: 0.3s;
         text-align: center;
+        cursor: pointer;
+    }
+
+    .details-btn {
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        color: #666;
+        padding: 8px 20px;
+        border-radius: 30px;
+        font-weight: 600;
+        transition: 0.3s;
+        text-decoration: none !important;
+        cursor: pointer;
+    }
+
+    .details-btn:hover {
+        background: #e9ecef;
+        color: #dc2626;
+        border-color: #dc2626;
     }
     
     .branch-option:hover .select-btn {
@@ -287,7 +298,6 @@ include 'header_UI.php';
                             <div class="branch-card">
                                 <div class="branch-carousel" id="carousel-hq">
                                     <?php 
-                                        // 这里的逻辑已统一，无论是 HQ 还是 Branch 都使用 decoded_images
                                         if ($hq_branch && !empty($hq_branch['decoded_images'])) {
                                             foreach ($hq_branch['decoded_images'] as $index => $img_path) {
                                                 $activeClass = ($index === 0) ? 'active' : '';
@@ -321,7 +331,10 @@ include 'header_UI.php';
                                             <i class="fas fa-map-marker-alt"></i> 
                                             <?php echo $hq_branch ? htmlspecialchars($hq_branch['Branch_City']) : 'Kuala Lumpur'; ?>
                                         </div>
-                                        <div class="select-btn">Select & Pay <i class="fas fa-chevron-right" style="font-size: 0.8em; margin-left: 5px;"></i></div>
+                                        <div class="btn-group-actions">
+                                            <a href="Branch_Details.php?id=0" class="details-btn" onclick="event.stopPropagation();">Details</a>
+                                            <div class="select-btn">Select & Pay <i class="fas fa-chevron-right" style="font-size: 0.8em; margin-left: 5px;"></i></div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -362,7 +375,10 @@ include 'header_UI.php';
                                                     <i class="fas fa-map-marker-alt"></i> 
                                                     <?php echo htmlspecialchars($row['Branch_City']); ?>
                                                 </div>
-                                                <div class="select-btn">Select & Pay <i class="fas fa-chevron-right" style="font-size: 0.8em; margin-left: 5px;"></i></div>
+                                                <div class="btn-group-actions">
+                                                    <a href="Branch_Details.php?id=<?php echo $row['Branch_ID']; ?>" class="details-btn" onclick="event.stopPropagation();">Details</a>
+                                                    <div class="select-btn">Select & Pay <i class="fas fa-chevron-right" style="font-size: 0.8em; margin-left: 5px;"></i></div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
