@@ -702,7 +702,7 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                                     <div onclick="openViewAdminModal(<?php echo htmlspecialchars(json_encode($admin)); ?>)"><i class="fas fa-eye"></i> View Details</div>
                                     <div onclick='openEditAdminModal(<?php echo json_encode($admin); ?>)'><i class="fas fa-edit"></i> Edit Details</div>
                                     
-                                    <?php if ($adminPosition === 'Super Admin'): ?>
+                                    <?php if ($adminPosition === 'Super Admin' && $admin['Admin_Role'] !== 'Super Admin'): ?>
                                     <div onclick="openBlockAdminModal(<?php echo $admin['Admin_ID']; ?>, '<?php echo htmlspecialchars($admin['Admin_Name'], ENT_QUOTES); ?>')" class="text-delete"><i class="fas fa-ban"></i> Block Admin</div>
                                     <?php endif; ?>
                                 </div>

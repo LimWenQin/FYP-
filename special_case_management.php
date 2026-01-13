@@ -14,6 +14,17 @@ include 'dataconnection.php';
 // 设置时区
 date_default_timezone_set('Asia/Kuala_Lumpur');
 
+// --- NEW: AUTOMATIC STATUS UPDATE LOGIC (Requirement 1) ---
+// 1. Auto-Complete: If End Date passed OR Target Reached (Excluding Cancelled)
+$conn->query("UPDATE special_case SET Case_Status = 'Completed' WHERE (End_Date < CURDATE() OR Raised_Amount >= Target_Amount) AND Case_Status != 'Cancelled' AND Case_Status != 'Completed'");
+
+// 2. Auto-Active: If within dates AND Target NOT Reached (Excluding Cancelled/Completed)
+$conn->query("UPDATE special_case SET Case_Status = 'Active' WHERE Start_Date <= CURDATE() AND End_Date >= CURDATE() AND Raised_Amount < Target_Amount AND Case_Status != 'Cancelled' AND Case_Status != 'Completed' AND Case_Status != 'Active'");
+
+// 3. Auto-Upcoming: If Start Date is in future (Excluding Cancelled/Completed)
+$conn->query("UPDATE special_case SET Case_Status = 'Upcoming' WHERE Start_Date > CURDATE() AND Case_Status != 'Cancelled' AND Case_Status != 'Completed' AND Case_Status != 'Upcoming'");
+
+
 // --- AJAX: FETCH DONATIONS FOR A SPECIFIC CASE ---
 if (isset($_GET['action']) && $_GET['action'] == 'get_case_donations' && isset($_GET['case_id'])) {
     $caseId = intval($_GET['case_id']);
@@ -74,11 +85,31 @@ if (isset($_SESSION['admin_id'])) {
     }
 }
 
+// --- PREPARE DATA FOR FILTERS ---
+// 1. Years
+$years = range(date('Y'), 2023); 
+// 2. Cities (Distinct)
+$cities = [];
+$cityQ = $conn->query("SELECT DISTINCT Case_City FROM special_case WHERE Case_City != '' ORDER BY Case_City ASC");
+if($cityQ) while($c = $cityQ->fetch_assoc()) $cities[] = $c['Case_City'];
+// 3. Categories
+$categories = ['Medical','Disability Support','Emergency Relief','Elderly Care','Children Support','Other Cases'];
+// 4. Phone Prefixes
+$phonePrefixes = ['010', '011', '012', '013', '014', '015', '016', '017', '018', '019'];
+// 5. Malaysia States
+$malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'];
+
 // --- FILTER & SEARCH PREPARATION ---
 $searchTerm = "";
 $filterType = "";
 $filterValue = "";
 $whereConditions = [];
+
+// Default Sort Order: Upcoming -> Active -> Others (Complete/Delete)
+$orderClause = "ORDER BY CASE 
+                WHEN Case_Status = 'Upcoming' THEN 1 
+                WHEN Case_Status = 'Active' THEN 2 
+                ELSE 3 END ASC, Created_At DESC";
 
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $searchTerm = $conn->real_escape_string($_GET['search']);
@@ -87,12 +118,47 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
 
 if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
     $filterType = $_GET['filter_type'];
+    
+    // Status Filter
     if ($filterType == 'status' && isset($_GET['filter_val_status']) && !empty($_GET['filter_val_status'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_status']);
         $whereConditions[] = "Case_Status = '$filterValue'";
-    } elseif ($filterType == 'year' && isset($_GET['filter_val_year']) && !empty($_GET['filter_val_year'])) {
+    } 
+    // Year Filter
+    elseif ($filterType == 'year' && isset($_GET['filter_val_year']) && !empty($_GET['filter_val_year'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_year']);
         $whereConditions[] = "YEAR(Created_At) = '$filterValue'";
+    }
+    // Name Sort
+    elseif ($filterType == 'name_sort' && isset($_GET['filter_val_name']) && !empty($_GET['filter_val_name'])) {
+        $filterValue = $_GET['filter_val_name'];
+        if ($filterValue == 'asc') $orderClause = "ORDER BY Case_Title ASC";
+        elseif ($filterValue == 'desc') $orderClause = "ORDER BY Case_Title DESC";
+    }
+    // Phone Prefix
+    elseif ($filterType == 'phone' && isset($_GET['filter_val_phone']) && !empty($_GET['filter_val_phone'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_phone']);
+        $whereConditions[] = "Contact_Number LIKE '%$filterValue%'";
+    }
+    // City
+    elseif ($filterType == 'city' && isset($_GET['filter_val_city']) && !empty($_GET['filter_val_city'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_city']);
+        $whereConditions[] = "Case_City = '$filterValue'";
+    }
+    // Category
+    elseif ($filterType == 'category' && isset($_GET['filter_val_category']) && !empty($_GET['filter_val_category'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_category']);
+        $whereConditions[] = "Case_Category = '$filterValue'";
+    }
+    // Start Date
+    elseif ($filterType == 'start_date' && isset($_GET['filter_val_date']) && !empty($_GET['filter_val_date'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_date']);
+        $whereConditions[] = "Start_Date >= '$filterValue'";
+    }
+    // End Date
+    elseif ($filterType == 'end_date' && isset($_GET['filter_val_date']) && !empty($_GET['filter_val_date'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_date']);
+        $whereConditions[] = "End_Date <= '$filterValue'";
     }
 }
 
@@ -104,7 +170,7 @@ if (count($whereConditions) > 0) {
 // --- EXPORT TO EXCEL ---
 if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
     $filename = "special_cases_" . date('Ymd') . ".xls";
-    $exportSql = "SELECT * FROM special_case $whereClause ORDER BY Created_At DESC";
+    $exportSql = "SELECT * FROM special_case $whereClause $orderClause";
     $exportResult = $conn->query($exportSql);
     
     header("Content-Type: application/vnd.ms-excel");
@@ -218,7 +284,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
     }
 
     $caseTitle = mysqli_real_escape_string($conn, $_POST['case_title']);
-    $caseCategory = mysqli_real_escape_string($conn, $_POST['case_category']); // NEW: Category
+    $caseCategory = mysqli_real_escape_string($conn, $_POST['case_category']);
     $caseDescription = mysqli_real_escape_string($conn, $_POST['case_description']);
     $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
     $caseStatus = mysqli_real_escape_string($conn, $_POST['case_status']);
@@ -281,7 +347,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_special_case'])
 
     $caseId = mysqli_real_escape_string($conn, $_POST['case_id']);
     $caseTitle = mysqli_real_escape_string($conn, $_POST['case_title']);
-    $caseCategory = mysqli_real_escape_string($conn, $_POST['case_category']); // NEW: Category
+    $caseCategory = mysqli_real_escape_string($conn, $_POST['case_category']); 
     $caseDescription = mysqli_real_escape_string($conn, $_POST['case_description']);
     $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
     $caseStatus = mysqli_real_escape_string($conn, $_POST['case_status']);
@@ -363,8 +429,9 @@ if ($count_result && $count_result->num_rows > 0) {
 }
 
 $total_pages = ceil($total_records / $results_per_page);
+if ($page > $total_pages && $total_pages > 0) { $page = $total_pages; $start_from = ($page - 1) * $results_per_page; }
 
-$sql = "SELECT * FROM special_case $whereClause ORDER BY Created_At DESC LIMIT $start_from, $results_per_page";
+$sql = "SELECT * FROM special_case $whereClause $orderClause LIMIT $start_from, $results_per_page";
 $result = $conn->query($sql);
 $specialCases = [];
 if ($result && $result->num_rows > 0) {
@@ -372,17 +439,13 @@ if ($result && $result->num_rows > 0) {
 }
 
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
-$end_record = min($page * $results_per_page, $total_records);
+$end_record = min($start_from + $results_per_page, $total_records);
 
 // --- STATS LOGIC ---
 $totalCases = $conn->query("SELECT COUNT(*) as c FROM special_case")->fetch_assoc()['c'];
 $activeCases = $conn->query("SELECT COUNT(*) as c FROM special_case WHERE Case_Status = 'Active'")->fetch_assoc()['c'];
 $completedCases = $conn->query("SELECT COUNT(*) as c FROM special_case WHERE Case_Status = 'Completed'")->fetch_assoc()['c'];
 $totalRaisedLifetime = $conn->query("SELECT SUM(Raised_Amount) as s FROM special_case")->fetch_assoc()['s'] ?: 0;
-
-$years = range(date('Y'), 2023); 
-$malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'];
-$categories = ['Medical','Disability Support','Emergency Relief','Elderly Care','Children Support','Other Cases']; // Categories Array
 
 $exportParams = $_GET;
 $exportParams['action'] = 'export_excel';
@@ -403,6 +466,14 @@ $allCaseImagesMap = [];
     <link rel="stylesheet" href="admin_common.css">
     
     <style>
+        /* Floating Alert - Top Left Icon Alignment (Match Staff Management) */
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; animation: slideIn 0.3s; display: none; }
+        .floating-alert div { line-height: 1.6; }
+        .floating-alert i { margin-top: 4px; }
+        .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
+        .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
         /* Stats & UI */
         .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
@@ -423,18 +494,18 @@ $allCaseImagesMap = [];
         .section-header h2 { font-size: 18px; font-weight: 600; }
         .action-buttons { display: flex; gap: 10px; }
         .btn { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: 500; transition: all 0.3s; display: flex; align-items: center; gap: 5px; text-decoration: none; font-size: 13px; color: white; }
-        .btn-primary { background: var(--primary); }
-        .btn-success { background: var(--success); }
-        .btn-danger { background: var(--danger); }
+        .btn-primary { background: var(--primary); } .btn-success { background: var(--success); } .btn-danger { background: var(--danger); }
         
-        .filter-search-bar { margin-bottom: 25px; display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
+        /* Filters */
+        .filter-search-bar { margin-bottom: 25px; display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee; flex-wrap: wrap; }
         .filter-group { display: flex; align-items: center; gap: 8px; }
         .filter-select, .search-input { padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; background: white; }
-        .search-input { flex: 1; }
-        .secondary-filter { display: none; }
+        .search-input { flex: 1; min-width: 200px; }
+        .secondary-filter { display: none; animation: fadeIn 0.3s; }
         .secondary-filter.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Grid & Cards (Updated for Carousel) */
+        /* Grid & Cards */
         .case-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; margin-top: 10px; margin-bottom: 30px; }
         .case-card { background: white; border-radius: 12px; position: relative; display: flex; flex-direction: column; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border: 1px solid #f0f0f0; transition: transform 0.3s; }
         .case-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-color: #eee; }
@@ -456,7 +527,7 @@ $allCaseImagesMap = [];
         .card-actions { position: absolute; top: 10px; right: 10px; z-index: 50; }
         .menu-btn { background-color: rgba(255, 255, 255, 0.95); border: none; cursor: pointer; width: 32px; height: 32px; border-radius: 50%; color: #555; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.15); transition: all 0.2s; }
         .menu-btn:hover { background-color: white; color: var(--primary); transform: scale(1.1); }
-        .dropdown-content { display: none; position: absolute; right: 0; top: 40px; background-color: white; min-width: 180px; box-shadow: 0 5px 25px rgba(0,0,0,0.2); z-index: 100; border-radius: 8px; overflow: hidden; border: 1px solid #eee; }
+        .dropdown-content { display: none; position: absolute; right: 0; top: 40px; background-color: white; min-width: 180px; box-shadow: 0 5px 25px rgba(0,0,0,0.2); z-index: 100; border-radius: 8px; overflow: hidden; border: 1px solid #eee; text-align: left; }
         .dropdown-content div, .dropdown-content a { color: #333; padding: 12px 16px; text-decoration: none; display: flex; align-items: center; gap: 10px; font-size: 13px; cursor: pointer; transition: background 0.2s; }
         .dropdown-content div:hover, .dropdown-content a:hover { background-color: #f8f9fa; color: var(--primary); }
         .text-delete { color: var(--danger) !important; border-top: 1px solid #eee; }
@@ -472,11 +543,10 @@ $allCaseImagesMap = [];
         .progress-fill.active { background: #17a2b8; } .progress-fill.completed { background: #28a745; } .progress-fill.upcoming { background: #ffc107; } .progress-fill.cancelled { background: #dc3545; }
         .card-footer { padding: 15px 20px; border-top: 1px solid #f0f0f0; background: #fafafa; font-size: 12px; color: #888; display: flex; justify-content: space-between; align-items: center; border-radius: 0 0 12px 12px; }
 
-        /* Pagination */
-        .pagination-container { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding: 15px 0; border-top: 1px solid var(--gray-light); }
-        .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; transition: all 0.3s; cursor: pointer; }
-        .pagination-btn:hover { background-color: #e2e6ea; border-color: #dae0e5; }
-        .pagination-btn.active { background-color: #F28585; color: white; border-color: #F28585; }
+        /* Pagination - Matched Staff Management Style */
+        .pagination-container { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid #eee; margin-top: 10px; }
+        .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; transition: all 0.3s; display: inline-block; }
+        .pagination-btn.active { background-color: #F28585; color: white; border-color: #F28585; cursor: default; }
         .pagination-btn.disabled { color: #ccc; cursor: not-allowed; background-color: #f8f9fa; border-color: #eee; }
         
         /* Modal */
@@ -497,18 +567,14 @@ $allCaseImagesMap = [];
         .required { color: red; margin-left: 3px; font-weight: bold; }
         .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
         
-        /* PHONE INPUT STYLING */
         .phone-format { display: flex; align-items: center; }
         .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid #ddd; border-right: none; border-radius: 6px 0 0 6px; color: #666; font-size: 14px; font-weight: bold; }
         .phone-input { border-radius: 0 6px 6px 0 !important; width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); outline: none; }
         .phone-input:focus { border-color: var(--primary); }
 
         .form-section-title { font-size: 14px; font-weight: 700; color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px; margin: 20px 0 15px 0; }
-        .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: inline-block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
-
-        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; display: none; }
-        .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
-        .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
+        /* FORM GUIDE STYLE */
+        .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
         
         /* File Upload */
         .upload-container { width: 100%; }
@@ -591,6 +657,12 @@ $allCaseImagesMap = [];
                         <select name="filter_type" id="filterType" class="filter-select" onchange="toggleFilterInputs()">
                             <option value="">Filter By...</option>
                             <option value="status" <?php echo ($filterType == 'status') ? 'selected' : ''; ?>>Status</option>
+                            <option value="name_sort" <?php echo ($filterType == 'name_sort') ? 'selected' : ''; ?>>Name Sorting</option>
+                            <option value="category" <?php echo ($filterType == 'category') ? 'selected' : ''; ?>>Category</option>
+                            <option value="phone" <?php echo ($filterType == 'phone') ? 'selected' : ''; ?>>Phone Prefix</option>
+                            <option value="city" <?php echo ($filterType == 'city') ? 'selected' : ''; ?>>City</option>
+                            <option value="start_date" <?php echo ($filterType == 'start_date') ? 'selected' : ''; ?>>Starts After</option>
+                            <option value="end_date" <?php echo ($filterType == 'end_date') ? 'selected' : ''; ?>>Ends Before</option>
                             <option value="year" <?php echo ($filterType == 'year') ? 'selected' : ''; ?>>Created Year</option>
                         </select>
                     </div>
@@ -612,6 +684,45 @@ $allCaseImagesMap = [];
                                 <option value="<?php echo $yr; ?>" <?php echo ($filterValue == $yr) ? 'selected' : ''; ?>><?php echo $yr; ?></option>
                             <?php endforeach; ?>
                         </select>
+                    </div>
+
+                    <div id="filter_name_container" class="secondary-filter">
+                        <select name="filter_val_name" class="filter-select">
+                            <option value="">Select Order...</option>
+                            <option value="asc" <?php echo ($filterValue == 'asc') ? 'selected' : ''; ?>>Name (A-Z)</option>
+                            <option value="desc" <?php echo ($filterValue == 'desc') ? 'selected' : ''; ?>>Name (Z-A)</option>
+                        </select>
+                    </div>
+
+                    <div id="filter_phone_container" class="secondary-filter">
+                        <select name="filter_val_phone" class="filter-select">
+                            <option value="">Select Prefix...</option>
+                            <?php foreach($phonePrefixes as $pp): ?>
+                                <option value="<?php echo $pp; ?>" <?php echo ($filterValue == $pp) ? 'selected' : ''; ?>>+6<?php echo $pp; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div id="filter_city_container" class="secondary-filter">
+                        <select name="filter_val_city" class="filter-select">
+                            <option value="">Select City...</option>
+                            <?php foreach($cities as $c): ?>
+                                <option value="<?php echo $c; ?>" <?php echo ($filterValue == $c) ? 'selected' : ''; ?>><?php echo $c; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div id="filter_category_container" class="secondary-filter">
+                        <select name="filter_val_category" class="filter-select">
+                            <option value="">Select Category...</option>
+                            <?php foreach($categories as $cat): ?>
+                                <option value="<?php echo $cat; ?>" <?php echo ($filterValue == $cat) ? 'selected' : ''; ?>><?php echo $cat; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div id="filter_date_container" class="secondary-filter">
+                        <input type="date" name="filter_val_date" class="filter-select" value="<?php echo ($filterType == 'start_date' || $filterType == 'end_date') ? $filterValue : ''; ?>">
                     </div>
 
                     <input type="text" name="search" class="search-input" placeholder="Search by title..." value="<?php echo htmlspecialchars($searchTerm); ?>">
@@ -715,11 +826,32 @@ $allCaseImagesMap = [];
                             $queryParams['filter_type'] = $filterType;
                             if ($filterType == 'status' && !empty($filterValue)) $queryParams['filter_val_status'] = $filterValue;
                             if ($filterType == 'year' && !empty($filterValue)) $queryParams['filter_val_year'] = $filterValue;
+                            if ($filterType == 'name_sort' && !empty($filterValue)) $queryParams['filter_val_name'] = $filterValue;
+                            if ($filterType == 'phone' && !empty($filterValue)) $queryParams['filter_val_phone'] = $filterValue;
+                            if ($filterType == 'city' && !empty($filterValue)) $queryParams['filter_val_city'] = $filterValue;
+                            if ($filterType == 'category' && !empty($filterValue)) $queryParams['filter_val_category'] = $filterValue;
+                            if (($filterType == 'start_date' || $filterType == 'end_date') && !empty($filterValue)) $queryParams['filter_val_date'] = $filterValue;
                         }
                         $search_query = !empty($queryParams) ? '&' . http_build_query($queryParams) : '';
                         
-                        if ($page > 1) echo "<a href='?page=".($page-1).$search_query."' class='pagination-btn'>Previous</a>"; else echo "<span class='pagination-btn disabled'>Previous</span>";
-                        if ($page < $total_pages) echo "<a href='?page=".($page+1).$search_query."' class='pagination-btn'>Next</a>"; else echo "<span class='pagination-btn disabled'>Next</span>";
+                        // PREVIOUS BUTTON
+                        if ($page > 1) echo "<a href='?page=".($page-1).$search_query."' class='pagination-btn'>Previous</a>"; 
+                        else echo "<span class='pagination-btn disabled'>Previous</span>";
+
+                        // PAGE NUMBERS (Window of 3 logic)
+                        $start_window = max(1, $page - 1);
+                        $end_window = min($total_pages, $page + 1);
+                        if ($page == 1) $end_window = min($total_pages, 3);
+                        if ($page == $total_pages) $start_window = max(1, $total_pages - 2);
+
+                        for ($i = $start_window; $i <= $end_window; $i++) {
+                            if ($i == $page) echo "<span class='pagination-btn active'>$i</span>";
+                            else echo "<a href='?page=$i$search_query' class='pagination-btn'>$i</a>";
+                        }
+
+                        // NEXT BUTTON
+                        if ($page < $total_pages) echo "<a href='?page=".($page+1).$search_query."' class='pagination-btn'>Next</a>"; 
+                        else echo "<span class='pagination-btn disabled'>Next</span>";
                         ?>
                     </div>
                 </div>
@@ -766,7 +898,7 @@ $allCaseImagesMap = [];
                         <select name="case_category" id="add_case_category" class="form-select" required>
                             <?php foreach($categories as $cat) echo "<option value='$cat'>$cat</option>"; ?>
                         </select>
-                        <span class="form-guide">Select the category that best fits this case.</span>
+                        <span class="form-guide">Select the category that best fits this case to help donors find it.</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Description <span class="required">*</span></label>
@@ -811,11 +943,11 @@ $allCaseImagesMap = [];
                     <div class="form-group">
                         <label class="form-label">Address Line 1 <span class="required">*</span></label>
                         <input type="text" id="add_address1" name="address1" class="form-input" required placeholder="e.g. No 15, Jalan Bahagia">
-                        <span class="form-guide">House no, street, etc.</span>
+                        <span class="form-guide">House no, street, building.</span>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" id="add_address2" name="address2" class="form-input" required placeholder="e.g. Taman Melati"><span class="form-guide">Area/Taman.</span></div>
-                        <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" id="add_address3" name="address3" class="form-input" placeholder="e.g. Section 12"></div>
+                        <div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" id="add_address2" name="address2" class="form-input" required placeholder="e.g. Taman Melati"><span class="form-guide">Area, Taman or Village.</span></div>
+                        <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" id="add_address3" name="address3" class="form-input" placeholder="e.g. Section 12"><span class="form-guide">Optional additional address info.</span></div>
                     </div>
                     <div class="form-row">
                         <div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" id="add_postal_code" name="postal_code" class="form-input" required placeholder="e.g. 50000"><span class="form-guide">Valid postal code.</span></div>
@@ -825,10 +957,12 @@ $allCaseImagesMap = [];
                         <div class="form-group">
                             <label class="form-label">State <span class="required">*</span></label>
                             <select id="add_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
+                            <span class="form-guide">Select state.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Country</label>
                             <input type="text" name="country" class="form-input" value="Malaysia" readonly>
+                            <span class="form-guide">Currently limited to Malaysia.</span>
                         </div>
                     </div>
 
@@ -857,8 +991,8 @@ $allCaseImagesMap = [];
                         <div class="form-group">
                             <label class="form-label">Contact Email <span class="required">*</span></label>
                             <input type="email" id="add_contact_email" name="contact_email" class="form-input" required placeholder="e.g. contact@example.com">
-                            <span class="form-guide">Official contact email.</span>
                             <div id="addEmailError" class="error-message">Invalid email format.</div>
+                            <span class="form-guide">Official contact email.</span>
                         </div>
                     </div>
                     
@@ -877,6 +1011,7 @@ $allCaseImagesMap = [];
                 <form id="editSpecialCaseForm" action="special_case_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateSpecialCaseForm('edit')" novalidate>
                     <input type="hidden" id="edit_case_id" name="case_id"><input type="hidden" name="update_special_case" value="1">
                     <input type="hidden" id="existing_images_json" name="existing_images_json">
+                    <input type="hidden" id="original_case_status" name="original_case_status">
                     
                     <div class="form-group">
                         <label class="form-label">Case Images <span class="required">*</span></label>
@@ -924,9 +1059,10 @@ $allCaseImagesMap = [];
                         </div>
                     </div>
                     <div class="form-group" id="edit_cancel_div" style="display:none;">
-                        <label class="form-label" style="color:red">Cancellation Reason</label>
+                        <label class="form-label" style="color:red">Cancellation Reason <span class="required">*</span></label>
                         <input type="text" id="edit_cancel_reason" name="cancel_reason" class="form-input">
                         <span class="form-guide">Why was this case cancelled?</span>
+                        <div id="edit_cancel_error" class="error-message">Cancellation reason is required.</div>
                     </div>
 
                     <div class="form-section-title">Logistics & Location</div>
@@ -934,12 +1070,12 @@ $allCaseImagesMap = [];
                          <div class="form-group">
                             <label class="form-label">Start Date <span class="required">*</span></label>
                             <input type="date" id="edit_start_date" name="start_date" class="form-input" required>
-                             <span class="form-guide">When the campaign or assistance starts.</span>
+                            <span class="form-guide">When the campaign or assistance starts.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">End Date <span class="required">*</span></label>
                             <input type="date" id="edit_end_date" name="end_date" class="form-input" required>
-                             <span class="form-guide">When the campaign is expected to end.</span>
+                            <span class="form-guide">When the campaign is expected to end.</span>
                         </div>
                     </div>
                     <div class="form-group">
@@ -950,11 +1086,11 @@ $allCaseImagesMap = [];
                     <div class="form-group">
                         <label class="form-label">Address Line 1 <span class="required">*</span></label>
                         <input type="text" id="edit_address1" name="address1" class="form-input" required>
-                         <span class="form-guide">House no, street, etc.</span>
+                        <span class="form-guide">House no, street, building.</span>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" id="edit_address2" name="address2" class="form-input" required><span class="form-guide">Area/Taman.</span></div>
-                        <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" id="edit_address3" name="address3" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" id="edit_address2" name="address2" class="form-input" required><span class="form-guide">Area, Taman or Village.</span></div>
+                        <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" id="edit_address3" name="address3" class="form-input"><span class="form-guide">Optional additional address info.</span></div>
                     </div>
                     <div class="form-row">
                         <div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" id="edit_postal_code" name="postal_code" class="form-input" required><span class="form-guide">Valid postal code.</span></div>
@@ -964,10 +1100,12 @@ $allCaseImagesMap = [];
                         <div class="form-group">
                             <label class="form-label">State <span class="required">*</span></label>
                             <select id="edit_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
+                            <span class="form-guide">Select state.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Country</label>
                             <input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly>
+                            <span class="form-guide">Currently limited to Malaysia.</span>
                         </div>
                     </div>
 
@@ -996,8 +1134,8 @@ $allCaseImagesMap = [];
                         <div class="form-group">
                             <label class="form-label">Contact Email <span class="required">*</span></label>
                             <input type="email" id="edit_contact_email" name="contact_email" class="form-input" required>
-                            <span class="form-guide">Official contact email.</span>
                             <div id="editEmailError" class="error-message">Invalid email format.</div>
+                            <span class="form-guide">Official contact email.</span>
                         </div>
                     </div>
 
@@ -1027,6 +1165,11 @@ $allCaseImagesMap = [];
             document.querySelectorAll('.secondary-filter').forEach(el => el.classList.remove('active'));
             if (type === 'status') document.getElementById('filter_status_container').classList.add('active');
             else if (type === 'year') document.getElementById('filter_year_container').classList.add('active');
+            else if (type === 'name_sort') document.getElementById('filter_name_container').classList.add('active');
+            else if (type === 'phone') document.getElementById('filter_phone_container').classList.add('active');
+            else if (type === 'city') document.getElementById('filter_city_container').classList.add('active');
+            else if (type === 'category') document.getElementById('filter_category_container').classList.add('active');
+            else if (type === 'start_date' || type === 'end_date') document.getElementById('filter_date_container').classList.add('active');
         }
 
         function setupPostcodeState(postcodeId, stateSelectId) {
@@ -1110,6 +1253,28 @@ $allCaseImagesMap = [];
                     if (event.key === "ArrowRight") changeLightboxImage(1);
                 }
             });
+            
+            // NEW: Status Change Listener for Dates
+            const statusSelect = document.getElementById('edit_case_status');
+            if(statusSelect) {
+                statusSelect.addEventListener('change', function() {
+                    const newStatus = this.value;
+                    const originalStatus = document.getElementById('original_case_status').value;
+                    const today = new Date().toISOString().split('T')[0];
+
+                    // Condition: Upcoming -> Active (Set Start Date to Today)
+                    if (originalStatus === 'Upcoming' && newStatus === 'Active') {
+                        document.getElementById('edit_start_date').value = today;
+                    }
+
+                    // Condition: Active -> Completed (Set End Date to Today)
+                    if (originalStatus === 'Active' && newStatus === 'Completed') {
+                        document.getElementById('edit_end_date').value = today;
+                    }
+
+                    toggleCancelReason();
+                });
+            }
         });
 
         function showSystemError(msg) {
@@ -1236,6 +1401,33 @@ $allCaseImagesMap = [];
             document.getElementById('edit_target_amount').value = data.Target_Amount;
             document.getElementById('edit_case_status').value = data.Case_Status;
             
+            // NEW: Store Original Status for Logic
+            document.getElementById('original_case_status').value = data.Case_Status;
+            
+            // Handle Status Dropdown Restrictions
+            const statusSelect = document.getElementById('edit_case_status');
+            // Enable all first
+            for (let i = 0; i < statusSelect.options.length; i++) {
+                statusSelect.options[i].disabled = false;
+            }
+
+            if (data.Case_Status === 'Active') {
+                // Cannot change Active -> Upcoming
+                for (let i = 0; i < statusSelect.options.length; i++) {
+                    if (statusSelect.options[i].value === 'Upcoming') statusSelect.options[i].disabled = true;
+                }
+            } else if (data.Case_Status === 'Completed') {
+                // Cannot change Completed -> Active/Cancelled/Upcoming (Lock it)
+                for (let i = 0; i < statusSelect.options.length; i++) {
+                    if (statusSelect.options[i].value !== 'Completed') statusSelect.options[i].disabled = true;
+                }
+            } else if (data.Case_Status === 'Cancelled') {
+                // Cannot change Cancelled -> Active/Completed/Upcoming (Lock it)
+                for (let i = 0; i < statusSelect.options.length; i++) {
+                    if (statusSelect.options[i].value !== 'Cancelled') statusSelect.options[i].disabled = true;
+                }
+            }
+            
             document.getElementById('edit_start_date').value = data.Start_Date || '';
             document.getElementById('edit_end_date').value = data.End_Date || '';
             
@@ -1279,10 +1471,19 @@ $allCaseImagesMap = [];
         
         function toggleCancelReason() {
             const val = document.getElementById('edit_case_status').value;
-            document.getElementById('edit_cancel_div').style.display = (val === 'Cancelled') ? 'block' : 'none';
+            const div = document.getElementById('edit_cancel_div');
+            const input = document.getElementById('edit_cancel_reason');
+            
+            if (val === 'Cancelled') {
+                div.style.display = 'block';
+                input.required = true;
+            } else {
+                div.style.display = 'none';
+                input.required = false;
+                document.getElementById('edit_cancel_error').style.display = 'none';
+            }
         }
 
-        // --- UPDATED: REPLACED ALERT WITH CUSTOM SYSTEM ERROR ---
         function checkEmail(val) {
             if(!val) return true; 
             return /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val);
@@ -1312,6 +1513,19 @@ $allCaseImagesMap = [];
             
             if(type === 'add' && !document.getElementById('add_case_status').value) errors.push("Status is required.");
             
+            // Validate Cancel Reason if status is Cancelled
+            if (type === 'edit') {
+                const status = document.getElementById('edit_case_status').value;
+                const cancelReason = document.getElementById('edit_cancel_reason').value.trim();
+                if (status === 'Cancelled' && !cancelReason) {
+                    errors.push("Cancellation Reason is required.");
+                    document.getElementById('edit_cancel_error').style.display = 'block';
+                    isValid = false;
+                } else {
+                    document.getElementById('edit_cancel_error').style.display = 'none';
+                }
+            }
+            
             if(!getValue(prefix + '_start_date')) errors.push("Start Date is required.");
             if(!getValue(prefix + '_end_date')) errors.push("End Date is required.");
             if(!getValue(prefix + '_case_venue')) errors.push("Venue is required.");
@@ -1336,7 +1550,6 @@ $allCaseImagesMap = [];
                 }
             }
             
-            // --- NEW: Start Date Validation (Can't be past) ---
             // Only check this for 'add' mode, to allow editing existing cases.
             if (type === 'add' && start) {
                 const startDate = new Date(start);
@@ -1344,12 +1557,12 @@ $allCaseImagesMap = [];
                 today.setHours(0,0,0,0); // Normalize today to midnight
                 
                 if(startDate < today) {
-                     errors.push("Start Date cannot be in the past.");
-                     isValid = false;
+                      errors.push("Start Date cannot be in the past.");
+                      isValid = false;
                 }
             }
             
-            // --- NEW: Target Amount Validation ---
+            // 3. Target Amount Validation
             const amountVal = document.getElementById(prefix + '_target_amount').value;
             if (amountVal && parseFloat(amountVal) < 0) {
                  if(document.getElementById(prefix + '_amount_error')) document.getElementById(prefix + '_amount_error').style.display = 'block';
@@ -1359,7 +1572,7 @@ $allCaseImagesMap = [];
                  if(document.getElementById(prefix + '_amount_error')) document.getElementById(prefix + '_amount_error').style.display = 'none';
             }
 
-            // 3. Name Validation (No Numbers)
+            // 4. Name Validation (No Numbers)
             const organizerName = document.getElementById(prefix + '_case_organizer').value;
             const contactName = document.getElementById(prefix + '_contact_name').value;
             
@@ -1372,7 +1585,7 @@ $allCaseImagesMap = [];
                 isValid = false;
             }
 
-            // 4. Email Validation
+            // 5. Email Validation
             const emailId = prefix + '_contact_email';
             const emailErrId = prefix + 'EmailError';
             const emailVal = document.getElementById(emailId).value;
@@ -1385,7 +1598,6 @@ $allCaseImagesMap = [];
             }
 
             if(!isValid || errors.length > 0) {
-                // Use system error instead of alert
                 showSystemError("Validation Error: " + errors.join(" "));
                 return false;
             }
@@ -1404,7 +1616,6 @@ $allCaseImagesMap = [];
                 tbody.innerHTML = '';
                 if(data.length > 0) {
                     data.forEach(d => {
-                        // 修改：添加 onclick 事件以跳转
                         tbody.innerHTML += `<tr class="donation-row" onclick="window.open('admin_payment_details.php?id=${d.id}', '_blank')"><td style="padding:10px; border-bottom:1px solid #eee;">${d.date}</td><td style="padding:10px; border-bottom:1px solid #eee;">${d.name}</td><td style="padding:10px; border-bottom:1px solid #eee;">RM ${d.amount}</td></tr>`;
                     });
                 } else {
@@ -1414,11 +1625,10 @@ $allCaseImagesMap = [];
         }
 
         function confirmDeleteSpecialCase(id) {
-            // Confirm delete still uses native confirm, as requested only form validation messages were specified.
             if(confirm("Delete this case?")) window.location.href = `special_case_management.php?delete_case_id=${id}`;
         }
 
-        // --- LIGHTBOX JS LOGIC (ADDED) ---
+        // --- LIGHTBOX JS LOGIC ---
         const allCaseImages = <?php echo json_encode($allCaseImagesMap); ?>;
         let currentLightboxCaseId = null;
         let currentLightboxIndex = 0;

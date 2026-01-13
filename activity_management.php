@@ -42,22 +42,92 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_activity_donations' && iss
     exit();
 }
 
+// --- SEARCH & FILTER PREPARATION ---
+$searchTerm = "";
+$filterType = "";
+$filterValue = "";
+$conditions = []; // Base WHERE clauses
+$orderClause = "ORDER BY a.Activity_StartDate DESC"; // Default Sort
+
+// 1. Keyword Search
+if (isset($_GET['search']) && !empty($_GET['search'])) {
+    $searchTerm = $conn->real_escape_string($_GET['search']);
+    $conditions[] = "(a.Activity_Name LIKE '%$searchTerm%' OR a.Activity_Description LIKE '%$searchTerm%' OR b.Branch_Name LIKE '%$searchTerm%' OR a.Activity_City LIKE '%$searchTerm%')";
+}
+
+// 2. Dynamic Filters
+if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
+    $filterType = $_GET['filter_type'];
+
+    // Status Filter
+    if ($filterType == 'status' && !empty($_GET['filter_val_status'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_status']);
+        $conditions[] = "a.Activity_Status = '$filterValue'";
+    } 
+    // Branch ID Filter
+    elseif ($filterType == 'branch' && !empty($_GET['filter_val_branch'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_branch']);
+        $conditions[] = "a.Branch_ID = '$filterValue'";
+    } 
+    // Year Filter
+    elseif ($filterType == 'year' && !empty($_GET['filter_val_year'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_year']);
+        $conditions[] = "YEAR(a.Activity_StartDate) = '$filterValue'";
+    }
+    // Phone Prefix Filter
+    elseif ($filterType == 'phone' && !empty($_GET['filter_val_phone'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_phone']);
+        $conditions[] = "a.Activity_Contact_Number LIKE '%$filterValue%'";
+    }
+    // City Filter
+    elseif ($filterType == 'city' && !empty($_GET['filter_val_city'])) {
+        $filterValue = $conn->real_escape_string($_GET['filter_val_city']);
+        $conditions[] = "a.Activity_City = '$filterValue'";
+    }
+    // Capacity Filter
+    elseif ($filterType == 'capacity' && !empty($_GET['filter_val_capacity'])) {
+        $filterValue = $_GET['filter_val_capacity'];
+        if ($filterValue == 'below_100') {
+            $conditions[] = "a.Activity_Max_Participants < 100 AND a.Activity_Max_Participants > 0";
+        } elseif ($filterValue == '100_500') {
+            $conditions[] = "a.Activity_Max_Participants BETWEEN 100 AND 500";
+        } elseif ($filterValue == 'above_500') {
+            $conditions[] = "a.Activity_Max_Participants > 500";
+        }
+    }
+    // Date Range Filter
+    elseif ($filterType == 'date_range' && !empty($_GET['filter_start_date']) && !empty($_GET['filter_end_date'])) {
+        $sDate = $conn->real_escape_string($_GET['filter_start_date']);
+        $eDate = $conn->real_escape_string($_GET['filter_end_date']);
+        // Check overlap: (StartA <= EndB) and (EndA >= StartB)
+        $conditions[] = "(a.Activity_StartDate <= '$eDate' AND a.Activity_EndDate >= '$sDate')";
+    }
+    // Branch Name Sorting
+    elseif ($filterType == 'branch_sort' && !empty($_GET['filter_val_bsort'])) {
+        $filterValue = $_GET['filter_val_bsort'];
+        if ($filterValue == 'asc') $orderClause = "ORDER BY b.Branch_Name ASC";
+        elseif ($filterValue == 'desc') $orderClause = "ORDER BY b.Branch_Name DESC";
+    }
+}
+
+$whereClause = count($conditions) > 0 ? "WHERE " . implode(" AND ", $conditions) : "";
+
 // --- EXPORT TO EXCEL HANDLER ---
 if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
     $filename = "activity_list_" . date('Ymd') . ".xls";
-    
-    $exportSql = "SELECT a.*, b.Branch_Name 
-                  FROM activity a 
-                  LEFT JOIN branch b ON a.Branch_ID = b.Branch_ID
-                  ORDER BY a.Activity_StartDate DESC";
-    
-    $exportResult = $conn->query($exportSql);
     
     header("Content-Type: application/vnd.ms-excel");
     header("Content-Disposition: attachment; filename=\"$filename\"");
     header("Pragma: no-cache");
     header("Expires: 0");
 
+    $exportSql = "SELECT a.*, b.Branch_Name 
+                  FROM activity a 
+                  LEFT JOIN branch b ON a.Branch_ID = b.Branch_ID
+                  $whereClause $orderClause";
+                  
+    $exportResult = $conn->query($exportSql);
+    
     echo '<table border="1">
           <tr>
             <th>ID</th><th>Name</th><th>Venue</th><th>Specific Date</th><th>Start Date</th><th>End Date</th>
@@ -96,7 +166,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
     exit();
 }
 
-// --- 修改 2: 获取当前用户信息 (支持 Admin 和 Staff) ---
+// --- GET ADMIN INFO ---
 $adminName = "User";
 $adminPosition = "Role";
 $adminProfilePicture = null;
@@ -106,27 +176,23 @@ if (isset($_SESSION['admin_id'])) {
     $adminId = $_SESSION['admin_id'];
     $adminSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $adminId";
     $adminResult = $conn->query($adminSql);
-
-    if ($adminResult && $adminResult->num_rows > 0) {
-        $adminData = $adminResult->fetch_assoc();
-        $adminName = $adminData['Admin_Name'];
-        $adminPosition = $adminData['Admin_Role']; 
-        $adminProfilePicture = $adminData['Admin_ProfilePicture']; 
+    if ($adminResult && $row = $adminResult->fetch_assoc()) {
+        $adminName = $row['Admin_Name'];
+        $adminPosition = $row['Admin_Role']; 
+        $adminProfilePicture = $row['Admin_ProfilePicture']; 
     }
 } elseif (isset($_SESSION['staff_id'])) {
     $adminId = $_SESSION['staff_id'];
     $staffSql = "SELECT Staff_FullName, Staff_ProfilePicture, Staff_Role FROM staff WHERE Staff_ID = $adminId";
     $staffResult = $conn->query($staffSql);
-
-    if ($staffResult && $staffResult->num_rows > 0) {
-        $staffData = $staffResult->fetch_assoc();
-        $adminName = $staffData['Staff_FullName'];
-        $adminPosition = $staffData['Staff_Role'];
-        $adminProfilePicture = $staffData['Staff_ProfilePicture'];
+    if ($staffResult && $row = $staffResult->fetch_assoc()) {
+        $adminName = $row['Staff_FullName'];
+        $adminPosition = $row['Staff_Role'];
+        $adminProfilePicture = $row['Staff_ProfilePicture'];
     }
 }
 
-// --- MULTI FILE UPLOAD HELPER ---
+// --- HELPER FUNCTIONS ---
 function handleMultiImageUpload($files) {
     $uploadedPaths = [];
     $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
@@ -146,95 +212,62 @@ function handleMultiImageUpload($files) {
     return $uploadedPaths;
 }
 
-// --- SERVER-SIDE VALIDATION HELPER ---
-// Added $mode parameter to distinguish between 'add' and 'edit'
 function validateActivityInput($post, $mode = 'add') {
-    // 1. Name Check (No numbers allowed in Name or Organizer)
     if (preg_match('/\d/', $post['contact_name'])) return "Contact Name cannot contain numbers.";
     if (!empty($post['organizer']) && preg_match('/\d/', $post['organizer'])) return "Organizer Name cannot contain numbers.";
+    if (!empty($post['contact_email']) && !filter_var($post['contact_email'], FILTER_VALIDATE_EMAIL)) return "Invalid Contact Email format.";
 
-    // 2. Email Check
-    if (!empty($post['contact_email']) && !filter_var($post['contact_email'], FILTER_VALIDATE_EMAIL)) {
-        return "Invalid Contact Email format.";
-    }
-
-    // 3. Date Check
     $startDate = new DateTime($post['start_date']);
     $endDate = new DateTime($post['end_date']);
     $now = new DateTime();
-    
-    // Normalize "now" to today at midnight for comparison
-    $today = new DateTime();
-    $today->setTime(0, 0, 0); 
+    $today = new DateTime(); $today->setTime(0, 0, 0); 
 
-    // Start date cannot be more than 1 year from today
     $oneYearLimit = (clone $now)->modify('+1 year');
-    if ($startDate > $oneYearLimit) {
-        return "Start Date cannot be more than 1 year from today.";
-    }
-
-    // Duration check
+    if ($startDate > $oneYearLimit) return "Start Date cannot be more than 1 year from today.";
     $diff = $startDate->diff($endDate);
-    if ($diff->days > 365) {
-        return "Activity duration cannot exceed 1 year.";
-    }
-    
-    // End date must be after start date
-    if ($endDate < $startDate) {
-        return "End Date cannot be earlier than Start Date.";
+    if ($diff->days > 365) return "Activity duration cannot exceed 1 year.";
+    if ($endDate < $startDate) return "End Date cannot be earlier than Start Date.";
+
+    if ($mode === 'add') {
+        if ($startDate < $today) return "Start Date cannot be before the current date.";
     }
 
-    // --- NEW: Start Date cannot be in the past (Only for 'add' mode) ---
-    // We skip this check for 'edit' so you can update old events without error
-    if ($mode === 'add') {
-        if ($startDate < $today) {
-            return "Start Date cannot be before the current date.";
+    if (floatval($post['target_amount']) < 0) return "Target Amount cannot be negative.";
+    if (intval($post['max_participants']) < 0) return "Max Participants cannot be negative (Enter 0 for unlimited).";
+
+    // Cancelled logic check for Edit
+    if ($mode === 'edit' && $post['activity_status'] === 'Cancelled') {
+        if (empty(trim($post['cancel_reason']))) {
+            return "Cancellation Reason is required when status is Cancelled.";
         }
     }
 
-    // 4. Numeric Checks (Target Amount & Max Participants)
-    if (floatval($post['target_amount']) < 0) {
-        return "Target Amount cannot be negative.";
-    }
-
-    if (intval($post['max_participants']) < 0) {
-        return "Max Participants cannot be negative (Enter 0 for unlimited).";
-    }
-
-    return true; // Valid
+    return true;
 }
 
 // --- ADD ACTIVITY LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
-    
-    // Server Validation First (Pass 'add' mode)
     $validation = validateActivityInput($_POST, 'add');
     if ($validation !== true) {
         header("Location: activity_management.php?error=" . urlencode($validation));
         exit();
     }
 
-    // 1. Basic Info
     $activityName = mysqli_real_escape_string($conn, $_POST['activity_name']);
     $branchId = mysqli_real_escape_string($conn, $_POST['branch_id']);
     $activityStatus = mysqli_real_escape_string($conn, $_POST['activity_status']);
     $description = mysqli_real_escape_string($conn, $_POST['activity_description']);
-    
-    // 2. Financial
     $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
     $getAmount = 0.00; 
 
-    // 3. Dates & Venue
     $startDate = mysqli_real_escape_string($conn, $_POST['start_date']);
     $endDate = mysqli_real_escape_string($conn, $_POST['end_date']);
     $specificDate = !empty($_POST['specific_date']) ? "'" . mysqli_real_escape_string($conn, $_POST['specific_date']) . "'" : "NULL";
     $venue = !empty($_POST['venue']) ? "'" . mysqli_real_escape_string($conn, $_POST['venue']) . "'" : "NULL";
 
-    // 4. Organizer & Contact
     $organizer = !empty($_POST['organizer']) ? "'" . mysqli_real_escape_string($conn, $_POST['organizer']) . "'" : "NULL";
     $contactName = !empty($_POST['contact_name']) ? "'" . mysqli_real_escape_string($conn, $_POST['contact_name']) . "'" : "NULL";
     
-    // Phone Format Logic (+60)
     $contactRaw = $_POST['contact_number'];
     $contactNumber = (strpos($contactRaw, '+60') === 0) ? $contactRaw : "+60" . $contactRaw;
     $contactNumber = !empty($contactNumber) ? "'" . mysqli_real_escape_string($conn, $contactNumber) . "'" : "NULL";
@@ -242,7 +275,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
     $contactEmail = !empty($_POST['contact_email']) ? "'" . mysqli_real_escape_string($conn, $_POST['contact_email']) . "'" : "NULL";
     $maxParticipants = !empty($_POST['max_participants']) ? intval($_POST['max_participants']) : 0;
 
-    // 5. Address
     $address1 = mysqli_real_escape_string($conn, $_POST['address1']);
     $address2 = mysqli_real_escape_string($conn, $_POST['address2']);
     $address3 = mysqli_real_escape_string($conn, $_POST['address3']);
@@ -251,7 +283,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
     $postalCode = mysqli_real_escape_string($conn, $_POST['postal_code']);
     $country = mysqli_real_escape_string($conn, $_POST['country']);
     
-    // Image Upload
     $imageJson = "[]";
     if (isset($_FILES['activity_images'])) {
         $uploaded = handleMultiImageUpload($_FILES['activity_images']);
@@ -273,18 +304,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
         '$address3', '$city', '$state', '$postalCode', '$country', '$branchId'
     )";
     
-    if ($conn->query($sql)) {
-        header("Location: activity_management.php?success=" . urlencode("Activity added successfully!"));
-    } else {
-        header("Location: activity_management.php?error=" . urlencode("Error: " . $conn->error));
-    }
+    if ($conn->query($sql)) header("Location: activity_management.php?success=" . urlencode("Activity added successfully!"));
+    else header("Location: activity_management.php?error=" . urlencode("Error: " . $conn->error));
     exit();
 }
 
 // --- UPDATE ACTIVITY LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
-    
-    // Server Validation (Pass 'edit' mode)
     $validation = validateActivityInput($_POST, 'edit');
     if ($validation !== true) {
         header("Location: activity_management.php?error=" . urlencode($validation));
@@ -293,24 +319,44 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
 
     $activityId = mysqli_real_escape_string($conn, $_POST['activity_id']);
     
-    // 1. Basic
+    // --- STATUS CHANGE LOGIC ---
+    // Fetch old status first
+    $oldStatusQuery = $conn->query("SELECT Activity_Status FROM activity WHERE Activity_ID = '$activityId'");
+    $oldStatusData = $oldStatusQuery->fetch_assoc();
+    $oldStatus = $oldStatusData['Activity_Status'];
+    $newStatus = mysqli_real_escape_string($conn, $_POST['activity_status']);
+
+    $startDate = mysqli_real_escape_string($conn, $_POST['start_date']);
+    $endDate = mysqli_real_escape_string($conn, $_POST['end_date']);
+
+    // 1. Upcoming -> Active (Set Start Date to Today)
+    if ($oldStatus == 'Upcoming' && $newStatus == 'Active') {
+        $startDate = date('Y-m-d');
+    }
+
+    // 3. Active -> Completed (Set End Date to Today)
+    if ($oldStatus == 'Active' && $newStatus == 'Completed') {
+        $endDate = date('Y-m-d');
+    }
+
+    // 4. Cancelled Logic
+    $cancelReasonSQL = "NULL";
+    if ($newStatus == 'Cancelled') {
+        $cancelReason = mysqli_real_escape_string($conn, $_POST['cancel_reason']);
+        $cancelReasonSQL = "'$cancelReason'";
+    }
+
     $activityName = mysqli_real_escape_string($conn, $_POST['activity_name']);
     $branchId = mysqli_real_escape_string($conn, $_POST['branch_id']);
-    $activityStatus = mysqli_real_escape_string($conn, $_POST['activity_status']);
     $description = mysqli_real_escape_string($conn, $_POST['activity_description']);
     $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
 
-    // 2. Dates & Venue
-    $startDate = mysqli_real_escape_string($conn, $_POST['start_date']);
-    $endDate = mysqli_real_escape_string($conn, $_POST['end_date']);
     $specificDate = !empty($_POST['specific_date']) ? "'" . mysqli_real_escape_string($conn, $_POST['specific_date']) . "'" : "NULL";
     $venue = !empty($_POST['venue']) ? "'" . mysqli_real_escape_string($conn, $_POST['venue']) . "'" : "NULL";
 
-    // 3. Organizer & Contact
     $organizer = !empty($_POST['organizer']) ? "'" . mysqli_real_escape_string($conn, $_POST['organizer']) . "'" : "NULL";
     $contactName = !empty($_POST['contact_name']) ? "'" . mysqli_real_escape_string($conn, $_POST['contact_name']) . "'" : "NULL";
     
-    // Phone Format
     $contactRaw = $_POST['contact_number'];
     $contactNumber = (strpos($contactRaw, '+60') === 0) ? $contactRaw : "+60" . $contactRaw;
     $contactNumber = !empty($contactNumber) ? "'" . mysqli_real_escape_string($conn, $contactNumber) . "'" : "NULL";
@@ -318,7 +364,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
     $contactEmail = !empty($_POST['contact_email']) ? "'" . mysqli_real_escape_string($conn, $_POST['contact_email']) . "'" : "NULL";
     $maxParticipants = !empty($_POST['max_participants']) ? intval($_POST['max_participants']) : 0;
 
-    // 4. Address
     $address1 = mysqli_real_escape_string($conn, $_POST['address1']);
     $address2 = mysqli_real_escape_string($conn, $_POST['address2']);
     $address3 = mysqli_real_escape_string($conn, $_POST['address3']);
@@ -327,7 +372,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
     $postalCode = mysqli_real_escape_string($conn, $_POST['postal_code']);
     $country = mysqli_real_escape_string($conn, $_POST['country']);
 
-    // Handle Image Merge
     $existingImages = json_decode($_POST['existing_images_json'] ?? "[]", true);
     if (!$existingImages) $existingImages = [];
 
@@ -337,10 +381,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
     }
 
     $finalImages = array_merge($existingImages, $newImages);
-    if(count($finalImages) > 10) {
-        $finalImages = array_slice($finalImages, 0, 10);
-    }
-    
+    if(count($finalImages) > 10) $finalImages = array_slice($finalImages, 0, 10);
     $finalJson = mysqli_real_escape_string($conn, json_encode($finalImages));
 
     $sql = "UPDATE activity SET 
@@ -356,7 +397,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
             Activity_Contact_Email = $contactEmail,
             Activity_Max_Participants = $maxParticipants,
             Activity_TargetAmount = '$targetAmount',
-            Activity_Status = '$activityStatus',
+            Activity_Status = '$newStatus',
             Activity_Address1 = '$address1',
             Activity_Address2 = '$address2',
             Activity_Address3 = '$address3',
@@ -365,14 +406,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
             Activity_PostalCode = '$postalCode',
             Activity_Country = '$country',
             Branch_ID = '$branchId',
-            Activity_Images = '$finalJson'
+            Activity_Images = '$finalJson',
+            Cancel_Reason = $cancelReasonSQL
             WHERE Activity_ID = $activityId";
     
-    if ($conn->query($sql)) {
-        header("Location: activity_management.php?success=" . urlencode("Activity updated successfully!"));
-    } else {
-        header("Location: activity_management.php?error=" . urlencode("Error: " . $conn->error));
-    }
+    if ($conn->query($sql)) header("Location: activity_management.php?success=" . urlencode("Activity updated successfully!"));
+    else header("Location: activity_management.php?error=" . urlencode("Error: " . $conn->error));
     exit();
 }
 
@@ -380,59 +419,39 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
 if (isset($_GET['delete_activity_id'])) {
     $deleteId = $_GET['delete_activity_id'];
     $deleteSql = "DELETE FROM activity WHERE Activity_ID = $deleteId";
-    if ($conn->query($deleteSql)) {
-        header("Location: activity_management.php?success=" . urlencode("Activity deleted successfully!"));
-    } else {
-        header("Location: activity_management.php?error=" . urlencode("Error: " . $conn->error));
-    }
+    if ($conn->query($deleteSql)) header("Location: activity_management.php?success=" . urlencode("Activity deleted successfully!"));
+    else header("Location: activity_management.php?error=" . urlencode("Error: " . $conn->error));
     exit();
 }
 
-// --- PAGINATION & FILTERS ---
+// --- PAGINATION & QUERY ---
 $results_per_page = 6; 
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
 $start_from = ($page - 1) * $results_per_page;
 
-$searchTerm = ""; $filterType = ""; $filterValue = ""; $whereConditions = [];
-
-if (isset($_GET['search']) && !empty($_GET['search'])) {
-    $searchTerm = $conn->real_escape_string($_GET['search']);
-    $whereConditions[] = "(a.Activity_Name LIKE '%$searchTerm%' OR a.Activity_Description LIKE '%$searchTerm%' OR b.Branch_Name LIKE '%$searchTerm%')";
-}
-
-if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
-    $filterType = $_GET['filter_type'];
-    if ($filterType == 'status' && !empty($_GET['filter_val_status'])) {
-        $filterValue = $conn->real_escape_string($_GET['filter_val_status']);
-        $whereConditions[] = "a.Activity_Status = '$filterValue'";
-    } elseif ($filterType == 'branch' && !empty($_GET['filter_val_branch'])) {
-        $filterValue = $conn->real_escape_string($_GET['filter_val_branch']);
-        $whereConditions[] = "a.Branch_ID = '$filterValue'";
-    } elseif ($filterType == 'year' && !empty($_GET['filter_val_year'])) {
-        $filterValue = $conn->real_escape_string($_GET['filter_val_year']);
-        $whereConditions[] = "YEAR(a.Activity_StartDate) = '$filterValue'";
-    }
-}
-
-$whereClause = count($whereConditions) > 0 ? "WHERE " . implode(" AND ", $whereConditions) : "";
-
 $count_sql = "SELECT COUNT(*) as total FROM activity a LEFT JOIN branch b ON a.Branch_ID = b.Branch_ID $whereClause";
 $count_result = $conn->query($count_sql);
-$total_activities_count = $count_result->fetch_assoc()['total'];
-$total_pages = ceil($total_activities_count / $results_per_page);
+$total_records = $count_result->fetch_assoc()['total'];
+$total_pages = ceil($total_records / $results_per_page);
+if ($page > $total_pages && $total_pages > 0) { $page = $total_pages; $start_from = ($page - 1) * $results_per_page; }
 
-$sql = "SELECT a.*, b.Branch_Name FROM activity a LEFT JOIN branch b ON a.Branch_ID = b.Branch_ID $whereClause ORDER BY a.Activity_StartDate DESC LIMIT $start_from, $results_per_page";
+$sql = "SELECT a.*, b.Branch_Name FROM activity a LEFT JOIN branch b ON a.Branch_ID = b.Branch_ID $whereClause $orderClause LIMIT $start_from, $results_per_page";
 $result = $conn->query($sql);
 $activities = [];
 if ($result && $result->num_rows > 0) { while($row = $result->fetch_assoc()) $activities[] = $row; }
 
-$start_record = ($total_activities_count > 0) ? $start_from + 1 : 0;
-$end_record = min($page * $results_per_page, $total_activities_count);
+$start_record = ($total_records > 0) ? $start_from + 1 : 0;
+$end_record = min($start_from + $results_per_page, $total_records);
 
+// --- LOAD DATA FOR DROPDOWNS ---
 $branches = [];
 $branchResult = $conn->query("SELECT Branch_ID, Branch_Name FROM branch ORDER BY Branch_Name");
-if ($branchResult && $branchResult->num_rows > 0) { while($row = $branchResult->fetch_assoc()) $branches[] = $row; }
+if ($branchResult) { while($row = $branchResult->fetch_assoc()) $branches[] = $row; }
+
+$cities = [];
+$cityResult = $conn->query("SELECT DISTINCT Activity_City FROM activity WHERE Activity_City IS NOT NULL AND Activity_City != '' ORDER BY Activity_City");
+if ($cityResult) { while($row = $cityResult->fetch_assoc()) $cities[] = $row['Activity_City']; }
 
 $totalActivities = $conn->query("SELECT COUNT(*) as c FROM activity")->fetch_assoc()['c'];
 $activeActivities = $conn->query("SELECT COUNT(*) as c FROM activity WHERE Activity_Status = 'Active'")->fetch_assoc()['c'];
@@ -441,7 +460,10 @@ $totalDonations = $conn->query("SELECT SUM(Activity_GetAmount) as s FROM activit
 
 $years = range(date('Y'), 2023);
 $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'];
-$exportParams = $_GET; $exportParams['action'] = 'export_excel'; $exportUrl = "?" . http_build_query($exportParams);
+$phonePrefixes = ['010', '011', '012', '013', '014', '015', '016', '017', '018', '019'];
+
+$exportParams = $_GET; $exportParams['action'] = 'export_excel'; unset($exportParams['page']);
+$exportUrl = "?" . http_build_query($exportParams);
 
 // --- COLLECT IMAGES FOR LIGHTBOX JS ---
 $allActivityImagesMap = [];
@@ -524,10 +546,7 @@ $allActivityImagesMap = [];
         .card-footer { padding: 15px 20px; border-top: 1px solid #f0f0f0; background: #fafafa; font-size: 12px; color: #888; display: flex; justify-content: space-between; align-items: center; border-radius: 0 0 12px 12px; }
 
         .pagination-container { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid #eee; margin-top: 10px; }
-        .pagination-info { font-size: 14px; color: #666; }
-        .pagination-controls { display: flex; gap: 5px; align-items: center; }
-        .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; transition: all 0.3s; cursor: pointer; }
-        .pagination-btn:hover { background-color: #e2e6ea; border-color: #dae0e5; }
+        .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; transition: all 0.3s; display: inline-block; }
         .pagination-btn.active { background-color: #F28585; color: white; border-color: #F28585; cursor: default; }
         .pagination-btn.disabled { color: #ccc; cursor: not-allowed; background-color: #f8f9fa; border-color: #eee; }
 
@@ -563,7 +582,10 @@ $allActivityImagesMap = [];
         .donation-table th { background-color: #f8f9fa; font-weight: 600; color: #555; }
         .donation-row:hover { background-color: #f9f9f9; cursor: pointer; }
 
-        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; display: none; animation: slideIn 0.3s; }
+        /* Updated Floating Alert - Top Left Icon Alignment */
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: flex-start; gap: 10px; display: none; animation: slideIn 0.3s; max-width: 400px; }
+        .floating-alert div { line-height: 1.6; }
+        .floating-alert i { margin-top: 4px; }
         .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
@@ -639,14 +661,30 @@ $allActivityImagesMap = [];
                         <select name="filter_type" id="filterType" class="filter-select" onchange="toggleFilterInputs()">
                             <option value="">Filter By...</option>
                             <option value="status" <?php echo ($filterType == 'status') ? 'selected' : ''; ?>>Status</option>
-                            <option value="branch" <?php echo ($filterType == 'branch') ? 'selected' : ''; ?>>Branch</option>
+                            <option value="branch" <?php echo ($filterType == 'branch') ? 'selected' : ''; ?>>Branch ID</option>
                             <option value="year" <?php echo ($filterType == 'year') ? 'selected' : ''; ?>>Year</option>
+                            <option value="phone" <?php echo ($filterType == 'phone') ? 'selected' : ''; ?>>Phone Prefix</option>
+                            <option value="city" <?php echo ($filterType == 'city') ? 'selected' : ''; ?>>City</option>
+                            <option value="capacity" <?php echo ($filterType == 'capacity') ? 'selected' : ''; ?>>Capacity</option>
+                            <option value="branch_sort" <?php echo ($filterType == 'branch_sort') ? 'selected' : ''; ?>>Branch Name Sort</option>
+                            <option value="date_range" <?php echo ($filterType == 'date_range') ? 'selected' : ''; ?>>Date Range</option>
                         </select>
                     </div>
+                    
                     <div id="filter_status_container" class="secondary-filter"><select name="filter_val_status" class="filter-select"><option value="">Select Status...</option><option value="Active" <?php echo ($filterValue == 'Active') ? 'selected' : ''; ?>>Active</option><option value="Upcoming" <?php echo ($filterValue == 'Upcoming') ? 'selected' : ''; ?>>Upcoming</option><option value="Completed" <?php echo ($filterValue == 'Completed') ? 'selected' : ''; ?>>Completed</option><option value="Cancelled" <?php echo ($filterValue == 'Cancelled') ? 'selected' : ''; ?>>Cancelled</option></select></div>
                     <div id="filter_branch_container" class="secondary-filter"><select name="filter_val_branch" class="filter-select"><option value="">Select Branch...</option><?php foreach($branches as $b): ?><option value="<?php echo $b['Branch_ID']; ?>" <?php echo ($filterValue == $b['Branch_ID']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['Branch_Name']); ?></option><?php endforeach; ?></select></div>
                     <div id="filter_year_container" class="secondary-filter"><select name="filter_val_year" class="filter-select"><option value="">Select Year...</option><?php foreach($years as $yr): ?><option value="<?php echo $yr; ?>" <?php echo ($filterValue == $yr) ? 'selected' : ''; ?>><?php echo $yr; ?></option><?php endforeach; ?></select></div>
-                    <input type="text" name="search" class="search-input" placeholder="Search activity or branch..." value="<?php echo htmlspecialchars($searchTerm); ?>">
+                    <div id="filter_phone_container" class="secondary-filter"><select name="filter_val_phone" class="filter-select"><option value="">Select Prefix...</option><?php foreach($phonePrefixes as $pp): ?><option value="<?php echo $pp; ?>" <?php if($filterValue == $pp) echo 'selected'; ?>>+6<?php echo $pp; ?></option><?php endforeach; ?></select></div>
+                    <div id="filter_city_container" class="secondary-filter"><select name="filter_val_city" class="filter-select"><option value="">Select City...</option><?php foreach($cities as $c): ?><option value="<?php echo $c; ?>" <?php if($filterValue == $c) echo 'selected'; ?>><?php echo $c; ?></option><?php endforeach; ?></select></div>
+                    <div id="filter_capacity_container" class="secondary-filter"><select name="filter_val_capacity" class="filter-select"><option value="">Select Range...</option><option value="below_100" <?php if($filterValue == 'below_100') echo 'selected'; ?>>Below 100</option><option value="100_500" <?php if($filterValue == '100_500') echo 'selected'; ?>>100 - 500</option><option value="above_500" <?php if($filterValue == 'above_500') echo 'selected'; ?>>Above 500</option></select></div>
+                    <div id="filter_branch_sort_container" class="secondary-filter"><select name="filter_val_bsort" class="filter-select"><option value="">Select Order...</option><option value="asc" <?php if($filterValue == 'asc') echo 'selected'; ?>>Branch Name (A-Z)</option><option value="desc" <?php if($filterValue == 'desc') echo 'selected'; ?>>Branch Name (Z-A)</option></select></div>
+                    <div id="filter_date_range_container" class="secondary-filter" style="display:none; align-items:center; gap:5px;">
+                        <input type="date" name="filter_start_date" class="filter-select" value="<?php echo isset($_GET['filter_start_date']) ? $_GET['filter_start_date'] : ''; ?>">
+                        <span>to</span>
+                        <input type="date" name="filter_end_date" class="filter-select" value="<?php echo isset($_GET['filter_end_date']) ? $_GET['filter_end_date'] : ''; ?>">
+                    </div>
+
+                    <input type="text" name="search" class="search-input" placeholder="Search activity, description, city..." value="<?php echo htmlspecialchars($searchTerm); ?>">
                     <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
                     <?php if (!empty($searchTerm) || !empty($filterType)): ?><a href="activity_management.php" class="btn btn-danger" style="background-color: #dc3545; padding: 10px 15px;" title="Clear Filters"><i class="fas fa-times"></i></a><?php endif; ?>
                 </form>
@@ -718,22 +756,45 @@ $allActivityImagesMap = [];
                         <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #888;">No activities found.</div>
                     <?php endif; ?>
                 </div>
+                
                 <div class="pagination-container">
-                    <div class="pagination-info">Showing <?php echo $start_record; ?> to <?php echo $end_record; ?> of <?php echo $total_activities_count; ?> results</div>
+                    <div class="pagination-info">Showing <?php echo $start_record; ?> to <?php echo $end_record; ?> of <?php echo $total_records; ?> results</div>
                     <div class="pagination-controls">
                         <?php 
-                        $queryParams = [];
-                        if (!empty($searchTerm)) $queryParams['search'] = $searchTerm;
-                        if (!empty($filterType)) {
+                        // Build query string
+                        $queryParams = []; if(!empty($searchTerm)) $queryParams['search'] = $searchTerm;
+                        if(!empty($filterType)) {
                             $queryParams['filter_type'] = $filterType;
                             if ($filterType == 'status' && !empty($filterValue)) $queryParams['filter_val_status'] = $filterValue;
                             if ($filterType == 'branch' && !empty($filterValue)) $queryParams['filter_val_branch'] = $filterValue;
                             if ($filterType == 'year' && !empty($filterValue)) $queryParams['filter_val_year'] = $filterValue;
+                            if ($filterType == 'phone' && !empty($filterValue)) $queryParams['filter_val_phone'] = $filterValue;
+                            if ($filterType == 'city' && !empty($filterValue)) $queryParams['filter_val_city'] = $filterValue;
+                            if ($filterType == 'capacity' && !empty($filterValue)) $queryParams['filter_val_capacity'] = $filterValue;
+                            if ($filterType == 'branch_sort' && !empty($filterValue)) $queryParams['filter_val_bsort'] = $filterValue;
+                            if ($filterType == 'date_range') {
+                                $queryParams['filter_start_date'] = $_GET['filter_start_date'];
+                                $queryParams['filter_end_date'] = $_GET['filter_end_date'];
+                            }
                         }
                         $search_query = !empty($queryParams) ? '&' . http_build_query($queryParams) : '';
                         
-                        if ($page > 1) echo "<a href='?page=".($page-1).$search_query."' class='pagination-btn'>Previous</a>"; else echo "<span class='pagination-btn disabled'>Previous</span>";
-                        if ($page < $total_pages) echo "<a href='?page=".($page+1).$search_query."' class='pagination-btn'>Next</a>"; else echo "<span class='pagination-btn disabled'>Next</span>";
+                        if ($page > 1) echo "<a href='?page=".($page-1).$search_query."' class='pagination-btn'>Previous</a>";
+                        else echo "<span class='pagination-btn disabled'>Previous</span>";
+
+                        // Sliding Window Logic
+                        $start_window = max(1, $page - 1);
+                        $end_window = min($total_pages, $page + 1);
+                        if ($page == 1) $end_window = min($total_pages, 3);
+                        if ($page == $total_pages) $start_window = max(1, $total_pages - 2);
+
+                        for ($i = $start_window; $i <= $end_window; $i++) {
+                            if ($i == $page) echo "<span class='pagination-btn active'>$i</span>";
+                            else echo "<a href='?page=$i$search_query' class='pagination-btn'>$i</a>";
+                        }
+
+                        if ($page < $total_pages) echo "<a href='?page=".($page+1).$search_query."' class='pagination-btn'>Next</a>";
+                        else echo "<span class='pagination-btn disabled'>Next</span>";
                         ?>
                     </div>
                 </div>
@@ -923,6 +984,12 @@ $allActivityImagesMap = [];
                             <span class="form-guide">Update the current operational status.</span>
                         </div>
                     </div>
+
+                    <div class="form-group" id="cancel-reason-group" style="display:none;">
+                        <label class="form-label">Cancellation Reason <span class="required">*</span></label>
+                        <textarea id="edit_cancel_reason" name="cancel_reason" class="form-textarea" placeholder="Please provide a reason for cancellation..."></textarea>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Target (RM) <span class="required">*</span></label>
@@ -1140,10 +1207,19 @@ $allActivityImagesMap = [];
 
         function toggleFilterInputs() {
             const type = document.getElementById('filterType').value;
-            document.querySelectorAll('.secondary-filter').forEach(el => { el.classList.remove('active'); el.querySelector('select').disabled = true; });
+            document.querySelectorAll('.secondary-filter').forEach(el => { 
+                el.classList.remove('active'); 
+                if(el.tagName === 'DIV' && el.querySelector('select')) el.querySelector('select').disabled = true; 
+            });
+            
             if (type === 'status') { document.getElementById('filter_status_container').classList.add('active'); document.getElementById('filter_status_container').querySelector('select').disabled = false; }
             else if (type === 'branch') { document.getElementById('filter_branch_container').classList.add('active'); document.getElementById('filter_branch_container').querySelector('select').disabled = false; }
             else if (type === 'year') { document.getElementById('filter_year_container').classList.add('active'); document.getElementById('filter_year_container').querySelector('select').disabled = false; }
+            else if (type === 'phone') { document.getElementById('filter_phone_container').classList.add('active'); document.getElementById('filter_phone_container').querySelector('select').disabled = false; }
+            else if (type === 'city') { document.getElementById('filter_city_container').classList.add('active'); document.getElementById('filter_city_container').querySelector('select').disabled = false; }
+            else if (type === 'capacity') { document.getElementById('filter_capacity_container').classList.add('active'); document.getElementById('filter_capacity_container').querySelector('select').disabled = false; }
+            else if (type === 'branch_sort') { document.getElementById('filter_branch_sort_container').classList.add('active'); document.getElementById('filter_branch_sort_container').querySelector('select').disabled = false; }
+            else if (type === 'date_range') { document.getElementById('filter_date_range_container').classList.add('active'); document.getElementById('filter_date_range_container').style.display = 'flex'; }
         }
 
         function setupPostcodeState(postcodeId, stateSelectId) {
@@ -1178,7 +1254,7 @@ $allActivityImagesMap = [];
 
         function showSystemError(msg) {
             const el = document.getElementById('floatingError');
-            document.getElementById('msgError').innerText = msg;
+            document.getElementById('msgError').innerHTML = msg.replace(/\n/g, '<br>');
             el.style.display = 'flex';
             setTimeout(() => el.style.display='none', 5000);
         }
@@ -1197,23 +1273,19 @@ $allActivityImagesMap = [];
         }
 
         function checkName(val) {
-            // Returns true if NO numbers are found
             if (!val) return true;
             return !/\d/.test(val);
         }
 
-        // --- UPDATED: CUSTOM VALIDATION FUNCTION ---
         function validateActivityForm(prefix) { 
             let isValid = true;
             let errors = [];
 
-            // Helper to get value
             const getValue = (id) => {
                 const el = document.getElementById(id);
                 return el ? el.value.trim() : '';
             };
 
-            // 1. Required Field Checks (Manual because novalidate is on)
             if (prefix === 'add' && addFiles.length === 0) errors.push("At least one image is required.");
             if (prefix === 'edit' && editNewFiles.length === 0 && editExistingImages.length === 0) errors.push("At least one image is required.");
 
@@ -1235,7 +1307,16 @@ $allActivityImagesMap = [];
             if (!getValue(prefix + '_postal_code')) errors.push("Postcode is required.");
             if (!getValue(prefix + '_activity_description')) errors.push("Description is required.");
 
-            // 2. Date Validation
+            // Check cancelled reason in edit
+            if (prefix === 'edit') {
+                const status = getValue(prefix + '_activity_status');
+                if (status === 'Cancelled' && !getValue(prefix + '_cancel_reason')) {
+                    errors.push("Cancellation Reason is required.");
+                    isValid = false;
+                }
+            }
+
+            // Date Validation
             const start = document.getElementById(prefix + '_start_date').value;
             const end = document.getElementById(prefix + '_end_date').value;
             
@@ -1263,7 +1344,6 @@ $allActivityImagesMap = [];
                     isValid = false; 
                 }
 
-                // --- NEW: Start Date cannot be in the past (Only for 'add' mode) ---
                 if (prefix === 'add') {
                     const todayMid = new Date();
                     todayMid.setHours(0,0,0,0);
@@ -1274,17 +1354,16 @@ $allActivityImagesMap = [];
                 }
             }
 
-            // 3. Amount Validation
+            // Amount Validation
             const amountId = prefix + '_target_amount'; 
             const amountErrId = prefix + '_amount_error';
             if(!validateAmount(amountId, amountErrId)) {
                 isValid = false;
             }
 
-            // 4. Max Participants Validation
+            // Max Participants Validation
             const partId = prefix + '_max_participants';
             const partVal = document.getElementById(partId).value;
-            // Assuming IDs: add_participants_error / edit_participants_error
             const partErrId = prefix + '_participants_error';
             const partErrDiv = document.getElementById(partErrId);
 
@@ -1296,7 +1375,7 @@ $allActivityImagesMap = [];
                 if(partErrDiv) partErrDiv.style.display = 'none';
             }
 
-            // 5. Name Validation (No Numbers)
+            // Name Validation (No Numbers)
             const organizerName = document.getElementById(prefix + '_organizer').value;
             const contactName = document.getElementById(prefix + '_contact_name').value;
             
@@ -1309,7 +1388,7 @@ $allActivityImagesMap = [];
                 isValid = false;
             }
 
-            // 6. Email Validation
+            // Email Validation
             const emailId = prefix + '_contact_email';
             const emailErrId = prefix + 'EmailError';
             const emailVal = document.getElementById(emailId).value;
@@ -1322,7 +1401,7 @@ $allActivityImagesMap = [];
             }
 
             if(errors.length > 0) {
-                showSystemError("Validation Error: " + errors.join(" "));
+                showSystemError("Validation Error:<br>" + errors.join("<br>"));
                 return false;
             }
 
@@ -1366,11 +1445,47 @@ $allActivityImagesMap = [];
             document.getElementById('edit_activity_id').value = obj.Activity_ID;
             document.getElementById('edit_activity_name').value = obj.Activity_Name;
             document.getElementById('edit_branch_id').value = obj.Branch_ID;
-            document.getElementById('edit_activity_status').value = obj.Activity_Status;
+            
+            const statusSelect = document.getElementById('edit_activity_status');
+            statusSelect.value = obj.Activity_Status;
+            
+            // Logic: If already Active, cannot select Upcoming
+            const upcomingOption = statusSelect.querySelector('option[value="Upcoming"]');
+            if (obj.Activity_Status === 'Active') {
+                upcomingOption.hidden = true;
+                upcomingOption.disabled = true;
+            } else {
+                upcomingOption.hidden = false;
+                upcomingOption.disabled = false;
+            }
+
+            // Logic: Show/Hide Cancel Reason
+            const reasonContainer = document.getElementById('cancel-reason-group');
+            const reasonInput = document.getElementById('edit_cancel_reason');
+            if (obj.Activity_Status === 'Cancelled') {
+                reasonContainer.style.display = 'block';
+                reasonInput.value = obj.Cancel_Reason || '';
+                reasonInput.required = true;
+            } else {
+                reasonContainer.style.display = 'none';
+                reasonInput.value = '';
+                reasonInput.required = false;
+            }
+
+            // Listener for status change
+            statusSelect.onchange = function() {
+                if (this.value === 'Cancelled') {
+                    reasonContainer.style.display = 'block';
+                    reasonInput.required = true;
+                } else {
+                    reasonContainer.style.display = 'none';
+                    reasonInput.required = false;
+                }
+            };
+
             document.getElementById('edit_target_amount').value = obj.Activity_TargetAmount;
             document.getElementById('edit_activity_description').value = obj.Activity_Description;
             
-            // New Fields Mapping
             document.getElementById('edit_start_date').value = obj.Activity_StartDate;
             document.getElementById('edit_end_date').value = obj.Activity_EndDate;
             document.getElementById('edit_specific_date').value = obj.Activity_Date || '';
@@ -1378,7 +1493,6 @@ $allActivityImagesMap = [];
             document.getElementById('edit_organizer').value = obj.Activity_Organizer || '';
             document.getElementById('edit_contact_name').value = obj.Activity_Contact_Name || '';
             
-            // Contact Number Cleaning (Remove +60 if present for display)
             let phone = obj.Activity_Contact_Number || '';
             if(phone.startsWith('+60')) phone = phone.substring(3);
             document.getElementById('edit_contact_number').value = phone;
@@ -1386,7 +1500,6 @@ $allActivityImagesMap = [];
             document.getElementById('edit_contact_email').value = obj.Activity_Contact_Email || '';
             document.getElementById('edit_max_participants').value = obj.Activity_Max_Participants || '';
 
-            // Address
             document.getElementById('edit_address1').value = obj.Activity_Address1 || '';
             document.getElementById('edit_address2').value = obj.Activity_Address2 || '';
             document.getElementById('edit_address3').value = obj.Activity_Address3 || '';
@@ -1395,7 +1508,6 @@ $allActivityImagesMap = [];
             document.getElementById('edit_postal_code').value = obj.Activity_PostalCode || '';
             document.getElementById('edit_country').value = obj.Activity_Country || 'Malaysia';
             
-            // Image Logic
             try { editExistingImages = JSON.parse(obj.Activity_Images || "[]"); } catch(e) { editExistingImages = []; }
             document.getElementById('existing_images_json').value = JSON.stringify(editExistingImages);
             renderEditPreviews();
@@ -1418,7 +1530,6 @@ $allActivityImagesMap = [];
 
         function confirmDeleteActivity(id) { if (confirm('Delete this activity?')) window.location.href = 'activity_management.php?delete_activity_id=' + id; }
 
-        // Lightbox
         const allActivityImages = <?php echo json_encode($allActivityImagesMap); ?>;
         let currentLightboxActivityId = null;
         let currentLightboxIndex = 0;
@@ -1454,11 +1565,9 @@ $allActivityImagesMap = [];
 
         document.addEventListener('DOMContentLoaded', function() {
             toggleFilterInputs();
-            // Setup Postal Code Listeners
             setupPostcodeState('add_postal_code', 'add_state');
             setupPostcodeState('edit_postal_code', 'edit_state');
             
-            // Setup Phone Input Listeners
             setupPhoneInput('add_contact_number');
             setupPhoneInput('edit_contact_number');
 

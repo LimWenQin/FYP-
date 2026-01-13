@@ -2,7 +2,7 @@
 // reward_item_management.php
 session_start();
 
-// 1. Check Login (Modified to allow Staff)
+// 1. Check Login (Allow Admin or Staff)
 if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
@@ -40,6 +40,19 @@ if (isset($_SESSION['admin_id'])) {
     }
 }
 
+// --- FETCH BRANCHES FOR SUPPLIER SELECTION ---
+$branchesData = [];
+$branchTypes = ['Old Folks Home', 'Orphanage', 'Disabled Care Center']; // Matches Branch_Type enum
+$brSql = "SELECT Branch_Name, Branch_Type FROM branch WHERE Is_Deleted = 0 ORDER BY Branch_Name ASC";
+$brResult = $conn->query($brSql);
+if ($brResult) {
+    while ($brRow = $brResult->fetch_assoc()) {
+        $branchesData[$brRow['Branch_Type']][] = $brRow['Branch_Name'];
+    }
+}
+$jsonBranches = json_encode($branchesData);
+
+
 // --- CONFIG: CATEGORY ID PREFIXES ---
 $categoryPrefixes = [
     'Household' => 'HO',
@@ -53,6 +66,8 @@ $categoryPrefixes = [
 
 // --- CONSTANT: MAX STOCK ---
 define('MAX_STOCK_LIMIT', 500);
+// --- CONSTANT: LOW STOCK THRESHOLD ---
+define('LOW_STOCK_THRESHOLD', 15);
 
 // --- HELPER: Generate Unique Reward Code ---
 function generateRewardCode($conn, $category, $prefixes) {
@@ -78,17 +93,6 @@ function logRewardAction($conn, $rewardId, $adminId, $type, $details) {
     $conn->query($sql);
 }
 
-// --- AUTO-FIX: Generate IDs for Old Data ---
-$checkNullSql = "SELECT Reward_ID, Reward_Category FROM reward_item WHERE Reward_Code IS NULL OR Reward_Code = ''";
-$nullResult = $conn->query($checkNullSql);
-if ($nullResult && $nullResult->num_rows > 0) {
-    while($row = $nullResult->fetch_assoc()) {
-        $newCode = generateRewardCode($conn, $row['Reward_Category'], $categoryPrefixes);
-        $rid = $row['Reward_ID'];
-        $conn->query("UPDATE reward_item SET Reward_Code = '$newCode' WHERE Reward_ID = $rid");
-    }
-}
-
 // --- HELPER: Handle Image Upload ---
 function handleImageUpload($file) {
     if (isset($file) && $file['error'] == 0) {
@@ -101,29 +105,49 @@ function handleImageUpload($file) {
     return null;
 }
 
-// --- HANDLE EXPORT: SINGLE ITEM HISTORY (DETAILED) ---
+// --- HANDLE EXPORT: SINGLE ITEM HISTORY (BEAUTIFIED XLS) ---
 if (isset($_GET['action']) && $_GET['action'] == 'export_item_history' && isset($_GET['id'])) {
     $itemId = intval($_GET['id']);
     
-    // Get Item Details
+    // Get Item Info
     $itemQ = $conn->query("SELECT Reward_ItemName, Reward_Code, Reward_Stock FROM reward_item WHERE Reward_ID = $itemId");
     $itemInfo = $itemQ->fetch_assoc();
     $itemNameClean = preg_replace('/[^A-Za-z0-9\-]/', '_', $itemInfo['Reward_ItemName']);
     
-    $filename = "History_" . $itemInfo['Reward_Code'] . "_" . $itemNameClean . "_" . date('Y-m-d') . ".csv";
+    $filename = "History_" . $itemInfo['Reward_Code'] . "_" . $itemNameClean . "_" . date('Ymd') . ".xls";
     
-    header('Content-Type: text/csv');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header("Content-Type: application/vnd.ms-excel");
+    header("Content-Disposition: attachment; filename=\"$filename\"");
+    header("Pragma: no-cache");
+    header("Expires: 0");
     
-    $output = fopen('php://output', 'w');
-    
-    fputcsv($output, ['REPORT FOR:', $itemInfo['Reward_ItemName'] . ' (' . $itemInfo['Reward_Code'] . ')']);
-    fputcsv($output, ['Current Stock:', $itemInfo['Reward_Stock']]);
-    fputcsv($output, []);
+    echo '<style>
+        table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; }
+        th { background-color: #f2f2f2; color: #333; font-weight: bold; border: 1px solid #999; padding: 10px; }
+        td { border: 1px solid #999; padding: 8px; vertical-align: top; }
+        .section-header { background-color: #444; color: white; font-weight: bold; font-size: 14px; text-align: left; }
+        .info-row { background-color: #e9ecef; font-weight: bold; }
+    </style>';
 
-    // 1. Redemption History (Detailed)
-    fputcsv($output, ['--- REDEMPTION HISTORY (DONORS) ---']);
-    fputcsv($output, ['Redemption ID', 'Date', 'Donor Name', 'Email', 'Contact', 'IC Number', 'Points Spent', 'Status', 'Tracking No']);
+    // Main Info
+    echo '<table>';
+    echo '<tr><td colspan="9" class="info-row" style="font-size:16px; border:none;">REPORT FOR: ' . $itemInfo['Reward_ItemName'] . ' (' . $itemInfo['Reward_Code'] . ')</td></tr>';
+    echo '<tr><td colspan="9" style="border:none;">Current Stock: <strong>' . $itemInfo['Reward_Stock'] . '</strong> | Generated on: ' . date('d M Y, h:i A') . '</td></tr>';
+    echo '<tr><td colspan="9" style="border:none; height:20px;"></td></tr>'; // Spacer
+
+    // 1. Redemption History
+    echo '<tr><th colspan="9" class="section-header">REDEMPTION HISTORY (DONORS)</th></tr>';
+    echo '<tr>
+            <th>Redemption ID</th>
+            <th>Date</th>
+            <th>Donor Name</th>
+            <th>Email</th>
+            <th>Contact</th>
+            <th>IC Number</th>
+            <th>Points Spent</th>
+            <th>Status</th>
+            <th>Tracking No</th>
+          </tr>';
     
     $sqlRedeem = "SELECT r.Redemption_ID, r.Redemption_Updated_At, d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber, d.Donor_ICNumber,
                   r.Redemption_PointsSpent, r.Redemption_Status, r.Redemption_TrackingNumber
@@ -131,64 +155,114 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_item_history' && isset(
                   JOIN donor d ON r.Donor_ID = d.Donor_ID 
                   WHERE r.Reward_ID = $itemId ORDER BY r.Redemption_Updated_At DESC";
     $resRedeem = $conn->query($sqlRedeem);
-    while($row = $resRedeem->fetch_assoc()) {
-        fputcsv($output, [
-            $row['Redemption_ID'], 
-            $row['Redemption_Updated_At'], 
-            $row['Donor_Name'], 
-            $row['Donor_Email'], 
-            $row['Donor_ContactNumber'], 
-            $row['Donor_ICNumber'],
-            $row['Redemption_PointsSpent'], 
-            $row['Redemption_Status'],
-            $row['Redemption_TrackingNumber']
-        ]);
+    
+    if ($resRedeem && $resRedeem->num_rows > 0) {
+        while($row = $resRedeem->fetch_assoc()) {
+            echo '<tr>';
+            echo '<td style="text-align:center;">' . $row['Redemption_ID'] . '</td>';
+            echo '<td>' . $row['Redemption_Updated_At'] . '</td>';
+            echo '<td>' . htmlspecialchars($row['Donor_Name']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Donor_Email']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Donor_ContactNumber']) . '</td>';
+            echo '<td style="mso-number-format:\'\@\'">' . htmlspecialchars($row['Donor_ICNumber']) . '</td>';
+            echo '<td style="text-align:center;">' . $row['Redemption_PointsSpent'] . '</td>';
+            
+            $statusColor = '#000';
+            if ($row['Redemption_Status'] == 'Completed' || $row['Redemption_Status'] == 'Shipped') $statusColor = '#28a745';
+            elseif ($row['Redemption_Status'] == 'Pending') $statusColor = '#ffc107';
+            elseif ($row['Redemption_Status'] == 'Cancelled') $statusColor = '#dc3545';
+            
+            echo '<td style="color:'.$statusColor.'; font-weight:bold;">' . $row['Redemption_Status'] . '</td>';
+            echo '<td>' . htmlspecialchars($row['Redemption_TrackingNumber']) . '</td>';
+            echo '</tr>';
+        }
+    } else {
+        echo '<tr><td colspan="9" style="text-align:center; padding:15px; color:#777;">No redemption history found.</td></tr>';
     }
-    
-    fputcsv($output, []);
-    
-    // 2. Admin Audit Log
-    fputcsv($output, ['--- ADMIN AUDIT LOG (STOCK & UPDATES) ---']);
-    fputcsv($output, ['Date', 'Admin Name', 'Admin Email', 'Action Type', 'Detailed Description']);
+
+    echo '<tr><td colspan="9" style="border:none; height:30px;"></td></tr>'; // Spacer
+
+    // 2. Admin Audit Log (Added back per request)
+    echo '<tr><th colspan="9" class="section-header">ADMIN AUDIT LOG (STOCK & UPDATES)</th></tr>';
+    echo '<tr>
+            <th colspan="2">Date</th>
+            <th colspan="2">Admin Name</th>
+            <th colspan="2">Admin Email</th>
+            <th>Action Type</th>
+            <th colspan="2">Detailed Description</th>
+          </tr>';
     
     $sqlLog = "SELECT l.Log_Created_At, a.Admin_Name, a.Admin_Email, l.Action_Type, l.Action_Details 
                FROM reward_logs l 
                JOIN admin a ON l.Admin_ID = a.Admin_ID 
                WHERE l.Reward_ID = $itemId ORDER BY l.Log_Created_At DESC";
     $resLog = $conn->query($sqlLog);
-    while($row = $resLog->fetch_assoc()) {
-        fputcsv($output, [
-            $row['Log_Created_At'], 
-            $row['Admin_Name'], 
-            $row['Admin_Email'], 
-            $row['Action_Type'], 
-            $row['Action_Details']
-        ]);
-    }
     
-    fclose($output);
+    if ($resLog && $resLog->num_rows > 0) {
+        while($row = $resLog->fetch_assoc()) {
+            echo '<tr>';
+            echo '<td colspan="2">' . $row['Log_Created_At'] . '</td>';
+            echo '<td colspan="2">' . htmlspecialchars($row['Admin_Name']) . '</td>';
+            echo '<td colspan="2">' . htmlspecialchars($row['Admin_Email']) . '</td>';
+            echo '<td style="text-align:center; font-weight:bold;">' . $row['Action_Type'] . '</td>';
+            echo '<td colspan="2">' . htmlspecialchars($row['Action_Details']) . '</td>';
+            echo '</tr>';
+        }
+    } else {
+        echo '<tr><td colspan="9" style="text-align:center; padding:15px; color:#777;">No audit logs found.</td></tr>';
+    }
+
+    echo '</table>';
     exit();
 }
 
 // --- HANDLE EXPORT: ALL DATA ---
 if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
-    $filename = "All_Rewards_Report_" . date('Y-m-d') . ".csv";
-    header('Content-Type: text/csv');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    $output = fopen('php://output', 'w');
-    
-    fputcsv($output, ['ID Code', 'Item Name', 'Category', 'Stock Qty', 'Points Required', 'Status', 'Supplier']);
+    $filename = "All_Rewards_Report_" . date('Ymd') . ".xls";
+    header("Content-Type: application/vnd.ms-excel");
+    header("Content-Disposition: attachment; filename=\"$filename\"");
+    header("Pragma: no-cache");
+    header("Expires: 0");
+
+    echo '<table border="1" style="border-collapse: collapse; width: 100%;">';
+    echo '<tr style="background-color: #f2f2f2; font-weight: bold; text-align: center;">';
+    echo '<th style="padding: 10px; width: 120px;">ID Code</th>';
+    echo '<th style="padding: 10px; width: 250px;">Item Name</th>';
+    echo '<th style="padding: 10px; width: 150px;">Category</th>';
+    echo '<th style="padding: 10px; width: 100px;">Stock Qty</th>';
+    echo '<th style="padding: 10px; width: 100px;">Points Req.</th>';
+    echo '<th style="padding: 10px; width: 120px;">Status</th>';
+    echo '<th style="padding: 10px; width: 200px;">Supplier</th>';
+    echo '</tr>';
+
     $sqlInv = "SELECT Reward_Code, Reward_ItemName, Reward_Category, Reward_Stock, Reward_RequiredPoint, Reward_Status, Reward_Supplier 
-               FROM reward_item ORDER BY Reward_Category ASC";
+               FROM reward_item ORDER BY Reward_Category ASC, Reward_ItemName ASC";
     $resInv = $conn->query($sqlInv);
-    while($row = $resInv->fetch_assoc()) {
-        fputcsv($output, $row);
+    
+    if ($resInv && $resInv->num_rows > 0) {
+        while($row = $resInv->fetch_assoc()) {
+            echo '<tr>';
+            echo '<td style="padding: 8px; text-align: center;">' . htmlspecialchars($row['Reward_Code']) . '</td>';
+            echo '<td style="padding: 8px;">' . htmlspecialchars($row['Reward_ItemName']) . '</td>';
+            echo '<td style="padding: 8px; text-align: center;">' . htmlspecialchars($row['Reward_Category']) . '</td>';
+            echo '<td style="padding: 8px; text-align: center;">' . $row['Reward_Stock'] . '</td>';
+            echo '<td style="padding: 8px; text-align: center;">' . $row['Reward_RequiredPoint'] . '</td>';
+            
+            $statusColor = '#000000';
+            if($row['Reward_Status'] == 'Active') $statusColor = '#28a745';
+            elseif($row['Reward_Status'] == 'Inactive') $statusColor = '#dc3545';
+            elseif($row['Reward_Status'] == 'Low Stock') $statusColor = '#ffc107';
+            
+            echo '<td style="padding: 8px; text-align: center; color: '.$statusColor.'; font-weight: bold;">' . $row['Reward_Status'] . '</td>';
+            echo '<td style="padding: 8px;">' . htmlspecialchars($row['Reward_Supplier']) . '</td>';
+            echo '</tr>';
+        }
     }
-    fclose($output);
+    echo '</table>';
     exit();
 }
 
-// --- AJAX: Get History (Updated to include ID for linking) ---
+// --- AJAX: Get History ---
 if (isset($_GET['action']) && $_GET['action'] == 'get_full_history' && isset($_GET['item_id'])) {
     $itemId = intval($_GET['item_id']);
     
@@ -208,7 +282,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_full_history' && isset($_G
     exit();
 }
 
-// --- HANDLE QUICK STOCK UPDATE (WITH LIMIT) ---
+// --- HANDLE QUICK STOCK UPDATE ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['quick_stock_update'])) {
     $id = intval($_POST['stock_reward_id']);
     $addQty = intval($_POST['add_stock_qty']); 
@@ -217,27 +291,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['quick_stock_update']))
     if ($checkResult && $checkResult->num_rows > 0) {
         $row = $checkResult->fetch_assoc();
         $currentStock = intval($row['Reward_Stock']);
-        
-        // 1. Calculate Limit
         $finalStock = $currentStock + $addQty;
         
         if ($finalStock > MAX_STOCK_LIMIT) {
             $allowedToAdd = MAX_STOCK_LIMIT - $currentStock;
-            $exceededBy = $finalStock - MAX_STOCK_LIMIT;
             $errorMsg = "Stock Limit Exceeded (Max 500). Current: $currentStock. You can only add $allowedToAdd more.";
             header("Location: reward_item_management.php?error=" . urlencode($errorMsg));
             exit();
         }
-
         if ($finalStock < 0) {
              header("Location: reward_item_management.php?error=Stock cannot be negative.");
              exit();
         }
-
-        $statusUpdate = ($finalStock == 0) ? "Inactive" : (($finalStock < 10) ? "Low Stock" : "Active");
+        $statusUpdate = ($finalStock == 0) ? "Inactive" : (($finalStock < LOW_STOCK_THRESHOLD) ? "Low Stock" : "Active");
         
         $sql = "UPDATE reward_item SET Reward_Stock = $finalStock, Reward_Status = '$statusUpdate' WHERE Reward_ID = $id";
-        
         if ($conn->query($sql)) {
             logRewardAction($conn, $id, $currentAdminId, 'Stock Update', "Added $addQty qty. New Total: $finalStock");
             header("Location: reward_item_management.php?success=Stock Updated.");
@@ -248,7 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['quick_stock_update']))
     exit();
 }
 
-// --- HANDLE ADD REWARD (WITH LIMIT) ---
+// --- HANDLE ADD REWARD ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_reward'])) {
     $name = $conn->real_escape_string($_POST['name']);
     $category = $conn->real_escape_string($_POST['category']); 
@@ -258,7 +326,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_reward'])) {
     $points = (int)$_POST['points'];
     $stock = (int)$_POST['stock'];
     
-    // 1. Validate Stock Limit
     if ($stock > MAX_STOCK_LIMIT) {
         $errorMsg = "Cannot create item. Initial stock ($stock) exceeds maximum limit of " . MAX_STOCK_LIMIT . ".";
         header("Location: reward_item_management.php?error=" . urlencode($errorMsg));
@@ -270,7 +337,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_reward'])) {
         exit();
     }
 
-    $status = ($stock == 0) ? 'Inactive' : (($stock < 10) ? 'Low Stock' : 'Active');
+    $status = ($stock == 0) ? 'Inactive' : (($stock < LOW_STOCK_THRESHOLD) ? 'Low Stock' : 'Active');
     $imageName = handleImageUpload($_FILES['photo']);
     $expiryVal = $expiryDate ? "'$expiryDate'" : "NULL";
 
@@ -289,7 +356,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_reward'])) {
     exit();
 }
 
-// --- HANDLE EDIT REWARD (WITH LIMIT) ---
+// --- HANDLE EDIT REWARD ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_reward'])) {
     $id = (int)$_POST['reward_id'];
     $name = $conn->real_escape_string($_POST['name']);
@@ -301,15 +368,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_reward'])) {
     $stock = (int)$_POST['stock'];
     $status = $_POST['status']; 
 
-    // 1. Validate Stock Limit (Replaced alert with header redirect)
     if ($stock > MAX_STOCK_LIMIT) {
         $errorMsg = "Cannot update item. Stock ($stock) exceeds maximum limit of " . MAX_STOCK_LIMIT . ".";
         header("Location: reward_item_management.php?error=" . urlencode($errorMsg));
         exit();
     }
 
+    // Only auto-update status if not manually set to Inactive, or enforce rules?
+    // User requested validation on status, logic remains:
     if ($status != 'Inactive') {
-        $status = ($stock < 10) ? 'Low Stock' : 'Active';
+        $status = ($stock < LOW_STOCK_THRESHOLD) ? 'Low Stock' : 'Active';
     }
 
     $imageSql = "";
@@ -377,12 +445,20 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
     if ($filterType == 'status' && !empty($_GET['filter_val_status'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_status']);
         $whereConditions[] = "Reward_Status = '$filterValue'";
-    } elseif ($filterType == 'points' && !empty($_GET['filter_val_points'])) {
+    } 
+    elseif ($filterType == 'points' && !empty($_GET['filter_val_points'])) {
         $filterValue = $_GET['filter_val_points'];
-        if ($filterValue == 'low') $whereConditions[] = "Reward_RequiredPoint < 150";
-        elseif ($filterValue == 'mid') $whereConditions[] = "Reward_RequiredPoint BETWEEN 150 AND 300";
-        elseif ($filterValue == 'high') $whereConditions[] = "Reward_RequiredPoint > 300";
-    } elseif ($filterType == 'category' && !empty($_GET['filter_val_category'])) {
+        if ($filterValue == 'low') $whereConditions[] = "Reward_RequiredPoint < 15";
+        elseif ($filterValue == 'mid') $whereConditions[] = "Reward_RequiredPoint BETWEEN 15 AND 35";
+        elseif ($filterValue == 'high') $whereConditions[] = "Reward_RequiredPoint > 35";
+    } 
+    elseif ($filterType == 'stock' && !empty($_GET['filter_val_stock'])) {
+        $filterValue = $_GET['filter_val_stock'];
+        if ($filterValue == 'low') $whereConditions[] = "Reward_Stock < 10";
+        elseif ($filterValue == 'mid') $whereConditions[] = "Reward_Stock BETWEEN 10 AND 200";
+        elseif ($filterValue == 'high') $whereConditions[] = "Reward_Stock > 200";
+    } 
+    elseif ($filterType == 'category' && !empty($_GET['filter_val_category'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_category']);
         $whereConditions[] = "Reward_Category = '$filterValue'";
     }
@@ -405,12 +481,11 @@ $resultItems = $conn->query($sqlItems);
 // --- STATS ---
 $totalItems = $conn->query("SELECT COUNT(*) as total FROM reward_item")->fetch_assoc()['total'];
 $activeRewards = $conn->query("SELECT COUNT(*) as active FROM reward_item WHERE Reward_Status = 'Active'")->fetch_assoc()['active'];
-$lowStockCount = $conn->query("SELECT COUNT(*) as low FROM reward_item WHERE Reward_Stock < 10")->fetch_assoc()['low'];
+$lowStockCount = $conn->query("SELECT COUNT(*) as low FROM reward_item WHERE Reward_Stock < " . LOW_STOCK_THRESHOLD)->fetch_assoc()['low'];
 $totalRedemptions = $conn->query("SELECT COUNT(*) as total FROM redemption_order")->fetch_assoc()['total'];
 
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
 $end_record = min($start_from + $results_per_page, $total_records);
-
 $categories = array_keys($categoryPrefixes); 
 ?>
 
@@ -479,8 +554,6 @@ $categories = array_keys($categoryPrefixes);
         .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; display: inline-block; }
         .status-active { background-color: rgba(40, 167, 69, 0.1); color: #28a745; border: 1px solid rgba(40, 167, 69, 0.2); }
         .status-low { background-color: rgba(255, 193, 7, 0.1); color: #856404; border: 1px solid rgba(255, 193, 7, 0.2); }
-        
-        /* [MODIFIED] Inactive color changed to Red */
         .status-inactive { background-color: rgba(220, 53, 69, 0.15); color: #dc3545; border: 1px solid rgba(220, 53, 69, 0.3); }
 
         .action-cell { display: flex; justify-content: center; align-items: center; }
@@ -508,50 +581,12 @@ $categories = array_keys($categoryPrefixes);
         .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #6c757d; }
         .modal-body { padding: 20px; max-height: 80vh; overflow-y: auto; }
         
-        /* --- LIGHTBOX (IMAGE VIEWER) CSS [FROM DONOR PAGE] --- */
-        .lightbox-modal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            padding-top: 50px;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: rgba(0, 0, 0, 0.9);
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-        .lightbox-content {
-            margin: auto;
-            display: block;
-            max-width: 90%;
-            max-height: 80vh;
-            border-radius: 5px;
-            box-shadow: 0 0 20px rgba(255,255,255,0.1);
-            object-fit: contain;
-            animation: zoomIn 0.3s;
-        }
+        /* --- LIGHTBOX (IMAGE VIEWER) CSS --- */
+        .lightbox-modal { display: none; position: fixed; z-index: 2000; padding-top: 50px; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; background-color: rgba(0, 0, 0, 0.9); flex-direction: column; justify-content: center; align-items: center; }
+        .lightbox-content { margin: auto; display: block; max-width: 90%; max-height: 80vh; border-radius: 5px; box-shadow: 0 0 20px rgba(255,255,255,0.1); object-fit: contain; animation: zoomIn 0.3s; }
         @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
-        
-        .close-lightbox {
-            position: absolute;
-            top: 20px;
-            right: 35px;
-            color: #f1f1f1;
-            font-size: 40px;
-            font-weight: bold;
-            transition: 0.3s;
-            cursor: pointer;
-            z-index: 2002;
-        }
-        .close-lightbox:hover, .close-lightbox:focus {
-            color: #bbb;
-            text-decoration: none;
-            cursor: pointer;
-        }
+        .close-lightbox { position: absolute; top: 20px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; z-index: 2002; }
+        .close-lightbox:hover, .close-lightbox:focus { color: #bbb; text-decoration: none; cursor: pointer; }
 
         .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
         .form-row .form-group { flex: 1; margin-bottom: 0; }
@@ -559,8 +594,9 @@ $categories = array_keys($categoryPrefixes);
         .form-label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px; color: #343a40; }
         .form-control, .form-select { width: 100%; padding: 10px 15px; border: 1px solid #ced4da; border-radius: 5px; outline: none; font-size: 14px; }
         .form-control:focus, .form-select:focus { border-color: #F28585; }
+        .form-control:read-only, .form-select:disabled { background-color: #e9ecef; cursor: not-allowed; }
         
-        /* Guide & Error Styles [Added per request] */
+        /* Guide & Error Styles */
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
         .error-message { color: #dc3545; font-size: 12px; margin-top: 5px; display: none; }
 
@@ -576,7 +612,10 @@ $categories = array_keys($categoryPrefixes);
         .btn-submit { width: 100%; background: #F28585; color: white; padding: 12px; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; margin-top: 10px; font-size: 14px; transition: 0.2s;}
         .btn-submit:hover { background: #d66565; }
         
-        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1100; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s; background: white; border-left: 4px solid #28a745; color: #28a745; }
+        /* Updated Floating Alert CSS */
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; animation: slideIn 0.3s; background: white; border-left: 4px solid #28a745; color: #28a745; }
+        .floating-alert div { line-height: 1.6; }
+        .floating-alert i { margin-top: 4px; }
         .floating-alert-danger { border-left-color: #dc3545; color: #dc3545; }
         
         .history-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -620,12 +659,12 @@ $categories = array_keys($categoryPrefixes);
 
             <div class="floating-alert" id="alertMsg" style="display: <?php echo isset($_GET['success']) ? 'flex' : 'none'; ?>">
                 <i class="fas fa-check-circle"></i>
-                <span id="alertMsgText"><?php echo isset($_GET['success']) ? htmlspecialchars($_GET['success']) : ''; ?></span>
+                <div id="alertMsgText"><?php echo isset($_GET['success']) ? htmlspecialchars($_GET['success']) : ''; ?></div>
             </div>
 
             <div class="floating-alert floating-alert-danger" id="alertError" style="display: <?php echo isset($_GET['error']) ? 'flex' : 'none'; ?>">
                 <i class="fas fa-exclamation-circle"></i>
-                <span id="alertErrorText"><?php echo isset($_GET['error']) ? htmlspecialchars($_GET['error']) : ''; ?></span>
+                <div id="alertErrorText"><?php echo isset($_GET['error']) ? htmlspecialchars($_GET['error']) : ''; ?></div>
             </div>
 
             <div class="stats-cards">
@@ -682,6 +721,7 @@ $categories = array_keys($categoryPrefixes);
                             <option value="">Filter By...</option>
                             <option value="status" <?php echo ($filterType == 'status') ? 'selected' : ''; ?>>Status</option>
                             <option value="points" <?php echo ($filterType == 'points') ? 'selected' : ''; ?>>Points</option>
+                            <option value="stock" <?php echo ($filterType == 'stock') ? 'selected' : ''; ?>>Stock Quantity</option>
                             <option value="category" <?php echo ($filterType == 'category') ? 'selected' : ''; ?>>Category</option>
                         </select>
                     </div>
@@ -696,9 +736,17 @@ $categories = array_keys($categoryPrefixes);
 
                     <div id="filter_points_container" class="secondary-filter">
                         <select name="filter_val_points" class="filter-select">
-                            <option value="low">Low (< 150)</option>
-                            <option value="mid">Mid (150-300)</option>
-                            <option value="high">High (> 300)</option>
+                            <option value="low">Low (< 15)</option>
+                            <option value="mid">Mid (15-35)</option>
+                            <option value="high">High (> 35)</option>
+                        </select>
+                    </div>
+                    
+                    <div id="filter_stock_container" class="secondary-filter">
+                        <select name="filter_val_stock" class="filter-select">
+                            <option value="low">Below 10</option>
+                            <option value="mid">10 - 200</option>
+                            <option value="high">Above 200</option>
                         </select>
                     </div>
                     
@@ -729,7 +777,7 @@ $categories = array_keys($categoryPrefixes);
                             <th>ITEM NAME / ID</th>
                             <th style="text-align: center;">CATEGORY</th>
                             <th style="text-align: center;">POINTS REQUIRED</th> 
-                            <th style="text-align: center;">STOCK QTY</th>
+                            <th style="text-align: center;">STOCK QUANTITY</th>
                             <th style="text-align: center;">STATUS</th>
                             <th style="text-align: center;">SUPPLIER</th>
                             <th style="text-align: center;">ACTIONS</th>
@@ -789,6 +837,9 @@ $categories = array_keys($categoryPrefixes);
                                                     <i class="fas fa-ellipsis-v"></i>
                                                 </button>
                                                 <div id="menu-<?php echo $row['Reward_ID']; ?>" class="dropdown-content">
+                                                    <div onclick='openViewModal(<?php echo $rowData; ?>)'>
+                                                        <i class="fas fa-eye"></i> View Details
+                                                    </div>
                                                     <div onclick='openEditModal(<?php echo $rowData; ?>)'>
                                                         <i class="fas fa-edit"></i> Edit Details
                                                     </div>
@@ -853,6 +904,56 @@ $categories = array_keys($categoryPrefixes);
         <img class="lightbox-content" id="lightboxImage">
     </div>
 
+    <div id="viewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>View Reward Details</h2><button class="close-btn" onclick="closeModal('viewModal')">&times;</button></div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Reward Image</label>
+                    <div class="reward-img-preview" id="view-preview-container">
+                        <span>No Image</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Item Name</label>
+                    <input type="text" id="view_name" class="form-control" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <input type="text" id="view_category" class="form-control" readonly>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Points Required</label>
+                        <input type="text" id="view_points" class="form-control" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Stock Quantity</label>
+                        <input type="text" id="view_stock" class="form-control" readonly>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Supplier</label>
+                        <input type="text" id="view_supplier" class="form-control" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Expiry Date</label>
+                        <input type="text" id="view_expiry" class="form-control" readonly>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <input type="text" id="view_status" class="form-control" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea id="view_desc" class="form-control" rows="4" style="resize: vertical;" readonly></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="addModal" class="modal">
         <div class="modal-content">
             <div class="modal-header"><h2>Add New Reward</h2><button class="close-btn" onclick="closeModal('addModal')">&times;</button></div>
@@ -912,15 +1013,38 @@ $categories = array_keys($categoryPrefixes);
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">Supplier / Source</label>
-                            <input type="text" name="supplier" class="form-control" placeholder="e.g. Public Donation">
-                            <span class="form-guide">Where this item originated from (Donor, Vendor, etc.).</span>
+                            <label class="form-label">Supplier Source <span class="required-star">*</span></label>
+                            <select id="add_source_type" class="form-select" onchange="updateSupplierInput('add')">
+                                <option value="">-- Select Source Type --</option>
+                                <?php foreach($branchTypes as $type): ?>
+                                    <option value="<?php echo $type; ?>"><?php echo $type; ?></option>
+                                <?php endforeach; ?>
+                                <option value="Others">Others</option>
+                            </select>
+                            <span class="form-guide">Choose if the item comes from a branch or external source.</span>
                         </div>
-                        <div class="form-group" id="add_expiry_container" style="display:none;">
-                            <label class="form-label">Expiry Date <span class="required-star">*</span></label>
-                            <input type="date" name="expiry_date" id="add_expiry" class="form-control">
-                            <span class="form-guide">Required for Food or Voucher categories.</span>
+                        
+                        <div class="form-group" id="add_branch_container" style="display:none;">
+                            <label class="form-label">Select Branch <span class="required-star">*</span></label>
+                            <select id="add_branch_select" class="form-select" onchange="updateSupplierInput('add')">
+                                <option value="">-- Select Branch --</option>
+                            </select>
+                            <span class="form-guide">Select the specific branch.</span>
                         </div>
+
+                        <div class="form-group" id="add_manual_container" style="display:none;">
+                            <label class="form-label">Supplier Name <span class="required-star">*</span></label>
+                            <input type="text" id="add_manual_supplier" class="form-control" placeholder="e.g. Public Donation" oninput="updateSupplierInput('add')">
+                            <span class="form-guide">Enter the name of the external supplier.</span>
+                        </div>
+                        
+                        <input type="hidden" name="supplier" id="add_final_supplier">
+                    </div>
+
+                    <div class="form-group" id="add_expiry_container" style="display:none;">
+                        <label class="form-label">Expiry Date <span class="required-star">*</span></label>
+                        <input type="date" name="expiry_date" id="add_expiry" class="form-control">
+                        <span class="form-guide">Required for Food or Voucher categories.</span>
                     </div>
 
                     <div class="form-group">
@@ -944,7 +1068,7 @@ $categories = array_keys($categoryPrefixes);
                     <input type="hidden" name="reward_id" id="edit_id">
                     
                     <div class="form-group">
-                        <label class="form-label">Reward Image</label>
+                        <label class="form-label">Reward Image <span class="required-star">*</span></label>
                         <div class="reward-img-preview" id="edit-preview-container">
                             <span>No Image</span>
                         </div>
@@ -960,7 +1084,7 @@ $categories = array_keys($categoryPrefixes);
                                 </button>
                             </div>
                         </div>
-                        <span class="form-guide">Leave empty to keep current image.</span>
+                        <span class="form-guide">Leave empty to keep current image. Format: JPG, PNG.</span>
                     </div>
 
                     <div class="form-group">
@@ -984,6 +1108,7 @@ $categories = array_keys($categoryPrefixes);
                         <div class="form-group">
                             <label class="form-label">Points Required <span class="required-star">*</span></label>
                             <input type="number" name="points" id="edit_points" class="form-control" required min="0" oninput="validity.valid||(value='');">
+                            <span class="form-guide">Points needed to redeem one unit.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Stock Quantity (Max 500) <span class="required-star">*</span></label>
@@ -994,17 +1119,42 @@ $categories = array_keys($categoryPrefixes);
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">Supplier / Source</label>
-                            <input type="text" name="supplier" id="edit_supplier" class="form-control">
+                            <label class="form-label">Supplier Source <span class="required-star">*</span></label>
+                            <select id="edit_source_type" class="form-select" onchange="updateSupplierInput('edit')">
+                                <option value="">-- Select Source Type --</option>
+                                <?php foreach($branchTypes as $type): ?>
+                                    <option value="<?php echo $type; ?>"><?php echo $type; ?></option>
+                                <?php endforeach; ?>
+                                <option value="Others">Others</option>
+                            </select>
+                            <span class="form-guide">Choose source type.</span>
                         </div>
-                        <div class="form-group" id="edit_expiry_container" style="display:none;">
-                            <label class="form-label">Expiry Date <span class="required-star">*</span></label>
-                            <input type="date" name="expiry_date" id="edit_expiry" class="form-control">
+                        
+                        <div class="form-group" id="edit_branch_container" style="display:none;">
+                            <label class="form-label">Select Branch <span class="required-star">*</span></label>
+                            <select id="edit_branch_select" class="form-select" onchange="updateSupplierInput('edit')">
+                                <option value="">-- Select Branch --</option>
+                            </select>
+                            <span class="form-guide">Update specific branch.</span>
                         </div>
+
+                        <div class="form-group" id="edit_manual_container" style="display:none;">
+                            <label class="form-label">Supplier Name <span class="required-star">*</span></label>
+                            <input type="text" id="edit_manual_supplier" class="form-control" oninput="updateSupplierInput('edit')">
+                            <span class="form-guide">Enter external supplier name.</span>
+                        </div>
+                        
+                        <input type="hidden" name="supplier" id="edit_final_supplier">
+                    </div>
+
+                    <div class="form-group" id="edit_expiry_container" style="display:none;">
+                        <label class="form-label">Expiry Date <span class="required-star">*</span></label>
+                        <input type="date" name="expiry_date" id="edit_expiry" class="form-control">
+                        <span class="form-guide">Required for Food or Voucher categories.</span>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Status</label>
+                        <label class="form-label">Status <span class="required-star">*</span></label>
                         <select name="status" id="edit_status" class="form-select">
                             <option value="Active">Active</option>
                             <option value="Low Stock">Low Stock</option>
@@ -1095,12 +1245,54 @@ $categories = array_keys($categoryPrefixes);
     </div>
 
     <script>
+        // --- SUPPLIER LOGIC ---
+        // Parse PHP branch data
+        const branches = <?php echo $jsonBranches; ?>;
+
+        function updateSupplierInput(mode) {
+            const sourceType = document.getElementById(mode + '_source_type').value;
+            const branchSelect = document.getElementById(mode + '_branch_select');
+            const manualInput = document.getElementById(mode + '_manual_supplier');
+            const finalInput = document.getElementById(mode + '_final_supplier');
+            
+            const branchContainer = document.getElementById(mode + '_branch_container');
+            const manualContainer = document.getElementById(mode + '_manual_container');
+
+            // Reset
+            branchContainer.style.display = 'none';
+            manualContainer.style.display = 'none';
+
+            if (sourceType === 'Others') {
+                manualContainer.style.display = 'block';
+                finalInput.value = manualInput.value;
+            } else if (sourceType) {
+                // It's a branch type
+                branchContainer.style.display = 'block';
+                // Populate options only if changed or empty
+                if (branchSelect.getAttribute('data-current-type') !== sourceType) {
+                    branchSelect.innerHTML = '<option value="">-- Select Branch --</option>';
+                    if (branches[sourceType]) {
+                        branches[sourceType].forEach(bName => {
+                            const opt = document.createElement('option');
+                            opt.value = bName;
+                            opt.innerText = bName;
+                            branchSelect.appendChild(opt);
+                        });
+                    }
+                    branchSelect.setAttribute('data-current-type', sourceType);
+                }
+                finalInput.value = branchSelect.value;
+            } else {
+                finalInput.value = '';
+            }
+        }
+
         // --- ALERT SYSTEM ---
         function showSystemError(msg) {
             const errBox = document.getElementById('alertError');
             const errText = document.getElementById('alertErrorText');
             if(errBox && errText) {
-                errText.innerText = msg;
+                errText.innerHTML = msg; // Changed to innerHTML to allow <br>
                 errBox.style.display = 'flex';
                 setTimeout(() => { errBox.style.display = 'none'; }, 5000);
             } else {
@@ -1115,12 +1307,15 @@ $categories = array_keys($categoryPrefixes);
             document.getElementById('add-file-info').style.display = 'none';
             document.getElementById('add_name_error').style.display = 'none';
             toggleExpiryField('add_category', 'add_expiry_container');
+            
+            // Reset Supplier fields
+            document.getElementById('add_branch_select').setAttribute('data-current-type', '');
+            updateSupplierInput('add');
         }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
-        // --- NEW LIGHTBOX FUNCTIONS ---
         function openLightbox(src) {
-            if(!src) return;
+            if(!src) return; 
             document.getElementById('lightboxImage').src = src;
             document.getElementById('imageLightbox').style.display = 'flex';
         }
@@ -1146,7 +1341,6 @@ $categories = array_keys($categoryPrefixes);
             document.getElementById('stockModal').style.display = 'flex';
         }
 
-        // [MODIFIED] Replaced alert() with showSystemError()
         function validateStockAdd() {
             const current = parseInt(document.getElementById('display_current_stock').innerText);
             const qtyInput = document.getElementById('add_stock_qty');
@@ -1168,41 +1362,60 @@ $categories = array_keys($categoryPrefixes);
             return true;
         }
 
-        // [NEW] Validate Form (Similar to Donor Page)
         function validateRewardForm(type) {
             let errors = [];
             const prefix = (type === 'add') ? 'add' : 'edit';
             
-            // Get Elements
             const elName = document.getElementById(prefix + '_name');
             const elPoints = document.getElementById(prefix + '_points');
             const elStock = document.getElementById(prefix + '_stock');
             const elDesc = document.getElementById(prefix + '_desc');
             const elCat = document.getElementById(prefix + '_category');
             
-            // Check Required
             if (!elName.value.trim()) errors.push("Item Name is required.");
             if (!elCat.value) errors.push("Category is required.");
             if (!elPoints.value) errors.push("Points Required is required.");
             if (!elStock.value) errors.push("Stock Quantity is required.");
             if (!elDesc.value.trim()) errors.push("Description is required.");
 
-            // Image Check (Add only)
+            // Image Check (Add: Required. Edit: Required if no existing)
             if (type === 'add') {
                 const elPhoto = document.getElementById('add_photo');
                 if (!elPhoto.files || elPhoto.files.length === 0) {
                     errors.push("Reward Image is required.");
                 }
+            } else if (type === 'edit') {
+                const preview = document.getElementById('edit-preview-container');
+                const hasExistingImg = preview.querySelector('img') !== null;
+                const hasNewFile = document.getElementById('edit_photo').files.length > 0;
+                
+                if (!hasExistingImg && !hasNewFile) {
+                    errors.push("Reward Image is required.");
+                }
             }
 
-            // Expiry Check (If visible/required based on category)
+            // Supplier Check (New Requirement)
+            const sourceType = document.getElementById(prefix + '_source_type').value;
+            if (!sourceType) {
+                errors.push("Supplier Source is required.");
+            } else if (sourceType === 'Others') {
+                if (!document.getElementById(prefix + '_manual_supplier').value.trim()) errors.push("Supplier Name is required.");
+            } else {
+                if (!document.getElementById(prefix + '_branch_select').value) errors.push("Branch selection is required.");
+            }
+
+            // Status Check for Edit (New Requirement)
+            if (type === 'edit') {
+                const elStatus = document.getElementById('edit_status');
+                if (!elStatus.value) errors.push("Status is required.");
+            }
+
             const catVal = elCat.value;
             if (['Food', 'Voucher'].includes(catVal)) {
                 const elExpiry = document.getElementById(prefix + '_expiry');
                 if (!elExpiry.value) errors.push("Expiry Date is required for this category.");
             }
 
-            // Regex Check for Name
             const nameRegex = /^[a-zA-Z0-9\s\-]+$/;
             const errorDiv = document.getElementById(prefix + '_name_error');
             
@@ -1214,7 +1427,7 @@ $categories = array_keys($categoryPrefixes);
             }
 
             if (errors.length > 0) {
-                showSystemError("Validation Error: " + errors.join(" "));
+                showSystemError("Please correct the following errors:<br>" + errors.join("<br>"));
                 return false;
             }
 
@@ -1267,19 +1480,15 @@ $categories = array_keys($categoryPrefixes);
         window.addEventListener('click', function(e) { 
             if (!e.target.matches('.menu-btn') && !e.target.matches('.menu-btn *')) { document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); } 
             if (e.target.classList.contains('modal')) { e.target.style.display = 'none'; } 
-            
-            // Close lightbox on outside click
             if (e.target.id == 'imageLightbox') closeLightbox();
         });
         
-        // Keyboard Support for Lightbox
         document.addEventListener('keydown', function(event) {
             if (event.key === "Escape" && document.getElementById('imageLightbox').style.display === "flex") {
                 closeLightbox();
             }
         });
         
-        // [MODIFIED] Replaced standard confirm() with SweetAlert2
         function confirmDelete(id, name) { 
             Swal.fire({
                 title: 'Delete Item?',
@@ -1301,11 +1510,34 @@ $categories = array_keys($categoryPrefixes);
             document.querySelectorAll('.secondary-filter').forEach(el => el.classList.remove('active')); 
             if (val === 'status') document.getElementById('filter_status_container').classList.add('active'); 
             if (val === 'points') document.getElementById('filter_points_container').classList.add('active'); 
+            if (val === 'stock') document.getElementById('filter_stock_container').classList.add('active');
             if (val === 'category') document.getElementById('filter_category_container').classList.add('active'); 
         }
         document.addEventListener('DOMContentLoaded', toggleFilterInputs);
         const alertBox = document.getElementById('alertMsg'); if (alertBox) setTimeout(() => { alertBox.style.display = 'none'; }, 4000);
         const alertErr = document.getElementById('alertError'); if (alertErr) setTimeout(() => { alertErr.style.display = 'none'; }, 4000);
+
+        // --- OPEN VIEW DETAILS MODAL ---
+        function openViewModal(data) {
+            document.getElementById('view_name').value = data.Reward_ItemName;
+            document.getElementById('view_category').value = data.Reward_Category;
+            document.getElementById('view_points').value = data.Reward_RequiredPoint;
+            document.getElementById('view_stock').value = data.Reward_Stock;
+            document.getElementById('view_supplier').value = data.Reward_Supplier || '-';
+            document.getElementById('view_expiry').value = data.Reward_ExpiryDate || '-';
+            document.getElementById('view_status').value = data.Reward_Status;
+            document.getElementById('view_desc').value = data.Reward_Description;
+            
+            const previewContainer = document.getElementById('view-preview-container');
+            if (data.Reward_PhotoPath) { 
+                const originalSrc = "uploads/rewards/" + data.Reward_PhotoPath;
+                previewContainer.innerHTML = `<img src="${originalSrc}" alt="Image">`; 
+            } else { 
+                previewContainer.innerHTML = '<span>No Image</span>'; 
+            }
+            
+            document.getElementById('viewModal').style.display = 'flex';
+        }
 
         function openEditModal(data) {
             document.getElementById('edit_id').value = data.Reward_ID;
@@ -1318,15 +1550,48 @@ $categories = array_keys($categoryPrefixes);
             const categorySelect = document.getElementById('edit_category');
             categorySelect.value = data.Reward_Category || 'Others';
             
-            document.getElementById('edit_supplier').value = data.Reward_Supplier || '';
             document.getElementById('edit_expiry').value = data.Reward_ExpiryDate || '';
             
+            // SUPPLIER REVERSE-ENGINEERING LOGIC
+            const currentSupplier = data.Reward_Supplier || '';
+            let foundType = '';
+            
+            for (const [type, branchList] of Object.entries(branches)) {
+                if (branchList.includes(currentSupplier)) {
+                    foundType = type;
+                    break;
+                }
+            }
+
+            const sourceTypeSelect = document.getElementById('edit_source_type');
+            const branchSelect = document.getElementById('edit_branch_select');
+            const manualInput = document.getElementById('edit_manual_supplier');
+
+            manualInput.value = '';
+
+            if (foundType) {
+                sourceTypeSelect.value = foundType;
+                updateSupplierInput('edit');
+                branchSelect.value = currentSupplier;
+            } else {
+                if (currentSupplier) {
+                    sourceTypeSelect.value = 'Others';
+                    manualInput.value = currentSupplier;
+                } else {
+                    sourceTypeSelect.value = '';
+                }
+                updateSupplierInput('edit');
+            }
+            updateSupplierInput('edit');
+
             const previewContainer = document.getElementById('edit-preview-container');
             let originalSrc = null;
             if (data.Reward_PhotoPath) { 
                 originalSrc = "uploads/rewards/" + data.Reward_PhotoPath;
                 previewContainer.innerHTML = `<img src="${originalSrc}" alt="Current">`; 
-            } else { previewContainer.innerHTML = '<span>No Image</span>'; }
+            } else { 
+                previewContainer.innerHTML = '<span><i class="fas fa-image" style="font-size:24px; color:#ccc;"></i></span>'; 
+            }
             
             document.getElementById('edit_photo').value = '';
             document.getElementById('edit-file-info').style.display = 'none';
@@ -1347,9 +1612,7 @@ $categories = array_keys($categoryPrefixes);
             bodyRedeem.innerHTML = '<tr><td colspan="4" style="text-align:center">Loading...</td></tr>';
             bodyLog.innerHTML = '<tr><td colspan="4" style="text-align:center">Loading...</td></tr>';
             
-            // Reset to first tab
             switchHistoryTab('redeem');
-
             document.getElementById('historyModal').style.display = 'flex';
             
             fetch(`reward_item_management.php?action=get_full_history&item_id=${id}`)
@@ -1358,24 +1621,16 @@ $categories = array_keys($categoryPrefixes);
                 bodyRedeem.innerHTML = '';
                 bodyLog.innerHTML = '';
 
-                // Render Redemptions (With Link to Details)
                 if (data.redemptions.length === 0) {
                     bodyRedeem.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999; font-size:12px;">No redemptions found.</td></tr>';
                 } else {
                     data.redemptions.forEach(row => {
                         let color = (row.status.toLowerCase() === 'completed') ? '#28a745' : '#ffc107';
                         let viewLink = `<a href="admin_redemption_details.php?id=${row.Redemption_ID}" target="_blank" class="view-btn">View</a>`;
-                        
-                        bodyRedeem.innerHTML += `<tr>
-                            <td>${row.date}</td>
-                            <td>${row.user}</td>
-                            <td style="color:${color};font-weight:600">${row.status}</td>
-                            <td>${viewLink}</td>
-                        </tr>`;
+                        bodyRedeem.innerHTML += `<tr><td>${row.date}</td><td>${row.user}</td><td style="color:${color};font-weight:600">${row.status}</td><td>${viewLink}</td></tr>`;
                     });
                 }
 
-                // Render Admin Logs
                 if (data.logs.length === 0) {
                     bodyLog.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999; font-size:12px;">No updates recorded.</td></tr>';
                 } else {
@@ -1384,7 +1639,6 @@ $categories = array_keys($categoryPrefixes);
                         if(row.status === 'Create') actionColor = 'blue';
                         if(row.status === 'Delete') actionColor = 'red';
                         if(row.status === 'Stock Update') actionColor = 'green';
-                        
                         bodyLog.innerHTML += `<tr><td>${row.date}</td><td>${row.user}</td><td style="color:${actionColor};font-weight:600">${row.status}</td><td style=\"font-size:11px;\">${row.info}</td></tr>`;
                     });
                 }

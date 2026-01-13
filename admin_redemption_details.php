@@ -15,8 +15,9 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 $redemptionId = intval($_GET['id']);
 
 // Fetch comprehensive redemption details
+// [Modified]: Added i.Reward_PhotoPath to the query
 $sql = "SELECT r.*, d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber,
-        i.Reward_ItemName, i.Reward_Code, i.Reward_Category
+        i.Reward_ItemName, i.Reward_Code, i.Reward_Category, i.Reward_PhotoPath
         FROM redemption_order r
         JOIN donor d ON r.Donor_ID = d.Donor_ID
         JOIN reward_item i ON r.Reward_ID = i.Reward_ID
@@ -36,6 +37,8 @@ $statusLower = strtolower($order['Redemption_Status']);
 if($statusLower == 'completed' || $statusLower == 'shipped' || $statusLower == 'delivered') $statusClass = 'text-success';
 if($statusLower == 'cancelled' || $statusLower == 'rejected') $statusClass = 'text-danger'; 
 
+// [Modified]: Image Path Logic
+$imgSrc = !empty($order['Reward_PhotoPath']) ? 'uploads/rewards/' . $order['Reward_PhotoPath'] : 'uploads/rewards/default.jpg';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -58,9 +61,8 @@ if($statusLower == 'cancelled' || $statusLower == 'rejected') $statusClass = 'te
             overflow: hidden; 
         }
 
-        /* [修改点1]：背景色改为 var(--primary) 与 Payment 一致 */
         .details-header { 
-            background: var(--primary); 
+            background: var(--primary); /* Uses your admin_common.css primary color (Pink) */
             color: white; 
             padding: 25px 40px; 
             display: flex; 
@@ -71,10 +73,23 @@ if($statusLower == 'cancelled' || $statusLower == 'rejected') $statusClass = 'te
         
         .details-body { padding: 40px; }
         
+        /* [Modified]: Image Styles */
+        .reward-img-container {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .reward-img-large {
+            width: 150px;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 4px solid #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
         .info-group { margin-bottom: 35px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
         .info-group:last-child { border-bottom: none; }
         
-        /* [修改点2]：左侧边框颜色改为 var(--primary) */
         .info-group h3 { 
             font-size: 18px; 
             color: #555; 
@@ -124,7 +139,7 @@ if($statusLower == 'cancelled' || $statusLower == 'rejected') $statusClass = 'te
             line-height: 1.6; 
         }
         
-        .item-display { font-size: 28px; color: #333; font-weight: bold; text-align: center; margin-top: 10px; }
+        .item-display { font-size: 28px; color: #333; font-weight: bold; text-align: center; margin-top: 5px; }
         .points-spent { text-align: center; color: #dc3545; font-weight: bold; font-size: 18px; margin-bottom: 40px; margin-top: 5px;}
         
         .text-success { color: #28a745; } .text-danger { color: #dc3545; } .text-warning { color: #856404; }
@@ -187,6 +202,11 @@ if($statusLower == 'cancelled' || $statusLower == 'rejected') $statusClass = 'te
             <span>ID: #<?php echo $order['Redemption_ID']; ?></span>
         </div>
         <div class="details-body">
+            
+            <div class="reward-img-container">
+                <img src="<?php echo htmlspecialchars($imgSrc); ?>" class="reward-img-large" alt="Reward Image">
+            </div>
+
             <div class="item-display">
                 <?php echo htmlspecialchars($order['Reward_ItemName']); ?>
             </div>
@@ -202,6 +222,15 @@ if($statusLower == 'cancelled' || $statusLower == 'rejected') $statusClass = 'te
                         <span class="colon">:</span>
                         <span class="value <?php echo $statusClass; ?>"><?php echo strtoupper($order['Redemption_Status']); ?></span>
                     </div>
+                    <?php if($statusLower == 'cancelled' || $statusLower == 'rejected'): ?>
+                    <div class="info-item">
+                        <span class="label" style="color:#dc3545;">Cancellation Reason</span>
+                        <span class="colon">:</span>
+                        <span class="value" style="color:#dc3545;">
+                            <?php echo !empty($order['Redemption_CancelReason']) ? nl2br(htmlspecialchars($order['Redemption_CancelReason'])) : 'No reason provided'; ?>
+                        </span>
+                    </div>
+                    <?php endif; ?>
                     <div class="info-item">
                         <span class="label">Tracking Number</span>
                         <span class="colon">:</span>
@@ -257,6 +286,11 @@ if($statusLower == 'cancelled' || $statusLower == 'rejected') $statusClass = 'te
                         <span class="colon">:</span>
                         <span class="value"><?php echo $order['Reward_Category']; ?></span>
                     </div>
+                    <div class="info-item">
+                        <span class="label">Quantity Redeemed</span>
+                        <span class="colon">:</span>
+                        <span class="value"><?php echo $order['Redemption_Quantity']; ?></span>
+                    </div>
                 </div>
             </div>
             
@@ -274,6 +308,7 @@ if($statusLower == 'cancelled' || $statusLower == 'rejected') $statusClass = 'te
 
     <script>
         document.querySelector('.btn-back').onclick = function() {
+            // Try to go back, if no history (opened in new tab), close it
             if (window.history.length > 1 && document.referrer.indexOf(window.location.host) !== -1) {
                 window.history.back();
             } else {
