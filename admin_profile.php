@@ -2,30 +2,40 @@
 // admin_profile.php
 session_start();
 
-// Check if user is logged in
-if (!isset($_SESSION['admin_id'])) {
+// --- 1. 检查权限：Admin 或 Staff 均可进入 ---
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
 }
 
 include 'dataconnection.php';
 
-// --- AJAX: Verify Current Password (For Step 1) ---
+// --- 确定当前用户身份 (Admin 或 Staff) ---
+$isStaff = isset($_SESSION['staff_id']);
+$currentUserId = $isStaff ? $_SESSION['staff_id'] : $_SESSION['admin_id'];
+
+// 定义表名和主键列名
+$tableName = $isStaff ? 'staff' : 'admin';
+$idColumn = $isStaff ? 'Staff_ID' : 'Admin_ID';
+$passwordColumn = $isStaff ? 'Staff_Password' : 'Admin_Password';
+$picColumn = $isStaff ? 'Staff_ProfilePicture' : 'Admin_ProfilePicture';
+
+// --- AJAX: 验证当前密码 (用于修改密码的第一步) ---
 if (isset($_POST['verify_current_password_ajax'])) {
     header('Content-Type: application/json');
-    $adminId = $_SESSION['admin_id'];
     $currentPass = $_POST['current_password'];
     
-    $stmt = $conn->prepare("SELECT Admin_Password FROM admin WHERE Admin_ID = ?");
-    $stmt->bind_param("i", $adminId);
+    // 动态查询密码
+    $stmt = $conn->prepare("SELECT $passwordColumn FROM $tableName WHERE $idColumn = ?");
+    $stmt->bind_param("i", $currentUserId);
     $stmt->execute();
     $result = $stmt->get_result();
     
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
-        $dbPass = $row['Admin_Password'];
+        $dbPass = $row[$passwordColumn];
         
-        // Verify Password
+        // 验证密码
         if (password_verify($currentPass, $dbPass) || ($currentPass === $dbPass)) {
             echo json_encode(['status' => 'success']);
         } else {
@@ -38,34 +48,69 @@ if (isset($_POST['verify_current_password_ajax'])) {
     exit();
 }
 
-$adminId = $_SESSION['admin_id'];
 $message = '';
 $error = '';
-
-// Check Edit Mode
 $editMode = isset($_GET['edit']) && $_GET['edit'] == 'true';
 
-// Get Current Admin Info
-$sql = "SELECT * FROM admin WHERE Admin_ID = ?";
+// --- 获取当前用户信息并映射到通用变量 ---
+$sql = "SELECT * FROM $tableName WHERE $idColumn = ?";
 $stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $adminId);
+$stmt->bind_param("i", $currentUserId);
 $stmt->execute();
 $result = $stmt->get_result();
-$admin = $result->fetch_assoc();
+$userData = $result->fetch_assoc();
 $stmt->close();
 
-// Variables for Header
-$adminProfilePicture = $admin['Admin_ProfilePicture'];
-$adminName = $admin['Admin_Name'];
-$adminPosition = $admin['Admin_Role'];
+if (!$userData) {
+    echo "User profile not found.";
+    exit();
+}
 
-// --- Handle Profile Update (Excluding Password) ---
+// 统一字段映射 (因为 Admin 和 Staff 表的列名不一样)
+if ($isStaff) {
+    // Staff 表列名映射
+    $val_Name = $userData['Staff_FullName'];
+    $val_Email = $userData['Staff_Email'];
+    $val_Contact = $userData['Staff_ContactNumber'];
+    $val_IC = $userData['Staff_ICNumber'];
+    $val_DOB = $userData['Staff_DOB'];
+    $val_Pic = $userData['Staff_ProfilePicture'];
+    $val_Addr1 = $userData['Staff_Address1'];
+    $val_Addr2 = $userData['Staff_Address2'];
+    $val_Addr3 = $userData['Staff_Address3'];
+    $val_City = $userData['Staff_City'];
+    $val_State = $userData['Staff_State'];
+    $val_Postal = $userData['Staff_PostalCode'];
+    $val_Country = $userData['Staff_Country'];
+    $roleDisplay = $userData['Staff_Role'];
+} else {
+    // Admin 表列名映射
+    $val_Name = $userData['Admin_Name'];
+    $val_Email = $userData['Admin_Email'];
+    $val_Contact = $userData['Admin_ContactNumber'];
+    $val_IC = $userData['Admin_ICNUMBER']; // 注意大小写差异
+    $val_DOB = $userData['Admin_DOB'];
+    $val_Pic = $userData['Admin_ProfilePicture'];
+    $val_Addr1 = $userData['Admin_Address1'];
+    $val_Addr2 = $userData['Admin_Address2'];
+    $val_Addr3 = $userData['Admin_Address3'];
+    $val_City = $userData['Admin_City'];
+    $val_State = $userData['Admin_State'];
+    $val_Postal = $userData['Admin_PostalCode'];
+    $val_Country = $userData['Admin_Country'];
+    $roleDisplay = $userData['Admin_Role'];
+}
+
+// 侧边栏/头部可能用到的变量
+$adminProfilePicture = $val_Pic;
+$adminName = $val_Name; 
+
+// --- 处理资料更新 ---
 if ($editMode && $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_profile'])) {
     $fullName = mysqli_real_escape_string($conn, $_POST['full_name']);
     $email = mysqli_real_escape_string($conn, $_POST['email']);
     
     $contactRaw = mysqli_real_escape_string($conn, $_POST['contact_number']);
-    // Ensure formatting logic matches your DB preference
     $contact = "+601" . $contactRaw;
 
     $address1 = mysqli_real_escape_string($conn, $_POST['address1']);
@@ -83,39 +128,63 @@ if ($editMode && $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_pr
     } else {
         // Handle Avatar Upload
         if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] == 0) {
-            $uploadDir = 'uploads/profiles/';
+            $uploadDir = $isStaff ? 'uploads/staff_profiles/' : 'uploads/profiles/';
             if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
             
+            $prefix = $isStaff ? 'staff_' : 'admin_';
             $fileExtension = pathinfo($_FILES['profile_picture']['name'], PATHINFO_EXTENSION);
-            $fileName = 'admin_' . $adminId . '_' . time() . '.' . $fileExtension;
+            $fileName = $prefix . $currentUserId . '_' . time() . '.' . $fileExtension;
             $uploadPath = $uploadDir . $fileName;
             
             if (move_uploaded_file($_FILES['profile_picture']['tmp_name'], $uploadPath)) {
-                if (!empty($admin['Admin_ProfilePicture']) && file_exists($admin['Admin_ProfilePicture'])) {
-                    unlink($admin['Admin_ProfilePicture']);
+                if (!empty($val_Pic) && file_exists($val_Pic)) {
+                    unlink($val_Pic);
                 }
-                $conn->query("UPDATE admin SET Admin_ProfilePicture = '" . $uploadPath . "' WHERE Admin_ID = $adminId");
+                // 更新头像路径
+                $conn->query("UPDATE $tableName SET $picColumn = '" . $uploadPath . "' WHERE $idColumn = $currentUserId");
+                $val_Pic = $uploadPath; // 更新当前变量显示
             }
         }
         
-        $updateSql = "UPDATE admin SET 
-                      Admin_Name = ?, Admin_Email = ?, Admin_ContactNumber = ?, 
-                      Admin_Address1 = ?, Admin_Address2 = ?, Admin_Address3 = ?, 
-                      Admin_City = ?, Admin_State = ?, Admin_PostalCode = ?, Admin_Country = ?,
-                      Admin_ICNUMBER = ?, Admin_DOB = ?
-                      WHERE Admin_ID = ?";
+        // 构建动态更新 SQL
+        if ($isStaff) {
+            $updateSql = "UPDATE staff SET 
+                          Staff_FullName = ?, Staff_Email = ?, Staff_ContactNumber = ?, 
+                          Staff_Address1 = ?, Staff_Address2 = ?, Staff_Address3 = ?, 
+                          Staff_City = ?, Staff_State = ?, Staff_PostalCode = ?, Staff_Country = ?,
+                          Staff_ICNumber = ?, Staff_DOB = ?
+                          WHERE Staff_ID = ?";
+        } else {
+            $updateSql = "UPDATE admin SET 
+                          Admin_Name = ?, Admin_Email = ?, Admin_ContactNumber = ?, 
+                          Admin_Address1 = ?, Admin_Address2 = ?, Admin_Address3 = ?, 
+                          Admin_City = ?, Admin_State = ?, Admin_PostalCode = ?, Admin_Country = ?,
+                          Admin_ICNUMBER = ?, Admin_DOB = ?
+                          WHERE Admin_ID = ?";
+        }
         
         $stmt = $conn->prepare($updateSql);
-        $stmt->bind_param("ssssssssssssi", $fullName, $email, $contact, $address1, $address2, $address3, $city, $state, $postalCode, $country, $icNumber, $dateOfBirth, $adminId);
+        $stmt->bind_param("ssssssssssssi", $fullName, $email, $contact, $address1, $address2, $address3, $city, $state, $postalCode, $country, $icNumber, $dateOfBirth, $currentUserId);
         
         if ($stmt->execute()) {
             $message = "Profile updated successfully!";
-            $_SESSION['admin_name'] = $fullName; 
-            // Refresh Data
-            $result = $conn->query("SELECT * FROM admin WHERE Admin_ID = $adminId");
-            $admin = $result->fetch_assoc();
-            $adminName = $admin['Admin_Name'];
-            $adminProfilePicture = $admin['Admin_ProfilePicture']; 
+            // 更新当前页面显示的变量
+            $val_Name = $fullName;
+            $val_Email = $email;
+            $val_Contact = $contact;
+            $val_Addr1 = $address1;
+            $val_Addr2 = $address2;
+            $val_Addr3 = $address3;
+            $val_City = $city;
+            $val_State = $state;
+            $val_Postal = $postalCode;
+            $val_IC = $icNumber;
+            $val_DOB = $dateOfBirth;
+            
+            // 更新 Session 名称显示
+            if($isStaff) $_SESSION['staff_name'] = $fullName;
+            else $_SESSION['admin_name'] = $fullName;
+            
             $editMode = false; 
         } else {
             $error = "Failed to update profile: " . $conn->error;
@@ -124,7 +193,7 @@ if ($editMode && $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_pr
     }
 }
 
-// --- Handle Change Password Logic ---
+// --- 处理修改密码 ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password_action'])) {
     $currentPass = $_POST['current_password'];
     $newPass = $_POST['new_password'];
@@ -137,26 +206,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password_action
     } elseif (!preg_match($pattern, $newPass)) {
         $error = "Password does not meet requirements.";
     } else {
-        $stmt = $conn->prepare("SELECT Admin_Password FROM admin WHERE Admin_ID = ?");
-        $stmt->bind_param("i", $adminId);
+        // 查询旧密码
+        $stmt = $conn->prepare("SELECT $passwordColumn FROM $tableName WHERE $idColumn = ?");
+        $stmt->bind_param("i", $currentUserId);
         $stmt->execute();
         $result = $stmt->get_result();
 
         if ($result->num_rows > 0) {
             $row = $result->fetch_assoc();
-            $dbPass = $row['Admin_Password'];
+            $dbPass = $row[$passwordColumn];
 
+            // 1. 验证旧密码是否正确
             if (password_verify($currentPass, $dbPass) || ($currentPass === $dbPass)) {
-                $newPassHash = password_hash($newPass, PASSWORD_DEFAULT);
-                $updateStmt = $conn->prepare("UPDATE admin SET Admin_Password = ? WHERE Admin_ID = ?");
-                $updateStmt->bind_param("si", $newPassHash, $adminId);
                 
-                if ($updateStmt->execute()) {
-                    $message = "Password updated successfully!";
-                } else {
-                    $error = "Error updating password.";
+                // --- 2. 关键修改：验证新密码是否与旧密码相同 ---
+                $isSameAsOld = false;
+                if (password_verify($newPass, $dbPass)) {
+                    $isSameAsOld = true;
+                } elseif ($newPass === $dbPass) {
+                    $isSameAsOld = true;
                 }
-                $updateStmt->close();
+
+                if ($isSameAsOld) {
+                    $error = "New password cannot be the same as your current password.";
+                } else {
+                    // 3. 执行更新
+                    $newPassHash = password_hash($newPass, PASSWORD_DEFAULT);
+                    $updateStmt = $conn->prepare("UPDATE $tableName SET $passwordColumn = ? WHERE $idColumn = ?");
+                    $updateStmt->bind_param("si", $newPassHash, $currentUserId);
+                    
+                    if ($updateStmt->execute()) {
+                        $message = "Password updated successfully!";
+                    } else {
+                        $error = "Error updating password.";
+                    }
+                    $updateStmt->close();
+                }
             } else {
                 $error = "Current password is incorrect.";
             }
@@ -165,7 +250,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['change_password_action
     }
 }
 
-$displayPhone = isset($admin['Admin_ContactNumber']) ? str_replace('+601', '', $admin['Admin_ContactNumber']) : '';
+// 格式化电话显示
+$displayPhone = isset($val_Contact) ? str_replace('+601', '', $val_Contact) : '';
 $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'];
 ?>
 <!DOCTYPE html>
@@ -202,9 +288,14 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
         .btn { padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer; font-weight: 500; font-size: 14px; transition: all 0.3s; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-secondary { background: var(--gray-light); color: var(--dark); }
-        .alert { padding: 15px; border-radius: 5px; margin-bottom: 20px; text-align: center; }
-        .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .alert-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        /* Floating Alert Styles */
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 2000; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; animation: slideIn 0.3s; }
+        .floating-alert div { line-height: 1.6; font-size: 14px; }
+        .floating-alert i { margin-top: 4px; }
+        .floating-alert-success { background: white; color: #28a745; border-left: 4px solid #28a745; }
+        .floating-alert-danger { background: white; color: #dc3545; border-left: 4px solid #dc3545; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 1100; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
         .modal-content { background-color: white; border-radius: 12px; width: 90%; max-width: 450px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); animation: slideDown 0.3s ease-out; overflow: hidden; }
@@ -248,13 +339,23 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
         <?php include 'admin_header.php'; ?>
 
         <div class="dashboard-content">
+            <?php if ($message != ""): ?>
+            <div class="floating-alert floating-alert-success" id="alertSuccess">
+                <i class="fas fa-check-circle"></i>
+                <div><?php echo $message; ?></div>
+            </div>
+            <?php endif; ?>
+            <?php if ($error != ""): ?>
+            <div class="floating-alert floating-alert-danger" id="alertError">
+                <i class="fas fa-exclamation-circle"></i>
+                <div><?php echo $error; ?></div>
+            </div>
+            <?php endif; ?>
+
             <div class="welcome-section">
                 <h1><?php echo $editMode ? "Edit Profile" : "My Profile"; ?></h1>
                 <p>Manage your account settings and preferences.</p>
             </div>
-
-            <?php if ($message): ?><div class="alert alert-success"><?php echo $message; ?></div><?php endif; ?>
-            <?php if ($error): ?><div class="alert alert-error"><?php echo $error; ?></div><?php endif; ?>
 
             <div class="profile-container">
                 <form method="POST" enctype="multipart/form-data" onsubmit="return validateProfileForm()">
@@ -262,8 +363,8 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                     
                     <div class="profile-picture-section">
                         <div class="profile-picture-preview" id="preview-container">
-                            <?php if (!empty($admin['Admin_ProfilePicture'])): ?>
-                                <img src="<?php echo htmlspecialchars($admin['Admin_ProfilePicture']); ?>" alt="Profile">
+                            <?php if (!empty($val_Pic)): ?>
+                                <img src="<?php echo htmlspecialchars($val_Pic); ?>" alt="Profile">
                             <?php else: ?>
                                 <div class="default-avatar-icon"><i class="fas fa-user"></i></div>
                             <?php endif; ?>
@@ -289,7 +390,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                     <div class="form-group">
                         <label class="form-label">Full Name <?php if($editMode) echo '<span class="required">*</span>'; ?></label>
                         <input type="text" name="full_name" class="form-input" 
-                               value="<?php echo htmlspecialchars($admin['Admin_Name']); ?>" 
+                               value="<?php echo htmlspecialchars($val_Name); ?>" 
                                <?php echo $editMode ? 'required oninput="validateName(this)"' : 'readonly'; ?>>
                         <?php if($editMode): ?>
                             <span class="form-guide">Enter your full name as per IC. Letters and spaces only.</span>
@@ -300,7 +401,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                         <div class="form-group">
                             <label class="form-label">Email Address <?php if($editMode) echo '<span class="required">*</span>'; ?></label>
                             <input type="email" id="email" name="email" class="form-input" 
-                                   value="<?php echo htmlspecialchars($admin['Admin_Email']); ?>" 
+                                   value="<?php echo htmlspecialchars($val_Email); ?>" 
                                    <?php echo $editMode ? 'required onblur="validateEmail()"' : 'readonly'; ?>>
                             <?php if($editMode): ?>
                                 <span class="form-guide">Valid email address (e.g. name@domain.com).</span>
@@ -318,7 +419,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                                 </div>
                                 <span class="form-guide">Format: 2-3456789 or 11-12345678 (No need for +601).</span>
                             <?php else: ?>
-                                <input type="text" class="form-input" value="<?php echo htmlspecialchars($admin['Admin_ContactNumber']); ?>" readonly>
+                                <input type="text" class="form-input" value="<?php echo htmlspecialchars($val_Contact); ?>" readonly>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -327,7 +428,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                         <div class="form-group">
                             <label class="form-label">IC Number <?php if($editMode) echo '<span class="required">*</span>'; ?></label>
                             <input type="text" name="ic_number" class="form-input" 
-                                   value="<?php echo htmlspecialchars($admin['Admin_ICNUMBER']); ?>" 
+                                   value="<?php echo htmlspecialchars($val_IC); ?>" 
                                    <?php echo $editMode ? 'required' : 'readonly'; ?>>
                             <?php if($editMode): ?>
                                 <span class="form-guide">Format: YYMMDD-PB-#### (e.g. 900101-01-1234).</span>
@@ -336,7 +437,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                         <div class="form-group">
                             <label class="form-label">Date of Birth <?php if($editMode) echo '<span class="required">*</span>'; ?></label>
                             <input type="date" name="date_of_birth" class="form-input" 
-                                   value="<?php echo htmlspecialchars($admin['Admin_DOB']); ?>" 
+                                   value="<?php echo htmlspecialchars($val_DOB); ?>" 
                                    <?php echo $editMode ? 'required' : 'readonly'; ?>>
                             <?php if($editMode): ?>
                                 <span class="form-guide">Select your date of birth.</span>
@@ -349,7 +450,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                     <div class="form-group">
                         <label class="form-label">Address Line 1 <?php if($editMode) echo '<span class="required">*</span>'; ?></label>
                         <input type="text" name="address1" class="form-input" 
-                               value="<?php echo htmlspecialchars($admin['Admin_Address1']); ?>" 
+                               value="<?php echo htmlspecialchars($val_Addr1); ?>" 
                                <?php echo $editMode ? 'required' : 'readonly'; ?>>
                         <?php if($editMode): ?>
                             <span class="form-guide">House unit no., floor, building, street name.</span>
@@ -358,7 +459,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                     <div class="form-group">
                         <label class="form-label">Address Line 2</label>
                         <input type="text" name="address2" class="form-input" 
-                               value="<?php echo htmlspecialchars($admin['Admin_Address2']); ?>" 
+                               value="<?php echo htmlspecialchars($val_Addr2); ?>" 
                                <?php echo $editMode ? '' : 'readonly'; ?>>
                         <?php if($editMode): ?>
                             <span class="form-guide">Residential area, village, or section.</span>
@@ -367,7 +468,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                     <div class="form-group">
                         <label class="form-label">Address Line 3</label>
                         <input type="text" name="address3" class="form-input" 
-                               value="<?php echo htmlspecialchars($admin['Admin_Address3']); ?>" 
+                               value="<?php echo htmlspecialchars($val_Addr3); ?>" 
                                <?php echo $editMode ? '' : 'readonly'; ?>>
                     </div>
 
@@ -375,7 +476,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                         <div class="form-group">
                             <label class="form-label">Postal Code <?php if($editMode) echo '<span class="required">*</span>'; ?></label>
                             <input type="text" name="postal_code" class="form-input" 
-                                   value="<?php echo htmlspecialchars($admin['Admin_PostalCode']); ?>" 
+                                   value="<?php echo htmlspecialchars($val_Postal); ?>" 
                                    <?php echo $editMode ? 'required' : 'readonly'; ?>>
                             <?php if($editMode): ?>
                                 <span class="form-guide">Enter postal code (e.g. 50000).</span>
@@ -384,7 +485,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                         <div class="form-group">
                             <label class="form-label">City <?php if($editMode) echo '<span class="required">*</span>'; ?></label>
                             <input type="text" name="city" class="form-input" 
-                                   value="<?php echo htmlspecialchars($admin['Admin_City']); ?>" 
+                                   value="<?php echo htmlspecialchars($val_City); ?>" 
                                    <?php echo $editMode ? 'required' : 'readonly'; ?>>
                             <?php if($editMode): ?>
                                 <span class="form-guide">City or Municipality.</span>
@@ -399,11 +500,11 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
                                 <select name="state" class="form-select" required>
                                     <option value="">Select State</option>
                                     <?php foreach($malaysiaStates as $s): ?>
-                                        <option value="<?php echo $s; ?>" <?php echo ($admin['Admin_State'] == $s) ? 'selected' : ''; ?>><?php echo $s; ?></option>
+                                        <option value="<?php echo $s; ?>" <?php echo ($val_State == $s) ? 'selected' : ''; ?>><?php echo $s; ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             <?php else: ?>
-                                <input type="text" class="form-input" value="<?php echo htmlspecialchars($admin['Admin_State']); ?>" readonly>
+                                <input type="text" class="form-input" value="<?php echo htmlspecialchars($val_State); ?>" readonly>
                             <?php endif; ?>
                         </div>
                         <div class="form-group">
@@ -493,6 +594,14 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
     </div>
 
     <script>
+        // Auto-hide alerts
+        setTimeout(() => { 
+            const s = document.getElementById('alertSuccess'); 
+            const e = document.getElementById('alertError');
+            if(s) s.style.display = 'none'; 
+            if(e) e.style.display = 'none'; 
+        }, 5000);
+
         function previewImage(input) {
             const container = document.getElementById('preview-container');
             const fileInfo = document.getElementById('file-info');

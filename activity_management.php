@@ -2,7 +2,7 @@
 // activity_management.php
 session_start();
 
-// --- 修改 1: 检查是否登录 (Admin 或 Staff 均可) ---
+// --- 检查是否登录 ---
 if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();
@@ -11,20 +11,78 @@ if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
 // Include database connection
 include 'dataconnection.php';
 
-// --- AJAX: FETCH DONATIONS FOR A SPECIFIC ACTIVITY ---
+// --- Malaysia Banks List ---
+$malaysiaBanks = [
+    "Maybank" => "Maybank",
+    "CIMB" => "CIMB Bank",
+    "Public Bank" => "Public Bank",
+    "RHB" => "RHB Bank",
+    "Hong Leong" => "Hong Leong Bank",
+    "AmBank" => "AmBank",
+    "UOB" => "UOB Malaysia",
+    "Bank Rakyat" => "Bank Rakyat",
+    "OCBC" => "OCBC Bank",
+    "HSBC" => "HSBC Bank",
+    "Bank Islam" => "Bank Islam",
+    "Affin Bank" => "Affin Bank",
+    "Alliance Bank" => "Alliance Bank",
+    "Standard Chartered" => "Standard Chartered",
+    "MBSB" => "MBSB Bank",
+    "Citibank" => "Citibank",
+    "Bank Muamalat" => "Bank Muamalat",
+    "Agrobank" => "Agrobank",
+    "BSN" => "Bank Simpanan Nasional"
+];
+
+// --- AJAX: GET BRANCH BANK INFO ---
+if (isset($_GET['action']) && $_GET['action'] == 'get_branch_bank_info' && isset($_GET['branch_id'])) {
+    $branchId = intval($_GET['branch_id']);
+    $sql = "SELECT Branch_BankName, Branch_BankAccount FROM branch WHERE Branch_ID = $branchId";
+    $result = $conn->query($sql);
+    if ($result && $row = $result->fetch_assoc()) {
+        echo json_encode($row);
+    } else {
+        echo json_encode(null);
+    }
+    exit();
+}
+
+// --- AJAX: GET WITHDRAWAL HISTORY ---
+if (isset($_GET['action']) && $_GET['action'] == 'get_withdrawal_history' && isset($_GET['activity_id'])) {
+    $activityId = intval($_GET['activity_id']);
+    $sql = "SELECT w.*, b.Branch_Name 
+            FROM withdrawals w 
+            LEFT JOIN branch b ON w.Branch_ID = b.Branch_ID 
+            WHERE w.Activity_ID = $activityId 
+            ORDER BY w.Request_Date DESC";
+    $result = $conn->query($sql);
+    $data = [];
+    $totalWithdrawn = 0;
+    if ($result) {
+        while($row = $result->fetch_assoc()) {
+            if ($row['Status'] == 'Approved' || $row['Status'] == 'Completed') {
+                $totalWithdrawn += $row['Amount'];
+            }
+            $row['Formatted_Amount'] = number_format($row['Amount'], 2);
+            $row['Formatted_Date'] = date('d M Y, h:i A', strtotime($row['Request_Date']));
+            $data[] = $row;
+        }
+    }
+    echo json_encode(['history' => $data, 'total_withdrawn' => number_format($totalWithdrawn, 2)]);
+    exit();
+}
+
+// --- AJAX: FETCH DONATIONS ---
 if (isset($_GET['action']) && $_GET['action'] == 'get_activity_donations' && isset($_GET['activity_id'])) {
     $activityId = intval($_GET['activity_id']);
-    
     $sql = "SELECT o.Order_ID, o.Order_Created_At, o.Order_Amount, o.Order_TXN_Ref, d.Donor_Name, d.Donor_Email 
             FROM orders o 
             JOIN donor d ON o.Donor_ID = d.Donor_ID 
             WHERE o.Activity_ID = $activityId 
             AND (o.Order_Status = 'Completed' OR o.Order_Status = 'Success') 
             ORDER BY o.Order_Created_At DESC";
-            
     $result = $conn->query($sql);
     $donations = [];
-    
     if ($result && $result->num_rows > 0) {
         while($row = $result->fetch_assoc()) {
             $donations[] = [
@@ -36,7 +94,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_activity_donations' && iss
             ];
         }
     }
-    
     header('Content-Type: application/json');
     echo json_encode($donations);
     exit();
@@ -46,46 +103,32 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_activity_donations' && iss
 $searchTerm = "";
 $filterType = "";
 $filterValue = "";
-$conditions = []; // Base WHERE clauses
-$orderClause = "ORDER BY a.Activity_StartDate DESC"; // Default Sort
+$conditions = []; 
+$orderClause = "ORDER BY a.Activity_StartDate DESC"; 
 
-// 1. Keyword Search
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $searchTerm = $conn->real_escape_string($_GET['search']);
     $conditions[] = "(a.Activity_Name LIKE '%$searchTerm%' OR a.Activity_Description LIKE '%$searchTerm%' OR b.Branch_Name LIKE '%$searchTerm%' OR a.Activity_City LIKE '%$searchTerm%')";
 }
 
-// 2. Dynamic Filters
 if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
     $filterType = $_GET['filter_type'];
-
-    // Status Filter
     if ($filterType == 'status' && !empty($_GET['filter_val_status'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_status']);
         $conditions[] = "a.Activity_Status = '$filterValue'";
-    } 
-    // Branch ID Filter
-    elseif ($filterType == 'branch' && !empty($_GET['filter_val_branch'])) {
+    } elseif ($filterType == 'branch' && !empty($_GET['filter_val_branch'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_branch']);
         $conditions[] = "a.Branch_ID = '$filterValue'";
-    } 
-    // Year Filter
-    elseif ($filterType == 'year' && !empty($_GET['filter_val_year'])) {
+    } elseif ($filterType == 'year' && !empty($_GET['filter_val_year'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_year']);
         $conditions[] = "YEAR(a.Activity_StartDate) = '$filterValue'";
-    }
-    // Phone Prefix Filter
-    elseif ($filterType == 'phone' && !empty($_GET['filter_val_phone'])) {
+    } elseif ($filterType == 'phone' && !empty($_GET['filter_val_phone'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_phone']);
         $conditions[] = "a.Activity_Contact_Number LIKE '%$filterValue%'";
-    }
-    // City Filter
-    elseif ($filterType == 'city' && !empty($_GET['filter_val_city'])) {
+    } elseif ($filterType == 'city' && !empty($_GET['filter_val_city'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_city']);
         $conditions[] = "a.Activity_City = '$filterValue'";
-    }
-    // Capacity Filter
-    elseif ($filterType == 'capacity' && !empty($_GET['filter_val_capacity'])) {
+    } elseif ($filterType == 'capacity' && !empty($_GET['filter_val_capacity'])) {
         $filterValue = $_GET['filter_val_capacity'];
         if ($filterValue == 'below_100') {
             $conditions[] = "a.Activity_Max_Participants < 100 AND a.Activity_Max_Participants > 0";
@@ -94,16 +137,11 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
         } elseif ($filterValue == 'above_500') {
             $conditions[] = "a.Activity_Max_Participants > 500";
         }
-    }
-    // Date Range Filter
-    elseif ($filterType == 'date_range' && !empty($_GET['filter_start_date']) && !empty($_GET['filter_end_date'])) {
+    } elseif ($filterType == 'date_range' && !empty($_GET['filter_start_date']) && !empty($_GET['filter_end_date'])) {
         $sDate = $conn->real_escape_string($_GET['filter_start_date']);
         $eDate = $conn->real_escape_string($_GET['filter_end_date']);
-        // Check overlap: (StartA <= EndB) and (EndA >= StartB)
         $conditions[] = "(a.Activity_StartDate <= '$eDate' AND a.Activity_EndDate >= '$sDate')";
-    }
-    // Branch Name Sorting
-    elseif ($filterType == 'branch_sort' && !empty($_GET['filter_val_bsort'])) {
+    } elseif ($filterType == 'branch_sort' && !empty($_GET['filter_val_bsort'])) {
         $filterValue = $_GET['filter_val_bsort'];
         if ($filterValue == 'asc') $orderClause = "ORDER BY b.Branch_Name ASC";
         elseif ($filterValue == 'desc') $orderClause = "ORDER BY b.Branch_Name DESC";
@@ -112,30 +150,24 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
 
 $whereClause = count($conditions) > 0 ? "WHERE " . implode(" AND ", $conditions) : "";
 
-// --- EXPORT TO EXCEL HANDLER ---
+// --- EXPORT TO EXCEL ---
 if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
     $filename = "activity_list_" . date('Ymd') . ".xls";
-    
     header("Content-Type: application/vnd.ms-excel");
     header("Content-Disposition: attachment; filename=\"$filename\"");
     header("Pragma: no-cache");
     header("Expires: 0");
 
-    $exportSql = "SELECT a.*, b.Branch_Name 
-                  FROM activity a 
-                  LEFT JOIN branch b ON a.Branch_ID = b.Branch_ID
-                  $whereClause $orderClause";
-                  
+    $exportSql = "SELECT a.*, b.Branch_Name FROM activity a LEFT JOIN branch b ON a.Branch_ID = b.Branch_ID $whereClause $orderClause";
     $exportResult = $conn->query($exportSql);
-    
     echo '<table border="1">
           <tr>
             <th>ID</th><th>Name</th><th>Venue</th><th>Specific Date</th><th>Start Date</th><th>End Date</th>
             <th>Organizer</th><th>Contact Name</th><th>Contact Phone</th><th>Contact Email</th>
             <th>Max Participants</th><th>Status</th><th>Target (RM)</th><th>Raised (RM)</th>
             <th>Address</th><th>City</th><th>State</th><th>Postcode</th><th>Country</th><th>Branch</th>
+            <th>Bank Name</th><th>Bank Account</th>
           </tr>';
-    
     if ($exportResult && $exportResult->num_rows > 0) {
         while($row = $exportResult->fetch_assoc()) {
             echo '<tr>';
@@ -159,6 +191,8 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
             echo '<td>' . htmlspecialchars($row['Activity_PostalCode']) . '</td>';
             echo '<td>' . htmlspecialchars($row['Activity_Country']) . '</td>';
             echo '<td>' . htmlspecialchars($row['Branch_Name']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_BankName']) . '</td>';
+            echo '<td>' . htmlspecialchars($row['Activity_BankAccount']) . '</td>';
             echo '</tr>';
         }
     }
@@ -166,12 +200,11 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
     exit();
 }
 
-// --- GET ADMIN INFO ---
+// --- ADMIN INFO ---
 $adminName = "User";
 $adminPosition = "Role";
 $adminProfilePicture = null;
 $adminId = 0;
-
 if (isset($_SESSION['admin_id'])) {
     $adminId = $_SESSION['admin_id'];
     $adminSql = "SELECT Admin_Name, Admin_ProfilePicture, Admin_Role FROM admin WHERE Admin_ID = $adminId";
@@ -198,7 +231,6 @@ function handleMultiImageUpload($files) {
     $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
     $uploadDir = 'uploads/activities/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
-
     $count = count($files['name']);
     for ($i = 0; $i < $count; $i++) {
         if ($files['error'][$i] == 0 && in_array($files['type'][$i], $allowedTypes)) {
@@ -235,17 +267,18 @@ function validateActivityInput($post, $mode = 'add') {
     if (floatval($post['target_amount']) < 0) return "Target Amount cannot be negative.";
     if (intval($post['max_participants']) < 0) return "Max Participants cannot be negative (Enter 0 for unlimited).";
 
-    // Cancelled logic check for Edit
     if ($mode === 'edit' && $post['activity_status'] === 'Cancelled') {
-        if (empty(trim($post['cancel_reason']))) {
-            return "Cancellation Reason is required when status is Cancelled.";
-        }
+        if (empty(trim($post['cancel_reason']))) return "Cancellation Reason is required when status is Cancelled.";
     }
+    
+    // New validation for Bank Details (Server-side backup)
+    if (empty($post['bank_name'])) return "Bank Name is required.";
+    if (empty($post['bank_account'])) return "Bank Account Number is required.";
 
     return true;
 }
 
-// --- ADD ACTIVITY LOGIC ---
+// --- ADD ACTIVITY ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
     $validation = validateActivityInput($_POST, 'add');
     if ($validation !== true) {
@@ -259,6 +292,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
     $description = mysqli_real_escape_string($conn, $_POST['activity_description']);
     $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
     $getAmount = 0.00; 
+
+    // Bank Info
+    $bankName = mysqli_real_escape_string($conn, $_POST['bank_name']);
+    $bankAccount = mysqli_real_escape_string($conn, $_POST['bank_account']);
 
     $startDate = mysqli_real_escape_string($conn, $_POST['start_date']);
     $endDate = mysqli_real_escape_string($conn, $_POST['end_date']);
@@ -295,13 +332,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
         Activity_Description, Activity_Organizer, Activity_Contact_Name, Activity_Contact_Number, 
         Activity_Contact_Email, Activity_Max_Participants, Activity_Images, Activity_Status, 
         Activity_GetAmount, Activity_TargetAmount, Activity_Address1, Activity_Address2, 
-        Activity_Address3, Activity_City, Activity_State, Activity_PostalCode, Activity_Country, Branch_ID
+        Activity_Address3, Activity_City, Activity_State, Activity_PostalCode, Activity_Country, Branch_ID,
+        Activity_BankName, Activity_BankAccount
     ) VALUES (
         '$activityName', $venue, $specificDate, '$startDate', '$endDate', 
         '$description', $organizer, $contactName, $contactNumber, 
         $contactEmail, $maxParticipants, '$imageJson', '$activityStatus', 
         '$getAmount', '$targetAmount', '$address1', '$address2', 
-        '$address3', '$city', '$state', '$postalCode', '$country', '$branchId'
+        '$address3', '$city', '$state', '$postalCode', '$country', '$branchId',
+        '$bankName', '$bankAccount'
     )";
     
     if ($conn->query($sql)) header("Location: activity_management.php?success=" . urlencode("Activity added successfully!"));
@@ -309,7 +348,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_activity'])) {
     exit();
 }
 
-// --- UPDATE ACTIVITY LOGIC ---
+// --- UPDATE ACTIVITY ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
     $validation = validateActivityInput($_POST, 'edit');
     if ($validation !== true) {
@@ -319,8 +358,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
 
     $activityId = mysqli_real_escape_string($conn, $_POST['activity_id']);
     
-    // --- STATUS CHANGE LOGIC ---
-    // Fetch old status first
     $oldStatusQuery = $conn->query("SELECT Activity_Status FROM activity WHERE Activity_ID = '$activityId'");
     $oldStatusData = $oldStatusQuery->fetch_assoc();
     $oldStatus = $oldStatusData['Activity_Status'];
@@ -329,17 +366,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
     $startDate = mysqli_real_escape_string($conn, $_POST['start_date']);
     $endDate = mysqli_real_escape_string($conn, $_POST['end_date']);
 
-    // 1. Upcoming -> Active (Set Start Date to Today)
     if ($oldStatus == 'Upcoming' && $newStatus == 'Active') {
         $startDate = date('Y-m-d');
     }
-
-    // 3. Active -> Completed (Set End Date to Today)
     if ($oldStatus == 'Active' && $newStatus == 'Completed') {
         $endDate = date('Y-m-d');
     }
 
-    // 4. Cancelled Logic
     $cancelReasonSQL = "NULL";
     if ($newStatus == 'Cancelled') {
         $cancelReason = mysqli_real_escape_string($conn, $_POST['cancel_reason']);
@@ -350,6 +383,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
     $branchId = mysqli_real_escape_string($conn, $_POST['branch_id']);
     $description = mysqli_real_escape_string($conn, $_POST['activity_description']);
     $targetAmount = mysqli_real_escape_string($conn, $_POST['target_amount']);
+
+    // Bank Info
+    $bankName = mysqli_real_escape_string($conn, $_POST['bank_name']);
+    $bankAccount = mysqli_real_escape_string($conn, $_POST['bank_account']);
 
     $specificDate = !empty($_POST['specific_date']) ? "'" . mysqli_real_escape_string($conn, $_POST['specific_date']) . "'" : "NULL";
     $venue = !empty($_POST['venue']) ? "'" . mysqli_real_escape_string($conn, $_POST['venue']) . "'" : "NULL";
@@ -406,6 +443,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
             Activity_PostalCode = '$postalCode',
             Activity_Country = '$country',
             Branch_ID = '$branchId',
+            Activity_BankName = '$bankName',
+            Activity_BankAccount = '$bankAccount',
             Activity_Images = '$finalJson',
             Cancel_Reason = $cancelReasonSQL
             WHERE Activity_ID = $activityId";
@@ -415,7 +454,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_activity'])) {
     exit();
 }
 
-// --- DELETE LOGIC ---
+// --- DELETE ---
 if (isset($_GET['delete_activity_id'])) {
     $deleteId = $_GET['delete_activity_id'];
     $deleteSql = "DELETE FROM activity WHERE Activity_ID = $deleteId";
@@ -444,7 +483,7 @@ if ($result && $result->num_rows > 0) { while($row = $result->fetch_assoc()) $ac
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
 $end_record = min($start_from + $results_per_page, $total_records);
 
-// --- LOAD DATA FOR DROPDOWNS ---
+// --- LOAD DATA ---
 $branches = [];
 $branchResult = $conn->query("SELECT Branch_ID, Branch_Name FROM branch ORDER BY Branch_Name");
 if ($branchResult) { while($row = $branchResult->fetch_assoc()) $branches[] = $row; }
@@ -465,7 +504,6 @@ $phonePrefixes = ['010', '011', '012', '013', '014', '015', '016', '017', '018',
 $exportParams = $_GET; $exportParams['action'] = 'export_excel'; unset($exportParams['page']);
 $exportUrl = "?" . http_build_query($exportParams);
 
-// --- COLLECT IMAGES FOR LIGHTBOX JS ---
 $allActivityImagesMap = [];
 ?>
 
@@ -566,12 +604,10 @@ $allActivityImagesMap = [];
         .form-textarea { min-height: 100px; resize: vertical; }
         .form-input:read-only, .form-textarea:read-only { background-color: #f8f9fa; color: #555; cursor: default; }
 
-        /* Styles for the form guides */
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: inline-block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
         .required { color: red; margin-left: 3px; font-weight: bold; }
         .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
 
-        /* PHONE INPUT STYLING */
         .phone-format { display: flex; align-items: center; }
         .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid #ddd; border-right: none; border-radius: 6px 0 0 6px; color: #666; font-size: 14px; font-weight: bold; }
         .phone-input { border-radius: 0 6px 6px 0 !important; width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); outline: none; }
@@ -582,7 +618,6 @@ $allActivityImagesMap = [];
         .donation-table th { background-color: #f8f9fa; font-weight: 600; color: #555; }
         .donation-row:hover { background-color: #f9f9f9; cursor: pointer; }
 
-        /* Updated Floating Alert - Top Left Icon Alignment */
         .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: flex-start; gap: 10px; display: none; animation: slideIn 0.3s; max-width: 400px; }
         .floating-alert div { line-height: 1.6; }
         .floating-alert i { margin-top: 4px; }
@@ -590,7 +625,6 @@ $allActivityImagesMap = [];
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-        /* Upload Styles */
         .upload-container { width: 100%; }
         .upload-box { border: 2px dashed #ccc; background: #fafafa; border-radius: 8px; padding: 30px 20px; text-align: center; cursor: pointer; transition: all 0.3s; position: relative; }
         .upload-box:hover { background: #fff5f5; border-color: var(--primary); }
@@ -604,7 +638,6 @@ $allActivityImagesMap = [];
         .remove-img-btn { position: absolute; top: 4px; right: 4px; background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; }
         .remove-img-btn:hover { background: #cc0000; transform: scale(1.1); }
 
-        /* Lightbox */
         .lightbox-modal { display: none; position: fixed; z-index: 2000; padding-top: 50px; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; background-color: rgba(0, 0, 0, 0.9); flex-direction: column; justify-content: center; align-items: center; }
         .lightbox-content { margin: auto; display: block; max-width: 90%; max-height: 80vh; border-radius: 5px; box-shadow: 0 0 20px rgba(255,255,255,0.1); object-fit: contain; animation: zoomIn 0.3s; }
         @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
@@ -614,6 +647,18 @@ $allActivityImagesMap = [];
         .lightbox-nav:hover { background-color: rgba(255,255,255,0.2); }
         .lightbox-prev { left: 0; border-radius: 0 3px 3px 0; }
         .lightbox-next { right: 0; border-radius: 3px 0 0 3px; }
+
+        .section-separator { border-top: 1px dashed #ddd; margin: 25px 0; position: relative; }
+        .section-separator span { position: absolute; top: -12px; left: 0; background: #fff; padding-right: 10px; font-size: 12px; color: #888; font-weight: 600; text-transform: uppercase; }
+
+        .history-list { max-height: 300px; overflow-y: auto; }
+        .history-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #eee; }
+        .h-left h4 { margin: 0 0 3px; font-size: 14px; color: #333; }
+        .h-left p { margin: 0; font-size: 12px; color: #888; }
+        .h-right { font-weight: bold; color: #28a745; font-size: 14px; }
+        .h-right-negative { font-weight: bold; color: #dc3545; font-size: 14px; }
+        /* Added Hover Effect for interactive items */
+        .history-item:hover { background-color: #f9f9f9; cursor: pointer; }
 
         @media (max-width: 768px) {
             .stats-cards { grid-template-columns: repeat(2, 1fr); }
@@ -670,7 +715,6 @@ $allActivityImagesMap = [];
                             <option value="date_range" <?php echo ($filterType == 'date_range') ? 'selected' : ''; ?>>Date Range</option>
                         </select>
                     </div>
-                    
                     <div id="filter_status_container" class="secondary-filter"><select name="filter_val_status" class="filter-select"><option value="">Select Status...</option><option value="Active" <?php echo ($filterValue == 'Active') ? 'selected' : ''; ?>>Active</option><option value="Upcoming" <?php echo ($filterValue == 'Upcoming') ? 'selected' : ''; ?>>Upcoming</option><option value="Completed" <?php echo ($filterValue == 'Completed') ? 'selected' : ''; ?>>Completed</option><option value="Cancelled" <?php echo ($filterValue == 'Cancelled') ? 'selected' : ''; ?>>Cancelled</option></select></div>
                     <div id="filter_branch_container" class="secondary-filter"><select name="filter_val_branch" class="filter-select"><option value="">Select Branch...</option><?php foreach($branches as $b): ?><option value="<?php echo $b['Branch_ID']; ?>" <?php echo ($filterValue == $b['Branch_ID']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($b['Branch_Name']); ?></option><?php endforeach; ?></select></div>
                     <div id="filter_year_container" class="secondary-filter"><select name="filter_val_year" class="filter-select"><option value="">Select Year...</option><?php foreach($years as $yr): ?><option value="<?php echo $yr; ?>" <?php echo ($filterValue == $yr) ? 'selected' : ''; ?>><?php echo $yr; ?></option><?php endforeach; ?></select></div>
@@ -702,7 +746,6 @@ $allActivityImagesMap = [];
                             $hasImgs = (!empty($jsonImgs) && is_array($jsonImgs));
                             if($hasImgs) { $allActivityImagesMap[$activity['Activity_ID']] = $jsonImgs; }
 
-                            // Format Date Logic for the Card Footer
                             $startDateStr = date('d M Y', strtotime($activity['Activity_StartDate']));
                             $endDateStr = date('d M Y', strtotime($activity['Activity_EndDate']));
                             $dateDisplay = $startDateStr . ' - ' . $endDateStr;
@@ -715,6 +758,7 @@ $allActivityImagesMap = [];
                                         <div onclick="openViewDonors(<?php echo $activity['Activity_ID']; ?>)"><i class="fas fa-file-invoice-dollar"></i> View Donation History</div>
                                         <a href="admin_activity_details.php?id=<?php echo $activity['Activity_ID']; ?>" target="_blank"><i class="fas fa-eye"></i> View Details</a>
                                         <div onclick='editActivity(<?php echo json_encode($activity, JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'><i class="fas fa-edit"></i> Edit Details</div>
+                                        <div onclick="openWithdrawalHistory(<?php echo $activity['Activity_ID']; ?>)"><i class="fas fa-money-bill-wave"></i> Withdrawal History</div>
                                         <a href="javascript:confirmDeleteActivity(<?php echo $activity['Activity_ID']; ?>)" class="text-delete"><i class="fas fa-trash"></i> Delete</a>
                                     </div>
                                 </div>
@@ -761,7 +805,6 @@ $allActivityImagesMap = [];
                     <div class="pagination-info">Showing <?php echo $start_record; ?> to <?php echo $end_record; ?> of <?php echo $total_records; ?> results</div>
                     <div class="pagination-controls">
                         <?php 
-                        // Build query string
                         $queryParams = []; if(!empty($searchTerm)) $queryParams['search'] = $searchTerm;
                         if(!empty($filterType)) {
                             $queryParams['filter_type'] = $filterType;
@@ -782,7 +825,6 @@ $allActivityImagesMap = [];
                         if ($page > 1) echo "<a href='?page=".($page-1).$search_query."' class='pagination-btn'>Previous</a>";
                         else echo "<span class='pagination-btn disabled'>Previous</span>";
 
-                        // Sliding Window Logic
                         $start_window = max(1, $page - 1);
                         $end_window = min($total_pages, $page + 1);
                         if ($page == 1) $end_window = min($total_pages, 3);
@@ -808,23 +850,20 @@ $allActivityImagesMap = [];
             <div class="modal-body">
                 <form id="addActivityForm" action="activity_management.php" method="POST" enctype="multipart/form-data" onsubmit="return validateActivityForm('add')" novalidate>
                     <input type="hidden" name="add_activity" value="1">
-                    
                     <div class="form-group">
                         <label class="form-label">Activity Images (Max 10) <span class="required">*</span></label>
                         <div class="upload-container"><div class="upload-box"><i class="fas fa-cloud-upload-alt"></i><p>Click or Drag images here</p><input type="file" id="add_activity_images" name="activity_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'add')" required></div><div class="preview-grid" id="add_preview_container"></div></div>
                         <span class="form-guide">Accepted formats: JPG, PNG. Multiple files allowed. First image will be the cover.</span>
                     </div>
-
                     <div class="form-group">
                         <label class="form-label">Activity Name <span class="required">*</span></label>
-                        <input type="text" id="add_activity_name" name="activity_name" class="form-input" required>
-                        <span class="form-guide">Enter the official name of the campaign or event (e.g., "Charity Fun Run 2026").</span>
+                        <input type="text" id="add_activity_name" name="activity_name" class="form-input" placeholder="e.g. Charity Run 2024" required>
+                        <span class="form-guide">Enter the official name of the campaign or event.</span>
                     </div>
-
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Branch <span class="required">*</span></label>
-                            <select id="add_branch_id" name="branch_id" class="form-select" required><option value="">Select Branch</option><?php foreach($branches as $b) echo "<option value='{$b['Branch_ID']}'>{$b['Branch_Name']}</option>"; ?></select>
+                            <select id="add_branch_id" name="branch_id" class="form-select" required onchange="fetchBranchBankInfo('add')"><option value="">Select Branch</option><?php foreach($branches as $b) echo "<option value='{$b['Branch_ID']}'>{$b['Branch_Name']}</option>"; ?></select>
                             <span class="form-guide">Select the branch responsible for organizing this event.</span>
                         </div>
                         <div class="form-group">
@@ -833,20 +872,44 @@ $allActivityImagesMap = [];
                             <span class="form-guide">Current operational status of the activity.</span>
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label">Description <span class="required">*</span></label>
+                        <textarea id="add_activity_description" name="activity_description" class="form-textarea" placeholder="e.g. A fundraising event for helping local animal shelters..." required></textarea>
+                        <span class="form-guide">Provide a detailed explanation of the activity.</span>
+                    </div>
+
+                    <div class="section-separator"><span>Bank Information</span></div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label class="form-label">Target Amount (RM) <span class="required">*</span></label>
-                            <input type="number" id="add_target_amount" name="target_amount" class="form-input" step="0.01" min="0" required><div id="add_amount_error" class="error-message">Cannot be negative.</div>
-                            <span class="form-guide">Estimated fundraising goal for this event.</span>
+                            <label class="form-label">Bank Name <span class="required">*</span></label>
+                            <select name="bank_name" id="add_bank_name" class="form-select" onchange="setupBankValidation('add')" required>
+                                <option value="">-- Select Bank --</option>
+                                <?php foreach($malaysiaBanks as $short => $full) echo "<option value='$short'>$full</option>"; ?>
+                            </select>
+                            <span class="form-guide">Bank for receiving funds.</span>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Max Participants <span class="required">*</span></label>
-                            <input type="number" id="add_max_participants" name="max_participants" class="form-input" placeholder="0 for unlimited" min="0" required>
-                            <div id="add_participants_error" class="error-message">Cannot be negative.</div>
-                            <span class="form-guide">Limit the number of attendees (0 means no limit).</span>
+                            <label class="form-label">Account Number <span class="required">*</span></label>
+                            <input type="text" name="bank_account" id="add_bank_account" class="form-input" placeholder="e.g. 1122334455" oninput="handleBankInput('add')" required>
+                            <div id="add_bank_counter" style="font-size:12px; margin-top:2px; font-weight:bold; color:#dc3545;"></div>
+                            <span class="form-guide">Numbers only.</span>
                         </div>
                     </div>
 
+                    <div class="section-separator"><span>Details</span></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Target Amount (RM) <span class="required">*</span></label>
+                            <input type="number" id="add_target_amount" name="target_amount" class="form-input" step="1" min="0" placeholder="e.g. 5000" required><div id="add_amount_error" class="error-message">Cannot be negative.</div>
+                            <span class="form-guide">Estimated fundraising goal.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Max Participants <span class="required">*</span></label>
+                            <input type="number" id="add_max_participants" name="max_participants" class="form-input" placeholder="e.g. 100 (Enter 0 for unlimited)" min="0" required>
+                            <div id="add_participants_error" class="error-message">Cannot be negative.</div>
+                            <span class="form-guide">Limit attendees (0 means no limit).</span>
+                        </div>
+                    </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Start Date <span class="required">*</span></label>
@@ -860,93 +923,32 @@ $allActivityImagesMap = [];
                         </div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Specific Date (One Day)</label>
-                            <input type="date" name="specific_date" class="form-input">
-                            <span class="form-guide">Fill this only if the event happens on a single specific day.</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Venue Name</label>
-                            <input type="text" name="venue" class="form-input" placeholder="e.g. Community Hall A">
-                            <span class="form-guide">Name of the building or place (not the full address).</span>
-                        </div>
+                        <div class="form-group"><label class="form-label">Specific Date (One Day)</label><input type="date" name="specific_date" class="form-input"><span class="form-guide">Fill only if single day event.</span></div>
+                        <div class="form-group"><label class="form-label">Venue Name</label><input type="text" name="venue" class="form-input" placeholder="e.g. Dewan Serbaguna MBPJ"><span class="form-guide">Building or place name.</span></div>
                     </div>
-
                     <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Organizer Name <span class="required">*</span></label>
-                            <input type="text" id="add_organizer" name="organizer" class="form-input" required>
-                            <span class="form-guide">Name of the organizing team or partner (No Numbers).</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Contact Person <span class="required">*</span></label>
-                            <input type="text" id="add_contact_name" name="contact_name" class="form-input" required>
-                            <span class="form-guide">Name of person in charge (No Numbers).</span>
-                        </div>
+                        <div class="form-group"><label class="form-label">Organizer Name <span class="required">*</span></label><input type="text" id="add_organizer" name="organizer" class="form-input" placeholder="e.g. Youth Care Team" required><span class="form-guide">Organizer team (No Numbers).</span></div>
+                        <div class="form-group"><label class="form-label">Contact Person <span class="required">*</span></label><input type="text" id="add_contact_name" name="contact_name" class="form-input" placeholder="e.g. Ali bin Ahmad" required><span class="form-guide">PIC name (No Numbers).</span></div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Contact Number <span class="required">*</span></label>
-                            <div class="phone-format">
-                                <span class="phone-prefix">+60</span>
-                                <input type="text" id="add_contact_number" name="contact_number" class="form-input phone-input" maxlength="11" placeholder="12-3456789" required>
-                            </div>
-                            <span class="form-guide">Phone number for enquiries (e.g. 11-12345678).</span>
+                            <div class="phone-format"><span class="phone-prefix">+60</span><input type="text" id="add_contact_number" name="contact_number" class="form-input phone-input" maxlength="11" placeholder="11-12345678" required></div>
+                            <span class="form-guide">Phone number for enquiries.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Contact Email <span class="required">*</span></label>
-                            <input type="email" id="add_contact_email" name="contact_email" class="form-input" required>
-                            <span class="form-guide">Email address for public enquiries.</span>
+                            <input type="email" id="add_contact_email" name="contact_email" class="form-input" placeholder="e.g. contact@example.com" required>
+                            <span class="form-guide">Email for enquiries.</span>
                             <div id="addEmailError" class="error-message">Invalid email format.</div>
                         </div>
                     </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Address 1 <span class="required">*</span></label>
-                        <input type="text" id="add_address1" name="address1" class="form-input" required>
-                        <span class="form-guide">House unit no., floor, building, street name.</span>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Address 2 <span class="required">*</span></label>
-                            <input type="text" id="add_address2" name="address2" class="form-input" required>
-                            <span class="form-guide">Residential area, village, or section.</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Address 3</label>
-                            <input type="text" id="add_address3" name="address3" class="form-input">
-                            <span class="form-guide">Additional address details (Optional).</span>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Postcode <span class="required">*</span></label>
-                            <input type="text" id="add_postal_code" name="postal_code" class="form-input" required>
-                            <span class="form-guide">e.g. 50000</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">City <span class="required">*</span></label>
-                            <input type="text" id="add_city" name="city" class="form-input" required>
-                            <span class="form-guide">e.g. Kuala Lumpur</span>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">State <span class="required">*</span></label>
-                            <select id="add_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Country</label>
-                            <input type="text" id="add_country" name="country" class="form-input" value="Malaysia" readonly>
-                        </div>
-                    </div>
+                    <div class="form-group"><label class="form-label">Address 1 <span class="required">*</span></label><input type="text" id="add_address1" name="address1" class="form-input" placeholder="e.g. No. 123, Jalan Harmoni" required><span class="form-guide">Unit, Floor, Building.</span></div>
+                    <div class="form-row"><div class="form-group"><label class="form-label">Address 2 <span class="required">*</span></label><input type="text" id="add_address2" name="address2" class="form-input" placeholder="e.g. Taman Melati" required><span class="form-guide">Area/Taman.</span></div><div class="form-group"><label class="form-label">Address 3</label><input type="text" id="add_address3" name="address3" class="form-input" placeholder="e.g. Near Petronas Station"><span class="form-guide">Optional details.</span></div></div>
+                    <div class="form-row"><div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" id="add_postal_code" name="postal_code" class="form-input" placeholder="e.g. 50450" required><span class="form-guide">e.g. 50000</span></div><div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" id="add_city" name="city" class="form-input" placeholder="e.g. Kuala Lumpur" required><span class="form-guide">City name.</span></div></div>
+                    <div class="form-row"><div class="form-group"><label class="form-label">State <span class="required">*</span></label><select id="add_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div><div class="form-group"><label class="form-label">Country</label><input type="text" id="add_country" name="country" class="form-input" value="Malaysia" readonly></div></div>
                     
-                    <div class="form-group">
-                        <label class="form-label">Description <span class="required">*</span></label>
-                        <textarea id="add_activity_description" name="activity_description" class="form-textarea" required></textarea>
-                        <span class="form-guide">Provide a detailed explanation of the activity, its purpose, and itinerary.</span>
-                    </div>
-                    <div class="form-group"><button type="submit" class="btn btn-primary" style="width:100%"><i class="fas fa-save"></i> Save Activity</button></div>
+                    <div class="form-group"><button type="submit" class="btn btn-primary" style="width:100%; justify-content: center; display: flex; align-items: center;"><i class="fas fa-save"></i>&nbsp;Save Activity</button></div>
                 </form>
             </div>
         </div>
@@ -966,144 +968,69 @@ $allActivityImagesMap = [];
                         <div class="upload-container"><div class="upload-box"><i class="fas fa-cloud-upload-alt"></i><p>Add more images</p><input type="file" id="edit_activity_images" name="activity_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'edit')"></div><div class="preview-grid" id="edit_preview_container"></div></div>
                         <span class="form-guide">Add new images or remove existing ones. Max 10 total.</span>
                     </div>
-                    
                     <div class="form-group">
                         <label class="form-label">Activity Name <span class="required">*</span></label>
-                        <input type="text" id="edit_activity_name" name="activity_name" class="form-input" required>
-                        <span class="form-guide">Update the official name of the campaign or event.</span>
+                        <input type="text" id="edit_activity_name" name="activity_name" class="form-input" placeholder="e.g. Charity Run 2024" required>
+                        <span class="form-guide">Update the official name.</span>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Branch <span class="required">*</span></label>
-                            <select id="edit_branch_id" name="branch_id" class="form-select" required><?php foreach($branches as $b) echo "<option value='{$b['Branch_ID']}'>{$b['Branch_Name']}</option>"; ?></select>
+                            <select id="edit_branch_id" name="branch_id" class="form-select" required onchange="fetchBranchBankInfo('edit')"><?php foreach($branches as $b) echo "<option value='{$b['Branch_ID']}'>{$b['Branch_Name']}</option>"; ?></select>
                             <span class="form-guide">Update the organizing branch.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Status <span class="required">*</span></label>
                             <select id="edit_activity_status" name="activity_status" class="form-select" required><option value="Active">Active</option><option value="Upcoming">Upcoming</option><option value="Completed">Completed</option><option value="Cancelled">Cancelled</option></select>
-                            <span class="form-guide">Update the current operational status.</span>
+                            <span class="form-guide">Update the operational status.</span>
                         </div>
                     </div>
-
                     <div class="form-group" id="cancel-reason-group" style="display:none;">
                         <label class="form-label">Cancellation Reason <span class="required">*</span></label>
-                        <textarea id="edit_cancel_reason" name="cancel_reason" class="form-textarea" placeholder="Please provide a reason for cancellation..."></textarea>
+                        <textarea id="edit_cancel_reason" name="cancel_reason" class="form-textarea" placeholder="Reason..."></textarea>
                     </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Target (RM) <span class="required">*</span></label>
-                            <input type="number" id="edit_target_amount" name="target_amount" class="form-input" step="0.01" min="0" required><div id="edit_amount_error" class="error-message">Cannot be negative.</div>
-                            <span class="form-guide">Update the fundraising goal.</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Max Participants <span class="required">*</span></label>
-                            <input type="number" id="edit_max_participants" name="max_participants" class="form-input" min="0" required>
-                            <div id="edit_participants_error" class="error-message">Cannot be negative.</div>
-                            <span class="form-guide">Update participant limit (0 for unlimited).</span>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Start Date <span class="required">*</span></label>
-                            <input type="date" id="edit_start_date" name="start_date" class="form-input" required>
-                            <span class="form-guide">Date when the activity begins.</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">End Date <span class="required">*</span></label>
-                            <input type="date" id="edit_end_date" name="end_date" class="form-input" required>
-                            <span class="form-guide">Date when the activity concludes.</span>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Specific Date</label>
-                            <input type="date" id="edit_specific_date" name="specific_date" class="form-input">
-                            <span class="form-guide">Single day event date (if applicable).</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Venue Name</label>
-                            <input type="text" id="edit_venue" name="venue" class="form-input">
-                            <span class="form-guide">Name of the building or place.</span>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Organizer Name <span class="required">*</span></label>
-                            <input type="text" id="edit_organizer" name="organizer" class="form-input" required>
-                            <span class="form-guide">Name of the organizing team or partner (No Numbers).</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Contact Person <span class="required">*</span></label>
-                            <input type="text" id="edit_contact_name" name="contact_name" class="form-input" required>
-                            <span class="form-guide">Person in charge for enquiries (No Numbers).</span>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Contact Number <span class="required">*</span></label>
-                            <div class="phone-format">
-                                <span class="phone-prefix">+60</span>
-                                <input type="text" id="edit_contact_number" name="contact_number" class="form-input phone-input" maxlength="11" required>
-                            </div>
-                            <span class="form-guide">Phone number for public enquiries.</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Contact Email <span class="required">*</span></label>
-                            <input type="email" id="edit_contact_email" name="contact_email" class="form-input" required>
-                            <span class="form-guide">Email address for public enquiries.</span>
-                            <div id="editEmailError" class="error-message">Invalid email format.</div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Address 1 <span class="required">*</span></label>
-                        <input type="text" id="edit_address1" name="address1" class="form-input" required>
-                        <span class="form-guide">House unit no., floor, building, street name.</span>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Address 2 <span class="required">*</span></label>
-                            <input type="text" id="edit_address2" name="address2" class="form-input" required>
-                            <span class="form-guide">Residential area, Taman, or Section.</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Address 3</label>
-                            <input type="text" id="edit_address3" name="address3" class="form-input">
-                            <span class="form-guide">Additional address details.</span>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Postcode <span class="required">*</span></label>
-                            <input type="text" id="edit_postal_code" name="postal_code" class="form-input" required>
-                            <span class="form-guide">e.g. 50000</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">City <span class="required">*</span></label>
-                            <input type="text" id="edit_city" name="city" class="form-input" required>
-                            <span class="form-guide">e.g. Kuala Lumpur</span>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">State <span class="required">*</span></label>
-                            <select id="edit_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Country</label>
-                            <input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly>
-                        </div>
-                    </div>
-                    
                     <div class="form-group">
                         <label class="form-label">Description <span class="required">*</span></label>
-                        <textarea id="edit_activity_description" name="activity_description" class="form-textarea" required></textarea>
-                        <span class="form-guide">Detailed explanation of the activity.</span>
+                        <textarea id="edit_activity_description" name="activity_description" class="form-textarea" placeholder="e.g. A fundraising event for helping local animal shelters..." required></textarea>
+                        <span class="form-guide">Detailed explanation.</span>
                     </div>
-                    <div class="form-group"><button type="submit" class="btn btn-primary" style="width:100%"><i class="fas fa-save"></i> Update Activity</button></div>
+
+                    <div class="section-separator"><span>Bank Information</span></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Bank Name <span class="required">*</span></label>
+                            <select name="bank_name" id="edit_bank_name" class="form-select" onchange="setupBankValidation('edit')" required>
+                                <option value="">-- Select Bank --</option>
+                                <?php foreach($malaysiaBanks as $short => $full) echo "<option value='$short'>$full</option>"; ?>
+                            </select>
+                            <span class="form-guide">Update bank details.</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Account Number <span class="required">*</span></label>
+                            <input type="text" name="bank_account" id="edit_bank_account" class="form-input" placeholder="e.g. 1122334455" oninput="handleBankInput('edit')" required>
+                            <div id="edit_bank_counter" style="font-size:12px; margin-top:2px; font-weight:bold; color:#dc3545;"></div>
+                            <span class="form-guide">Numbers only.</span>
+                        </div>
+                    </div>
+
+                    <div class="section-separator"><span>Details</span></div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Target (RM) <span class="required">*</span></label><input type="number" id="edit_target_amount" name="target_amount" class="form-input" step="1" min="0" placeholder="e.g. 5000" required><div id="edit_amount_error" class="error-message">Cannot be negative.</div><span class="form-guide">Update goal.</span></div>
+                        <div class="form-group"><label class="form-label">Max Participants <span class="required">*</span></label><input type="number" id="edit_max_participants" name="max_participants" class="form-input" min="0" placeholder="e.g. 100" required><div id="edit_participants_error" class="error-message">Cannot be negative.</div><span class="form-guide">Update limit.</span></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Start Date <span class="required">*</span></label><input type="date" id="edit_start_date" name="start_date" class="form-input" required><span class="form-guide">Start date.</span></div>
+                        <div class="form-group"><label class="form-label">End Date <span class="required">*</span></label><input type="date" id="edit_end_date" name="end_date" class="form-input" required><span class="form-guide">End date.</span></div>
+                    </div>
+                    <div class="form-row"><div class="form-group"><label class="form-label">Specific Date</label><input type="date" id="edit_specific_date" name="specific_date" class="form-input"><span class="form-guide">Single day event.</span></div><div class="form-group"><label class="form-label">Venue Name</label><input type="text" id="edit_venue" name="venue" class="form-input" placeholder="e.g. Dewan Serbaguna MBPJ"><span class="form-guide">Place name.</span></div></div>
+                    <div class="form-row"><div class="form-group"><label class="form-label">Organizer Name <span class="required">*</span></label><input type="text" id="edit_organizer" name="organizer" class="form-input" placeholder="e.g. Youth Care Team" required><span class="form-guide">No Numbers.</span></div><div class="form-group"><label class="form-label">Contact Person <span class="required">*</span></label><input type="text" id="edit_contact_name" name="contact_name" class="form-input" placeholder="e.g. Ali bin Ahmad" required><span class="form-guide">No Numbers.</span></div></div>
+                    <div class="form-row"><div class="form-group"><label class="form-label">Contact Number <span class="required">*</span></label><div class="phone-format"><span class="phone-prefix">+60</span><input type="text" id="edit_contact_number" name="contact_number" class="form-input phone-input" maxlength="11" placeholder="11-12345678" required></div><span class="form-guide">Phone number.</span></div><div class="form-group"><label class="form-label">Contact Email <span class="required">*</span></label><input type="email" id="edit_contact_email" name="contact_email" class="form-input" placeholder="e.g. contact@example.com" required><span class="form-guide">Email address.</span><div id="editEmailError" class="error-message">Invalid email.</div></div></div>
+                    <div class="form-group"><label class="form-label">Address 1 <span class="required">*</span></label><input type="text" id="edit_address1" name="address1" class="form-input" placeholder="e.g. No. 123, Jalan Harmoni" required><span class="form-guide">Primary address.</span></div>
+                    <div class="form-row"><div class="form-group"><label class="form-label">Address 2 <span class="required">*</span></label><input type="text" id="edit_address2" name="address2" class="form-input" placeholder="e.g. Taman Melati" required><span class="form-guide">Area/Taman.</span></div><div class="form-group"><label class="form-label">Address 3</label><input type="text" id="edit_address3" name="address3" class="form-input" placeholder="e.g. Near Petronas Station"><span class="form-guide">Additional details.</span></div></div>
+                    <div class="form-row"><div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" id="edit_postal_code" name="postal_code" class="form-input" placeholder="e.g. 50450" required><span class="form-guide">e.g. 50000</span></div><div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" id="edit_city" name="city" class="form-input" placeholder="e.g. Kuala Lumpur" required><span class="form-guide">City.</span></div></div>
+                    <div class="form-row"><div class="form-group"><label class="form-label">State <span class="required">*</span></label><select id="edit_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div><div class="form-group"><label class="form-label">Country</label><input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly></div></div>
+                    
+                    <div class="form-group"><button type="submit" class="btn btn-primary" style="width:100%; justify-content: center; display: flex; align-items: center;"><i class="fas fa-save"></i>&nbsp;Update Activity</button></div>
                 </form>
             </div>
         </div>
@@ -1112,92 +1039,204 @@ $allActivityImagesMap = [];
     <div class="modal" id="viewDonorsModal">
         <div class="modal-content">
             <div class="modal-header"><h2>Activity Donation History</h2><button class="close-btn" onclick="document.getElementById('viewDonorsModal').style.display='none'">&times;</button></div>
+            <div class="modal-body"><table class="donation-table"><thead><tr><th>Date</th><th>Donor Name</th><th>Amount (RM)</th><th>Ref</th></tr></thead><tbody id="donorsTableBody"></tbody></table></div>
+        </div>
+    </div>
+
+    <div id="withdrawalModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>Withdrawal History</h2><button class="close-btn" onclick="document.getElementById('withdrawalModal').style.display='none'">&times;</button></div>
             <div class="modal-body">
-                <table class="donation-table"><thead><tr><th>Date</th><th>Donor Name</th><th>Amount (RM)</th><th>Ref</th></tr></thead><tbody id="donorsTableBody"></tbody></table>
+                <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:14px; color:#555; font-weight:600;">Total Withdrawn:</span><span id="totalWithdrawnDisplay" style="font-size:18px; font-weight:bold; color:#dc3545;">RM 0.00</span>
+                </div>
+                <div id="withdrawalListContainer" class="history-list">Loading...</div>
             </div>
         </div>
     </div>
 
     <div id="imageLightbox" class="lightbox-modal">
         <span class="close-lightbox" onclick="closeLightbox()">&times;</span>
-        <a class="lightbox-nav lightbox-prev" onclick="changeLightboxImage(-1)">&#10094;</a>
-        <img class="lightbox-content" id="lightboxImage">
-        <a class="lightbox-nav lightbox-next" onclick="changeLightboxImage(1)">&#10095;</a>
+        <a class="lightbox-nav lightbox-prev" onclick="changeLightboxImage(-1)">&#10094;</a><img class="lightbox-content" id="lightboxImage"><a class="lightbox-nav lightbox-next" onclick="changeLightboxImage(1)">&#10095;</a>
     </div>
 
     <script>
         // --- JS Logic ---
-        let addFiles = []; 
-        let editNewFiles = []; 
-        let editExistingImages = []; 
+        let addFiles = []; let editNewFiles = []; let editExistingImages = []; 
 
+        function showSystemError(messageHTML) {
+            const errorBox = document.getElementById('floatingError');
+            const errorText = document.getElementById('msgError');
+            if(errorBox && errorText) {
+                errorText.innerHTML = messageHTML;
+                errorBox.style.display = 'flex';
+                setTimeout(() => { errorBox.style.display = 'none'; }, 5000);
+            }
+        }
+
+        // Bank Validation Rules
+        const bankRules = { "Maybank": { digits: 12 }, "CIMB": { digits: 10 }, "Public Bank": { digits: 10 }, "RHB": { digits: 10 }, "Hong Leong": { digits: 11 }, "AmBank": { digits: 13 }, "UOB": { digits: 11 }, "Bank Rakyat": { digits: 12 }, "OCBC": { digits: 10 }, "HSBC": { digits: 12 }, "Bank Islam": { digits: 14 }, "Affin Bank": { digits: 10 }, "Alliance Bank": { digits: 10 }, "Standard Chartered": { digits: 10 }, "MBSB": { digits: 10 }, "Citibank": { digits: 10 }, "Bank Muamalat": { digits: 14 }, "Agrobank": { digits: 15 }, "BSN": { digits: 16 } };
+
+        function setupBankValidation(mode) {
+            const bankSelect = document.getElementById(mode + '_bank_name');
+            const accInput = document.getElementById(mode + '_bank_account');
+            if(!bankSelect || !accInput) return;
+            const selectedBank = bankSelect.value;
+            const rule = bankRules[selectedBank];
+            if (selectedBank && rule) {
+                accInput.maxLength = rule.digits;
+                if (accInput.value.length > rule.digits) accInput.value = accInput.value.slice(0, rule.digits);
+                accInput.placeholder = `Enter ${rule.digits} digits for ${selectedBank}`;
+                handleBankInput(mode);
+            } else {
+                accInput.removeAttribute('maxLength');
+                accInput.placeholder = "Select a bank first";
+                document.getElementById(mode + '_bank_counter').innerText = "";
+            }
+        }
+
+        function handleBankInput(mode) {
+            const input = document.getElementById(mode + '_bank_account');
+            const counter = document.getElementById(mode + '_bank_counter');
+            const bankSelect = document.getElementById(mode + '_bank_name');
+            input.value = input.value.replace(/[^0-9]/g, '');
+            const rule = bankRules[bankSelect.value];
+            if (rule) {
+                const current = input.value.length;
+                const max = rule.digits;
+                counter.innerText = `Digits: ${current} / ${max}`;
+                counter.style.color = (current === max) ? '#28a745' : '#dc3545';
+            } else {
+                counter.innerText = "";
+            }
+        }
+
+        // --- NEW: DATE AUTO-STATUS LOGIC ---
+        function setupDateAutoStatus(prefix) {
+            const dateInput = document.getElementById(prefix + '_start_date');
+            const statusSelect = document.getElementById(prefix + '_activity_status');
+            
+            if(!dateInput || !statusSelect) return;
+
+            dateInput.addEventListener('change', function() {
+                const inputDateStr = this.value; // YYYY-MM-DD
+                if(!inputDateStr) return;
+
+                // Get Today in local YYYY-MM-DD
+                const d = new Date();
+                const year = d.getFullYear();
+                const month = ('0' + (d.getMonth() + 1)).slice(-2);
+                const day = ('0' + d.getDate()).slice(-2);
+                const todayStr = `${year}-${month}-${day}`;
+
+                if (inputDateStr === todayStr) {
+                    statusSelect.value = 'Active';
+                } else if (inputDateStr > todayStr) {
+                    statusSelect.value = 'Upcoming';
+                }
+            });
+        }
+
+        // --- Fetch Branch Info and Autofill ---
+        function fetchBranchBankInfo(mode) {
+            const branchId = document.getElementById(mode + '_branch_id').value;
+            if(!branchId) return;
+            fetch(`activity_management.php?action=get_branch_bank_info&branch_id=${branchId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if(data) {
+                        const bankSelect = document.getElementById(mode + '_bank_name');
+                        const accInput = document.getElementById(mode + '_bank_account');
+                        if(data.Branch_BankName) {
+                            bankSelect.value = data.Branch_BankName;
+                            setupBankValidation(mode);
+                        }
+                        if(data.Branch_BankAccount) {
+                            accInput.value = data.Branch_BankAccount;
+                            handleBankInput(mode);
+                        }
+                    }
+                })
+                .catch(err => console.error(err));
+        }
+
+        // --- WITHDRAWAL HISTORY (UPDATED for Click Event) ---
+        function openWithdrawalHistory(activityId) {
+            document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); 
+            document.getElementById('withdrawalModal').style.display = 'flex';
+            const container = document.getElementById('withdrawalListContainer');
+            const totalDisplay = document.getElementById('totalWithdrawnDisplay');
+            container.innerHTML = '<div style="text-align:center; padding:20px;">Loading...</div>';
+            totalDisplay.innerText = "RM 0.00";
+            
+            fetch(`activity_management.php?action=get_withdrawal_history&activity_id=${activityId}`)
+                .then(r => r.json()).then(res => {
+                    container.innerHTML = '';
+                    totalDisplay.innerText = "RM " + res.total_withdrawn;
+                    
+                    if (res.history.length === 0) { 
+                        container.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">No withdrawal records found.</div>'; 
+                        return; 
+                    }
+                    
+                    res.history.forEach(w => {
+                        const item = document.createElement('div'); 
+                        item.className = 'history-item';
+                        
+                        // Add Click Event to open new tab
+                        item.style.cursor = 'pointer';
+                        item.onclick = function() {
+                            window.open('admin_withdrawal_details.php?id=' + w.Withdrawal_ID, '_blank');
+                        };
+
+                        const desc = w.Branch_Name ? `<b>Via Branch:</b> ${w.Branch_Name}` : "Direct Withdrawal";
+                        item.innerHTML = `
+                            <div class="h-left">
+                                <h4>${desc}</h4>
+                                <p>${w.Formatted_Date} | Status: <span style="font-weight:bold; color:${w.Status=='Approved'?'green':'orange'}">${w.Status}</span></p>
+                            </div>
+                            <div class="h-right-negative">- RM ${w.Formatted_Amount}</div>
+                        `;
+                        container.appendChild(item);
+                    });
+                });
+        }
+
+        // --- Other Helpers (File, Preview, Modals, etc.) ---
         function handleFileSelect(event, mode) {
-            const input = event.target;
-            const newFiles = Array.from(input.files);
-            if (mode === 'add') {
-                addFiles = addFiles.concat(newFiles);
-                updateFileInput('add_activity_images', addFiles);
-                renderPreview('add_preview_container', addFiles, 'add');
-            } else if (mode === 'edit') {
-                editNewFiles = editNewFiles.concat(newFiles);
-                updateFileInput('edit_activity_images', editNewFiles);
-                renderEditPreviews();
-            }
+            const input = event.target; const newFiles = Array.from(input.files);
+            if (mode === 'add') { addFiles = addFiles.concat(newFiles); updateFileInput('add_activity_images', addFiles); renderPreview('add_preview_container', addFiles, 'add'); } 
+            else if (mode === 'edit') { editNewFiles = editNewFiles.concat(newFiles); updateFileInput('edit_activity_images', editNewFiles); renderEditPreviews(); }
         }
-
         function removeFile(index, mode) {
-            if (mode === 'add') {
-                addFiles.splice(index, 1);
-                updateFileInput('add_activity_images', addFiles);
-                renderPreview('add_preview_container', addFiles, 'add');
-            } else if (mode === 'edit') {
-                editNewFiles.splice(index, 1);
-                updateFileInput('edit_activity_images', editNewFiles);
-                renderEditPreviews();
-            }
+            if (mode === 'add') { addFiles.splice(index, 1); updateFileInput('add_activity_images', addFiles); renderPreview('add_preview_container', addFiles, 'add'); } 
+            else if (mode === 'edit') { editNewFiles.splice(index, 1); updateFileInput('edit_activity_images', editNewFiles); renderEditPreviews(); }
         }
-
-        function removeExistingImage(index) {
-            editExistingImages.splice(index, 1);
-            document.getElementById('existing_images_json').value = JSON.stringify(editExistingImages);
-            renderEditPreviews();
-        }
-
-        function updateFileInput(inputId, fileArray) {
-            const dataTransfer = new DataTransfer();
-            fileArray.forEach(file => dataTransfer.items.add(file));
-            document.getElementById(inputId).files = dataTransfer.files;
-        }
-
+        function removeExistingImage(index) { editExistingImages.splice(index, 1); document.getElementById('existing_images_json').value = JSON.stringify(editExistingImages); renderEditPreviews(); }
+        function updateFileInput(inputId, fileArray) { const dt = new DataTransfer(); fileArray.forEach(file => dt.items.add(file)); document.getElementById(inputId).files = dt.files; }
         function renderPreview(containerId, fileArray, mode) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = '';
+            const container = document.getElementById(containerId); container.innerHTML = '';
             fileArray.forEach((file, index) => {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    const item = document.createElement('div');
-                    item.className = 'preview-item';
+                    const item = document.createElement('div'); item.className = 'preview-item';
                     item.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-img-btn" onclick="removeFile(${index}, '${mode}')"><i class="fas fa-times"></i></button>`;
                     container.appendChild(item);
                 }
                 reader.readAsDataURL(file);
             });
         }
-
         function renderEditPreviews() {
-            const container = document.getElementById('edit_preview_container');
-            container.innerHTML = '';
+            const container = document.getElementById('edit_preview_container'); container.innerHTML = '';
             editExistingImages.forEach((src, index) => {
-                const item = document.createElement('div');
-                item.className = 'preview-item';
+                const item = document.createElement('div'); item.className = 'preview-item';
                 item.innerHTML = `<img src="${src}"><button type="button" class="remove-img-btn" onclick="removeExistingImage(${index})"><i class="fas fa-times"></i></button>`;
                 container.appendChild(item);
             });
             editNewFiles.forEach((file, index) => {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    const item = document.createElement('div');
-                    item.className = 'preview-item';
+                    const item = document.createElement('div'); item.className = 'preview-item';
                     item.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-img-btn" onclick="removeFile(${index}, 'edit')"><i class="fas fa-times"></i></button>`;
                     container.appendChild(item);
                 }
@@ -1207,11 +1246,7 @@ $allActivityImagesMap = [];
 
         function toggleFilterInputs() {
             const type = document.getElementById('filterType').value;
-            document.querySelectorAll('.secondary-filter').forEach(el => { 
-                el.classList.remove('active'); 
-                if(el.tagName === 'DIV' && el.querySelector('select')) el.querySelector('select').disabled = true; 
-            });
-            
+            document.querySelectorAll('.secondary-filter').forEach(el => { el.classList.remove('active'); if(el.tagName === 'DIV' && el.querySelector('select')) el.querySelector('select').disabled = true; });
             if (type === 'status') { document.getElementById('filter_status_container').classList.add('active'); document.getElementById('filter_status_container').querySelector('select').disabled = false; }
             else if (type === 'branch') { document.getElementById('filter_branch_container').classList.add('active'); document.getElementById('filter_branch_container').querySelector('select').disabled = false; }
             else if (type === 'year') { document.getElementById('filter_year_container').classList.add('active'); document.getElementById('filter_year_container').querySelector('select').disabled = false; }
@@ -1241,8 +1276,7 @@ $allActivityImagesMap = [];
         }
         
         function setupPhoneInput(inputId) {
-            const input = document.getElementById(inputId); 
-            if(!input) return;
+            const input = document.getElementById(inputId); if(!input) return;
             input.addEventListener('input', function(e) { 
                 let val = this.value.replace(/\D/g, ''); 
                 if (val.length > 11) val = val.substring(0, 11); 
@@ -1252,168 +1286,72 @@ $allActivityImagesMap = [];
             });
         }
 
-        function showSystemError(msg) {
-            const el = document.getElementById('floatingError');
-            document.getElementById('msgError').innerHTML = msg.replace(/\n/g, '<br>');
-            el.style.display = 'flex';
-            setTimeout(() => el.style.display='none', 5000);
-        }
-
-        function validateAmount(amountId, errorId) {
-            const val = document.getElementById(amountId).value;
-            const errorDiv = document.getElementById(errorId);
-            if(val && parseFloat(val) < 0) { errorDiv.style.display = 'block'; return false; }
-            errorDiv.style.display = 'none'; return true;
-        }
-
-        // --- VALIDATION HELPERS ---
-        function checkEmail(val) {
-            if(!val) return true; 
-            return /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val);
-        }
-
-        function checkName(val) {
-            if (!val) return true;
-            return !/\d/.test(val);
-        }
+        function validateAmount(amountId, errorId) { const val = document.getElementById(amountId).value; const errorDiv = document.getElementById(errorId); if(val && parseFloat(val) < 0) { errorDiv.style.display = 'block'; return false; } errorDiv.style.display = 'none'; return true; }
+        function checkEmail(val) { if(!val) return true; return /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val); }
+        function checkName(val) { if (!val) return true; return !/\d/.test(val); }
 
         function validateActivityForm(prefix) { 
-            let isValid = true;
             let errors = [];
+            const getValue = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
 
-            const getValue = (id) => {
-                const el = document.getElementById(id);
-                return el ? el.value.trim() : '';
-            };
+            if (prefix === 'add' && addFiles.length === 0) errors.push("At least one Activity Image is required.");
+            if (prefix === 'edit' && editNewFiles.length === 0 && editExistingImages.length === 0) errors.push("At least one Activity Image is required.");
 
-            if (prefix === 'add' && addFiles.length === 0) errors.push("At least one image is required.");
-            if (prefix === 'edit' && editNewFiles.length === 0 && editExistingImages.length === 0) errors.push("At least one image is required.");
-
+            // Detailed validation messages
             if (!getValue(prefix + '_activity_name')) errors.push("Activity Name is required.");
             if (!getValue(prefix + '_branch_id')) errors.push("Branch is required.");
-            if (!getValue(prefix + '_activity_status')) errors.push("Status is required.");
+            if (!getValue(prefix + '_activity_description')) errors.push("Description is required.");
+            
+            // New Bank Validations
+            if (!getValue(prefix + '_bank_name')) errors.push("Bank Name is required.");
+            if (!getValue(prefix + '_bank_account')) errors.push("Bank Account Number is required.");
+
             if (!getValue(prefix + '_target_amount')) errors.push("Target Amount is required.");
-            if (!getValue(prefix + '_max_participants')) errors.push("Max Participants is required.");
+            if (document.getElementById(prefix + '_max_participants').value === '') errors.push("Max Participants is required.");
+
             if (!getValue(prefix + '_start_date')) errors.push("Start Date is required.");
             if (!getValue(prefix + '_end_date')) errors.push("End Date is required.");
+
             if (!getValue(prefix + '_organizer')) errors.push("Organizer Name is required.");
-            if (!getValue(prefix + '_contact_name')) errors.push("Contact Person is required.");
+            if (!getValue(prefix + '_contact_name')) errors.push("Contact Person Name is required.");
             if (!getValue(prefix + '_contact_number')) errors.push("Contact Number is required.");
             if (!getValue(prefix + '_contact_email')) errors.push("Contact Email is required.");
+
             if (!getValue(prefix + '_address1')) errors.push("Address Line 1 is required.");
             if (!getValue(prefix + '_address2')) errors.push("Address Line 2 is required.");
+            if (!getValue(prefix + '_postal_code')) errors.push("Postal Code is required.");
             if (!getValue(prefix + '_city')) errors.push("City is required.");
             if (!getValue(prefix + '_state')) errors.push("State is required.");
-            if (!getValue(prefix + '_postal_code')) errors.push("Postcode is required.");
-            if (!getValue(prefix + '_activity_description')) errors.push("Description is required.");
 
-            // Check cancelled reason in edit
-            if (prefix === 'edit') {
-                const status = getValue(prefix + '_activity_status');
-                if (status === 'Cancelled' && !getValue(prefix + '_cancel_reason')) {
-                    errors.push("Cancellation Reason is required.");
-                    isValid = false;
-                }
-            }
-
-            // Date Validation
+            // Date Checks
             const start = document.getElementById(prefix + '_start_date').value;
             const end = document.getElementById(prefix + '_end_date').value;
-            
             if(start && end) {
-                const sDate = new Date(start); 
-                const eDate = new Date(end);
-                const today = new Date(); 
-                const oneYearLater = new Date(); 
-                oneYearLater.setFullYear(today.getFullYear() + 1);
-                
-                if (sDate > oneYearLater) { 
-                    errors.push("Start date cannot be more than 1 year from today."); 
-                    isValid = false; 
-                }
-                
-                if(eDate < sDate) { 
-                    errors.push("End date must be after Start date."); 
-                    isValid = false; 
-                }
-                
-                const diffTime = Math.abs(eDate - sDate); 
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                if (diffDays > 365) { 
-                    errors.push("Activity duration cannot exceed 1 year."); 
-                    isValid = false; 
-                }
-
+                const sDate = new Date(start); const eDate = new Date(end);
+                const today = new Date(); const oneYearLater = new Date(); oneYearLater.setFullYear(today.getFullYear() + 1);
+                if (sDate > oneYearLater) errors.push("Start date cannot be more than 1 year from today.");
+                if(eDate < sDate) errors.push("End date must be after Start date.");
                 if (prefix === 'add') {
-                    const todayMid = new Date();
-                    todayMid.setHours(0,0,0,0);
-                    if (sDate < todayMid) {
-                        errors.push("Start Date cannot be before today.");
-                        isValid = false;
-                    }
+                    const d = new Date();
+                    const todayStr = `${d.getFullYear()}-${('0'+(d.getMonth()+1)).slice(-2)}-${('0'+d.getDate()).slice(-2)}`;
+                    if (start < todayStr) errors.push("Start Date cannot be before today.");
                 }
             }
 
-            // Amount Validation
-            const amountId = prefix + '_target_amount'; 
-            const amountErrId = prefix + '_amount_error';
-            if(!validateAmount(amountId, amountErrId)) {
-                isValid = false;
+            if (prefix === 'edit' && getValue(prefix + '_activity_status') === 'Cancelled') {
+                if (!getValue(prefix + '_cancel_reason')) errors.push("Cancellation Reason is required.");
             }
 
-            // Max Participants Validation
-            const partId = prefix + '_max_participants';
-            const partVal = document.getElementById(partId).value;
-            const partErrId = prefix + '_participants_error';
-            const partErrDiv = document.getElementById(partErrId);
-
-            if (partVal && parseInt(partVal) < 0) {
-                if(partErrDiv) partErrDiv.style.display = 'block';
-                errors.push("Max Participants cannot be negative.");
-                isValid = false;
-            } else {
-                if(partErrDiv) partErrDiv.style.display = 'none';
+            if (errors.length > 0) { 
+                showSystemError("Please check the following:<br>" + errors.join("<br>")); 
+                return false; 
             }
-
-            // Name Validation (No Numbers)
-            const organizerName = document.getElementById(prefix + '_organizer').value;
-            const contactName = document.getElementById(prefix + '_contact_name').value;
-            
-            if(!checkName(organizerName)) {
-                errors.push("Organizer Name cannot contain numbers.");
-                isValid = false;
-            }
-            if(!checkName(contactName)) {
-                errors.push("Contact Person Name cannot contain numbers.");
-                isValid = false;
-            }
-
-            // Email Validation
-            const emailId = prefix + '_contact_email';
-            const emailErrId = prefix + 'EmailError';
-            const emailVal = document.getElementById(emailId).value;
-            if(emailVal && !checkEmail(emailVal)) {
-                document.getElementById(emailErrId).style.display = 'block';
-                errors.push("Invalid Email Format.");
-                isValid = false;
-            } else {
-                document.getElementById(emailErrId).style.display = 'none';
-            }
-
-            if(errors.length > 0) {
-                showSystemError("Validation Error:<br>" + errors.join("<br>"));
-                return false;
-            }
-
-            return isValid;
+            return true;
         }
 
         function moveCarousel(cardId, direction) {
-            const card = document.getElementById('card-' + cardId);
-            const images = card.querySelectorAll('.card-img');
-            const counter = card.querySelector('.img-counter');
-            let activeIndex = 0;
-            images.forEach((img, index) => { if (img.classList.contains('active')) activeIndex = index; img.classList.remove('active'); });
+            const card = document.getElementById('card-' + cardId); const images = card.querySelectorAll('.card-img'); const counter = card.querySelector('.img-counter');
+            let activeIndex = 0; images.forEach((img, index) => { if (img.classList.contains('active')) activeIndex = index; img.classList.remove('active'); });
             let newIndex = activeIndex + direction;
             if (newIndex >= images.length) newIndex = 0; if (newIndex < 0) newIndex = images.length - 1;
             images[newIndex].classList.add('active');
@@ -1423,69 +1361,38 @@ $allActivityImagesMap = [];
         function toggleMenu(e, id) { e.stopPropagation(); document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); const m = document.getElementById('menu-' + id); if (m) m.style.display = 'block'; }
         
         function openAddActivityModal() { 
-            addFiles = []; 
-            updateFileInput('add_activity_images', []);
+            addFiles = []; updateFileInput('add_activity_images', []);
             document.getElementById('add_preview_container').innerHTML = '';
+            setupBankValidation('add'); 
             document.getElementById('addActivityModal').style.display = 'flex'; 
         }
-        
-        function closeAddActivityModal() { 
-            document.getElementById('addActivityModal').style.display = 'none'; 
-            document.getElementById('addActivityForm').reset(); 
-            addFiles = [];
-            document.getElementById('add_preview_container').innerHTML = ''; 
-        }
-        
+        function closeAddActivityModal() { document.getElementById('addActivityModal').style.display = 'none'; document.getElementById('addActivityForm').reset(); addFiles = []; document.getElementById('add_preview_container').innerHTML = ''; }
         function closeEditActivityModal() { document.getElementById('editActivityModal').style.display = 'none'; }
         
         function editActivity(obj) {
-            editNewFiles = []; 
-            updateFileInput('edit_activity_images', []);
-            
+            editNewFiles = []; updateFileInput('edit_activity_images', []);
             document.getElementById('edit_activity_id').value = obj.Activity_ID;
             document.getElementById('edit_activity_name').value = obj.Activity_Name;
             document.getElementById('edit_branch_id').value = obj.Branch_ID;
-            
             const statusSelect = document.getElementById('edit_activity_status');
             statusSelect.value = obj.Activity_Status;
             
-            // Logic: If already Active, cannot select Upcoming
             const upcomingOption = statusSelect.querySelector('option[value="Upcoming"]');
-            if (obj.Activity_Status === 'Active') {
-                upcomingOption.hidden = true;
-                upcomingOption.disabled = true;
-            } else {
-                upcomingOption.hidden = false;
-                upcomingOption.disabled = false;
-            }
+            if (obj.Activity_Status === 'Active') { upcomingOption.hidden = true; upcomingOption.disabled = true; } 
+            else { upcomingOption.hidden = false; upcomingOption.disabled = false; }
 
-            // Logic: Show/Hide Cancel Reason
             const reasonContainer = document.getElementById('cancel-reason-group');
             const reasonInput = document.getElementById('edit_cancel_reason');
-            if (obj.Activity_Status === 'Cancelled') {
-                reasonContainer.style.display = 'block';
-                reasonInput.value = obj.Cancel_Reason || '';
-                reasonInput.required = true;
-            } else {
-                reasonContainer.style.display = 'none';
-                reasonInput.value = '';
-                reasonInput.required = false;
-            }
+            if (obj.Activity_Status === 'Cancelled') { reasonContainer.style.display = 'block'; reasonInput.value = obj.Cancel_Reason || ''; } 
+            else { reasonContainer.style.display = 'none'; reasonInput.value = ''; }
 
-            // Listener for status change
             statusSelect.onchange = function() {
-                if (this.value === 'Cancelled') {
-                    reasonContainer.style.display = 'block';
-                    reasonInput.required = true;
-                } else {
-                    reasonContainer.style.display = 'none';
-                    reasonInput.required = false;
-                }
+                if (this.value === 'Cancelled') { reasonContainer.style.display = 'block'; } 
+                else { reasonContainer.style.display = 'none'; }
             };
 
             document.getElementById('edit_target_amount').value = obj.Activity_TargetAmount;
             document.getElementById('edit_activity_description').value = obj.Activity_Description;
-            
             document.getElementById('edit_start_date').value = obj.Activity_StartDate;
             document.getElementById('edit_end_date').value = obj.Activity_EndDate;
             document.getElementById('edit_specific_date').value = obj.Activity_Date || '';
@@ -1493,13 +1400,10 @@ $allActivityImagesMap = [];
             document.getElementById('edit_organizer').value = obj.Activity_Organizer || '';
             document.getElementById('edit_contact_name').value = obj.Activity_Contact_Name || '';
             
-            let phone = obj.Activity_Contact_Number || '';
-            if(phone.startsWith('+60')) phone = phone.substring(3);
+            let phone = obj.Activity_Contact_Number || ''; if(phone.startsWith('+60')) phone = phone.substring(3);
             document.getElementById('edit_contact_number').value = phone;
-
             document.getElementById('edit_contact_email').value = obj.Activity_Contact_Email || '';
             document.getElementById('edit_max_participants').value = obj.Activity_Max_Participants || '';
-
             document.getElementById('edit_address1').value = obj.Activity_Address1 || '';
             document.getElementById('edit_address2').value = obj.Activity_Address2 || '';
             document.getElementById('edit_address3').value = obj.Activity_Address3 || '';
@@ -1507,16 +1411,20 @@ $allActivityImagesMap = [];
             document.getElementById('edit_state').value = obj.Activity_State || '';
             document.getElementById('edit_postal_code').value = obj.Activity_PostalCode || '';
             document.getElementById('edit_country').value = obj.Activity_Country || 'Malaysia';
+
+            document.getElementById('edit_bank_name').value = obj.Activity_BankName || "";
+            document.getElementById('edit_bank_account').value = obj.Activity_BankAccount || "";
+            setupBankValidation('edit'); 
             
             try { editExistingImages = JSON.parse(obj.Activity_Images || "[]"); } catch(e) { editExistingImages = []; }
             document.getElementById('existing_images_json').value = JSON.stringify(editExistingImages);
             renderEditPreviews();
             
-            document.getElementById('edit_amount_error').style.display='none';
             document.getElementById('editActivityModal').style.display = 'flex';
         }
 
         function openViewDonors(activityId) {
+            document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
             const modal = document.getElementById('viewDonorsModal'); const tbody = document.getElementById('donorsTableBody');
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">Loading donations...</td></tr>';
             modal.style.display = 'flex';
@@ -1531,45 +1439,22 @@ $allActivityImagesMap = [];
         function confirmDeleteActivity(id) { if (confirm('Delete this activity?')) window.location.href = 'activity_management.php?delete_activity_id=' + id; }
 
         const allActivityImages = <?php echo json_encode($allActivityImagesMap); ?>;
-        let currentLightboxActivityId = null;
-        let currentLightboxIndex = 0;
+        let currentLightboxActivityId = null; let currentLightboxIndex = 0;
 
-        function openLightbox(activityId, index) {
-            if (!allActivityImages[activityId] || allActivityImages[activityId].length === 0) return;
-            currentLightboxActivityId = activityId;
-            currentLightboxIndex = index;
-            updateLightboxImage();
-            document.getElementById('imageLightbox').style.display = "flex";
-        }
-
+        function openLightbox(activityId, index) { if (!allActivityImages[activityId] || allActivityImages[activityId].length === 0) return; currentLightboxActivityId = activityId; currentLightboxIndex = index; updateLightboxImage(); document.getElementById('imageLightbox').style.display = "flex"; }
         function closeLightbox() { document.getElementById('imageLightbox').style.display = "none"; }
-
-        function changeLightboxImage(n) {
-            if (currentLightboxActivityId === null) return;
-            const images = allActivityImages[currentLightboxActivityId];
-            currentLightboxIndex += n;
-            if (currentLightboxIndex >= images.length) currentLightboxIndex = 0;
-            else if (currentLightboxIndex < 0) currentLightboxIndex = images.length - 1;
-            updateLightboxImage();
-        }
-
-        function updateLightboxImage() {
-            const images = allActivityImages[currentLightboxActivityId];
-            const imgElement = document.getElementById('lightboxImage');
-            imgElement.src = images[currentLightboxIndex];
-            const prevBtn = document.querySelector('.lightbox-prev');
-            const nextBtn = document.querySelector('.lightbox-next');
-            if (images.length <= 1) { prevBtn.style.display = 'none'; nextBtn.style.display = 'none'; } 
-            else { prevBtn.style.display = 'block'; nextBtn.style.display = 'block'; }
-        }
+        function changeLightboxImage(n) { if (currentLightboxActivityId === null) return; const images = allActivityImages[currentLightboxActivityId]; currentLightboxIndex += n; if (currentLightboxIndex >= images.length) currentLightboxIndex = 0; else if (currentLightboxIndex < 0) currentLightboxIndex = images.length - 1; updateLightboxImage(); }
+        function updateLightboxImage() { const images = allActivityImages[currentLightboxActivityId]; document.getElementById('lightboxImage').src = images[currentLightboxIndex]; const prevBtn = document.querySelector('.lightbox-prev'); const nextBtn = document.querySelector('.lightbox-next'); if (images.length <= 1) { prevBtn.style.display = 'none'; nextBtn.style.display = 'none'; } else { prevBtn.style.display = 'block'; nextBtn.style.display = 'block'; } }
 
         document.addEventListener('DOMContentLoaded', function() {
             toggleFilterInputs();
             setupPostcodeState('add_postal_code', 'add_state');
             setupPostcodeState('edit_postal_code', 'edit_state');
-            
             setupPhoneInput('add_contact_number');
             setupPhoneInput('edit_contact_number');
+            // Init new date auto-status logic
+            setupDateAutoStatus('add');
+            setupDateAutoStatus('edit');
 
             const s = document.getElementById('floatingSuccess'); const e = document.getElementById('floatingError');
             if (s && s.querySelector('#msgSuccess').innerText !== '') { s.style.display='flex'; setTimeout(() => s.style.display='none', 5000); }

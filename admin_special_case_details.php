@@ -141,7 +141,7 @@ if ($case['Case_Status'] == 'Upcoming') $statusClass = 'status-upcoming';
 
     <div class="detail-wrapper">
         <div class="top-bar">
-            <a href="javascript:void(0);" onclick="goBackAndClose()" class="back-link"><i class="fas fa-arrow-left"></i> Back to Management</a>
+            <a href="javascript:void(0);" onclick="goBackAndClose()" class="back-link"><i class="fas fa-arrow-left"></i> Back to Special Case Management</a>
             <div style="font-size:12px; color:#999;">Case ID: #<?php echo str_pad($case['Case_ID'], 4, '0', STR_PAD_LEFT); ?></div>
         </div>
 

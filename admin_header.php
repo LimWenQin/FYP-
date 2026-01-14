@@ -60,8 +60,13 @@ if (isset($_SESSION['admin_id'])) {
             </div>
             <div class="settings-menu" id="settingsMenu">
                 <a href="admin_manage_stories.php"><i class="fas fa-book-open"></i> Manage Stories</a>
-                <a href="admin_manage_pages.php?type=about_us"><i class="fas fa-info-circle"></i> About Us</a>
-                <a href="admin_manage_pages.php?type=contact_us"><i class="fas fa-address-book"></i> Contact Us</a>
+                <a href="admin_manage_pages.php?type=about_us"><i class="fas fa-info-circle"></i> About Us (Content)</a>
+                <a href="admin_manage_team.php"><i class="fas fa-users"></i> Team Members</a>
+                
+                <div class="divider"></div>
+                <a href="admin_manage_pages.php?type=contact_settings"><i class="fas fa-map-marker-alt"></i> Contact Us (Settings)</a>
+                <a href="admin_manage_pages.php?type=contact_messages"><i class="fas fa-envelope"></i> Contact Messages</a>
+                <div class="divider"></div>
                 <a href="admin_manage_pages.php?type=terms_condition"><i class="fas fa-file-contract"></i> Terms & Conditions</a>
                 <a href="admin_manage_pages.php?type=privacy_policy"><i class="fas fa-user-shield"></i> Privacy Policy</a>
             </div>
@@ -102,15 +107,16 @@ if (isset($_SESSION['admin_id'])) {
                 </div>
                 <i class="fas fa-chevron-down" style="margin-left: 10px; font-size: 12px;"></i>
             </div>
+            
             <div class="user-profile-dropdown" id="userProfileMenu">
                 <?php if(isset($_SESSION['staff_id'])): ?>
-                    <a href="staff_profile.php">
+                    <a href="admin_profile.php">
                         <i class="fas fa-user"></i> View Profile
                     </a>
-                    <a href="staff_profile.php?edit=true">
+                    <a href="admin_profile.php?edit=true">
                         <i class="fas fa-edit"></i> Edit Profile
                     </a>
-                    <a href="staff_profile.php?action=change_password" onclick="smartPasswordModal(event)">
+                    <a href="admin_profile.php?action=change_password" onclick="smartPasswordModal(event)">
                         <i class="fas fa-key"></i> Change Password
                     </a>
                 <?php else: ?>
@@ -151,7 +157,6 @@ if (isset($_SESSION['admin_id'])) {
 </div>
 
 <style>
-    /* 这里的 Style 只保留 Notification Dropdown 内部的样式，不影响 Header 图标本身 */
     .notification-item { 
         padding: 0; 
         border-bottom: 1px solid #eee; 
@@ -192,6 +197,9 @@ if (isset($_SESSION['admin_id'])) {
     .notification-dropdown, .user-profile-dropdown, .settings-menu { display: none; }
     .notification-dropdown.active, .user-profile-dropdown.active, .settings-menu.active { display: block; }
     @keyframes fadeInModal { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    
+    /* 简单的分隔线样式 */
+    .divider { height: 1px; background: #eee; margin: 5px 0; }
 </style>
 
 <script>
@@ -216,8 +224,8 @@ if (isset($_SESSION['admin_id'])) {
     function proceedLogout() { return true; }
 
     function smartPasswordModal(e) {
-        const isStaff = window.location.pathname.includes('staff_profile.php');
-        const targetPage = isStaff ? 'staff_profile.php' : 'admin_profile.php';
+        // 修改这里的逻辑，统一指向 admin_profile.php
+        const targetPage = 'admin_profile.php';
 
         if (window.location.pathname.includes(targetPage)) {
             e.preventDefault();
@@ -275,7 +283,6 @@ if (isset($_SESSION['admin_id'])) {
             let html = '';
             data.notifications.forEach(notif => {
                 const isUnreadClass = 'unread'; 
-                // 保持功能：点击跳转
                 html += `
                     <div class="notification-item ${isUnreadClass}">
                         <a href="${notif.link}" class="notification-link">

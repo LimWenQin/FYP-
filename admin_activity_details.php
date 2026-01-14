@@ -140,7 +140,7 @@ if ($activity['Activity_Status'] == 'Upcoming') $statusClass = 'status-upcoming'
 
     <div class="detail-wrapper">
         <div class="top-bar">
-            <a href="javascript:void(0);" onclick="goBackAndClose()" class="back-link"><i class="fas fa-arrow-left"></i> Back to List</a>
+            <a href="javascript:void(0);" onclick="goBackAndClose()" class="back-link"><i class="fas fa-arrow-left"></i> Back to In-Person Activity Management</a>
             <div style="font-size:12px; color:#999;">ID: #<?php echo str_pad($activity['Activity_ID'], 4, '0', STR_PAD_LEFT); ?></div>
         </div>
 

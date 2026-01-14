@@ -3,57 +3,87 @@
 session_start();
 include 'dataconnection.php';
 
-$msg = "";
+$alertType = "";
+$alertMsg = "";
+$isValidRequest = true; // 标记请求是否有效
+
 // 使用 null coalescing operator 防止 undefined index warning
 $token = $_GET['token'] ?? '';
 $email = $_GET['email'] ?? '';
 
 // 1. 验证 URL 参数是否存在
 if (empty($token) || empty($email)) {
-    die("<div style='text-align:center; margin-top:50px; font-family:sans-serif;'>Invalid request. Missing token or email.</div>");
-}
+    $isValidRequest = false;
+    $alertType = "error";
+    $alertMsg = "Invalid request. Missing token or email.";
+} else {
+    // 2. 检查 Token 是否在数据库中有效且未过期
+    $sql = "SELECT * FROM password_resets WHERE token='$token' AND email='$email' AND expires_at > NOW()";
+    $result = mysqli_query($conn, $sql);
 
-// 2. 检查 Token 是否在数据库中有效且未过期
-$sql = "SELECT * FROM password_resets WHERE token='$token' AND email='$email' AND expires_at > NOW()";
-$result = mysqli_query($conn, $sql);
-
-if (mysqli_num_rows($result) == 0) {
-    // 如果找不到记录或者已经过期
-    die("<div style='text-align:center; margin-top:50px; font-family:sans-serif;'>Invalid or expired token. <a href='admin_forgot_password.php'>Try again</a></div>");
+    if (mysqli_num_rows($result) == 0) {
+        $isValidRequest = false;
+        $alertType = "error";
+        $alertMsg = "Invalid or expired token. Please request a new link.";
+    }
 }
 
 // 3. 处理表单提交 (更新密码)
-if (isset($_POST['update_password'])) {
+if ($isValidRequest && isset($_POST['update_password'])) {
     $pass1 = $_POST['pass1'];
     $pass2 = $_POST['pass2'];
 
-    // 后端再次验证密码复杂度 (防止绕过前端)
+    // 后端验证密码复杂度
     $uppercase = preg_match('@[A-Z]@', $pass1);
     $lowercase = preg_match('@[a-z]@', $pass1);
     $number    = preg_match('@[0-9]@', $pass1);
-    $special   = preg_match('@[^\w]@', $pass1); // 检查非单词字符 (即符号)
+    $special   = preg_match('@[^\w]@', $pass1); 
     $length    = strlen($pass1);
 
     if(!$uppercase || !$lowercase || !$number || !$special || $length < 8 || $length > 15) {
-        $msg = "<div class='error'>Password does not meet the requirements.</div>";
+        $alertType = "error";
+        $alertMsg = "Password does not meet the requirements.";
     } elseif ($pass1 !== $pass2) {
-        $msg = "<div class='error'>Passwords do not match.</div>";
+        $alertType = "error";
+        $alertMsg = "Passwords do not match.";
     } else {
-        // --- 密码加密 ---
-        // 根据你的 SQL 文件，密码是加密存储的。这里使用 password_hash。
-        // 如果你坚持要明文，请把下面这行改成: $new_pass = $pass1;
-        $new_pass = password_hash($pass1, PASSWORD_DEFAULT);
-
-        // 更新 admin 表中的密码
-        $update_sql = "UPDATE admin SET Admin_Password='$new_pass' WHERE Admin_Email='$email'";
+        // --- 关键修改：检查新密码是否与旧密码相同 ---
+        $check_old_sql = "SELECT Admin_Password FROM admin WHERE Admin_Email = '$email'";
+        $old_res = mysqli_query($conn, $check_old_sql);
         
-        if(mysqli_query($conn, $update_sql)) {
-            // 更新成功后，删除 Token (确保一次性使用)
-            mysqli_query($conn, "DELETE FROM password_resets WHERE email='$email'");
+        if ($old_res && mysqli_num_rows($old_res) > 0) {
+            $old_row = mysqli_fetch_assoc($old_res);
+            $current_hash = $old_row['Admin_Password'];
             
-            $msg = "<div class='success'>Password updated successfully! <br><a href='admin_login.php' class='btn-login'>Login Now</a></div>";
+            // 使用 password_verify 比对新密码和数据库中的旧Hash
+            if (password_verify($pass1, $current_hash)) {
+                $alertType = "error";
+                $alertMsg = "New password cannot be the same as your current password.";
+            } else {
+                // 如果不一样，才进行更新
+                $new_pass = password_hash($pass1, PASSWORD_DEFAULT);
+
+                $update_sql = "UPDATE admin SET Admin_Password='$new_pass' WHERE Admin_Email='$email'";
+                
+                if(mysqli_query($conn, $update_sql)) {
+                    // 更新成功后，删除 Token
+                    mysqli_query($conn, "DELETE FROM password_resets WHERE email='$email'");
+                    
+                    $alertType = "success";
+                    $alertMsg = "Password updated successfully! Redirecting to login...";
+                    
+                    // 为了让用户看到成功提示，延迟跳转
+                    echo "<script>setTimeout(function(){ window.location.href = 'admin_login.php'; }, 3000);</script>";
+                    // 防止表单再次显示
+                    $isValidRequest = false; 
+                } else {
+                    $alertType = "error";
+                    $alertMsg = "Database error: " . mysqli_error($conn);
+                }
+            }
         } else {
-            $msg = "<div class='error'>Database error: " . mysqli_error($conn) . "</div>";
+            $alertType = "error";
+            $alertMsg = "User not found.";
         }
     }
 }
@@ -92,7 +122,6 @@ if (isset($_POST['update_password'])) {
             font-weight: 700;
         }
         
-        /* 输入框容器，用于定位眼睛图标 */
         .input-group {
             position: relative;
             margin-bottom: 20px;
@@ -100,7 +129,7 @@ if (isset($_POST['update_password'])) {
         
         input { 
             width: 100%; 
-            padding: 14px 45px 14px 15px; /* 右侧留出空间给眼睛图标 */
+            padding: 14px 45px 14px 15px; 
             border: 2px solid #e1e1e1; 
             border-radius: 10px; 
             outline: none; 
@@ -112,7 +141,6 @@ if (isset($_POST['update_password'])) {
             border-color: #2563EB;
         }
 
-        /* 眼睛图标样式 */
         .toggle-password {
             position: absolute;
             right: 15px;
@@ -142,12 +170,7 @@ if (isset($_POST['update_password'])) {
         button:hover {
             background: #1d4ed8;
         }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
 
-        /* 验证条件列表样式 */
         .requirements-box {
             background: #f8f9fa;
             padding: 15px;
@@ -170,7 +193,7 @@ if (isset($_POST['update_password'])) {
         .requirement-list li {
             font-size: 13px;
             margin-bottom: 5px;
-            color: #dc3545; /* 默认红色 */
+            color: #dc3545; 
             transition: color 0.3s;
             display: flex;
             align-items: center;
@@ -180,45 +203,57 @@ if (isset($_POST['update_password'])) {
             width: 15px;
             text-align: center;
         }
-        
-        /* 验证通过的样式 */
         .requirement-list li.valid {
-            color: #198754; /* 绿色 */
+            color: #198754; 
         }
 
-        .success { 
-            color: #155724; 
-            background-color: #d4edda; 
-            border-color: #c3e6cb; 
-            padding: 15px; 
-            border-radius: 8px; 
-            margin-bottom: 20px; 
-            text-align: center;
-        }
-        .error { 
-            color: #721c24; 
-            background-color: #f8d7da; 
-            border-color: #f5c6cb; 
-            padding: 15px; 
-            border-radius: 8px; 
-            margin-bottom: 20px; 
-            text-align: center;
-        }
+        /* Floating Alert Styles */
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; animation: slideIn 0.3s; }
+        .floating-alert div { line-height: 1.6; font-size: 14px; }
+        .floating-alert i { margin-top: 4px; }
+        .floating-alert-success { background: white; color: #28a745; border-left: 4px solid #28a745; }
+        .floating-alert-danger { background: white; color: #dc3545; border-left: 4px solid #dc3545; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
         .btn-login {
-            display: inline-block;
-            margin-top: 10px;
-            color: #155724;
-            font-weight: bold;
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #2563EB;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .btn-login:hover { text-decoration: underline; }
+        
+        .error-placeholder {
+            text-align: center;
+            padding: 20px;
+            color: #555;
         }
     </style>
 </head>
 <body>
+    
+    <?php if ($alertMsg != ""): ?>
+    <div class="floating-alert <?php echo ($alertType == 'success') ? 'floating-alert-success' : 'floating-alert-danger'; ?>" id="systemAlert">
+        <i class="fas <?php echo ($alertType == 'success') ? 'fa-check-circle' : 'fa-exclamation-circle'; ?>"></i>
+        <div><?php echo $alertMsg; ?></div>
+    </div>
+    <script>
+        // Auto-hide alert after 5 seconds if not a critical request error
+        <?php if($isValidRequest || $alertType == 'success'): ?>
+        setTimeout(() => { 
+            const alert = document.getElementById('systemAlert'); 
+            if(alert) alert.style.display = 'none'; 
+        }, 5000);
+        <?php endif; ?>
+    </script>
+    <?php endif; ?>
+
     <div class="container">
         <h2>Reset Password</h2>
         
-        <?php echo $msg; ?>
-        
-        <?php if(strpos($msg, 'successfully') === false): ?>
+        <?php if($isValidRequest): ?>
         <form method="POST" id="resetForm">
             
             <div class="input-group">
@@ -246,6 +281,13 @@ if (isset($_POST['update_password'])) {
 
             <button type="submit" name="update_password" id="submitBtn">Update Password</button>
         </form>
+        <?php else: ?>
+            <div class="error-placeholder">
+                <i class="fas fa-link-slash" style="font-size: 40px; color: #dc3545; margin-bottom: 15px;"></i>
+                <p>Wait... Something went wrong with your request.</p>
+                <a href="admin_forgot_password.php" class="btn-login">Request New Link</a>
+                <a href="admin_login.php" class="btn-login" style="margin-top:10px; color:#666;">Back to Login</a>
+            </div>
         <?php endif; ?>
     </div>
 
@@ -290,6 +332,7 @@ if (isset($_POST['update_password'])) {
         }
 
         function validatePassword() {
+            if(!pass1) return false;
             const val = pass1.value;
             let allValid = true;
 
@@ -337,6 +380,7 @@ if (isset($_POST['update_password'])) {
         }
 
         function checkMatch() {
+            if(!pass2) return false;
             if (pass2.value === "") {
                 matchMsg.style.display = 'none';
                 return false;

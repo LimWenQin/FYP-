@@ -11,7 +11,8 @@ require 'PHPMailer/Exception.php';
 require 'PHPMailer/PHPMailer.php';
 require 'PHPMailer/SMTP.php';
 
-$msg = "";
+$alertType = ""; // success 或 error
+$alertMsg = "";
 
 // 处理表单提交
 if (isset($_POST['reset_request'])) {
@@ -38,18 +39,15 @@ if (isset($_POST['reset_request'])) {
                 $mail->Host       = 'smtp.gmail.com';
                 $mail->SMTPAuth   = true;
                 
-                // --- 已更新的部分 ---
-                $mail->Username   = 'lovebridge1201@gmail.com'; // 新的发送邮箱
-                $mail->Password   = 'odaj iwrz gfrt vven';      // 新的 App Password
+                // --- 邮箱配置 ---
+                $mail->Username   = 'lovebridge1201@gmail.com'; 
+                $mail->Password   = 'odaj iwrz gfrt vven';      
                 // ------------------
 
                 $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
                 $mail->Port       = 465;
 
-                // --- 发件人地址也已同步更新 ---
                 $mail->setFrom('lovebridge1201@gmail.com', 'Love Bridge Admin');
-                // --------------------------
-                
                 $mail->addAddress($email);
 
                 $base_url = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']);
@@ -69,13 +67,16 @@ if (isset($_POST['reset_request'])) {
                 ";
 
                 $mail->send();
-                $msg = "<div class='alert success'>Reset link has been sent to your email!</div>";
+                $alertType = "success";
+                $alertMsg = "Reset link has been sent to your email!";
             } catch (Exception $e) {
-                $msg = "<div class='alert error'>Mailer Error: {$mail->ErrorInfo}</div>";
+                $alertType = "error";
+                $alertMsg = "Mailer Error: {$mail->ErrorInfo}";
             }
         }
     } else {
-        $msg = "<div class='alert error'>Email not found in our system.</div>";
+        $alertType = "error";
+        $alertMsg = "Email not found in our system.";
     }
 }
 ?>
@@ -87,7 +88,6 @@ if (isset($_POST['reset_request'])) {
     <title>Forgot Password - Love Bridge</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* 关键修复：box-sizing 防止格子长出来 */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
         
         body { background-color: #FFF6E8; display: flex; justify-content: center; align-items: center; height: 100vh; }
@@ -98,7 +98,6 @@ if (isset($_POST['reset_request'])) {
         .input-group { position: relative; margin-bottom: 20px; text-align: left; }
         .input-group i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #aaa; }
         
-        /* 这里的 width: 100% 现在因为上面的 box-sizing 而变得安全了 */
         .input-group input { width: 100%; padding: 12px 15px 12px 45px; border: 1px solid #eee; border-radius: 8px; outline: none; background: #fafafa; }
         .input-group input:focus { border-color: #D97706; background: #fff; }
         
@@ -108,19 +107,35 @@ if (isset($_POST['reset_request'])) {
         .back-link { display: block; margin-top: 20px; color: #666; text-decoration: none; font-size: 13px; }
         .back-link:hover { color: #D97706; }
         
-        .alert { padding: 10px; border-radius: 5px; font-size: 13px; margin-bottom: 15px; }
-        .alert.success { background: #dcfce7; color: #166534; }
-        .alert.error { background: #fee2e2; color: #b91c1c; }
+        /* Floating Alert Styles */
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; animation: slideIn 0.3s; }
+        .floating-alert div { line-height: 1.6; font-size: 14px; }
+        .floating-alert i { margin-top: 4px; }
+        .floating-alert-success { background: white; color: #28a745; border-left: 4px solid #28a745; }
+        .floating-alert-danger { background: white; color: #dc3545; border-left: 4px solid #dc3545; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     </style>
 </head>
 <body>
+    
+    <?php if ($alertMsg != ""): ?>
+    <div class="floating-alert <?php echo ($alertType == 'success') ? 'floating-alert-success' : 'floating-alert-danger'; ?>" id="systemAlert">
+        <i class="fas <?php echo ($alertType == 'success') ? 'fa-check-circle' : 'fa-exclamation-circle'; ?>"></i>
+        <div><?php echo $alertMsg; ?></div>
+    </div>
+    <script>
+        setTimeout(() => { 
+            const alert = document.getElementById('systemAlert'); 
+            if(alert) alert.style.display = 'none'; 
+        }, 5000);
+    </script>
+    <?php endif; ?>
+
     <div class="container">
         <i class="fas fa-lock" style="font-size: 40px; color: #D97706; margin-bottom: 20px;"></i>
         <h2>Forgot Password?</h2>
         <p>Enter your email and we'll send you a reset link.</p>
         
-        <?php echo $msg; ?>
-
         <form method="POST">
             <div class="input-group">
                 <i class="fas fa-envelope"></i>

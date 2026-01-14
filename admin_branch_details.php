@@ -55,7 +55,7 @@ if (!$hasImages) {
             display: inline-flex; align-items: center; gap: 8px; 
             padding: 8px 16px; background: white; border-radius: 50px; 
             box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.2s;
-            cursor: pointer; /* 确保鼠标变成手型 */
+            cursor: pointer;
         }
         .back-link:hover { background: #F28585; color: white; transform: translateY(-2px); }
 
@@ -71,27 +71,21 @@ if (!$hasImages) {
         .status-open { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
         .status-closed { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
 
-        /* GALLERY SECTION (PREVIEW) */
+        /* GALLERY SECTION */
         .gallery-container { height: 320px; position: relative; background: #f8f9fa; border-bottom: 1px solid #eee; overflow: hidden; }
         .gallery-img { width: 100%; height: 100%; object-fit: cover; display: none; cursor: zoom-in; transition: opacity 0.3s; }
         .gallery-img:hover { opacity: 0.95; }
         .gallery-img.active { display: block; }
-        
-        /* Preview Navigation Buttons */
         .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.8); color: #333; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 18px; transition: 0.2s; display: flex; align-items: center; justify-content: center; z-index: 10; }
         .nav-btn:hover { background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
         .prev { left: 20px; } .next { right: 20px; }
-        
         .no-image-box { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ccc; }
         .no-image-box i { font-size: 50px; margin-bottom: 15px; }
-        .no-image-box span { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
 
         /* CONTENT GRID */
         .content-body { padding: 30px; display: grid; grid-template-columns: 2fr 1fr; gap: 40px; }
-        
         .section-title { font-size: 16px; font-weight: 700; color: #333; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
         .section-title i { color: #F28585; }
-        
         .description-box { font-size: 15px; line-height: 1.7; color: #555; white-space: pre-line; margin-bottom: 30px; text-align: justify; }
 
         .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px; }
@@ -105,83 +99,20 @@ if (!$hasImages) {
         .info-row:last-child { margin-bottom: 0; }
         .ir-icon { width: 32px; height: 32px; background: #fff0f0; border-radius: 8px; color: #F28585; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
         .ir-data h5 { margin: 0 0 3px 0; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
-        .ir-data p { margin: 0; font-size: 14px; font-weight: 600; color: #333; line-height: 1.4; }
+        .ir-data p { margin: 0; font-size: 14px; font-weight: 600; color: #333; line-height: 1.4; word-break: break-all; }
 
-        /* --- LIGHTBOX MODAL STYLES (FULL SCREEN GALLERY) --- */
-        .modal {
-            display: none; 
-            position: fixed; 
-            z-index: 10000; /* 确保在最顶层 */
-            left: 0;
-            top: 0;
-            width: 100%; 
-            height: 100%; 
-            overflow: hidden; 
-            background-color: rgba(0, 0, 0, 0.95); /* 深黑背景 */
-            align-items: center;
-            justify-content: center;
-            /* Flexbox 确保图片完美居中 */
-        }
-
-        .modal.show {
-            display: flex; /* 只在打开时设为 Flex */
-        }
-
-        .modal-content {
-            max-width: 90%;
-            max-height: 90vh;
-            border-radius: 4px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            animation: zoom 0.3s;
-            object-fit: contain;
-        }
-
-        @keyframes zoom {
-            from {transform:scale(0.9); opacity: 0} 
-            to {transform:scale(1); opacity: 1}
-        }
-
-        /* Modal Close Button (Top Right) */
-        .close-modal {
-            position: absolute;
-            top: 20px;
-            right: 30px;
-            color: #f1f1f1;
-            font-size: 40px;
-            font-weight: bold;
-            transition: 0.3s;
-            cursor: pointer;
-            z-index: 10002;
-            line-height: 1;
-        }
-
+        /* MODAL STYLES */
+        .modal { display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; background-color: rgba(0, 0, 0, 0.95); align-items: center; justify-content: center; }
+        .modal.show { display: flex; }
+        .modal-content { max-width: 90%; max-height: 90vh; border-radius: 4px; box-shadow: 0 0 20px rgba(0,0,0,0.5); animation: zoom 0.3s; object-fit: contain; }
+        @keyframes zoom { from {transform:scale(0.9); opacity: 0} to {transform:scale(1); opacity: 1} }
+        .close-modal { position: absolute; top: 20px; right: 30px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; z-index: 10002; line-height: 1; }
         .close-modal:hover { color: #F28585; }
-
-        /* Modal Navigation Arrows (Left & Right) */
-        .modal-nav-btn {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 50px;
-            font-weight: bold;
-            cursor: pointer;
-            padding: 20px;
-            user-select: none;
-            z-index: 10001;
-            transition: 0.3s;
-            text-decoration: none;
-        }
+        .modal-nav-btn { position: absolute; top: 50%; transform: translateY(-50%); color: rgba(255, 255, 255, 0.7); font-size: 50px; font-weight: bold; cursor: pointer; padding: 20px; user-select: none; z-index: 10001; transition: 0.3s; }
         .modal-nav-btn:hover { color: #fff; background: rgba(0,0,0,0.2); border-radius: 5px; }
-        .modal-prev { left: 20px; }
-        .modal-next { right: 20px; }
+        .modal-prev { left: 20px; } .modal-next { right: 20px; }
 
-        @media (max-width: 768px) {
-            .content-body { grid-template-columns: 1fr; }
-            .gallery-container { height: 220px; }
-            .modal-nav-btn { font-size: 30px; padding: 10px; }
-            .close-modal { top: 10px; right: 15px; font-size: 35px; }
-        }
+        @media (max-width: 768px) { .content-body { grid-template-columns: 1fr; } .gallery-container { height: 220px; } }
     </style>
 </head>
 <body>
@@ -258,22 +189,15 @@ if (!$hasImages) {
                         <div class="info-header">Branch Details</div>
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-phone"></i></div>
-                            <div class="ir-data">
-                                <h5>Branch Phone</h5>
-                                <p><?php echo htmlspecialchars($branch['Branch_ContactNumber']); ?></p>
-                            </div>
+                            <div class="ir-data"><h5>Branch Phone</h5><p><?php echo htmlspecialchars($branch['Branch_ContactNumber']); ?></p></div>
                         </div>
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-envelope"></i></div>
-                            <div class="ir-data">
-                                <h5>Branch Email</h5>
-                                <p><?php echo htmlspecialchars($branch['Branch_Email']); ?></p>
-                            </div>
+                            <div class="ir-data"><h5>Branch Email</h5><p><?php echo htmlspecialchars($branch['Branch_Email']); ?></p></div>
                         </div>
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-map-marker-alt"></i></div>
-                            <div class="ir-data">
-                                <h5>Location</h5>
+                            <div class="ir-data"><h5>Location</h5>
                                 <p>
                                     <?php echo htmlspecialchars($branch['Branch_Address1']); ?><br>
                                     <?php if($branch['Branch_Address2']) echo htmlspecialchars($branch['Branch_Address2']) . "<br>"; ?>
@@ -286,27 +210,47 @@ if (!$hasImages) {
                     </div>
 
                     <div class="info-card">
+                        <div class="info-header">Banking Information</div>
+                        <div class="info-row">
+                            <div class="ir-icon"><i class="fas fa-university"></i></div>
+                            <div class="ir-data">
+                                <h5>Bank Name</h5>
+                                <p>
+                                    <?php 
+                                        $malaysiaBanks = [
+                                            "Maybank" => "Maybank", "CIMB" => "CIMB Bank", "Public Bank" => "Public Bank", "RHB" => "RHB Bank", "Hong Leong" => "Hong Leong Bank",
+                                            "AmBank" => "AmBank", "UOB" => "UOB Malaysia", "Bank Rakyat" => "Bank Rakyat", "OCBC" => "OCBC Bank", "HSBC" => "HSBC Bank",
+                                            "Bank Islam" => "Bank Islam", "Affin Bank" => "Affin Bank", "Alliance Bank" => "Alliance Bank", "Standard Chartered" => "Standard Chartered",
+                                            "MBSB" => "MBSB Bank", "Citibank" => "Citibank", "Bank Muamalat" => "Bank Muamalat", "Agrobank" => "Agrobank", "BSN" => "Bank Simpanan Nasional"
+                                        ];
+                                        $bankKey = $branch['Branch_BankName'];
+                                        echo isset($malaysiaBanks[$bankKey]) ? $malaysiaBanks[$bankKey] : ($bankKey ?: 'Not Set'); 
+                                    ?>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="info-row">
+                            <div class="ir-icon"><i class="fas fa-money-check"></i></div>
+                            <div class="ir-data">
+                                <h5>Account Number</h5>
+                                <p><?php echo !empty($branch['Branch_BankAccount']) ? htmlspecialchars($branch['Branch_BankAccount']) : 'Not Set'; ?></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
                         <div class="info-header">Person In Charge (PIC)</div>
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-user-tie"></i></div>
-                            <div class="ir-data">
-                                <h5>PIC Name</h5>
-                                <p><?php echo htmlspecialchars($branch['Branch_Head']); ?></p>
-                            </div>
+                            <div class="ir-data"><h5>PIC Name</h5><p><?php echo htmlspecialchars($branch['Branch_Head']); ?></p></div>
                         </div>
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-mobile-alt"></i></div>
-                            <div class="ir-data">
-                                <h5>PIC Contact</h5>
-                                <p><?php echo !empty($branch['Branch_Head_Contact']) ? htmlspecialchars($branch['Branch_Head_Contact']) : 'N/A'; ?></p>
-                            </div>
+                            <div class="ir-data"><h5>PIC Contact</h5><p><?php echo !empty($branch['Branch_Head_Contact']) ? htmlspecialchars($branch['Branch_Head_Contact']) : 'N/A'; ?></p></div>
                         </div>
                         <div class="info-row">
                             <div class="ir-icon"><i class="far fa-envelope"></i></div>
-                            <div class="ir-data">
-                                <h5>PIC Email</h5>
-                                <p><?php echo !empty($branch['Branch_Head_Email']) ? htmlspecialchars($branch['Branch_Head_Email']) : 'N/A'; ?></p>
-                            </div>
+                            <div class="ir-data"><h5>PIC Email</h5><p><?php echo !empty($branch['Branch_Head_Email']) ? htmlspecialchars($branch['Branch_Head_Email']) : 'N/A'; ?></p></div>
                         </div>
                     </div>
 
@@ -318,30 +262,19 @@ if (!$hasImages) {
 
     <div id="lightboxModal" class="modal">
         <span class="close-modal" onclick="closeLightbox()">&times;</span>
-        
         <?php if(count($images) > 1): ?>
             <a class="modal-nav-btn modal-prev" onclick="changeLightboxSlide(-1)">&#10094;</a>
             <a class="modal-nav-btn modal-next" onclick="changeLightboxSlide(1)">&#10095;</a>
         <?php endif; ?>
-
         <img class="modal-content" id="lightboxImage" src="">
     </div>
 
     <script>
-        // --- 新增: 处理返回和关闭页面的逻辑 ---
         function goBackAndClose() {
-            // 1. 尝试关闭当前窗口 (如果是 window.open 打开的)
             window.close();
-            
-            // 2. 如果 window.close() 没反应 (比如是在同一页打开的)，则稍微延迟后执行跳转作为后备方案
-            setTimeout(function() {
-                if (!window.closed) {
-                    window.location.href = 'admin_branch.php';
-                }
-            }, 100);
+            setTimeout(function() { if (!window.closed) { window.location.href = 'branch_management_page.php'; } }, 100);
         }
 
-        // --- 1. Preview Slider Logic (预览小图逻辑) ---
         let slideIndex = 0;
         const slides = document.querySelectorAll('.gallery-img');
         
@@ -354,37 +287,26 @@ if (!$hasImages) {
             slides[slideIndex].classList.add('active');
         }
 
-        // --- 2. Lightbox / Modal Logic (全屏大图逻辑) ---
-        
-        // 把 PHP 图片数组传给 JS
         const imageList = <?php echo json_encode($images); ?>;
         let lightboxIndex = 0;
         const modal = document.getElementById('lightboxModal');
         const modalImg = document.getElementById('lightboxImage');
 
-        // 打开 Lightbox
         function openLightbox(index) {
             if(imageList.length === 0) return;
             lightboxIndex = index;
-            
-            modal.classList.add('show'); // 添加 class 显示
+            modal.classList.add('show');
             updateLightboxImage();
-            
-            // 监听键盘事件 (Esc, Left, Right)
             document.addEventListener('keydown', handleKeydown);
-            
-            // 禁止背景滚动
             document.body.style.overflow = 'hidden';
         }
 
-        // 关闭 Lightbox
         function closeLightbox() {
             modal.classList.remove('show');
             document.removeEventListener('keydown', handleKeydown);
-            document.body.style.overflow = 'auto'; // 恢复滚动
+            document.body.style.overflow = 'auto';
         }
 
-        // 切换 Lightbox 图片
         function changeLightboxSlide(n) {
             lightboxIndex += n;
             if (lightboxIndex >= imageList.length) lightboxIndex = 0;
@@ -392,12 +314,10 @@ if (!$hasImages) {
             updateLightboxImage();
         }
 
-        // 更新图片的 src
         function updateLightboxImage() {
             modalImg.src = imageList[lightboxIndex];
         }
 
-        // 键盘控制
         function handleKeydown(e) {
             if (modal.classList.contains('show')) {
                 if (e.key === "ArrowLeft") changeLightboxSlide(-1);
@@ -406,7 +326,6 @@ if (!$hasImages) {
             }
         }
 
-        // 点击背景区域也可以关闭 (可选功能)
         modal.addEventListener('click', function(e) {
             if (e.target === modal) {
                 closeLightbox();
