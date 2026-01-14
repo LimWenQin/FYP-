@@ -14,35 +14,24 @@ if (!isset($_SESSION['donor_id'])) {
 
 $current_donor_id = $_SESSION['donor_id'];
 
-// ==========================================
-// [NEW] 检查是否有 Session 数据 (从第二页返回时恢复数据)
-// ==========================================
+// 恢复 Session 数据
 $sess_amount = isset($_SESSION['donation_data']['amount']) ? $_SESSION['donation_data']['amount'] : '';
 $sess_type = isset($_SESSION['donation_data']['type']) ? $_SESSION['donation_data']['type'] : 'one-time';
 $sess_receipt = isset($_SESSION['donation_data']['tax_receipt']) ? $_SESSION['donation_data']['tax_receipt'] : '0';
-// 尝试恢复选中的 Case 或 Activity ID
 $sess_case_id = isset($_SESSION['donation_data']['case_id']) ? $_SESSION['donation_data']['case_id'] : '';
 $sess_activity_id = isset($_SESSION['donation_data']['activity_id']) ? $_SESSION['donation_data']['activity_id'] : '';
 
-
-// ==========================================
-// 1. 获取最新的 Special Case (取1个)
-// ==========================================
+// 1. 获取最新的 Special Case
 $case_sql = "SELECT * FROM special_case WHERE Case_Status = 'Active' ORDER BY Created_At DESC LIMIT 1";
 $case_res = $conn->query($case_sql);
 $special_case = $case_res->fetch_assoc();
 
-// ==========================================
-// 2. 获取即将开始的 Activity (取1个)
-// ==========================================
-// 注意：根据你的数据库，有些 Activity_Date 是 NULL，这里为了保险添加了 OR Activity_StartDate 的判断
+// 2. 获取即将开始的 Activity
 $act_sql = "SELECT * FROM activity WHERE Activity_Status = 'Active' AND (Activity_Date >= CURDATE() OR Activity_StartDate >= CURDATE()) ORDER BY Activity_StartDate ASC LIMIT 1";
 $act_res = $conn->query($act_sql);
 $activity = $act_res->fetch_assoc();
 
-// ==========================================
 // 3. 检查用户资料完整性
-// ==========================================
 $check_sql = "SELECT Donor_ICNumber, Donor_Address1, Donor_City, Donor_PostalCode FROM donor WHERE Donor_ID = ?";
 $stmt = $conn->prepare($check_sql);
 $stmt->bind_param("i", $current_donor_id);
@@ -111,7 +100,7 @@ include 'header_UI.php';
         border: 1px solid #f0f0f0;
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         margin-bottom: 50px; /* 区块间距 */
-        min-height: 350px; /* 增加高度，显得更大气 */
+        min-height: 300px; /* 增加高度，显得更大气 */
     }
     .showcase-block:hover { transform: translateY(-5px); box-shadow: 0 15px 40px rgba(0,0,0,0.15); }
     
@@ -181,7 +170,7 @@ include 'header_UI.php';
     @media (max-width: 900px) {
         .top-section { flex-direction: column-reverse; } /* 手机上表格在先 */
         .showcase-block { flex-direction: column !important; min-height: auto; } /* 手机上全变垂直排列 */
-        .showcase-img-box { height: 250px; flex: none; }
+        .showcase-img-box { height: 200px; flex: none; }
         .showcase-content { flex: none; }
     }
 </style>
@@ -201,9 +190,7 @@ include 'header_UI.php';
 ?>
 
 <div class="container">
-    
     <div class="top-section">
-        
         <div class="col-left">
             <img src="images/hero_3.jpg" alt="Donation Story" class="story-img">
         </div>
@@ -214,7 +201,6 @@ include 'header_UI.php';
                 <p style="text-align:center; color:#777; font-size:0.9rem; margin-bottom:20px;" id="form-subtitle">Supporting our main fund</p>
 
                 <form id="donationForm" method="POST" action="Branch_Selection.php">
-                    
                     <div class="type-group">
                         <div class="type-option active" id="btn-once" onclick="selectType('one-time')">One-time</div>
                         <div class="type-option" id="btn-monthly" onclick="selectType('monthly')">Monthly</div>
@@ -223,13 +209,11 @@ include 'header_UI.php';
                     <input type="hidden" id="donation_type" name="donation_type" value="one-time">
                     <input type="hidden" id="amount" name="amount">
                     <input type="hidden" id="tax_receipt" name="tax_receipt" value="0">
-                    
                     <input type="hidden" id="branch_id" name="branch_id" value=""> 
                     <input type="hidden" id="case_id" name="case_id" value="">
                     <input type="hidden" id="activity_id" name="activity_id" value="">
 
                     <div class="amount-grid" id="amount-grid"></div>
-
                     <input type="number" id="custom_amount" name="custom_amount" class="input-custom" placeholder="Enter custom amount (RM)">
 
                     <div class="tax-receipt-section">
@@ -245,7 +229,6 @@ include 'header_UI.php';
 
                     <div class="nav-buttons">
                         <button type="button" class="btn-nav btn-prev" disabled>Previous</button>
-                        
                         <button type="submit" class="btn-nav btn-next">
                             Next <i class="fas fa-arrow-right"></i>
                         </button>
@@ -261,9 +244,7 @@ include 'header_UI.php';
         </div>
     </div>
 
-
     <div class="bottom-section">
-        
         <h2 class="section-title">Urgent Needs & Events</h2>
 
         <?php if ($special_case): 
@@ -272,10 +253,16 @@ include 'header_UI.php';
                 $percent = ($special_case['Raised_Amount'] / $special_case['Target_Amount']) * 100;
                 if($percent > 100) $percent = 100;
             }
+
+            // 【修正：解析 JSON 图片】
+            $case_imgs = json_decode($special_case['Case_Images'], true);
+            $case_display_path = (!empty($case_imgs) && is_array($case_imgs)) 
+                                 ? str_replace('\\', '/', $case_imgs[0]) 
+                                 : 'images/default_case.jpg';
         ?>
         <div class="showcase-block">
             <div class="showcase-img-box">
-                <img src="<?php echo !empty($special_case['Case_Image']) ? htmlspecialchars($special_case['Case_Image']) : 'images/default_case.jpg'; ?>" alt="Case" class="showcase-img">
+                <img src="<?php echo $case_display_path; ?>" alt="Case" class="showcase-img">
             </div>
             <div class="showcase-content">
                 <span class="badge-tag tag-case">Featured Case</span>
@@ -287,31 +274,35 @@ include 'header_UI.php';
                         <div class="progress-bar-fill" style="width: <?php echo $percent; ?>%;"></div>
                     </div>
                     <div class="progress-text">
-                        <span>Raised: RM <?php echo number_format($special_case['Raised_Amount']); ?></span>
-                        <span>Goal: RM <?php echo number_format($special_case['Target_Amount']); ?></span>
+                        <span>Raised: RM <?php echo number_format($special_case['Raised_Amount'], 2); ?></span>
+                        <span>Goal: RM <?php echo number_format($special_case['Target_Amount'], 2); ?></span>
                     </div>
                 </div>
 
-                <a href="Special_case Page.php?case_id=<?php echo $special_case['Case_ID']; ?>" class="btn-support btn-case">
-                    <i class="fas fa-hand-holding-heart"></i> View details for this case
+                <a href="#" onclick="setDonationTarget('case', '<?php echo $special_case['Case_ID']; ?>', '<?php echo addslashes($special_case['Case_Title']); ?>'); return false;" class="btn-support btn-case">
+                    <i class="fas fa-hand-holding-heart"></i> Select this case to donate
                 </a>
             </div>
         </div>
         <?php endif; ?>
 
         <?php if ($activity): 
-             // Activity Date Handling
              $eventDate = !empty($activity['Activity_Date']) ? $activity['Activity_Date'] : $activity['Activity_StartDate'];
+             
+             // 【修正：解析 JSON 图片并更正字段名 Activity_Images】
+             $act_imgs = json_decode($activity['Activity_Images'], true);
+             $act_display_path = (!empty($act_imgs) && is_array($act_imgs)) 
+                                 ? str_replace('\\', '/', $act_imgs[0]) 
+                                 : 'images/activity_default.jpg';
         ?>
         <div class="showcase-block" style="flex-direction: row-reverse;">
             <div class="showcase-img-box">
-                <img src="<?php echo !empty($activity['Activity_Picture']) ? htmlspecialchars($activity['Activity_Picture']) : 'images/activity_default.jpg'; ?>" 
-                     alt="Activity" class="showcase-img">
+                <img src="<?php echo $act_display_path; ?>" alt="Activity" class="showcase-img">
             </div>
             <div class="showcase-content">
                 <span class="badge-tag tag-activity">Upcoming Campaign</span>
                 <h3 class="sc-title"><?php echo htmlspecialchars($activity['Activity_Name']); ?></h3>
-                <p class="sc-desc"><?php echo htmlspecialchars(substr($activity['Activity_Details'], 0, 150)) . '...'; ?></p>
+                <p class="sc-desc"><?php echo htmlspecialchars(substr($activity['Activity_Description'], 0, 150)) . '...'; ?></p>
                 
                 <div style="margin-bottom:25px; font-size:1rem; color:#555;">
                     <i class="far fa-calendar-alt" style="color:#2563eb; margin-right:8px;"></i> 
@@ -321,15 +312,14 @@ include 'header_UI.php';
                     <strong>Location:</strong> <?php echo htmlspecialchars($activity['Activity_City']); ?>
                 </div>
 
-                <a href="Campaign_Page.php?activity_id=<?php echo $activity['Activity_ID']; ?>" class="btn-support btn-act">
-                    <i class="fas fa-running"></i> View details for this campaign
+                <a href="#" onclick="setDonationTarget('activity', '<?php echo $activity['Activity_ID']; ?>', '<?php echo addslashes($activity['Activity_Name']); ?>'); return false;" class="btn-support btn-act">
+                    <i class="fas fa-running"></i> Support this campaign
                 </a>
             </div>
         </div>
         <?php endif; ?>
 
     </div>
-
 </div>
 
 <script>
