@@ -287,7 +287,7 @@ include 'header_UI.php';
                     
                     <div class="faq-item">
                         <div class="faq-question">
-                            <span>Is my donation tax-deductible?</span>
+                            <span>How to request a tax exemption?</span>
                             <i class="fas fa-chevron-down"></i>
                         </div>
                         <div class="faq-answer">

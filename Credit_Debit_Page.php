@@ -141,8 +141,8 @@ include 'header_UI.php';
         margin-bottom: 30px;
     }
     .banner-img {
-        width: 100%;
-        height: 300px;
+        width: 50%;
+        height: 400px;
         object-fit: cover;
         border-radius: 12px;
         box-shadow: 0 5px 15px rgba(0,0,0,0.1);
@@ -211,7 +211,7 @@ include 'header_UI.php';
             
             <div class="col-12">
                 <div class="banner-container">
-                    <img src="images/about_1.jpg" alt="Donation Story" class="banner-img">
+                    <img src="images/hero_7.jpg" alt="Donation Story" class="banner-img">
                     <div style="margin-top: 20px;">
                         <h3 class="text-cursive" style="color: #00a651;">Thank You for Your Support!</h3>
                         <p class="text-muted">Your donation of <strong style="font-size:1.2rem; color:#dc2626;">RM <?php echo number_format($amount, 2); ?></strong> makes a real difference.</p>

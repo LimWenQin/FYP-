@@ -2,7 +2,12 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-// --- 1. Login Check with SweetAlert Logic ---
+// --- [UPDATED] 1. 计算日期限制 ---
+// max设为今天，不block选择，只通过JS报错。min设为100年前，防止年份乱填。
+$current_date = date('Y-m-d');
+$min_date = date('Y-m-d', strtotime('-100 years')); 
+
+// --- 2. Login Check with SweetAlert Logic ---
 $show_login_modal = false;
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     $show_login_modal = true;
@@ -154,7 +159,7 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
         $donor['Donor_Name'] = $name;
         $donor['Donor_Email'] = $email;
         $donor['Donor_ContactNumber'] = $contact;
-        $donor['Donor_ICNumber'] = $ic_number; // This will now be clean digits
+        $donor['Donor_ICNumber'] = $ic_number; 
         $donor['Donor_DOB'] = $dob;
         $donor['Donor_Address1'] = $address1;
         $donor['Donor_Address2'] = $address2;
@@ -296,7 +301,7 @@ include 'header_UI.php';
         .change-pass-link { display: block; text-align: center; margin-top: 20px; color: var(--medium-gray); font-weight: bold; font-size: 16px; text-decoration: underline; transition: all 0.3s ease; }
         .change-pass-link:hover { color: var(--dark-blue); transform: scale(1.02); }
 
-        .tax-note { color: #dc2626; font-size: 12px; font-weight: bold; margin-top: 5px; display: block; }
+        .tax-note { color: #000000; font-size: 12px; font-weight: bold; margin-top: 5px; display: block; }
         
         .success-message { 
             background-color: var(--success-bg); 
@@ -437,7 +442,10 @@ include 'header_UI.php';
                         <div class="form-group">
                             <label for="dob">Date of Birth</label>
                             <input type="date" id="dob" name="dob" class="track-field" 
-                                   value="<?php echo $donor['Donor_DOB']; ?>">
+                                   value="<?php echo $donor['Donor_DOB']; ?>"
+                                   max="<?php echo $current_date; ?>" 
+                                   min="<?php echo $min_date; ?>">
+                            <div class="field-error-msg" id="dobError"></div>
                         </div>
                     </div>
                 </div>
@@ -535,8 +543,6 @@ include 'header_UI.php';
         <?php if ($show_login_modal): ?>
             document.addEventListener('DOMContentLoaded', function() {
                 document.querySelector('.page-container').style.display = 'none';
-
-            
                 Swal.fire({
                     title: 'Login Required',
                     text: "You need to login to make a donation.",
@@ -549,7 +555,6 @@ include 'header_UI.php';
                 }).then((result) => {
                     if (result.isConfirmed) {
                         window.location.href = 'donor_login.php'; 
-                    
                     } else {
                         window.location.href = 'Homepage.php'; 
                     }
@@ -599,16 +604,19 @@ include 'header_UI.php';
         const icError = document.getElementById('icError');
         const icGroup = document.getElementById('icGroup');
 
-        // [UPDATED] Auto-format IC with dashes
+       // [UPDATED] Auto-format IC with dashes and cursor fix
         icInput.addEventListener('input', function(e) {
-            // 1. Get numbers only
+            // 1. Save Cursor Position
+            let cursorStart = this.selectionStart;
+            let cursorEnd = this.selectionEnd;
+            let oldVal = this.value;
+
+            // 2. Logic to strip and re-format
             let val = this.value.replace(/\D/g, '');
             let newVal = '';
-
-            // 2. Limit to 12 digits (raw)
+            
             if (val.length > 12) val = val.substring(0, 12);
-
-            // 3. Add Dashes logic (XXXXXX-XX-XXXX)
+            
             if (val.length > 8) {
                 newVal = val.substring(0, 6) + '-' + val.substring(6, 8) + '-' + val.substring(8);
             } else if (val.length > 6) {
@@ -616,20 +624,29 @@ include 'header_UI.php';
             } else {
                 newVal = val;
             }
-
-            // 4. Update Input Value
+            
             this.value = newVal;
 
-            // 5. Run Validation (Logic uses raw numbers)
+            // 3. Restore Cursor Position logic 
+            // If we added a dash and the cursor was after it, move cursor forward
+            // If we are typing at the end, let browser handle it (it goes to end automatically)
+            if (cursorStart < oldVal.length) {
+                 // Check if a dash was added right before the cursor
+                 if(oldVal.slice(0, cursorStart).replace(/\D/g, '').length === newVal.slice(0, cursorStart).replace(/\D/g, '').length) {
+                     // length of digits is same, check if dash count changed
+                     let oldDashes = (oldVal.slice(0, cursorStart).match(/-/g) || []).length;
+                     let newDashes = (newVal.slice(0, cursorStart).match(/-/g) || []).length;
+                     if(newDashes > oldDashes) cursorStart++;
+                 }
+                 this.setSelectionRange(cursorStart, cursorStart);
+            }
+
             handleICInput(newVal); 
             updateProgress();
         });
 
         function handleICInput(formattedIC) {
-            // [UPDATED] Remove dashes to get clean digits for logic
             const ic = formattedIC.replace(/[^0-9]/g, '');
-
-            // Reset Date field if IC is cleared or invalid length
             if (ic.length < 12) {
                 dobInput.removeAttribute('readonly');
                 icError.style.display = 'none';
@@ -637,15 +654,13 @@ include 'header_UI.php';
                 return;
             }
 
-            // Valid Length (12 digits)
             if (ic.length === 12) {
-                // 1. Extract Date
                 const yearShort = ic.substring(0, 2);
                 const month = ic.substring(2, 4);
                 const day = ic.substring(4, 6);
-                const stateCode = ic.substring(6, 8); // Extract State Code
+                const stateCode = ic.substring(6, 8);
 
-                // Simple date validity check
+                // Auto-fill DOB logic
                 if (month > 0 && month <= 12 && day > 0 && day <= 31) {
                     const currentYearShort = new Date().getFullYear() % 100;
                     let fullYear = '';
@@ -653,29 +668,10 @@ include 'header_UI.php';
                     
                     const dateString = `${fullYear}-${month}-${day}`;
                     dobInput.value = dateString;
-                    dobInput.setAttribute('readonly', true); // User set IC, so they cannot pick date
+                    dobInput.setAttribute('readonly', true);
                 }
 
-                // 2. Validate State Code
-               const validStateCodes = [
-                 '01', // Johor
-                 '02', // Kedah
-                 '03', // Kelantan
-                 '04', // Melaka
-                 '05', // Negeri Sembilan
-                 '06', // Pahang
-                 '07', // Penang
-                 '08', // Perak
-                 '09', // Perlis
-                '10', // Selangor
-                '11', // Terengganu
-                '12', // Sabah
-                 '13', // Sarawak
-                '14', // Kuala Lumpur
-                '15', // Labuan
-                '16'  // Putrajaya
-                ];
-
+                const validStateCodes = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40','41','42','43','44','45','46','47','48','49','50','51','52','53','54','55','56','57','58','59'];
 
                 if (!validStateCodes.includes(stateCode)) {
                     icError.innerText = "Invalid IC Number: State code '" + stateCode + "' does not exist.";
@@ -688,14 +684,13 @@ include 'header_UI.php';
             }
         }
 
-        // --- 2. Contact Input Logic ---
+        // --- 2. Contact Input Logic (Visual Formatting Only) ---
         const contactInput = document.getElementById('contact');
         const contactError = document.getElementById('contactError');
         const contactGroup = document.querySelector('.phone-group');
 
         contactInput.addEventListener('input', function(e) {
             let val = e.target.value.replace(/\D/g, ''); 
-            
             if (val.length > 3) val = val.substring(0, 3) + '-' + val.substring(3);
             if (val.length > 12) val = val.substring(0, 12);
             
@@ -708,20 +703,20 @@ include 'header_UI.php';
             }
         });
 
-        // --- 3. Form Submission Validation ---
+        // --- 3. Form Submission Validation (UPDATED) ---
         document.getElementById('profileForm').addEventListener('submit', function(e) {
             let isValid = true;
             
-            // Validate Contact Number
-            const contactVal = contactInput.value.replace(/\D/g, '');
-            if(contactVal.length < 9) { 
-                isValid = false;
-                contactError.innerText = "Please enter a valid Malaysia contact number.";
-                contactError.style.display = 'block';
-                contactGroup.classList.add('error');
-            } else if (contactVal.charAt(0) !== '0') {
+            // --- A. Validate Contact Number (10-11 digits) ---
+            const contactVal = contactInput.value.replace(/\D/g, ''); 
+            if (contactVal.charAt(0) !== '0') {
                 isValid = false;
                 contactError.innerText = "Contact number must start with 0.";
+                contactError.style.display = 'block';
+                contactGroup.classList.add('error');
+            } else if (contactVal.length < 10 || contactVal.length > 11) {
+                isValid = false;
+                contactError.innerText = "Phone number must be 10-11 digits (e.g., 012-3456789).";
                 contactError.style.display = 'block';
                 contactGroup.classList.add('error');
             } else {
@@ -729,31 +724,69 @@ include 'header_UI.php';
                 contactGroup.classList.remove('error');
             }
 
-            // Validate IC (Only if entered)
+            // --- B. Validate Date of Birth (Must be 18+) ---
+            const dobError = document.getElementById('dobError'); 
+            const dobVal = dobInput.value;
+            
+            if (dobVal) {
+                const selectedDate = new Date(dobVal);
+                const today = new Date();
+                
+                // Calculate age
+                let age = today.getFullYear() - selectedDate.getFullYear();
+                const m = today.getMonth() - selectedDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < selectedDate.getDate())) {
+                    age--;
+                }
+
+                if (age < 18) {
+                    isValid = false;
+                    dobError.innerText = "Must be 18 years old and above.";
+                    dobError.style.display = 'block';
+                    dobInput.style.borderColor = "#dc2626";
+                } else {
+                    dobError.style.display = 'none';
+                    dobInput.style.borderColor = ""; 
+                }
+            }
+
+            // --- C. Validate IC (Strict Logic) ---
             if (icInput.value.trim() !== '') {
-                // [UPDATED] Check length of clean digits (should be 12)
                 const cleanIC = icInput.value.replace(/[^0-9]/g, '');
                 
                 if (cleanIC.length !== 12) {
                     isValid = false;
                     icError.innerText = "IC Number must be exactly 12 digits.";
-                    icError.style.display = 'block';
-                    icGroup.classList.add('error');
+                    icError.style.display = 'block'; icGroup.classList.add('error');
                 } else {
+                    const month = parseInt(cleanIC.substring(2, 4), 10);
+                    const day = parseInt(cleanIC.substring(4, 6), 10);
                     const stateCode = cleanIC.substring(6, 8);
-                     const validStateCodes = [
-                        '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', 
-                        '11', '12', '13', '14', '15', '16', 
-                        '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', 
-                        '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', 
-                        '41', '42', '43', '44', '45', '46', '47', '48', '49', '50', 
-                        '51', '52', '53', '54', '55', '56', '57', '58', '59'
-                    ];
-                    if (!validStateCodes.includes(stateCode)) {
+                    const validStateCodes = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40','41','42','43','44','45','46','47','48','49','50','51','52','53','54','55','56','57','58','59'];
+                    
+                    let isDateValid = true;
+                    if (month < 1 || month > 12) {
+                        isDateValid = false;
+                    } else {
+                        const daysInMonth = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+                        if (day < 1 || day > daysInMonth[month]) {
+                            isDateValid = false;
+                        }
+                    }
+
+                    if (!isDateValid) {
+                        isValid = false;
+                        icError.innerText = "Invalid IC Number: Invalid Date of Birth (YYMMDD).";
+                        icError.style.display = 'block';
+                        icGroup.classList.add('error');
+                    } else if (!validStateCodes.includes(stateCode)) {
                         isValid = false;
                         icError.innerText = "Invalid IC Number: Invalid state code.";
                         icError.style.display = 'block';
                         icGroup.classList.add('error');
+                    } else {
+                         icError.style.display = 'none';
+                         icGroup.classList.remove('error');
                     }
                 }
             }
@@ -761,12 +794,9 @@ include 'header_UI.php';
             if (!isValid) {
                 e.preventDefault();
                 const errorEl = document.querySelector('.field-error-msg[style*="block"]');
-                if(errorEl) {
-                    errorEl.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
+                if(errorEl) { errorEl.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
             }
         });
-
 
         // --- 4. Auto Detect State from Postcode Logic ---
         function handlePostcodeInput(postcode) {
@@ -842,7 +872,6 @@ include 'header_UI.php';
             });
             const icInput = document.getElementById('icnumber');
             if (icInput.value.trim() !== '') { 
-                // [UPDATED] If exists, re-format existing value with dashes
                 let val = icInput.value.replace(/\D/g, '');
                 if (val.length > 8) {
                     icInput.value = val.substring(0, 6) + '-' + val.substring(6, 8) + '-' + val.substring(8);

@@ -7,13 +7,13 @@ if (session_status() === PHP_SESSION_NONE) {
 // 引入数据库连接 (确保路径正确)
 include_once 'dataconnection.php'; 
 
-$logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
+// 强制转换布尔值，确保逻辑绝对清晰
+$logged_in = (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true);
 $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor_name']) : "Guest";
 $wallet_balance = 0.00;
 
 // [新增] 如果已登录，从数据库获取最新余额
 if ($logged_in && isset($_SESSION['donor_id'])) {
-    // 确保 $conn 存在防止报错
     if (isset($conn)) {
         $stmt = $conn->prepare("SELECT Donor_Wallet FROM donor WHERE Donor_ID = ?");
         $stmt->bind_param("i", $_SESSION['donor_id']);
@@ -109,20 +109,20 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             display: flex;
             align-items: center;
             color: var(--light-text);
-            background: rgba(0, 0, 0, 0.1); /* 轻微背景区分 */
+            background: rgba(0, 0, 0, 0.1); 
             padding: 5px 12px;
             border-radius: 20px;
             font-weight: bold;
             gap: 8px;
             transition: 0.3s;
-            margin-right: 10px; /* 与 Account 分开一点 */
+            margin-right: 10px; 
         }
         .wallet-display:hover {
             background: rgba(0, 0, 0, 0.2);
             transform: translateY(-1px);
         }
         .wallet-amount {
-            font-family: 'Segoe UI', sans-serif; /* 数字显示更好看 */
+            font-family: 'Segoe UI', sans-serif; 
         }
 
         /* --- 用户 Account 区域 --- */
@@ -149,10 +149,8 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         .icon-svg {
             width: 18px;
             height: 18px;
-            /* 关键修改：防止图标被挤压变形 */
             min-width: 18px; 
             flex-shrink: 0;
-            
             fill: none;
             stroke: currentColor;
             stroke-width: 2;
@@ -380,7 +378,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                         </div>
                     </div>
                     
-                    <a href="donor_logout.php" class="logout-btn">
+                    <a href="donor_logout.php" class="logout-btn" onclick="confirmLogout(event)">
                         <svg class="icon-svg" viewBox="0 0 24 24">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                             <polyline points="16 17 21 12 16 7"></polyline>
@@ -423,13 +421,17 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                     <button type="submit">🔍</button>
                 </form>
 
-                <a href="Payment_page.php" class="header-donate-btn" onclick="checkLogin(event)">Donate</a>
+                <?php if ($logged_in): ?>
+                    <a href="Payment_page.php" class="header-donate-btn">Donate</a>
+                <?php else: ?>
+                    <a href="#" class="header-donate-btn" onclick="showLoginAlert(event)">Donate</a>
+                <?php endif; ?>
             </div>
         </div>
     </header>
 
     <script>
-        // 1. 下拉菜单逻辑 (保持不变)
+        // 1. 下拉菜单逻辑
         function toggleDropdown() {
             const dropdown = document.getElementById('profileDropdown');
             dropdown.classList.toggle('active');
@@ -448,36 +450,45 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             event.stopPropagation();
         });
 
-        // 2. [新增] 捐款按钮检查登录状态逻辑
-        function checkLogin(event) {
+        // 2. 显示登录提示 (Donate 按钮)
+        function showLoginAlert(event) {
             event.preventDefault(); // 阻止默认跳转
 
-            // 获取 PHP 的登录状态
-            var isLoggedIn = <?php echo $logged_in ? 'true' : 'false'; ?>;
+            Swal.fire({
+                icon: 'info',
+                title: 'Login Required',
+                text: 'You need to login to make a donation.',
+                showCancelButton: true,
+                confirmButtonColor: '#e16161', 
+                cancelButtonColor: '#6c757d', 
+                confirmButtonText: 'Login Now',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = "donor_login.php";
+                }
+            });
+        }
 
-            if (isLoggedIn) {
-                // 如果已登录，直接跳转到捐款页
-                window.location.href = "Payment_page.php";
-            } else {
-                // 如果未登录，显示和截图一样的 SweetAlert2 弹窗
-                Swal.fire({
-                    icon: 'info', // 蓝色的 i 图标
-                    title: 'Login Required',
-                    text: 'You need to login to make a donation.',
-                    showCancelButton: true,
-                    confirmButtonColor: '#dc3545', // 红色按钮 (类似 Bootstrap danger red)
-                    cancelButtonColor: '#6c757d', // 灰色按钮 (类似 Bootstrap secondary grey)
-                    confirmButtonText: 'Login Now',
-                    cancelButtonText: 'Cancel',
-                    reverseButtons: false // 确保 Login 在左边（SweetAlert默认Confirm在左）
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        // 点击 Login Now，跳转到登录页
-                        window.location.href = "donor_login.php";
-                    }
-                    // 点击 Cancel 什么都不做，留在当前页面
-                });
-            }
+        // 3. [新增] 登出确认函数
+        function confirmLogout(event) {
+            event.preventDefault(); 
+
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You will be logged out of your account.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#e16161', 
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, Log out',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                  
+                    window.location.href = 'donor_logout.php';
+                }
+            });
         }
     </script>
 </body>

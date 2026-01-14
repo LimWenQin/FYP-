@@ -1,5 +1,5 @@
 <?php
-// 1. 启动 Session (防止重复启动报错)
+// 1. 启动 Session
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -10,8 +10,26 @@ include 'header_UI.php';
 // --- 2. 检查登录状态 ---
 $logged_in = isset($_SESSION['donor_id']) && !empty($_SESSION['donor_id']);
 
-// --- 3. 获取 Special Cases (Emergency Relief) ---
+// ==========================================
+// [核心逻辑] 自动检查并更新满额的案例状态
+// ==========================================
+// 这一步非常关键：
+// 1. 系统查找所有金额已达标 (Raised >= Target) 的 Emergency Relief 案例。
+// 2. 将它们的状态从 'Active' 改为 'Completed'。
+// 3. 结果：因为下面的查询只找 'Active'，所以这些刚刚变成 Completed 的案例会自动从主页隐藏。
+$auto_update_sql = "UPDATE special_case 
+                    SET Case_Status = 'Completed', Completed_At = NOW() 
+                    WHERE Case_Category = 'Emergency Relief' 
+                    AND Case_Status = 'Active' 
+                    AND Raised_Amount >= Target_Amount 
+                    AND Target_Amount > 0";
+$conn->query($auto_update_sql);
+
+// --- 3. 获取 Special Cases (Emergency Relief) 用于主页轮播 ---
 $special_cases = [];
+
+// 这里只选择 Active 的案例。
+// 由于上面的代码已经把满额的改成了 Completed，所以这里自然不会选出满额的案例。
 $query_sc = "SELECT * FROM special_case 
              WHERE Case_Category = 'Emergency Relief' 
              AND Case_Status = 'Active' 
@@ -21,25 +39,23 @@ $result_sc = $conn->query($query_sc);
 
 if ($result_sc && $result_sc->num_rows > 0) {
     while ($row = $result_sc->fetch_assoc()) {
-        // Image Handling (支持 JSON 或 单一字符串)
+        // Image Handling (支持 JSON 格式 或 普通字符串)
         $image_url = "https://images.unsplash.com/photo-1579684385127-1ef15d508118?ixlib=rb-1.2.1&auto=format&fit=crop&w=1600&q=80"; 
         if (!empty($row['Case_Images'])) {
-            // 尝试解析 JSON
             $decoded = json_decode($row['Case_Images'], true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded) && count($decoded) > 0) {
                 $image_url = $decoded[0]; // 取第一张
             } else {
-                // 如果不是 JSON，直接使用字符串
                 $image_url = $row['Case_Images'];
             }
         }
 
-        // Calculate days active
+        // 计算发布了多少天 (用于显示倒计时或天数，虽然主页显示的是倒计时)
         $created_date = new DateTime($row['Created_At']);
         $now = new DateTime();
         $interval = $created_date->diff($now);
         
-        // 按钮逻辑
+        // 按钮点击逻辑
         if ($logged_in) {
             $target_url = "S_C_Payment_Page.php?case_id=" . $row['Case_ID'];
             $btn_onclick = "window.location.href='$target_url';";
@@ -64,7 +80,7 @@ if ($result_sc && $result_sc->num_rows > 0) {
     }
 }
 
-// --- 4. Fetch Upcoming Activities ---
+// --- 4. 获取即将开始的活动 (Upcoming Activities) ---
 $activities = [];
 $query_act = "SELECT * FROM activity 
               WHERE Activity_Status IN ('Active', 'Upcoming') 
@@ -191,7 +207,7 @@ if ($logged_in) {
             pointer-events: none;
         }
 
-        /* --- [关键修复] 内容容器 --- */
+        /* --- 内容容器 --- */
         .special-case-content {
             position: absolute;
             bottom: 0; /* 贴底布局 */
@@ -207,10 +223,9 @@ if ($logged_in) {
             align-items: flex-end;
             flex-wrap: wrap;
             gap: 30px;
-            /* 增加底部 padding，把 Donate 按钮顶上去，防止被进度条挡住 */
             padding-bottom: 110px; 
-            height: 100%; /* 占满高度以便布局 */
-            pointer-events: none; /* 让点击穿透空白区域 */
+            height: 100%; 
+            pointer-events: none; 
         }
 
         /* 恢复子元素的点击事件 */
@@ -258,7 +273,7 @@ if ($logged_in) {
         .slide-action-content {
             text-align: right;
             min-width: 250px;
-            margin-bottom: 20px; /* 额外微调 */
+            margin-bottom: 20px; 
         }
 
         .days-counter {
@@ -304,10 +319,10 @@ if ($logged_in) {
         /* --- 进度条容器 --- */
         .bottom-progress-container {
             position: absolute;
-            bottom: 40px; /* 固定在离底边 40px 处，避开 dots */
+            bottom: 40px; 
             left: 0;
             width: 100%;
-            z-index: 10; /* 确保在最上层 */
+            z-index: 10;
             pointer-events: auto;
         }
 
@@ -320,7 +335,6 @@ if ($logged_in) {
             font-family: 'Segoe UI', sans-serif;
         }
 
-        /* 左侧已筹集金额 - 显眼 */
         .raised-amount {
             font-size: 2rem; 
             font-weight: 800;
@@ -336,7 +350,6 @@ if ($logged_in) {
             margin-bottom: 2px;
         }
 
-        /* 右侧目标金额 */
         .target-amount {
             font-size: 1.2rem;
             font-weight: 600;
@@ -394,7 +407,7 @@ if ($logged_in) {
         /* Slider Dots */
         .slider-controls {
             position: absolute;
-            bottom: 15px; /* 放在最底部 */
+            bottom: 15px; 
             left: 50%;
             transform: translateX(-50%);
             z-index: 20;
@@ -699,6 +712,8 @@ if ($logged_in) {
                 const distance = endDate - now;
 
                 const timerDisplay = slide.querySelector('.countdown-timer');
+                // Check if timerDisplay exists (in case of 'No Active Cases' slide)
+                if (!timerDisplay) return;
 
                 if (distance < 0) {
                     timerDisplay.innerHTML = "ENDED";
