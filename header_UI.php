@@ -378,7 +378,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                         </div>
                     </div>
                     
-                    <a href="donor_logout.php" class="logout-btn">
+                    <a href="donor_logout.php" class="logout-btn" onclick="confirmLogout(event)">
                         <svg class="icon-svg" viewBox="0 0 24 24">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                             <polyline points="16 17 21 12 16 7"></polyline>
@@ -450,8 +450,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             event.stopPropagation();
         });
 
-        // 2. [修改] 仅用于显示弹窗的函数
-        // 只有当 PHP 判定用户【未登录】时，这个函数才会被 HTML 调用
+        // 2. 显示登录提示 (Donate 按钮)
         function showLoginAlert(event) {
             event.preventDefault(); // 阻止默认跳转
 
@@ -460,14 +459,34 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 title: 'Login Required',
                 text: 'You need to login to make a donation.',
                 showCancelButton: true,
-                confirmButtonColor: '#dc3545', 
+                confirmButtonColor: '#e16161', 
                 cancelButtonColor: '#6c757d', 
                 confirmButtonText: 'Login Now',
-                cancelButtonText: 'Cancel',
-                reverseButtons: false
+                cancelButtonText: 'Cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
                     window.location.href = "donor_login.php";
+                }
+            });
+        }
+
+        // 3. [新增] 登出确认函数
+        function confirmLogout(event) {
+            event.preventDefault(); 
+
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You will be logged out of your account.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#e16161', 
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, Log out',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                  
+                    window.location.href = 'donor_logout.php';
                 }
             });
         }

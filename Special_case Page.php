@@ -2,44 +2,43 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-// --- 1. 定义分类配置 (已修改颜色) ---
+// --- 1. 定义分类配置 ---
 $categories = [
     'emergency' => [
         'db_name' => 'Emergency Relief', 
         'name' => 'Emergency Relief', 
         'icon' => 'fas fa-first-aid', 
-        'color' => '#d32f2f' // 红色 (重点)
+        'color' => '#d32f2f'
     ],
     'medical' => [
         'db_name' => 'Medical', 
         'name' => 'Medical Aid', 
         'icon' => 'fas fa-heartbeat', 
-        'color' => '#f57c00' // 橙色
+        'color' => '#f57c00'
     ],
     'disability' => [
         'db_name' => 'Disability Support', 
         'name' => 'Disability Support', 
         'icon' => 'fas fa-wheelchair', 
-        'color' => '#f57c00' // 橙色
+        'color' => '#f57c00'
     ],
-    
     'elderly' => [
         'db_name' => 'Elderly Care', 
         'name' => 'Elderly Care', 
         'icon' => 'fas fa-user-friends', 
-        'color' => '#f57c00' // 橙色
+        'color' => '#f57c00'
     ],
     'children' => [
         'db_name' => 'Children Support', 
         'name' => 'Children Support', 
         'icon' => 'fas fa-child', 
-        'color' => '#f57c00' // 橙色
+        'color' => '#f57c00'
     ],
     'other' => [
         'db_name' => 'Other Cases', 
         'name' => 'Other Cases', 
         'icon' => 'fas fa-hand-holding-heart', 
-        'color' => '#f57c00' // 橙色
+        'color' => '#f57c00'
     ]
 ];
 
@@ -54,7 +53,8 @@ $category_filter = isset($_GET['category']) ? $_GET['category'] : 'all';
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 
 // --- 3. 构建查询条件 ---
-$where_conditions = ["Case_Status = 'Active'"];
+// 【修改点】这里改成了 IN ('Active', 'Completed')，这样满额的案例也能显示出来
+$where_conditions = ["Case_Status IN ('Active', 'Completed')"];
 
 if ($category_filter !== 'all') {
     if (isset($categories[$category_filter])) {
@@ -92,7 +92,6 @@ include 'header_UI.php';
 
     <style>
         :root {
-            /* 保持基础红色用于页面标题等通用元素 */
             --primary-red: #e53935; 
             --dark-red: #c62828;
             --light-red: #ff5252;
@@ -100,24 +99,12 @@ include 'header_UI.php';
             --white: #FFFFFF;
             --light-bg: #fef7f7;
             --text: #212121;
-            
             --shadow: rgba(0, 0, 0, 0.1);
             --progress-bg: #e0e0e0;
         }
         
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        body {
-            background-color: var(--light-bg);
-            color: var(--text);
-            line-height: 1.6;
-            overflow-x: hidden;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--light-bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
         
         /* Full Width Page Header */
         .page-header {
@@ -133,504 +120,94 @@ include 'header_UI.php';
             border-radius: 0;
             margin-bottom: 0;
         }
-        
-        .page-header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.6); 
-            z-index: 1;
-        }
-        
-        .page-header-content {
-            position: relative;
-            z-index: 2;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        
-        .page-title {
-            font-size: 48px;
-            font-weight: 700;
-            margin-bottom: 20px;
-            color: white;
-            position: relative;
-            display: inline-block;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-        
-        .page-title::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 100px;
-            height: 4px;
-            background: var(--primary-red);
-            border-radius: 2px;
-        }
-        
-        .page-description {
-            font-size: 20px;
-            max-width: 800px;
-            margin: 0 auto 30px;
-            color: rgba(255, 255, 255, 0.9);
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-            font-weight: 500;
-        }
+        .page-header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.6); z-index: 1; }
+        .page-header-content { position: relative; z-index: 2; max-width: 1400px; margin: 0 auto; }
+        .page-title { font-size: 48px; font-weight: 700; margin-bottom: 20px; color: white; position: relative; display: inline-block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .page-title::after { content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 100px; height: 4px; background: var(--primary-red); border-radius: 2px; }
+        .page-description { font-size: 20px; max-width: 800px; margin: 0 auto 30px; color: rgba(255, 255, 255, 0.9); text-shadow: 1px 1px 2px rgba(0,0,0,0.5); font-weight: 500; }
         
         /* Main Container */
-        .case-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 40px 20px;
-            position: relative;
-        }
+        .case-container { max-width: 1400px; margin: 0 auto; padding: 40px 20px; position: relative; }
         
         /* Stats */
-        .stats-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-            margin-top: -60px;
-            position: relative;
-            z-index: 3;
-            padding: 0 20px;
-        }
-        
-        .stat-box {
-            background: var(--white);
-            padding: 25px;
-            border-radius: 15px;
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border: 1px solid #eee;
-            transition: transform 0.3s ease;
-        }
-        
-        .stat-box:hover {
-            transform: translateY(-5px);
-        }
-        
-        .stat-number {
-            font-size: 36px;
-            font-weight: 700;
-            color: var(--primary-red);
-            display: block;
-            margin-bottom: 10px;
-        }
-        
-        .stat-label {
-            font-size: 16px;
-            color: #8a8686;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+        .stats-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px; margin-top: -60px; position: relative; z-index: 3; padding: 0 20px; }
+        .stat-box { background: var(--white); padding: 25px; border-radius: 15px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #eee; transition: transform 0.3s ease; }
+        .stat-box:hover { transform: translateY(-5px); }
+        .stat-number { font-size: 36px; font-weight: 700; color: var(--primary-red); display: block; margin-bottom: 10px; }
+        .stat-label { font-size: 16px; color: #8a8686; text-transform: uppercase; letter-spacing: 1px; }
         
         /* Categories Grid */
-        .categories-container {
-            margin-bottom: 40px;
-        }
-        
-        .categories-title {
-            font-size: 24px;
-            color: var(--primary-red);
-            margin-bottom: 25px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .categories-title i {
-            font-size: 28px;
-        }
-        
-        .categories-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 15px;
-        }
-        
-        .category-item {
-            background: var(--white);
-            border: 2px solid #eee;
-            border-radius: 10px;
-            padding: 20px 15px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            color: var(--text);
-            display: block;
-        }
-        
-        .category-item:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-        
-        /* Active 状态由 PHP 动态控制颜色，这里只保留基础样式 */
-        .category-item.active {
-            color: white;
-            transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
-        }
-        
-        .category-icon {
-            font-size: 32px;
-            margin-bottom: 10px;
-            display: block;
-        }
-        
-        .category-name {
-            font-size: 14px;
-            font-weight: 600;
-        }
+        .categories-container { margin-bottom: 40px; }
+        .categories-title { font-size: 24px; color: var(--primary-red); margin-bottom: 25px; display: flex; align-items: center; gap: 10px; }
+        .categories-title i { font-size: 28px; }
+        .categories-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
+        .category-item { background: var(--white); border: 2px solid #eee; border-radius: 10px; padding: 20px 15px; text-align: center; cursor: pointer; transition: all 0.3s ease; text-decoration: none; color: var(--text); display: block; }
+        .category-item:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .category-item.active { color: white; transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15); }
+        .category-icon { font-size: 32px; margin-bottom: 10px; display: block; }
+        .category-name { font-size: 14px; font-weight: 600; }
         
         /* Cases Grid */
-        .cases-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 30px;
-            margin-bottom: 50px;
-        }
+        .cases-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; margin-bottom: 50px; }
         
         /* Case Card */
-        .case-card {
-            background: var(--white);
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.05);
-            transition: all 0.3s ease;
-            border: 1px solid #eee;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-        
-        .case-card:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-        }
-        
-        .case-image-container {
-            position: relative;
-            height: 250px;
-            overflow: hidden;
-        }
-        
-        .case-image {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.5s ease;
-            cursor: zoom-in; /* 【修改】添加鼠标手势，提示可点击 */
-        }
-        
-        .case-card:hover .case-image {
-            transform: scale(1.05);
-        }
-        
-        .case-badges {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            pointer-events: none; /* 防止遮挡图片点击 */
-        }
-        
-        .case-badge {
-            padding: 6px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-            color: white;
-        }
-        
-        .badge-urgent {
-            background: #d32f2f; /* 统一使用深红色 */
-        }
-        
-        .case-content {
-            padding: 25px;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .case-header {
-            margin-bottom: 15px;
-        }
-        
-        .case-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--text);
-            margin-bottom: 10px;
-            line-height: 1.3;
-        }
-        
-        .case-meta {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            color: #8a8686;
-            font-size: 14px;
-        }
-        
-        .case-description-container {
-            margin-bottom: 20px;
-            flex: 1;
-        }
-        
-        .case-description {
-            color: #8a8686;
-            font-size: 16px;
-            line-height: 1.6;
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-        
-        .case-description.expanded {
-            -webkit-line-clamp: unset;
-            overflow: visible;
-            display: block;
-        }
-        
-        .show-more-btn {
-            background: none;
-            border: none;
-            color: #888; 
-            cursor: pointer;
-            font-weight: 600;
-            margin-top: 10px;
-            padding: 0;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 15px;
-        }
-        
-        .show-more-btn:hover {
-            text-decoration: underline;
-            color: var(--text);
-        }
+        .case-card { background: var(--white); border-radius: 15px; overflow: hidden; box-shadow: 0 8px 25px rgba(0,0,0,0.05); transition: all 0.3s ease; border: 1px solid #eee; position: relative; display: flex; flex-direction: column; height: 100%; }
+        .case-card:hover { transform: translateY(-10px); box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1); }
+        .case-image-container { position: relative; height: 250px; overflow: hidden; }
+        .case-image { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; cursor: zoom-in; }
+        .case-card:hover .case-image { transform: scale(1.05); }
+        .case-badges { position: absolute; top: 15px; right: 15px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .case-badge { padding: 6px 15px; border-radius: 20px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2); color: white; }
+        .badge-urgent { background: #d32f2f; }
+        .case-content { padding: 25px; flex: 1; display: flex; flex-direction: column; }
+        .case-header { margin-bottom: 15px; }
+        .case-title { font-size: 24px; font-weight: 700; color: var(--text); margin-bottom: 10px; line-height: 1.3; }
+        .case-meta { display: flex; align-items: center; gap: 15px; color: #8a8686; font-size: 14px; }
+        .case-description-container { margin-bottom: 20px; flex: 1; }
+        .case-description { color: #8a8686; font-size: 16px; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; transition: all 0.3s ease; }
+        .case-description.expanded { -webkit-line-clamp: unset; overflow: visible; display: block; }
+        .show-more-btn { background: none; border: none; color: #888; cursor: pointer; font-weight: 600; margin-top: 10px; padding: 0; display: inline-flex; align-items: center; gap: 5px; font-size: 15px; }
+        .show-more-btn:hover { text-decoration: underline; color: var(--text); }
         
         /* Progress Bar */
-        .progress-section {
-            margin-bottom: 25px;
-        }
+        .progress-section { margin-bottom: 25px; }
+        .progress-info { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .progress-bar { height: 10px; background-color: var(--progress-bg); border-radius: 5px; overflow: hidden; margin-bottom: 5px; position: relative; }
+        .progress-fill { height: 100%; border-radius: 5px; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; }
+        .progress-fill::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.3) 50%, transparent 100%); animation: shimmer 2s infinite; }
+        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        .progress-percentage { text-align: right; font-size: 14px; font-weight: 600; }
         
-        .progress-info {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            font-size: 14px;
-        }
-        
-        .progress-bar {
-            height: 10px;
-            background-color: var(--progress-bg);
-            border-radius: 5px;
-            overflow: hidden;
-            margin-bottom: 5px;
-            position: relative;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            border-radius: 5px;
-            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .progress-fill::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(255, 255, 255, 0.3) 50%, 
-                transparent 100%);
-            animation: shimmer 2s infinite;
-        }
-        
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-        
-        .progress-percentage {
-            text-align: right;
-            font-size: 14px;
-            font-weight: 600;
-        }
-        
-        .case-details {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 25px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .detail-item {
-            text-align: center;
-        }
-        
-        .detail-value {
-            font-size: 22px;
-            font-weight: 700;
-            display: block;
-        }
-        
-        .detail-label {
-            font-size: 13px;
-            color: #8a8686;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+        .case-details { display: flex; justify-content: space-between; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+        .detail-item { text-align: center; }
+        .detail-value { font-size: 22px; font-weight: 700; display: block; }
+        .detail-label { font-size: 13px; color: #8a8686; text-transform: uppercase; letter-spacing: 1px; }
         
         /* Donate Button */
-        .case-actions {
-            margin-top: auto;
-        }
-        
-        .btn-donate {
-            display: block;
-            width: 100%;
-            padding: 15px;
-            color: var(--white);
-            border: none;
-            border-radius: 10px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        
-        .btn-donate:hover {
-            filter: brightness(0.9);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-        }
+        .case-actions { margin-top: auto; }
+        .btn-donate { display: block; width: 100%; padding: 15px; color: var(--white); border: none; border-radius: 10px; font-size: 18px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn-donate:hover { filter: brightness(0.9); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+        /* 【新增】禁用按钮样式 */
+        .btn-donate.disabled { background-color: #9e9e9e !important; cursor: not-allowed; transform: none; box-shadow: none; filter: none; }
         
         /* No Cases */
-        .no-cases {
-            grid-column: 1 / -1;
-            text-align: center;
-            padding: 80px 20px;
-            background: var(--white);
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
-        }
-        
-        .no-cases i {
-            font-size: 60px;
-            color: #ccc;
-            margin-bottom: 20px;
-        }
-        
-        .no-cases h3 {
-            font-size: 28px;
-            color: var(--text);
-            margin-bottom: 10px;
-        }
-        
-        .no-cases p {
-            color: #8a8686;
-            font-size: 18px;
-            max-width: 600px;
-            margin: 0 auto;
-        }
+        .no-cases { grid-column: 1 / -1; text-align: center; padding: 80px 20px; background: var(--white); border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
+        .no-cases i { font-size: 60px; color: #ccc; margin-bottom: 20px; }
+        .no-cases h3 { font-size: 28px; color: var(--text); margin-bottom: 10px; }
+        .no-cases p { color: #8a8686; font-size: 18px; max-width: 600px; margin: 0 auto; }
         
         /* Pagination */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin-top: 40px;
-        }
-        
-        .pagination a, .pagination span {
-            padding: 10px 18px;
-            text-decoration: none;
-            border: 2px solid var(--primary-red);
-            color: var(--primary-red);
-            border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-        
-        .pagination a:hover {
-            background: var(--primary-red);
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(229, 57, 53, 0.3);
-        }
-        
-        .pagination .current {
-            background: var(--primary-red);
-            color: white;
-            border-color: var(--primary-red);
-        }
-        
-        .pagination .disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 40px; }
+        .pagination a, .pagination span { padding: 10px 18px; text-decoration: none; border: 2px solid var(--primary-red); color: var(--primary-red); border-radius: 8px; font-weight: 600; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 5px; }
+        .pagination a:hover { background: var(--primary-red); color: white; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(229, 57, 53, 0.3); }
+        .pagination .current { background: var(--primary-red); color: white; border-color: var(--primary-red); }
+        .pagination .disabled { opacity: 0.5; cursor: not-allowed; }
         
         /* Responsive */
-        @media (max-width: 1200px) {
-            .page-title { font-size: 42px; }
-        }
-        @media (max-width: 992px) {
-            .cases-grid { grid-template-columns: 1fr; gap: 25px; }
-            .case-image-container { height: 220px; }
-            .page-title { font-size: 36px; }
-            .page-description { font-size: 18px; padding: 0 20px; }
-            .categories-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-        }
-        @media (max-width: 768px) {
-            .page-header { padding: 80px 20px; }
-            .stats-container { grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: -40px; }
-            .stat-box { padding: 20px 15px; }
-            .stat-number { font-size: 28px; }
-        }
-        @media (max-width: 576px) {
-            .page-title { font-size: 32px; }
-            .stats-container { grid-template-columns: 1fr; }
-            .case-image-container { height: 200px; }
-            .categories-grid { grid-template-columns: repeat(2, 1fr); }
-        }
+        @media (max-width: 1200px) { .page-title { font-size: 42px; } }
+        @media (max-width: 992px) { .cases-grid { grid-template-columns: 1fr; gap: 25px; } .case-image-container { height: 220px; } .page-title { font-size: 36px; } .page-description { font-size: 18px; padding: 0 20px; } .categories-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+        @media (max-width: 768px) { .page-header { padding: 80px 20px; } .stats-container { grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: -40px; } .stat-box { padding: 20px 15px; } .stat-number { font-size: 28px; } }
+        @media (max-width: 576px) { .page-title { font-size: 32px; } .stats-container { grid-template-columns: 1fr; } .case-image-container { height: 200px; } .categories-grid { grid-template-columns: repeat(2, 1fr); } }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -646,18 +223,16 @@ include 'header_UI.php';
     <div class="case-container">
         <div class="stats-container">
             <?php 
-            // 获取统计数据
-            $total_query = "SELECT COUNT(*) as total, SUM(Raised_Amount) as total_raised FROM special_case WHERE Case_Status = 'Active'";
+            // 统计总数时也包含 Active 和 Completed
+            $total_query = "SELECT COUNT(*) as total, SUM(Raised_Amount) as total_raised FROM special_case WHERE Case_Status IN ('Active', 'Completed')";
             $total_result = $conn->query($total_query);
             $stats = $total_result->fetch_assoc();
             
-            // --- [修改] 统计 Emergency Relief 的数量 ---
-            // 之前是 Urgency = 'high'，现在改为 Case_Category = 'Emergency Relief'
-            $urgent_count_query = "SELECT COUNT(*) as count FROM special_case WHERE Case_Status = 'Active' AND Case_Category = 'Emergency Relief'";
+            $urgent_count_query = "SELECT COUNT(*) as count FROM special_case WHERE Case_Status IN ('Active', 'Completed') AND Case_Category = 'Emergency Relief'";
             $urgent_result = $conn->query($urgent_count_query);
             $urgent_count = $urgent_result->fetch_assoc()['count'];
             
-            $total_donors_query = "SELECT SUM(Donor_Count) as total_donors FROM special_case WHERE Case_Status = 'Active'";
+            $total_donors_query = "SELECT SUM(Donor_Count) as total_donors FROM special_case WHERE Case_Status IN ('Active', 'Completed')";
             $donors_result = $conn->query($total_donors_query);
             $total_donors = $donors_result->fetch_assoc()['total_donors'] ?? 0;
             ?>
@@ -713,6 +288,10 @@ include 'header_UI.php';
                     $progress = ($raised / $target) * 100;
                     $progress = min($progress, 100);
                     
+                    // --- 【新增】判断是否完成 ---
+                    // 这里判断：进度满了 或者 状态已经是 Completed
+                    $is_completed = ($progress >= 100) || ($case['Case_Status'] === 'Completed');
+
                     // --- 自动匹配数据库样式 ---
                     $db_category_value = $case['Case_Category'];
                     $current_cat_info = $categories['other']; // 默认值
@@ -722,7 +301,7 @@ include 'header_UI.php';
                     }
 
                     $category_name = $current_cat_info['name'];
-                    $category_color = $current_cat_info['color']; // 这里的颜色已经是我们修改过的了
+                    $category_color = $current_cat_info['color'];
                     $category_icon = $current_cat_info['icon'];
                     
                     $is_urgent = isset($case['Urgency']) && $case['Urgency'] === 'high';
@@ -755,6 +334,9 @@ include 'header_UI.php';
                                 </span>
                                 <?php if ($is_urgent): ?>
                                     <span class="case-badge badge-urgent">URGENT</span>
+                                <?php endif; ?>
+                                <?php if ($is_completed): // 如果完成了，也加个 Completed 标签 ?>
+                                    <span class="case-badge" style="background: #2e7d32;">COMPLETED</span>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -798,18 +380,31 @@ include 'header_UI.php';
                                     <span class="detail-label">Donors</span>
                                 </div>
                                 <div class="detail-item">
-                                    <span class="detail-value" style="color: <?php echo $category_color; ?>"><?php echo isset($case['Case_Deadline']) ? date('M j', strtotime($case['Case_Deadline'])) : 'Ongoing'; ?></span>
-                                    <span class="detail-label">Deadline</span>
+                                    <?php if ($is_completed): ?>
+                                        <span class="detail-value" style="color: #2e7d32;">Completed</span>
+                                        <span class="detail-label">Status</span>
+                                    <?php else: ?>
+                                        <span class="detail-value" style="color: <?php echo $category_color; ?>">
+                                            <?php echo isset($case['End_Date']) ? date('M j, Y', strtotime($case['End_Date'])) : 'Ongoing'; ?>
+                                        </span>
+                                        <span class="detail-label">Deadline</span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             
                             <div class="case-actions">
-                                <a href="S_C_Payment_Page.php?case_id=<?php echo $case['Case_ID']; ?>" 
-                                   class="btn-donate" 
-                                   style="background: <?php echo $category_color; ?>"
-                                   onclick="return checkLogin(event, this.href)">
-                                    <i class="fas fa-heart"></i> Donate Now
-                                </a>
+                                <?php if ($is_completed): ?>
+                                    <button class="btn-donate disabled" disabled>
+                                        <i class="fas fa-check-circle"></i> Goal Reached
+                                    </button>
+                                <?php else: ?>
+                                    <a href="S_C_Payment_Page.php?case_id=<?php echo $case['Case_ID']; ?>" 
+                                       class="btn-donate" 
+                                       style="background: <?php echo $category_color; ?>"
+                                       onclick="return checkLogin(event, this.href)">
+                                        <i class="fas fa-heart"></i> Donate Now
+                                    </a>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -837,7 +432,6 @@ include 'header_UI.php';
                 <?php endif; ?>
                 
                 <?php 
-                // 显示分页链接
                 $start_page = max(1, $page - 2);
                 $end_page = min($total_pages, $start_page + 4);
                 $start_page = max(1, $end_page - 4);
@@ -865,22 +459,20 @@ include 'header_UI.php';
     <?php include 'footer.php'; ?>
 
     <script>
-        // 【新增】图片点击放大函数
         function showImage(src, title) {
             Swal.fire({
                 imageUrl: src,
                 imageAlt: title,
                 title: title,
-                width: 600, // 弹窗宽度
+                width: 600, 
                 padding: '1em',
                 background: '#fff',
-                showConfirmButton: false, // 隐藏确认按钮
-                showCloseButton: true,    // 显示右上角关闭X
-                backdrop: `rgba(0,0,0,0.8)` // 背景变黑
+                showConfirmButton: false, 
+                showCloseButton: true,
+                backdrop: `rgba(0,0,0,0.8)` 
             });
         }
 
-        // Toggle description expand/collapse
         function toggleDescription(caseId) {
             const description = document.getElementById(`desc-${caseId}`);
             const button = description.nextElementSibling;
@@ -894,7 +486,6 @@ include 'header_UI.php';
             }
         }
         
-        // Animate progress bars on scroll
         function animateProgressBars() {
             const progressBars = document.querySelectorAll('.progress-fill');
             
@@ -909,7 +500,6 @@ include 'header_UI.php';
         document.addEventListener('DOMContentLoaded', animateProgressBars);
         window.addEventListener('scroll', animateProgressBars);
 
-        // Login Check Function with SweetAlert2
         function checkLogin(event, url) {
             const isLoggedIn = <?php echo isset($_SESSION['Donor_ID']) || isset($_SESSION['donor_id']) ? 'true' : 'false'; ?>;
 

@@ -50,7 +50,6 @@ if (!$user_data) {
 // -------------------------
 $display_project_name = "General Donation"; 
 if ($case_id) {
-    // 注意：请确保你的数据库字段是 Case_Title 还是 Project_Title，这里沿用你之前的代码
     $c_res = $conn->query("SELECT Case_Title FROM special_case WHERE Case_ID = $case_id");
     if ($row = $c_res->fetch_assoc()) $display_project_name = "Case: " . $row['Case_Title'];
 } elseif ($activity_id) {
@@ -65,9 +64,6 @@ if ($case_id) {
 // 6. 处理付款提交
 // -------------------------
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
-
-    // ⭐ 已删除：之前的 "Payment already processed" 检查代码块
-    // 现在无论何时点击确认，都会执行下面的数据库插入
 
     // 生成交易信息
     $payment_method = "TNG eWallet";
@@ -125,20 +121,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         $stmt->close();
     }
 
-    // 4️⃣ 更新筹款进度 & 捐赠人数 (Special Case)
+    // =========================================================================
+    // 🔴【重要修改】把这里的 UPDATE 代码删掉/注释掉
+    // 因为 Payment_Settlement_Page.php 那边应该已经有同样的逻辑了。
+    // 如果两边都跑，钱就会加两次。
+    // =========================================================================
+
+    /* // 4️⃣ 更新筹款进度 & 捐赠人数 (Special Case)
     if ($case_id != null) {
-        // 注意：请确认你的数据库里是 Raised_Amount 还是 Current_Fund，这里沿用你刚才提供的 Raised_Amount
         $conn->query("UPDATE special_case SET Raised_Amount = Raised_Amount + $amount, Donor_Count = Donor_Count + 1 WHERE Case_ID = $case_id");
     }
     
     // 5️⃣ 更新 Activity 筹款进度 (Activity)
     if ($activity_id != null) {
-        // 假设 Activity 表有 Activity_GetAmount 字段
         $conn->query("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + $amount WHERE Activity_ID = $activity_id");
     }
+    */
 
-    // 跳转到结算页
-    // 使用 exit() 确保后续代码不执行
+    // 跳转到结算页 (Settlement Page)
+    // 结算页会根据 txn_ref 查找订单，如果那边没有加钱逻辑，请再把上面的代码取消注释。
     header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
     exit();
 }

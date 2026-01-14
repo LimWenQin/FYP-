@@ -3,7 +3,6 @@
 session_start();
 
 // --- 1. 手动引入 PHPMailer 文件 ---
-// 确保你的 PHPMailer 文件夹就在这个 php 文件的旁边
 require 'PHPMailer/Exception.php';
 require 'PHPMailer/PHPMailer.php';
 require 'PHPMailer/SMTP.php';
@@ -34,7 +33,6 @@ function logSecurityEvent($donor_id, $action, $details = '') {
     $ip_address = $_SERVER['REMOTE_ADDR'];
     $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
     
-    // Check if table exists (optional safety) or just insert
     $stmt = $conn->prepare("INSERT INTO donor_security_logs (donor_id, log_type, log_action, ip_address, user_agent, log_details) VALUES (?, 'password_reset', ?, ?, ?, ?)");
     $stmt->bind_param("issss", $donor_id, $action, $ip_address, $user_agent, $details);
     return $stmt->execute();
@@ -60,8 +58,6 @@ function checkRateLimit($donor_id, $email) {
 // Function to invalidate old tokens
 function invalidateOldTokens($donor_id) {
     global $conn;
-    
-    // 【修改】直接 DELETE 删除旧的 pending 请求，避免 Database Unique Key 报错
     $stmt = $conn->prepare("
         DELETE FROM donor_password_reset 
         WHERE donor_id = ? 
@@ -76,7 +72,7 @@ function generateSecureToken() {
     return bin2hex(random_bytes(32));
 }
 
-// --- 2. 发送邮件函数 (完整修正版) ---
+// --- 2. 发送邮件函数 ---
 function sendPasswordResetEmail($donor_name, $donor_email, $reset_token) {
     $mail = new PHPMailer(true);
 
@@ -94,21 +90,16 @@ function sendPasswordResetEmail($donor_name, $donor_email, $reset_token) {
         $mail->setFrom('qinwenlin989@gmail.com', 'Love Bridge Admin');
         $mail->addAddress($donor_email, $donor_name);
 
-        // --- 【关键修改】生成正确的链接 ---
-        // 1. 自动获取当前域名 (例如 localhost 或 localhost:8080)
+        // --- 生成正确的链接 ---
         $domain = $_SERVER['HTTP_HOST'];
-        
-        // 2. 这里是你存放文件的真实文件夹路径
         $folder_path = "/FYP/FYP-"; 
-        
-        // 3. 拼接完整网址
         $base_url = "http://" . $domain . $folder_path;
         $reset_link = $base_url . "/donor_reset_password.php?token=" . $reset_token;
         
         $mail->isHTML(true);
         $mail->Subject = 'Reset Your Password - Love Bridge';
         
-        // --- 邮件内容 (包含 15 分钟提示) ---
+        // --- 邮件内容 ---
         $email_content = "
         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px;'>
             <h2 style='color: #d32f2f; text-align: center;'>Password Reset Request</h2>
@@ -129,10 +120,10 @@ function sendPasswordResetEmail($donor_name, $donor_email, $reset_token) {
         $mail->send();
         return true;
     } catch (Exception $e) {
-        // 发送失败返回 false
         return false;
     }
 }
+
 // Process form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
@@ -160,9 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 invalidateOldTokens($donor_id);
                 $reset_token = generateSecureToken();
                 
-                // 计算过期时间为 15 分钟后
                 $expiry_time = date('Y-m-d H:i:s', strtotime('+' . RESET_TOKEN_EXPIRY_MINUTES . ' minutes'));
-                
                 $ip_address = $_SERVER['REMOTE_ADDR'];
                 $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
                 
@@ -175,6 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if (sendPasswordResetEmail($donor_name, $email, $reset_token)) {
                         $email_sent = true;
+                        // 如果是 Resend 操作，提示语可以稍微不同，这里保持通用即可
                         $success_message = 'Password reset instructions have been sent to your email.';
                         logSecurityEvent($donor_id, 'reset_email_sent', "Success");
                     } else {
@@ -353,6 +343,13 @@ include 'header_UI.php';
             animation: spin 1s linear infinite;
             margin: 0 auto;
         }
+        
+        /* Specific spinner for secondary btn (since bg is white) */
+        .secondary-btn .loading-spinner {
+            border: 2px solid rgba(211, 47, 47, 0.3);
+            border-top-color: #d32f2f;
+        }
+
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
@@ -369,11 +366,30 @@ include 'header_UI.php';
                     <i class="fas fa-exclamation-triangle"></i>
                     Too many attempts. Please try again later.
                 </div>
+                <div style="text-align:center;">
+                    <a href="donor_login.php" class="btn">Back to Login</a>
+                </div>
             <?php elseif (!empty($error_message)): ?>
                 <div class="error-message">
                     <i class="fas fa-exclamation-circle"></i>
                     <?php echo htmlspecialchars($error_message); ?>
                 </div>
+                <div class="form-container">
+                    <form method="POST" action="" id="retryForm">
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom:8px; font-weight:500;">Email Address</label>
+                            <div class="input-with-icon">
+                                <i class="fas fa-envelope"></i>
+                                <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($email); ?>" required placeholder="Enter your email">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn" id="retrySubmitBtn">
+                            <span id="retryBtnText">Try Again</span>
+                            <div class="loading-spinner" id="retryLoadingSpinner"></div>
+                        </button>
+                    </form>
+                </div>
+
             <?php elseif (!empty($success_message)): ?>
                 <div class="success-message">
                     <i class="fas fa-check-circle"></i>
@@ -381,7 +397,7 @@ include 'header_UI.php';
                 </div>
             <?php endif; ?>
             
-            <?php if (!$email_sent && !$rate_limit_exceeded): ?>
+            <?php if (!$email_sent && !$rate_limit_exceeded && empty($error_message)): ?>
                 <div class="form-container">
                     <form method="POST" action="" id="forgotPasswordForm">
                         <div class="form-group">
@@ -412,8 +428,20 @@ include 'header_UI.php';
                 <div style="text-align: center;">
                     <i class="fas fa-envelope-open-text" style="font-size: 50px; color: #4caf50; margin-bottom: 20px;"></i>
                     <p style="margin-bottom: 20px;">We sent instructions to <strong><?php echo htmlspecialchars($email); ?></strong></p>
-                    <a href="javascript:location.reload()" class="btn secondary-btn">Try Another Email</a>
+                    
+                    <form method="POST" action="" id="resendForm" style="margin-bottom: 15px;">
+                        <input type="hidden" name="email" value="<?php echo htmlspecialchars($email); ?>">
+                        <button type="submit" class="btn secondary-btn" id="resendBtn">
+                            <span id="resendBtnText">Resend Email</span>
+                            <div class="loading-spinner" id="resendSpinner"></div>
+                        </button>
+                    </form>
+
                     <a href="donor_login.php" class="btn" style="margin-top: 10px;">Back to Login</a>
+                    
+                    <div style="margin-top: 15px;">
+                        <a href="donor_forgot_password.php" style="color: #777; font-size: 14px; text-decoration: none;">Entered wrong email? Try again</a>
+                    </div>
                 </div>
             <?php endif; ?>
         </div>
@@ -422,6 +450,7 @@ include 'header_UI.php';
     <?php include 'footer.php'; ?>
     
     <script>
+        // Handle standard submit
         document.getElementById('forgotPasswordForm')?.addEventListener('submit', function() {
             const btn = document.getElementById('submitBtn');
             const txt = document.getElementById('btnText');
@@ -433,7 +462,29 @@ include 'header_UI.php';
             spin.style.display = 'block';
         });
 
-        
+        // Handle Resend submit
+        document.getElementById('resendForm')?.addEventListener('submit', function() {
+            const btn = document.getElementById('resendBtn');
+            const txt = document.getElementById('resendBtnText');
+            const spin = document.getElementById('resendSpinner');
+            
+            btn.disabled = true;
+            btn.style.opacity = '0.8';
+            txt.style.display = 'none';
+            spin.style.display = 'block';
+        });
+
+        // Handle Retry submit (if error occurred)
+        document.getElementById('retryForm')?.addEventListener('submit', function() {
+            const btn = document.getElementById('retrySubmitBtn');
+            const txt = document.getElementById('retryBtnText');
+            const spin = document.getElementById('retryLoadingSpinner');
+            
+            btn.disabled = true;
+            btn.style.opacity = '0.8';
+            txt.style.display = 'none';
+            spin.style.display = 'block';
+        });
     </script>
 </body>
 </html>
