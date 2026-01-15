@@ -214,6 +214,34 @@ if ($case['Case_Status'] == 'Upcoming') $statusClass = 'status-upcoming';
                         <div class="p-text"><?php echo number_format($percent, 1); ?>% Funded</div>
                     </div>
 
+                    <div class="section-title"><i class="fas fa-university"></i> Banking Information</div>
+                    <div class="info-card">
+                        <div class="info-row">
+                            <div class="ir-icon"><i class="fas fa-university"></i></div>
+                            <div class="ir-data">
+                                <h5>Bank Name</h5>
+                                <p>
+                                    <?php 
+                                        $malaysiaBanks = [
+                                            "Maybank" => "Maybank", "CIMB" => "CIMB Bank", "Public Bank" => "Public Bank", "RHB" => "RHB Bank", "Hong Leong" => "Hong Leong Bank",
+                                            "AmBank" => "AmBank", "UOB" => "UOB Malaysia", "Bank Rakyat" => "Bank Rakyat", "OCBC" => "OCBC Bank", "HSBC" => "HSBC Bank",
+                                            "Bank Islam" => "Bank Islam", "Affin Bank" => "Affin Bank", "Alliance Bank" => "Alliance Bank", "Standard Chartered" => "Standard Chartered",
+                                            "MBSB" => "MBSB Bank", "Citibank" => "Citibank", "Bank Muamalat" => "Bank Muamalat", "Agrobank" => "Agrobank", "BSN" => "Bank Simpanan Nasional"
+                                        ];
+                                        $bankKey = $case['Case_BankName'];
+                                        echo isset($malaysiaBanks[$bankKey]) ? $malaysiaBanks[$bankKey] : ($bankKey ?: 'Not Set'); 
+                                    ?>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="info-row">
+                            <div class="ir-icon"><i class="fas fa-money-check"></i></div>
+                            <div class="ir-data">
+                                <h5>Account Number</h5>
+                                <p><?php echo !empty($case['Case_BankAccount']) ? htmlspecialchars($case['Case_BankAccount']) : 'Not Set'; ?></p>
+                            </div>
+                        </div>
+                    </div>
                     <div class="section-title"><i class="fas fa-user-tie"></i> Organizer / Contact</div>
                     <div class="info-card">
                         <div class="info-row">

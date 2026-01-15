@@ -505,6 +505,10 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
         @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
         .close-lightbox { position: absolute; top: 20px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; z-index: 2002; }
         .close-lightbox:hover, .close-lightbox:focus { color: #bbb; text-decoration: none; cursor: pointer; }
+        
+        /* New Error Styles */
+        .input-error { border-color: var(--danger) !important; background-color: #fff5f5; }
+        .inline-error { color: var(--danger); font-size: 11px; margin-top: 4px; display: block; font-weight: 500; animation: fadeIn 0.3s; }
 
         @media (max-width: 768px) { .stats-cards { grid-template-columns: repeat(2, 1fr); } .form-row { flex-direction: column; gap: 0; } .pagination-container { flex-direction: column; gap: 15px; } .donor-search { flex-direction: column; align-items: stretch; } .filter-group { flex-wrap: wrap; } .history-card { flex-direction: column; align-items: flex-start; gap: 10px; } .h-info-right { align-items: flex-start; width: 100%; flex-direction: row; justify-content: space-between; } }
     </style>
@@ -1119,6 +1123,7 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
             document.getElementById('addDonorModal').style.display = 'none'; document.getElementById('addDonorForm').reset(); 
             document.getElementById('add-preview-container').innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; 
             document.getElementById('add-file-info').style.display = 'none'; document.getElementById('nameError').style.display = 'none';
+            clearFormErrors('addDonorForm');
         }
         
         function openEditDonorModal(donor) {
@@ -1134,6 +1139,7 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
             const container = document.getElementById('edit-preview-container');
             if (donor.Donor_ProfilePicture) { container.innerHTML = `<img src="${donor.Donor_ProfilePicture}" alt="Preview">`; } else { container.innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; }
             document.getElementById('edit_profile_picture').value = ''; document.getElementById('edit-file-info').style.display = 'none'; document.getElementById('editNameError').style.display = 'none';
+            clearFormErrors('editDonorForm');
             document.getElementById('editDonorModal').style.display = 'flex';
         }
         function closeEditDonorModal() { document.getElementById('editDonorModal').style.display = 'none'; }
@@ -1146,30 +1152,131 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
         }
 
         function isAgeValid(dobValue) { if (!dobValue) return true; const age = new Date().getFullYear() - new Date(dobValue).getFullYear(); return age >= 18; }
-        function isEmailValid(email) { const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/; return emailPattern.test(email); }
-        function validatePhone(id) {
-            const val = document.getElementById(id).value; if (!val.includes('-')) return "Format must be XX-XXXXXXX (dash is missing)";
-            const parts = val.split('-'); if (parts.length !== 2) return "Invalid format";
-            const back = parts[1]; if (back.length < 7 || back.length > 8) return "Phone number must have 7 or 8 digits after the hyphen (-)"; return ""; 
+        
+        // --- NEW VALIDATION HELPERS ---
+        
+        function validateEmailDetailed(email) {
+            if (!email) return "Email is required.";
+            if (!email.includes('@')) return "Missing '@' symbol in email.";
+            
+            const parts = email.split('@');
+            if (parts[1].length === 0) return "Missing domain name (e.g., gmail.com).";
+            
+            // Check for dot in domain part (simple check)
+            if (!parts[1].includes('.')) return "Missing top-level domain (like .com or .org).";
+            
+            // Final Regex Check for stricter validation
+            const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailPattern.test(email)) return "Invalid email format.";
+            
+            return "";
+        }
+
+        function validatePhone(val) {
+            if (!val.includes('-')) return "Missing hyphen symbol ( - ). Please use the dash key.";
+            const parts = val.split('-'); 
+            
+            if (parts.length !== 2) return "Invalid format. Only one hyphen ( - ) allowed.";
+            
+            const front = parts[0];
+            const back = parts[1];
+
+            // Validate Prefix (Front)
+            if (front.length < 2 || front.length > 3) return "Invalid prefix (e.g., 11, 12).";
+
+            // Validate Suffix (Back) - Detailed Length Check
+            if (back.length === 0) return "Please enter numbers after the hyphen ( - ).";
+            
+            if (back.length < 7) {
+                let diff = 7 - back.length;
+                return `Number after hyphen ( - ) is too short. Please add at least ${diff} more digit(s).`;
+            }
+            
+            if (back.length > 8) return "Number after hyphen ( - ) is too long. Max 8 digits allowed."; 
+            
+            return ""; 
+        }
+
+        function showFieldError(inputId, message) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            
+            // Add red border
+            input.classList.add('input-error');
+            
+            // Find parent to append error message
+            let parent = input.parentNode;
+            if (parent.classList.contains('phone-format')) {
+                parent = parent.parentNode; // Go one level up for phone input
+            }
+            
+            // Check if error message already exists
+            let errorDiv = parent.querySelector('.inline-error');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.className = 'inline-error';
+                parent.appendChild(errorDiv);
+            }
+            errorDiv.textContent = message;
+        }
+
+        function clearFormErrors(formId) {
+            const form = document.getElementById(formId);
+            const inputs = form.querySelectorAll('.form-input, .form-select');
+            inputs.forEach(i => i.classList.remove('input-error'));
+            form.querySelectorAll('.inline-error').forEach(e => e.remove());
         }
 
         function validateForm(type) {
-            let errors = [];
-            let name, email, dob, contactId, contactVal;
-            if (type === 'add') { name = document.getElementById('donor_name').value.trim(); email = document.getElementById('email').value.trim(); dob = document.getElementById('dob').value; contactId = 'contact'; } 
-            else { name = document.getElementById('edit_donor_name').value.trim(); email = document.getElementById('edit_email').value.trim(); dob = document.getElementById('edit_dob').value; contactId = 'edit_contact'; }
+            let formId = type === 'add' ? 'addDonorForm' : 'editDonorForm';
+            clearFormErrors(formId);
+            
+            let hasError = false;
+            let nameId = type === 'add' ? 'donor_name' : 'edit_donor_name';
+            let emailId = type === 'add' ? 'email' : 'edit_email';
+            let contactId = type === 'add' ? 'contact' : 'edit_contact';
+            let dobId = type === 'add' ? 'dob' : 'edit_dob';
 
-            if (!name) errors.push("Full Name is required.");
-            if (!email) errors.push("Email is required.");
-            contactVal = document.getElementById(contactId).value.trim();
-            if (!contactVal) errors.push("Contact Number is required.");
-            if (/\d/.test(name)) errors.push("Name cannot contain numbers.");
-            if (email && !isEmailValid(email)) errors.push("Invalid email format (e.g. user@example.com).");
-            if (dob && !isAgeValid(dob)) errors.push("Donor must be at least 18 years old.");
-            if (contactVal) { let pErr = validatePhone(contactId); if (pErr) errors.push("Contact: " + pErr); }
+            // 1. Name Check
+            let nameVal = document.getElementById(nameId).value.trim();
+            if (!nameVal) {
+                showFieldError(nameId, "This field is required.");
+                hasError = true;
+            } else if (/\d/.test(nameVal)) {
+                 showFieldError(nameId, "Name cannot contain numbers.");
+                 hasError = true;
+            }
 
-            if (errors.length > 0) {
-                showSystemError("Action failed:<br>" + errors.join("<br>"));
+            // 2. Email Check (Improved)
+            let emailVal = document.getElementById(emailId).value.trim();
+            let emailError = validateEmailDetailed(emailVal);
+            if (emailError) {
+                showFieldError(emailId, emailError);
+                hasError = true;
+            }
+
+            // 3. Contact Check (Improved)
+            let contactVal = document.getElementById(contactId).value.trim();
+            if (!contactVal) {
+                showFieldError(contactId, "This field is required.");
+                hasError = true;
+            } else {
+                let phoneErr = validatePhone(contactVal);
+                if (phoneErr) {
+                    showFieldError(contactId, phoneErr);
+                    hasError = true;
+                }
+            }
+            
+            // 4. DOB/Age Check
+            let dobVal = document.getElementById(dobId).value;
+            if (dobVal && !isAgeValid(dobVal)) {
+                showFieldError(dobId, "Donor must be at least 18 years old.");
+                hasError = true;
+            }
+
+            if (hasError) {
+                showSystemError("Please correct the highlighted errors.");
                 return false; 
             }
             return true;

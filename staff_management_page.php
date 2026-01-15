@@ -171,9 +171,29 @@ function generateStrongRandomPassword($length = 12) {
     return str_shuffle($password);
 }
 
+// --- UPDATED IC VALIDATION PHP ---
 function validateIcDobMatch($ic, $dob) {
     $cleanIc = preg_replace('/[^0-9]/', '', $ic);
-    if (strlen($cleanIc) < 6) return false;
+    
+    // 1. Check Full Length (Must be 12 digits)
+    if (strlen($cleanIc) !== 12) return false;
+    
+    // 2. Check PB Code (Digits 7-8)
+    $pbCode = (int)substr($cleanIc, 6, 2);
+    // Valid Malaysian State/PB Codes (01-59, 82, etc.)
+    $validPBCodes = [
+        1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16, // States
+        21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40, // States
+        41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59, // States
+        82 // Sarawak Special
+        // Note: Codes 60+ are technically valid for foreign born, but we prioritize local validation as requested
+    ];
+    if (!in_array($pbCode, $validPBCodes)) {
+        // Strict check: if not in list, fail.
+        // If you want to allow foreigners born overseas (code 60+), remove this check or expand the list.
+        return false; 
+    }
+
     $y = substr($cleanIc, 0, 2); $m = substr($cleanIc, 2, 2); $d = substr($cleanIc, 4, 2);
     $currentYearShort = date('y');
     $century = ($y > $currentYearShort) ? '19' : '20';
@@ -212,7 +232,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (empty($fullName) || empty($email) || empty($contactRaw) || empty($icNumber) || empty($dob)) {
             $errorMessage = "Required fields are missing.";
         } elseif (!validateIcDobMatch($icNumber, $dob)) {
-            $errorMessage = "IC Number and Date of Birth do not match.";
+            $errorMessage = "Invalid IC Number (Format, Length, or State Code mismatch with DOB).";
         } else {
             $checkEmail = $conn->query("SELECT Staff_ID FROM staff WHERE Staff_Email = '$email'");
             if ($checkEmail && $checkEmail->num_rows > 0) {
@@ -272,7 +292,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         if (!validateIcDobMatch($icNumber, $dob)) {
-            $errorMessage = "IC Number and Date of Birth do not match.";
+            $errorMessage = "Invalid IC Number or Mismatch with DOB.";
         } else {
             $sql = "UPDATE staff SET Staff_FullName = '$fullName', Staff_ContactNumber = '$contact', Staff_ICNumber = '$icNumber', Staff_Email = '$email', Staff_DOB = '$dob', Staff_Address1 = '$address1', Staff_Address2 = '$address2', Staff_Address3 = '$address3', Staff_City = '$city', Staff_State = '$state', Staff_PostalCode = '$postalCode', Staff_Status = '$status', Staff_Comment = '$comment' $imageUpdateSQL WHERE Staff_ID = $staffId";
             if ($conn->query($sql)) $successMessage = "Staff updated successfully!";
@@ -415,6 +435,10 @@ $galleryData = [];
         .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* New Error Styles */
+        .input-error { border-color: var(--danger) !important; background-color: #fff5f5; }
+        .inline-error { color: var(--danger); font-size: 11px; margin-top: 4px; display: block; font-weight: 500; animation: fadeIn 0.3s; }
 
         .pagination-container { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid #eee; margin-top: 10px; }
         .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; transition: all 0.3s; display: inline-block; }
@@ -574,7 +598,7 @@ $galleryData = [];
 
     <div class="modal" id="addStaffModal">
         <div class="modal-content"><div class="modal-header"><h2>Add New Staff</h2><button class="close-btn" onclick="closeAddStaffModal()">&times;</button></div><div class="modal-body">
-            <form id="addStaffForm" action="staff_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')" novalidate><input type="hidden" name="add_staff" value="1"><div class="form-group"><label class="form-label">Profile Picture</label><div class="profile-picture-preview" id="add-preview-container"><div class="default-avatar-icon"><i class="fas fa-user"></i></div></div><div class="file-upload"><label for="add_profile_picture" class="file-upload-label" id="addFileUploadLabel"><i class="fas fa-upload"></i> Choose Profile Picture</label><input type="file" id="add_profile_picture" name="profile_picture" accept="image/*" onchange="previewImage(this, 'add-preview-container', 'add-file-info', 'add-file-name')"><div id="add-file-info" class="file-info"><span id="add-file-name" class="file-name"></span><button type="button" class="file-remove" onclick="removeImage('add_profile_picture', 'add-preview-container', 'add-file-info')"><i class="fas fa-times"></i></button></div></div></div><div class="form-group"><label class="form-label">Full Name <span class="required">*</span></label><input type="text" id="full_name" name="full_name" class="form-input" required oninput="validateName(this)" placeholder="e.g. John Doe"><span class="form-guide">Enter full name as per IC. English letters only.</span></div><div class="form-row"><div class="form-group"><label class="form-label">Email <span class="required">*</span></label><input type="text" id="email" name="email" class="form-input" required onblur="validateEmail('email', 'emailError')" placeholder="e.g. user@example.com"><span class="form-guide">Valid email address (e.g. name@domain.com).</span><div id="emailError" class="error-message">Invalid email format (missing @ or valid domain).</div></div><div class="form-group"><label class="form-label">Contact Number <span class="required">*</span></label><div class="phone-format"><span class="phone-prefix">+60</span><input type="text" id="add_contact" name="contact" class="form-input phone-input" required placeholder="12-3456789" maxlength="11"></div><span class="form-guide">Format: 12-3456789 or 11-23456789 (No need for +60).</span></div></div><div class="form-row"><div class="form-group"><label class="form-label">IC Number <span class="required">*</span></label><input type="text" id="ic_number" name="ic_number" class="form-input" placeholder="XXXXXX-XX-XXXX" maxlength="14" required><span class="form-guide">Format: YYMMDD-PB-#### (e.g. 990101-07-1234).</span></div><div class="form-group"><label class="form-label">Date of Birth <span class="required">*</span></label><input type="date" id="dob" name="dob" class="form-input" required onchange="validateAge('dob', 'ageError')"><div id="ageError" class="error-message">Must be at least 18 years old</div></div></div><div class="form-group"><label class="form-label">Address Line 1</label><input type="text" name="address1" class="form-input" placeholder="e.g. No. 123, Jalan Example"><span class="form-guide">House unit no., floor, building, street name.</span></div><div class="form-group"><label class="form-label">Address Line 2</label><input type="text" name="address2" class="form-input" placeholder="e.g. Taman Sri"><span class="form-guide">Residential area, village, or section.</span></div><div class="form-group"><label class="form-label">Address Line 3</label><input type="text" name="address3" class="form-input" placeholder="Address Line 3 (Optional)"></div><div class="form-row"><div class="form-group"><label class="form-label">City</label><input type="text" name="city" class="form-input" placeholder="e.g. Kuala Lumpur"></div><div class="form-group"><label class="form-label">State</label><select id="state" name="state" class="form-select"><option value="">Select State</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div></div><div class="form-row"><div class="form-group"><label class="form-label">Postal Code</label><input type="text" id="postal_code" name="postal_code" class="form-input" oninput="detectStateFromPostcode('postal_code', 'state')" placeholder="e.g. 50000"><span class="form-guide">5-digit postcode.</span></div><div class="form-group"><label class="form-label">Country</label><input type="text" name="country" class="form-input" value="Malaysia" readonly></div></div><div class="form-row"><div class="form-group"><label class="form-label">Role <span class="required">*</span></label><input type="text" name="role" class="form-input" value="Staff" readonly style="background-color: #f8f9fa; color: #555;"></div><div class="form-group"><label class="form-label">Status <span class="required">*</span></label><select id="status" name="status" class="form-select" required><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div></div><div class="form-group"><label class="form-label">Comments</label><textarea name="comment" class="form-textarea" rows="2" placeholder="e.g. Staff specific skills or notes"></textarea><span class="form-guide">Optional notes (e.g., specific skills, emergency contact info, or department details).</span></div><div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Staff</button></div></form>
+            <form id="addStaffForm" action="staff_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')" novalidate><input type="hidden" name="add_staff" value="1"><div class="form-group"><label class="form-label">Profile Picture</label><div class="profile-picture-preview" id="add-preview-container"><div class="default-avatar-icon"><i class="fas fa-user"></i></div></div><div class="file-upload"><label for="add_profile_picture" class="file-upload-label" id="addFileUploadLabel"><i class="fas fa-upload"></i> Choose Profile Picture</label><input type="file" id="add_profile_picture" name="profile_picture" accept="image/*" onchange="previewImage(this, 'add-preview-container', 'add-file-info', 'add-file-name')"><div id="add-file-info" class="file-info"><span id="add-file-name" class="file-name"></span><button type="button" class="file-remove" onclick="removeImage('add_profile_picture', 'add-preview-container', 'add-file-info')"><i class="fas fa-times"></i></button></div></div></div><div class="form-group"><label class="form-label">Full Name <span class="required">*</span></label><input type="text" id="full_name" name="full_name" class="form-input" required oninput="validateName(this)" placeholder="e.g. John Doe"><span class="form-guide">Enter full name as per IC. English letters only.</span></div><div class="form-row"><div class="form-group"><label class="form-label">Email <span class="required">*</span></label><input type="text" id="email" name="email" class="form-input" required placeholder="e.g. user@example.com"><span class="form-guide">Valid email address (e.g. name@domain.com).</span></div><div class="form-group"><label class="form-label">Contact Number <span class="required">*</span></label><div class="phone-format"><span class="phone-prefix">+60</span><input type="text" id="add_contact" name="contact" class="form-input phone-input" required placeholder="12-3456789" maxlength="11"></div><span class="form-guide">Format: 12-3456789 or 11-23456789 (No need for +60).</span></div></div><div class="form-row"><div class="form-group"><label class="form-label">IC Number <span class="required">*</span></label><input type="text" id="ic_number" name="ic_number" class="form-input" placeholder="XXXXXX-XX-XXXX" maxlength="14" required><span class="form-guide">Format: YYMMDD-PB-#### (e.g. 990101-07-1234).</span></div><div class="form-group"><label class="form-label">Date of Birth <span class="required">*</span></label><input type="date" id="dob" name="dob" class="form-input" required onchange="validateAge('dob')"></div></div><div class="form-group"><label class="form-label">Address Line 1</label><input type="text" name="address1" class="form-input" placeholder="e.g. No. 123, Jalan Example"><span class="form-guide">House unit no., floor, building, street name.</span></div><div class="form-group"><label class="form-label">Address Line 2</label><input type="text" name="address2" class="form-input" placeholder="e.g. Taman Sri"><span class="form-guide">Residential area, village, or section.</span></div><div class="form-group"><label class="form-label">Address Line 3</label><input type="text" name="address3" class="form-input" placeholder="Address Line 3 (Optional)"></div><div class="form-row"><div class="form-group"><label class="form-label">City</label><input type="text" name="city" class="form-input" placeholder="e.g. Kuala Lumpur"></div><div class="form-group"><label class="form-label">State</label><select id="state" name="state" class="form-select"><option value="">Select State</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div></div><div class="form-row"><div class="form-group"><label class="form-label">Postal Code</label><input type="text" id="postal_code" name="postal_code" class="form-input" oninput="detectStateFromPostcode('postal_code', 'state')" placeholder="e.g. 50000"><span class="form-guide">5-digit postcode.</span></div><div class="form-group"><label class="form-label">Country</label><input type="text" name="country" class="form-input" value="Malaysia" readonly></div></div><div class="form-row"><div class="form-group"><label class="form-label">Role <span class="required">*</span></label><input type="text" name="role" class="form-input" value="Staff" readonly style="background-color: #f8f9fa; color: #555;"></div><div class="form-group"><label class="form-label">Status <span class="required">*</span></label><select id="status" name="status" class="form-select" required><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div></div><div class="form-group"><label class="form-label">Comments</label><textarea name="comment" class="form-textarea" rows="2" placeholder="e.g. Staff specific skills or notes"></textarea><span class="form-guide">Optional notes (e.g., specific skills, emergency contact info, or department details).</span></div><div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Staff</button></div></form>
         </div></div>
     </div>
 
@@ -582,8 +606,8 @@ $galleryData = [];
         <div class="modal-content"><div class="modal-header"><h2>Edit Staff</h2><button class="close-btn" onclick="closeEditStaffModal()">&times;</button></div><div class="modal-body">
             <form id="editStaffForm" action="staff_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('edit')" novalidate><input type="hidden" name="update_staff" value="1"><input type="hidden" id="edit_staff_id" name="staff_id"><div class="form-group"><label class="form-label">Profile Picture</label><div class="profile-picture-preview" id="edit-preview-container"><div class="default-avatar-icon"><i class="fas fa-user"></i></div></div><div class="file-upload"><label for="edit_profile_picture" class="file-upload-label" id="editFileUploadLabel"><i class="fas fa-upload"></i> Change Profile Picture</label><input type="file" id="edit_profile_picture" name="profile_picture" accept="image/*" onchange="previewImage(this, 'edit-preview-container', 'edit-file-info', 'edit-file-name')"><div id="edit-file-info" class="file-info"><span id="edit-file-name" class="file-name"></span><button type="button" class="file-remove" id="edit-file-remove-btn"><i class="fas fa-times"></i></button></div></div></div>
             <div class="form-group"><label class="form-label">Full Name <span class="required">*</span></label><input type="text" id="edit_fullname" name="full_name" class="form-input" required oninput="validateName(this)" placeholder="e.g. John Doe"><span class="form-guide">Enter full name as per IC. English letters only.</span></div>
-            <div class="form-row"><div class="form-group"><label class="form-label">Email <span class="required">*</span></label><input type="email" id="edit_email" name="email" class="form-input" required onblur="validateEmail('edit_email', 'editEmailError')" placeholder="e.g. user@example.com"><span class="form-guide">Valid email address (e.g. name@domain.com).</span><div id="editEmailError" class="error-message">Invalid email</div></div><div class="form-group"><label class="form-label">Contact Number <span class="required">*</span></label><div class="phone-format"><span class="phone-prefix">+60</span><input type="text" id="edit_contact" name="contact" class="form-input phone-input" required maxlength="11" placeholder="12-3456789"></div><span class="form-guide">Format: 12-3456789 or 11-23456789 (No need for +60).</span></div></div>
-            <div class="form-row"><div class="form-group"><label class="form-label">IC Number <span class="required">*</span></label><input type="text" id="edit_ic_number" name="ic_number" class="form-input" maxlength="14" required placeholder="XXXXXX-XX-XXXX"><span class="form-guide">Format: YYMMDD-PB-#### (e.g. 990101-07-1234).</span></div><div class="form-group"><label class="form-label">Date of Birth <span class="required">*</span></label><input type="date" id="edit_dob" name="dob" class="form-input" required onchange="validateAge('edit_dob', 'editAgeError')"><div id="editAgeError" class="error-message">Must be at least 18 years old</div></div></div>
+            <div class="form-row"><div class="form-group"><label class="form-label">Email <span class="required">*</span></label><input type="email" id="edit_email" name="email" class="form-input" required placeholder="e.g. user@example.com"><span class="form-guide">Valid email address (e.g. name@domain.com).</span></div><div class="form-group"><label class="form-label">Contact Number <span class="required">*</span></label><div class="phone-format"><span class="phone-prefix">+60</span><input type="text" id="edit_contact" name="contact" class="form-input phone-input" required maxlength="11" placeholder="12-3456789"></div><span class="form-guide">Format: 12-3456789 or 11-23456789 (No need for +60).</span></div></div>
+            <div class="form-row"><div class="form-group"><label class="form-label">IC Number <span class="required">*</span></label><input type="text" id="edit_ic_number" name="ic_number" class="form-input" maxlength="14" required placeholder="XXXXXX-XX-XXXX"><span class="form-guide">Format: YYMMDD-PB-#### (e.g. 990101-07-1234).</span></div><div class="form-group"><label class="form-label">Date of Birth <span class="required">*</span></label><input type="date" id="edit_dob" name="dob" class="form-input" required onchange="validateAge('edit_dob')"></div></div>
             <div class="form-group"><label class="form-label">Address Line 1</label><input type="text" id="edit_address1" name="address1" class="form-input" placeholder="e.g. No. 123, Jalan Example"><span class="form-guide">House unit no., floor, building, street name.</span></div><div class="form-group"><label class="form-label">Address Line 2</label><input type="text" id="edit_address2" name="address2" class="form-input" placeholder="e.g. Taman Sri"><span class="form-guide">Residential area, village, or section.</span></div><div class="form-group"><label class="form-label">Address Line 3</label><input type="text" id="edit_address3" name="address3" class="form-input" placeholder="Address Line 3 (Optional)"></div>
             <div class="form-row"><div class="form-group"><label class="form-label">City</label><input type="text" id="edit_city" name="city" class="form-input" placeholder="e.g. Kuala Lumpur"></div><div class="form-group"><label class="form-label">State</label><select id="edit_state" name="state" class="form-select"><option value="">Select State</option><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select></div></div>
             <div class="form-row"><div class="form-group"><label class="form-label">Postal Code</label><input type="text" id="edit_postal_code" name="postal_code" class="form-input" oninput="detectStateFromPostcode('edit_postal_code', 'edit_state')" placeholder="e.g. 50000"><span class="form-guide">5-digit postcode.</span></div><div class="form-group"><label class="form-label">Country</label><input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly></div></div>
@@ -660,7 +684,6 @@ $galleryData = [];
                     const fullYear = (yearPrefix > currentYearShort) ? '19' + val.substring(0, 2) : '20' + val.substring(0, 2);
                     if (parseInt(month) >= 1 && parseInt(month) <= 12 && parseInt(day) >= 1 && parseInt(day) <= 31) {
                         dobInput.value = `${fullYear}-${month}-${day}`; dobInput.readOnly = true; dobInput.style.backgroundColor = "#e9ecef"; dobInput.style.color = "#6c757d"; dobInput.style.cursor = "not-allowed";
-                        if(dobInputId === 'dob') validateAge('dob', 'ageError'); else validateAge('edit_dob', 'editAgeError');
                     } else { dobInput.readOnly = false; dobInput.style.backgroundColor = ""; dobInput.style.color = ""; dobInput.style.cursor = ""; }
                 } else { dobInput.readOnly = false; dobInput.style.backgroundColor = ""; dobInput.style.color = ""; dobInput.style.cursor = ""; }
             });
@@ -703,8 +726,8 @@ $galleryData = [];
             document.getElementById('viewStaffModal').style.display = 'flex';
         }
 
-        function openAddStaffModal() { const dob = document.getElementById('dob'); dob.readOnly = false; dob.style.backgroundColor = ""; dob.style.color = ""; dob.style.cursor = ""; document.getElementById('addStaffModal').style.display = 'flex'; }
-        function closeAddStaffModal() { document.getElementById('addStaffModal').style.display = 'none'; document.getElementById('addStaffForm').reset(); document.getElementById('add-preview-container').innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; document.getElementById('add-file-info').style.display = 'none'; document.getElementById('emailError').style.display = 'none'; }
+        function openAddStaffModal() { const dob = document.getElementById('dob'); dob.readOnly = false; dob.style.backgroundColor = ""; dob.style.color = ""; dob.style.cursor = ""; clearFormErrors('addStaffForm'); document.getElementById('addStaffModal').style.display = 'flex'; }
+        function closeAddStaffModal() { document.getElementById('addStaffModal').style.display = 'none'; document.getElementById('addStaffForm').reset(); document.getElementById('add-preview-container').innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; document.getElementById('add-file-info').style.display = 'none'; clearFormErrors('addStaffForm'); }
 
         function openEditStaffModal(staff) {
             document.getElementById('edit_staff_id').value = staff.Staff_ID; document.getElementById('edit_fullname').value = staff.Staff_FullName; document.getElementById('edit_email').value = staff.Staff_Email;
@@ -718,33 +741,144 @@ $galleryData = [];
             if (staff.Staff_ProfilePicture) { originalSrc = staff.Staff_ProfilePicture; previewContainer.innerHTML = `<img src="${staff.Staff_ProfilePicture}" alt="Preview">`; } else { previewContainer.innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; }
             document.getElementById('edit_profile_picture').value = ''; fileInfo.style.display = 'none';
             document.getElementById('edit-file-remove-btn').onclick = function() { removeImage('edit_profile_picture', 'edit-preview-container', 'edit-file-info', originalSrc); };
-            document.getElementById('editEmailError').style.display = 'none'; document.getElementById('editStaffModal').style.display = 'flex';
+            
+            clearFormErrors('editStaffForm');
+            document.getElementById('editStaffModal').style.display = 'flex';
         }
         function closeEditStaffModal() { document.getElementById('editStaffModal').style.display = 'none'; }
         
         function validateName(input) { input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); }
-        function validateEmail(id) { const val = document.getElementById(id).value; if (val.indexOf('@') === -1) return "Missing '@' symbol"; const domainPattern = /@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/; if (!domainPattern.test(val)) return "Missing domain extension (e.g. .com)"; return ""; }
-        function validateAge(id, errId) { const val = document.getElementById(id).value; if(!val) return false; const age = new Date().getFullYear() - new Date(val).getFullYear(); const valid = age >= 18; document.getElementById(errId).style.display = valid ? 'none' : 'block'; return valid; }
-        function validatePhone(id) { const val = document.getElementById(id).value; if (!val.includes('-')) return "Format must be XX-XXXXXXX (dash is missing)"; const parts = val.split('-'); if (parts.length !== 2) return "Invalid format"; const back = parts[1]; if (back.length < 7 || back.length > 8) { return "Phone number must have 7 or 8 digits after the hyphen (-)"; } return ""; }
+        
+        // --- NEW VALIDATION HELPERS (COMPLETE) ---
+        
+        function validateEmailDetailed(email) {
+            if (!email) return "Email is required.";
+            if (!email.includes('@')) return "Missing '@' symbol in email.";
+            const parts = email.split('@');
+            if (parts[1].length === 0) return "Missing domain name (e.g., gmail.com).";
+            if (!parts[1].includes('.')) return "Missing top-level domain (like .com or .org).";
+            const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailPattern.test(email)) return "Invalid email format.";
+            return "";
+        }
+
+        function validatePhoneDetailed(val) {
+            if (!val.includes('-')) return "Missing hyphen symbol ( - ). Please use the dash key.";
+            const parts = val.split('-'); 
+            if (parts.length !== 2) return "Invalid format. Only one hyphen ( - ) allowed.";
+            const front = parts[0]; const back = parts[1];
+            if (front.length < 2 || front.length > 3) return "Invalid prefix (e.g., 11, 12).";
+            if (back.length === 0) return "Please enter numbers after the hyphen ( - ).";
+            if (back.length < 7) { let diff = 7 - back.length; return `Number after hyphen ( - ) is too short. Please add at least ${diff} more digit(s).`; }
+            if (back.length > 8) return "Number after hyphen ( - ) is too long. Max 8 digits allowed."; 
+            return ""; 
+        }
+
+        // --- UPDATED IC VALIDATION LOGIC ---
+        function validateICDetailed(ic) {
+            // Remove hyphens for length check
+            const clean = ic.replace(/[^0-9]/g, '');
+
+            // 1. Length Check
+            if (clean.length !== 12) {
+                return "Incomplete IC number. Must be 12 digits (excluding hyphens).";
+            }
+
+            // 2. State/PB Code Check (Digits 7 & 8)
+            // Extract the PB code
+            const pbCode = parseInt(clean.substring(6, 8));
+            
+            // Valid JPN State Codes for Malaysia (including WP and Sarawak specific)
+            // 01-16, 21-59, 82
+            const validStateCodes = [
+                1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16, // Standard States
+                21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40, // Extended States
+                41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59, // Extended States
+                82 // Sarawak Special
+            ];
+            
+            if (!validStateCodes.includes(pbCode)) {
+                return "Invalid State/Place of Birth code (digits 7-8).";
+            }
+
+            return "";
+        }
+
+        function isAgeValid(dobValue) { if (!dobValue) return true; const age = new Date().getFullYear() - new Date(dobValue).getFullYear(); return age >= 18; }
+
+        function showFieldError(inputId, message) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            
+            input.classList.add('input-error');
+            
+            let parent = input.parentNode;
+            if (parent.classList.contains('phone-format')) {
+                parent = parent.parentNode; 
+            }
+            
+            let errorDiv = parent.querySelector('.inline-error');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.className = 'inline-error';
+                parent.appendChild(errorDiv);
+            }
+            errorDiv.textContent = message;
+        }
+
+        function clearFormErrors(formId) {
+            const form = document.getElementById(formId);
+            const inputs = form.querySelectorAll('.form-input, .form-select');
+            inputs.forEach(i => i.classList.remove('input-error'));
+            form.querySelectorAll('.inline-error').forEach(e => e.remove());
+        }
 
         function validateForm(type) {
-            let errors = []; let name, email, dob, contactId, icNum;
-            if (type === 'add') { name = document.getElementById('full_name').value.trim(); email = document.getElementById('email').value.trim(); dob = document.getElementById('dob').value; contactId = 'add_contact'; icNum = document.getElementById('ic_number').value.trim(); } 
-            else { name = document.getElementById('edit_fullname').value.trim(); email = document.getElementById('edit_email').value.trim(); dob = document.getElementById('edit_dob').value; contactId = 'edit_contact'; icNum = document.getElementById('edit_ic_number').value.trim(); }
+            let formId = type === 'add' ? 'addStaffForm' : 'editStaffForm';
+            clearFormErrors(formId);
+            
+            let hasError = false;
+            let nameId = type === 'add' ? 'full_name' : 'edit_fullname';
+            let emailId = type === 'add' ? 'email' : 'edit_email';
+            let dobId = type === 'add' ? 'dob' : 'edit_dob';
+            let contactId = type === 'add' ? 'add_contact' : 'edit_contact';
+            let icId = type === 'add' ? 'ic_number' : 'edit_ic_number';
 
-            if (!name) errors.push("Full Name is required.");
-            if (!email) errors.push("Email is required.");
-            if (!icNum) errors.push("IC Number is required.");
-            if (!dob) errors.push("Date of Birth is required.");
-            const contactVal = document.getElementById(contactId).value.trim();
-            if (!contactVal) errors.push("Contact Number is required.");
+            // 1. Name
+            let nameVal = document.getElementById(nameId).value.trim();
+            if (!nameVal) { showFieldError(nameId, "This field is required."); hasError = true; }
 
-            if (email) { let emailMsg = validateEmail(type === 'add' ? 'email' : 'edit_email'); if(emailMsg) errors.push("Email: " + emailMsg); }
-            if (dob && !validateAge(type === 'add' ? 'dob' : 'edit_dob', type === 'add' ? 'ageError' : 'editAgeError')) { errors.push("Age: Must be at least 18 years old."); }
-            if (contactVal) { let phoneMsg = validatePhone(contactId); if(phoneMsg) errors.push("Contact Number: " + phoneMsg); }
+            // 2. Email
+            let emailVal = document.getElementById(emailId).value.trim();
+            let emailMsg = validateEmailDetailed(emailVal);
+            if (emailMsg) { showFieldError(emailId, emailMsg); hasError = true; }
 
-            if (errors.length > 0) {
-                showSystemError("Please correct the following errors:<br>" + errors.join("<br>"));
+            // 3. Contact
+            let contactVal = document.getElementById(contactId).value.trim();
+            if (!contactVal) { showFieldError(contactId, "This field is required."); hasError = true; }
+            else {
+                let phoneMsg = validatePhoneDetailed(contactVal);
+                if (phoneMsg) { showFieldError(contactId, phoneMsg); hasError = true; }
+            }
+
+            // 4. IC & DOB (Updated Logic)
+            let icVal = document.getElementById(icId).value.trim();
+            if (!icVal) { 
+                showFieldError(icId, "This field is required."); hasError = true; 
+            } else {
+                let icMsg = validateICDetailed(icVal);
+                if (icMsg) {
+                    showFieldError(icId, icMsg);
+                    hasError = true;
+                }
+            }
+            
+            let dobVal = document.getElementById(dobId).value;
+            if (!dobVal) { showFieldError(dobId, "This field is required."); hasError = true; }
+            else if (!isAgeValid(dobVal)) { showFieldError(dobId, "Staff must be at least 18 years old."); hasError = true; }
+
+            if (hasError) {
+                showSystemError("Please correct the highlighted errors.");
                 return false; 
             }
             return true; 

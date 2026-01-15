@@ -25,31 +25,39 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $desc = $_POST['description'];
     $id = isset($_POST['team_id']) ? intval($_POST['team_id']) : 0;
     
-    // 处理图片上传
-    $imagePath = "";
+    // 获取现有的图片路径（如果有）
+    $existing_image_json = isset($_POST['existing_image']) ? $_POST['existing_image'] : '';
+
+    // 默认图片路径
+    $defaultImage = json_encode(['images/default_user.jpg']);
+    $finalImagePath = $existing_image_json; // 默认为现有图片
+
+    // 处理新图片上传
     if (!empty($_FILES['photo']['name'])) {
         $targetDir = "images/"; 
-        if (!is_dir($targetDir)) mkdir($targetDir, 0777, true); // 确保文件夹存在
+        if (!is_dir($targetDir)) mkdir($targetDir, 0777, true); 
         
         $fileName = "team_" . time() . "_" . basename($_FILES['photo']['name']);
         $targetFilePath = $targetDir . $fileName;
+        
         if (move_uploaded_file($_FILES['photo']['tmp_name'], $targetFilePath)) {
-            $imagePath = json_encode([$targetFilePath]);
+            $finalImagePath = json_encode([$targetFilePath]); // 如果上传成功，覆盖路径
         }
+    }
+
+    // 如果没有新上传，且现有的也被删除了（为空），则使用默认头像
+    if (empty($finalImagePath)) {
+        $finalImagePath = $defaultImage;
     }
 
     if ($id > 0) {
         // Update
-        $sql = "UPDATE team_members SET Name=?, Position=?, Description=?";
-        if ($imagePath) $sql .= ", Images='$imagePath'";
-        $sql .= " WHERE Team_ID=?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("sssi", $name, $position, $desc, $id);
+        $stmt = $conn->prepare("UPDATE team_members SET Name=?, Position=?, Description=?, Images=? WHERE Team_ID=?");
+        $stmt->bind_param("ssssi", $name, $position, $desc, $finalImagePath, $id);
     } else {
         // Insert
-        if (empty($imagePath)) $imagePath = json_encode(['images/default_user.jpg']);
         $stmt = $conn->prepare("INSERT INTO team_members (Name, Position, Description, Images) VALUES (?, ?, ?, ?)");
-        $stmt->bind_param("ssss", $name, $position, $desc, $imagePath);
+        $stmt->bind_param("ssss", $name, $position, $desc, $finalImagePath);
     }
 
     if ($stmt->execute()) {
@@ -104,10 +112,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .team-card:hover { transform: translateY(-8px); box-shadow: 0 15px 35px rgba(0,0,0,0.1); border-color: #ffcdd2; }
         
         .team-img-wrapper {
-            height: 240px; background: #f0f0f0; position: relative; overflow: hidden;
+            height: 240px; background: #f0f0f0; position: relative; overflow: hidden; cursor: pointer;
         }
         .team-img-wrapper img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
         .team-card:hover .team-img-wrapper img { transform: scale(1.05); }
+        .team-img-wrapper::after {
+            content: '\f00e'; /* Search/Zoom icon */
+            font-family: "Font Awesome 5 Free"; font-weight: 900;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: white; font-size: 30px; opacity: 0; transition: opacity 0.3s;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.5); pointer-events: none;
+        }
+        .team-img-wrapper:hover::after { opacity: 1; }
         
         .team-info { padding: 25px; flex-grow: 1; }
         .team-info h4 { margin: 0 0 5px; color: #222; font-size: 18px; font-weight: 700; }
@@ -154,14 +170,62 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .form-control:focus { border-color: #d32f2f; outline: none; box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.1); }
         textarea.form-control { resize: vertical; min-height: 100px; }
 
+        /* Edit Modal Image Preview Styles */
         .file-upload-wrapper {
             border: 2px dashed #ddd; padding: 20px; text-align: center; border-radius: 8px; cursor: pointer; background: #fafafa;
         }
         .file-upload-wrapper:hover { border-color: #d32f2f; background: #fff; }
+        
+        .current-img-container {
+            position: relative; display: inline-block; margin-bottom: 15px;
+            border: 1px solid #eee; padding: 5px; border-radius: 8px; background: white;
+        }
+        .current-img-preview {
+            width: 100px; height: 100px; object-fit: cover; border-radius: 6px; display: block;
+        }
+        .remove-img-btn {
+            position: absolute; top: -10px; right: -10px;
+            background: #d32f2f; color: white; border-radius: 50%;
+            width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .remove-img-btn:hover { background: #b71c1c; transform: scale(1.1); }
 
         .modal-footer { margin-top: 30px; display: flex; justify-content: flex-end; gap: 15px; }
         .btn-modal-cancel { padding: 12px 25px; border: none; background: #eee; color: #555; border-radius: 8px; cursor: pointer; font-weight: 600; }
         .btn-modal-save { padding: 12px 25px; border: none; background: #d32f2f; color: white; border-radius: 8px; cursor: pointer; font-weight: 600; box-shadow: 0 4px 10px rgba(211, 47, 47, 0.2); }
+
+        /* Lightbox (Image Viewer) Styles */
+        .image-viewer-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 3000;
+            justify-content: center; align-items: center;
+            opacity: 0; transition: opacity 0.3s ease;
+        }
+        .image-viewer-modal.active { display: flex; opacity: 1; }
+        
+        .image-viewer-content {
+            position: relative; max-width: 90%; max-height: 90%;
+            animation: zoomIn 0.3s ease;
+        }
+        @keyframes zoomIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        
+        .image-viewer-content img {
+            max-width: 100%; max-height: 90vh; border-radius: 5px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5); border: 2px solid white;
+        }
+        
+        .close-viewer-btn {
+            position: absolute; top: -40px; right: -40px;
+            color: white; font-size: 35px; cursor: pointer;
+            transition: 0.2s; background: transparent; border: none;
+        }
+        .close-viewer-btn:hover { color: #d32f2f; transform: scale(1.1); }
+
+        /* Responsive adjustments for close button */
+        @media (max-width: 768px) {
+            .close-viewer-btn { top: -40px; right: 0; }
+        }
     </style>
 </head>
 <body>
@@ -197,7 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     }
             ?>
             <div class="team-card">
-                <div class="team-img-wrapper">
+                <div class="team-img-wrapper" onclick="openImageViewer('<?php echo htmlspecialchars($img); ?>')">
                     <img src="<?php echo htmlspecialchars($img); ?>" alt="Team">
                 </div>
                 <div class="team-info">
@@ -235,6 +299,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
         <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="team_id" id="team_id">
+            <input type="hidden" name="existing_image" id="existing_image">
             
             <div class="form-group">
                 <label>Full Name</label>
@@ -253,9 +318,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             <div class="form-group">
                 <label>Profile Photo</label>
+                
+                <div id="currentPhotoContainer" class="current-img-container" style="display:none;">
+                    <img id="currentPhotoPreview" src="" class="current-img-preview">
+                    <div class="remove-img-btn" onclick="removeCurrentPhoto()" title="Remove current photo">
+                        <i class="fas fa-times"></i>
+                    </div>
+                </div>
+
                 <div class="file-upload-wrapper" onclick="document.getElementById('photoInput').click()">
                     <i class="fas fa-cloud-upload-alt" style="font-size: 24px; color: #d32f2f; margin-bottom: 10px;"></i>
-                    <p style="margin:0; font-size:13px; color:#666;">Click to upload image</p>
+                    <p style="margin:0; font-size:13px; color:#666;">Click to upload new image</p>
                     <input type="file" name="photo" id="photoInput" class="form-control" accept="image/*" style="display:none;" onchange="previewFile()">
                     <div id="filePreview" style="margin-top:10px; font-size:12px; color:green;"></div>
                 </div>
@@ -269,27 +342,77 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
 </div>
 
+<div class="image-viewer-modal" id="imageViewer">
+    <div class="image-viewer-content">
+        <button class="close-viewer-btn" onclick="closeImageViewer()">
+            <i class="fas fa-times"></i>
+        </button>
+        <img id="viewerImage" src="" alt="Full View">
+    </div>
+</div>
+
 <script>
+    // --- Add/Edit Modal Functions ---
     function openModal() {
         document.getElementById('teamModal').classList.add('active');
         document.getElementById('modalTitle').innerText = 'Add Team Member';
+        
+        // Reset form
         document.getElementById('team_id').value = '';
         document.getElementById('name').value = '';
         document.getElementById('position').value = '';
         document.getElementById('description').value = '';
+        document.getElementById('photoInput').value = '';
         document.getElementById('filePreview').innerText = '';
+        
+        // Hide existing image preview
+        document.getElementById('existing_image').value = '';
+        document.getElementById('currentPhotoContainer').style.display = 'none';
+        document.getElementById('currentPhotoPreview').src = '';
     }
     
     function editMember(data) {
         document.getElementById('teamModal').classList.add('active');
         document.getElementById('modalTitle').innerText = 'Edit Team Member';
+        
+        // Fill form data
         document.getElementById('team_id').value = data.Team_ID;
         document.getElementById('name').value = data.Name;
         document.getElementById('position').value = data.Position;
         document.getElementById('description').value = data.Description;
-        document.getElementById('filePreview').innerText = 'Current photo kept unless new one uploaded';
+        
+        // Handle Image
+        let imgPath = '';
+        if(data.Images) {
+            try {
+                const images = JSON.parse(data.Images);
+                if(images && images.length > 0) imgPath = images[0];
+            } catch(e) { console.error(e); }
+        }
+
+        // Show existing image and hidden input
+        if (imgPath) {
+            document.getElementById('existing_image').value = data.Images; // keep original JSON string
+            document.getElementById('currentPhotoPreview').src = imgPath;
+            document.getElementById('currentPhotoContainer').style.display = 'inline-block';
+        } else {
+            document.getElementById('existing_image').value = '';
+            document.getElementById('currentPhotoContainer').style.display = 'none';
+        }
+
+        document.getElementById('photoInput').value = '';
+        document.getElementById('filePreview').innerText = '';
     }
     
+    function removeCurrentPhoto() {
+        // 清空隐藏的 existing_image 字段
+        document.getElementById('existing_image').value = '';
+        // 隐藏预览区域
+        document.getElementById('currentPhotoContainer').style.display = 'none';
+        // 清空 src 防止缓存显示
+        document.getElementById('currentPhotoPreview').src = '';
+    }
+
     function closeModal() {
         document.getElementById('teamModal').classList.remove('active');
     }
@@ -301,11 +424,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
 
-    // Close modal on outside click
+    // --- Image Viewer (Lightbox) Functions ---
+    function openImageViewer(src) {
+        document.getElementById('viewerImage').src = src;
+        document.getElementById('imageViewer').classList.add('active');
+    }
+
+    function closeImageViewer() {
+        document.getElementById('imageViewer').classList.remove('active');
+        setTimeout(() => {
+            document.getElementById('viewerImage').src = '';
+        }, 300); // Wait for transition
+    }
+
+    // --- Global Click Listeners ---
     window.onclick = function(event) {
+        // Close Edit Modal on outside click
         const modal = document.getElementById('teamModal');
         if (event.target == modal) {
             closeModal();
+        }
+
+        // Close Image Viewer on outside click (clicking background)
+        const viewer = document.getElementById('imageViewer');
+        if (event.target == viewer) {
+            closeImageViewer();
         }
     }
 </script>
