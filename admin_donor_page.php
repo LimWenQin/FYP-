@@ -206,6 +206,19 @@ function generateStrongRandomPassword($length = 12) {
     return str_shuffle($password);
 }
 
+// --- PHP VALIDATION HELPER FOR IC ---
+function validateMalaysianIcStructure($ic) {
+    $cleanIc = preg_replace('/[^0-9]/', '', $ic);
+    // 1. Length Check
+    if (strlen($cleanIc) !== 12) return false;
+    
+    // 2. PB Code Check (Digits 7-8)
+    $pbCode = (int)substr($cleanIc, 6, 2);
+    $validPBCodes = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,82];
+    
+    return in_array($pbCode, $validPBCodes);
+}
+
 // --- FORM HANDLING ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['add_donor'])) {
@@ -227,6 +240,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (isset($_FILES['profile_picture'])) {
             $uploadedPath = handleProfileUpload($_FILES['profile_picture']);
             if ($uploadedPath) $profilePicture = $uploadedPath;
+        }
+
+        // Validate IC if provided
+        if (!empty($icNumber) && !validateMalaysianIcStructure($icNumber)) {
+             header("Location: admin_donor_page.php?error=" . urlencode("Invalid IC Number (Length or State Code).")); exit();
         }
 
         $checkEmailSql = "SELECT Donor_ID FROM donor WHERE Donor_Email = '$email'";
@@ -267,6 +285,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] == 0) {
             $uploadedPath = handleProfileUpload($_FILES['profile_picture']);
             if ($uploadedPath) $picSql = ", Donor_ProfilePicture = '$uploadedPath'";
+        }
+
+        // Validate IC if provided
+        if (!empty($icNumber) && !validateMalaysianIcStructure($icNumber)) {
+             header("Location: admin_donor_page.php?error=" . urlencode("Invalid IC Number (Length or State Code).")); exit();
         }
 
         $sql = "UPDATE donor SET Donor_Name = '$donorName', Donor_ContactNumber = '$contact', Donor_ICNumber = '$icNumber', 
@@ -1197,6 +1220,36 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
             return ""; 
         }
 
+        // --- UPDATED IC VALIDATION LOGIC (For Optional IC Field) ---
+        function validateICDetailed(ic) {
+            // Remove hyphens for length check
+            const clean = ic.replace(/[^0-9]/g, '');
+
+            // 1. Length Check
+            if (clean.length !== 12) {
+                return "Incomplete IC number. Must be 12 digits (excluding hyphens).";
+            }
+
+            // 2. State/PB Code Check (Digits 7 & 8)
+            // Extract the PB code
+            const pbCode = parseInt(clean.substring(6, 8));
+            
+            // Valid JPN State Codes for Malaysia (including WP and Sarawak specific)
+            // 01-16, 21-59, 82
+            const validStateCodes = [
+                1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16, // Standard States
+                21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40, // Extended States
+                41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59, // Extended States
+                82 // Sarawak Special
+            ];
+            
+            if (!validStateCodes.includes(pbCode)) {
+                return "Invalid State/Place of Birth code (digits 7-8).";
+            }
+
+            return "";
+        }
+
         function showFieldError(inputId, message) {
             const input = document.getElementById(inputId);
             if (!input) return;
@@ -1236,6 +1289,7 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
             let emailId = type === 'add' ? 'email' : 'edit_email';
             let contactId = type === 'add' ? 'contact' : 'edit_contact';
             let dobId = type === 'add' ? 'dob' : 'edit_dob';
+            let icId = type === 'add' ? 'ic_number' : 'edit_ic_number';
 
             // 1. Name Check
             let nameVal = document.getElementById(nameId).value.trim();
@@ -1267,8 +1321,18 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                     hasError = true;
                 }
             }
+
+            // 4. IC Check (Strict Validation if Inputted)
+            let icVal = document.getElementById(icId).value.trim();
+            if (icVal) { // Only run if field is NOT empty
+                let icMsg = validateICDetailed(icVal);
+                if (icMsg) {
+                    showFieldError(icId, icMsg);
+                    hasError = true;
+                }
+            }
             
-            // 4. DOB/Age Check
+            // 5. DOB/Age Check
             let dobVal = document.getElementById(dobId).value;
             if (dobVal && !isAgeValid(dobVal)) {
                 showFieldError(dobId, "Donor must be at least 18 years old.");

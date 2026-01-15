@@ -72,9 +72,6 @@ if (isset($_SESSION['admin_id'])) {
 
 // --- AJAX: Get Branch Payment History ---
 if (isset($_GET['action']) && $_GET['action'] == 'get_payment_history' && isset($_GET['branch_id'])) {
-    // Security check: Staff should not access this via direct URL manipulation strictly speaking, 
-    // but relying on UI hiding is usually sufficient for this level unless strict security is required.
-    // However, keeping consistent with UI:
     if ($isStaff) { echo json_encode([]); exit(); }
 
     $branchId = intval($_GET['branch_id']);
@@ -616,6 +613,10 @@ $exportUrl = "?" . http_build_query($exportParams);
         .close-lightbox { position: absolute; top: 20px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; z-index: 2002; }
         .lightbox-nav { cursor: pointer; position: absolute; top: 50%; padding: 16px; margin-top: -50px; color: white; font-weight: bold; font-size: 30px; transition: 0.6s ease; z-index: 2001; background-color: rgba(0,0,0,0.3); }
         .lightbox-prev { left: 0; } .lightbox-next { right: 0; }
+        
+        /* New Error Styles */
+        .input-error { border-color: var(--danger) !important; background-color: #fff5f5; }
+        .inline-error { color: var(--danger); font-size: 11px; margin-top: 4px; display: block; font-weight: 500; animation: fadeIn 0.3s; }
 
         @media (max-width: 768px) {
             .stats-cards { grid-template-columns: 1fr; }
@@ -833,7 +834,7 @@ $exportUrl = "?" . http_build_query($exportParams);
         <div class="modal-content">
             <div class="modal-header"><h2>Add New Branch</h2><button class="close-btn" onclick="closeModal('addModal')">&times;</button></div>
             <div class="modal-body">
-                <form action="branch_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')" novalidate>
+                <form id="addBranchForm" action="branch_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')" novalidate>
                     <input type="hidden" name="add_branch" value="1">
                     
                     <div class="form-group">
@@ -891,7 +892,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                             <input type="text" name="bank_account" id="add_bank_account" class="form-input" placeholder="Select a bank first" oninput="handleBankInput('add')" required>
                             <div id="add_bank_counter" style="font-size:12px; margin-top:2px; font-weight:bold; color:#dc3545;"></div>
                             <small class="form-guide">Enter the account number without dashes (e.g. 1122334455).</small>
-                            <div id="addBankError" class="error-message">Invalid account number length.</div>
                         </div>
                     </div>
 
@@ -901,7 +901,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                             <label class="form-label">Branch Email <span class="required">*</span></label>
                             <input type="email" name="email" id="add_email" class="form-input" required placeholder="branch@example.com">
                             <small class="form-guide">Official email address for general inquiries.</small>
-                            <div id="addEmailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Branch Contact Number <span class="required">*</span></label>
@@ -916,7 +915,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                     <div class="section-separator"><span>Person In Charge Info</span></div>
                     <div class="form-group">
                         <label class="form-label">PIC Name <span class="required">*</span></label>
-                        <input type="text" name="branch_head" id="add_branch_head" class="form-input" required placeholder="e.g. Mr. John Doe">
+                        <input type="text" name="branch_head" id="add_branch_head" class="form-input" required placeholder="e.g. Mr. John Doe" oninput="validateName(this)">
                         <small class="form-guide">Full name of the branch manager or person in charge.</small>
                     </div>
                     <div class="form-row">
@@ -924,7 +923,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                             <label class="form-label">PIC Email <span class="required">*</span></label>
                             <input type="email" name="branch_head_email" id="add_head_email" class="form-input" required placeholder="manager@example.com">
                             <small class="form-guide">Direct email for the Person In Charge.</small>
-                            <div id="addHeadEmailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">PIC Contact Number <span class="required">*</span></label>
@@ -944,8 +942,8 @@ $exportUrl = "?" . http_build_query($exportParams);
                             <small class="form-guide">Maximum number of occupants this branch can support.</small>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Est. Date <span class="required">*</span></label>
-                            <input type="date" name="est_date" id="add_est_date" class="form-input" required>
+                            <label class="form-label">Established Date <span class="required">*</span></label>
+                            <input type="date" name="est_date" id="add_est_date" class="form-input" required max="<?php echo date('Y-m-d'); ?>">
                             <small class="form-guide">Date when this branch was established.</small>
                         </div>
                     </div>
@@ -1009,7 +1007,7 @@ $exportUrl = "?" . http_build_query($exportParams);
         <div class="modal-content">
             <div class="modal-header"><h2>Edit Branch</h2><button class="close-btn" onclick="closeModal('editModal')">&times;</button></div>
             <div class="modal-body">
-                <form action="branch_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('edit')" novalidate>
+                <form id="editBranchForm" action="branch_management_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('edit')" novalidate>
                     <input type="hidden" name="update_branch" value="1">
                     <input type="hidden" name="branch_id" id="edit_branch_id">
                     <input type="hidden" name="existing_images_json" id="edit_existing_images_input">
@@ -1063,7 +1061,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                             <input type="text" name="bank_account" id="edit_bank_account" class="form-input" placeholder="e.g. 1122334455" oninput="handleBankInput('edit')" required>
                             <div id="edit_bank_counter" style="font-size:12px; margin-top:2px; font-weight:bold; color:#dc3545;"></div>
                             <small class="form-guide">Enter account number (Format depends on selected bank).</small>
-                            <div id="editBankError" class="error-message">Invalid account number length.</div>
                         </div>
                     </div>
 
@@ -1073,7 +1070,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                             <label class="form-label">Branch Email <span class="required">*</span></label>
                             <input type="email" name="email" id="edit_email" class="form-input" required placeholder="branch@example.com">
                             <small class="form-guide">Official email address.</small>
-                            <div id="editEmailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Branch Contact Number <span class="required">*</span></label>
@@ -1088,7 +1084,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                     <div class="section-separator"><span>Person In Charge Info</span></div>
                     <div class="form-group">
                         <label class="form-label">PIC Name <span class="required">*</span></label>
-                        <input type="text" name="branch_head" id="edit_branch_head" class="form-input" required placeholder="e.g. Mr. John Doe">
+                        <input type="text" name="branch_head" id="edit_branch_head" class="form-input" required placeholder="e.g. Mr. John Doe" oninput="validateName(this)">
                         <small class="form-guide">Full name of the Person In Charge.</small>
                     </div>
                     <div class="form-row">
@@ -1096,7 +1092,6 @@ $exportUrl = "?" . http_build_query($exportParams);
                             <label class="form-label">PIC Email <span class="required">*</span></label>
                             <input type="email" name="branch_head_email" id="edit_head_email" class="form-input" required placeholder="manager@example.com">
                             <small class="form-guide">Direct email for the PIC.</small>
-                            <div id="editHeadEmailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">PIC Contact Number <span class="required">*</span></label>
@@ -1116,8 +1111,8 @@ $exportUrl = "?" . http_build_query($exportParams);
                             <small class="form-guide">Maximum pax capacity.</small>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Est. Date <span class="required">*</span></label>
-                            <input type="date" name="est_date" id="edit_est_date" class="form-input" required>
+                            <label class="form-label">Established Date <span class="required">*</span></label>
+                            <input type="date" name="est_date" id="edit_est_date" class="form-input" required max="<?php echo date('Y-m-d'); ?>">
                             <small class="form-guide">Date established.</small>
                         </div>
                     </div>
@@ -1138,7 +1133,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                         <small class="form-guide">Additional info (optional).</small>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" name="postal_code" id="edit_postal_code" class="form-input" required placeholder="e.g. 50450"><small class="form-guide">5-digit postal code.</small></div>
+                        <div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" name="postal_code" id="edit_postal_code" class="form-input" required placeholder="e.g. 50450"><small class="form-guide">5-digit postcode.</small></div>
                         <div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" name="city" id="edit_city" class="form-input" required placeholder="e.g. Kuala Lumpur"><small class="form-guide">City name.</small></div>
                     </div>
                     <div class="form-row">
@@ -1335,7 +1330,9 @@ $exportUrl = "?" . http_build_query($exportParams);
         }
 
         function openAddModal() { 
-            addFiles = []; updateFileInput('add_branch_images', []); document.getElementById('add_preview_container').innerHTML = ''; document.getElementById('addModal').style.display = 'flex'; 
+            addFiles = []; updateFileInput('add_branch_images', []); document.getElementById('add_preview_container').innerHTML = ''; 
+            clearFormErrors('addBranchForm');
+            document.getElementById('addModal').style.display = 'flex'; 
         }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
@@ -1377,6 +1374,7 @@ $exportUrl = "?" . http_build_query($exportParams);
             document.getElementById('edit_description').value = branch.Branch_Description;
 
             renderEditPreviews();
+            clearFormErrors('editBranchForm');
             document.getElementById('editModal').style.display = 'flex';
         }
 
@@ -1501,11 +1499,9 @@ $exportUrl = "?" . http_build_query($exportParams);
         }
         setupPhoneInput('add_contact'); setupPhoneInput('edit_contact_number'); setupPhoneInput('add_head_contact'); setupPhoneInput('edit_head_contact');
 
-        // --- NEW BANK ACCOUNT VALIDATION LOGIC ---
-        
-        // Define rules for Malaysia Banks (Key matches the $malaysiaBanks array keys)
+        // --- BANK ACCOUNT VALIDATION LOGIC ---
         const bankRules = {
-            "Maybank": { digits: 12 }, // Can be 10-12, but modern usually 12
+            "Maybank": { digits: 12 },
             "CIMB": { digits: 10 },
             "Public Bank": { digits: 10 },
             "RHB": { digits: 10 },
@@ -1513,16 +1509,16 @@ $exportUrl = "?" . http_build_query($exportParams);
             "AmBank": { digits: 13 },
             "UOB": { digits: 11 },
             "Bank Rakyat": { digits: 12 },
-            "OCBC": { digits: 10 }, // Or 12
+            "OCBC": { digits: 10 },
             "HSBC": { digits: 12 },
             "Bank Islam": { digits: 14 },
             "Affin Bank": { digits: 10 },
             "Alliance Bank": { digits: 10 },
             "Standard Chartered": { digits: 10 },
-            "MBSB": { digits: 10 }, // Variable
+            "MBSB": { digits: 10 },
             "Citibank": { digits: 10 },
             "Bank Muamalat": { digits: 14 },
-            "Agrobank": { digits: 15 }, // Or 12
+            "Agrobank": { digits: 15 },
             "BSN": { digits: 16 }
         };
 
@@ -1536,144 +1532,196 @@ $exportUrl = "?" . http_build_query($exportParams);
             const rule = bankRules[selectedBank];
 
             if (selectedBank && rule) {
-                // Set the hard limit so users cannot type more
                 accInput.maxLength = rule.digits;
-                
-                // If they change bank and existing is too long, truncate it
                 if (accInput.value.length > rule.digits) {
                     accInput.value = accInput.value.slice(0, rule.digits);
                 }
-
                 accInput.placeholder = `Enter ${rule.digits} digits for ${selectedBank}`;
-                // Trigger an update to the counter text immediately
                 handleBankInput(mode);
             } else {
-                accInput.removeAttribute('maxLength'); // No limit if no bank selected yet
+                accInput.removeAttribute('maxLength');
                 accInput.placeholder = "Select a bank first";
                 document.getElementById(mode + '_bank_counter').innerText = "";
             }
         }
 
-        // New function to handle input counting and validation
         function handleBankInput(mode) {
             const input = document.getElementById(mode + '_bank_account');
             const counter = document.getElementById(mode + '_bank_counter');
             const bankSelect = document.getElementById(mode + '_bank_name');
-            
-            // 1. Enforce Numbers Only
             input.value = input.value.replace(/[^0-9]/g, '');
-
-            // 2. Update Counter
             const rule = bankRules[bankSelect.value];
             if (rule) {
                 const current = input.value.length;
                 const max = rule.digits;
                 counter.innerText = `Digits: ${current} / ${max}`;
-                
-                // Visual feedback
-                if (current === max) {
-                    counter.style.color = '#28a745'; // Green when done
-                } else {
-                    counter.style.color = '#dc3545'; // Red/Orange while typing
-                }
+                if (current === max) { counter.style.color = '#28a745'; } else { counter.style.color = '#dc3545'; }
             } else {
                 counter.innerText = "";
             }
         }
 
-        function checkEmail(val) { if(!val) return true; return /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val); }
+        // --- NEW VALIDATION HELPERS ---
+        function validateEmailDetailed(email) {
+            if (!email) return "This field is required.";
+            if (!email.includes('@')) return "Missing '@' symbol in email.";
+            const parts = email.split('@');
+            if (parts[1].length === 0) return "Missing domain name (e.g., gmail.com).";
+            if (!parts[1].includes('.')) return "Missing top-level domain (like .com or .org).";
+            const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailPattern.test(email)) return "Invalid email format.";
+            return "";
+        }
 
-        function validateBankAccount(mode) {
-            const bankSelect = document.getElementById(mode + '_bank_name');
-            const accInput = document.getElementById(mode + '_bank_account');
-            const errorMsg = document.getElementById(mode + 'BankError');
+        function validatePhoneDetailed(val) {
+            if (!val.includes('-')) return "Missing hyphen symbol ( - ). Please use the dash key.";
+            const parts = val.split('-'); 
+            if (parts.length !== 2) return "Invalid format. Only one hyphen ( - ) allowed.";
+            const front = parts[0]; const back = parts[1];
+            if (front.length < 2 || front.length > 3) return "Invalid prefix (e.g., 11, 12).";
+            if (back.length === 0) return "Please enter numbers after the hyphen ( - ).";
+            if (back.length < 7) { let diff = 7 - back.length; return `Too short. Current: ${back.length}, Need: 7 or 8.`; }
+            if (back.length > 8) return `Too long. Current: ${back.length}, Max: 8.`; 
+            return ""; 
+        }
+
+        function validateName(input) {
+            // Only used for on-input cleaning if desired, but we rely on validateForm for display
+        }
+
+        function showFieldError(inputId, message) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            input.classList.add('input-error');
             
-            // If no bank is selected, account is optional/irrelevant unless user typed in it
-            if (!bankSelect.value) {
-                return "Bank Name is required.";
+            // Find parent to append error message
+            let parent = input.parentNode;
+            if (parent.classList.contains('phone-format') || parent.classList.contains('upload-box')) {
+                parent = parent.parentNode; 
             }
-
-            if (!accInput.value.trim()) {
-                return "Bank Account Number is required.";
+            
+            let errorDiv = parent.querySelector('.inline-error');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.className = 'inline-error';
+                parent.appendChild(errorDiv);
             }
+            errorDiv.textContent = message;
+        }
 
-            const rule = bankRules[bankSelect.value];
-            if (rule && accInput.value.length !== rule.digits) {
-                return `${bankSelect.value} account number must be ${rule.digits} digits.`;
-            }
-
-            if(errorMsg) errorMsg.style.display = 'none';
-            return ""; // No error
+        function clearFormErrors(formId) {
+            const form = document.getElementById(formId);
+            const inputs = form.querySelectorAll('.form-input, .form-select, .form-textarea');
+            inputs.forEach(i => i.classList.remove('input-error'));
+            form.querySelectorAll('.inline-error').forEach(e => e.remove());
         }
 
         function validateForm(mode) {
-            let errors = [];
+            let formId = mode === 'add' ? 'addBranchForm' : 'editBranchForm';
+            clearFormErrors(formId);
+            let hasError = false;
             
-            // 1. Basic Fields
-            const name = document.getElementById(mode + '_branch_name').value.trim();
-            const type = document.getElementById(mode + '_branch_type').value;
-            const status = document.getElementById(mode + '_operational_status').value;
-            const capacity = document.getElementById(mode + '_capacity').value;
-            const estDate = document.getElementById(mode + '_est_date').value;
+            // Define field IDs
+            const fields = {
+                name: mode + '_branch_name',
+                type: mode + '_branch_type',
+                status: mode + '_operational_status',
+                capacity: mode + '_capacity',
+                estDate: mode + '_est_date',
+                bankName: mode + '_bank_name',
+                bankAcc: mode + '_bank_account',
+                email: mode + '_email',
+                contact: mode === 'add' ? 'add_contact' : 'edit_contact_number',
+                headName: mode + '_branch_head',
+                headEmail: mode + '_head_email',
+                headContact: mode === 'add' ? 'add_head_contact' : 'edit_head_contact',
+                addr1: mode + '_address1',
+                addr2: mode + '_address2',
+                postcode: mode + '_postal_code',
+                city: mode + '_city',
+                state: mode + '_state',
+                desc: mode + '_description'
+            };
+
+            // 1. Basic Validations
             
-            if (!name) errors.push("Branch Name is required.");
-            if (!type) errors.push("Branch Category is required.");
-            if (!status) errors.push("Operational Status is required.");
-            if (!capacity) errors.push("Capacity is required.");
-            if (!estDate) errors.push("Established Date is required.");
+            // Name Check
+            const nameVal = document.getElementById(fields.name).value.trim();
+            if (!nameVal) { showFieldError(fields.name, "This field is required."); hasError = true; }
+            else if (/\d/.test(nameVal)) { showFieldError(fields.name, "Name cannot contain numbers."); hasError = true; }
 
-            // 2. Bank Validation
-            const bankErr = validateBankAccount(mode);
-            if (bankErr) errors.push(bankErr);
+            // Simple Required Fields
+            const simpleRequired = ['type', 'status', 'capacity', 'addr1', 'addr2', 'postcode', 'city', 'state', 'desc'];
+            simpleRequired.forEach(key => {
+                const val = document.getElementById(fields[key]).value.trim();
+                if (!val) { showFieldError(fields[key], "This field is required."); hasError = true; }
+            });
 
-            // 3. Email Validation
-            const email = document.getElementById(mode + '_email').value;
-            if(!email) errors.push("Branch Email is required.");
-            else if(!checkEmail(email)) errors.push("Invalid Branch Email format.");
-            
-            // 4. Contact Validation
-            const contact = document.getElementById(mode === 'add' ? 'add_contact' : 'edit_contact_number').value;
-            if(!contact) errors.push("Branch Contact Number is required.");
-            else if(contact.length < 8) errors.push("Branch Contact Number is too short.");
+            // Date Check (Must exist & Not in future)
+            const estDateVal = document.getElementById(fields.estDate).value;
+            const today = new Date().toISOString().split('T')[0];
+            if (!estDateVal) { showFieldError(fields.estDate, "This field is required."); hasError = true; }
+            else if (estDateVal > today) { showFieldError(fields.estDate, "Established Date cannot be in the future."); hasError = true; }
 
-            // 5. PIC Info
-            const picName = document.getElementById(mode + '_branch_head').value.trim();
-            if(!picName) errors.push("PIC Name is required.");
-            
-            const headEmail = document.getElementById(mode + '_head_email').value;
-            if(!headEmail) errors.push("PIC Email is required.");
-            else if(!checkEmail(headEmail)) errors.push("Invalid PIC Email format.");
+            // Bank Check
+            const bankNameVal = document.getElementById(fields.bankName).value;
+            const bankAccVal = document.getElementById(fields.bankAcc).value.trim();
+            if (!bankNameVal) { showFieldError(fields.bankName, "This field is required."); hasError = true; }
+            if (!bankAccVal) { showFieldError(fields.bankAcc, "This field is required."); hasError = true; }
+            else if (bankNameVal && bankRules[bankNameVal] && bankAccVal.length !== bankRules[bankNameVal].digits) {
+                showFieldError(fields.bankAcc, `Must be exactly ${bankRules[bankNameVal].digits} digits.`);
+                hasError = true;
+            }
 
-            const headContact = document.getElementById(mode === 'add' ? 'add_head_contact' : 'edit_head_contact').value;
-            if(!headContact) errors.push("PIC Contact Number is required.");
-            else if(headContact.length < 8) errors.push("PIC Contact Number is too short.");
+            // Email Check (Branch)
+            const emailVal = document.getElementById(fields.email).value.trim();
+            let emailMsg = validateEmailDetailed(emailVal);
+            if (emailMsg) { showFieldError(fields.email, emailMsg); hasError = true; }
 
-            // 6. Address Info
-            const addr1 = document.getElementById(mode + '_address1').value.trim();
-            const addr2 = document.getElementById(mode + '_address2').value.trim();
-            const postcode = document.getElementById(mode + '_postal_code').value.trim();
-            const city = document.getElementById(mode + '_city').value.trim();
-            const state = document.getElementById(mode + '_state').value;
-            const desc = document.getElementById(mode + '_description').value.trim();
+            // Contact Check (Branch)
+            const contactVal = document.getElementById(fields.contact).value.trim();
+            if (!contactVal) { showFieldError(fields.contact, "This field is required."); hasError = true; }
+            else {
+                let phoneMsg = validatePhoneDetailed(contactVal);
+                if (phoneMsg) { showFieldError(fields.contact, phoneMsg); hasError = true; }
+            }
 
-            if(!addr1) errors.push("Address Line 1 is required.");
-            if(!addr2) errors.push("Address Line 2 is required.");
-            if(!postcode) errors.push("Postal Code is required.");
-            if(!city) errors.push("City is required.");
-            if(!state) errors.push("State is required.");
-            if(!desc) errors.push("Description is required.");
+            // PIC Name
+            const headNameVal = document.getElementById(fields.headName).value.trim();
+            if (!headNameVal) { showFieldError(fields.headName, "This field is required."); hasError = true; }
+            else if (/\d/.test(headNameVal)) { showFieldError(fields.headName, "Name cannot contain numbers."); hasError = true; }
 
-            // 7. Image Check (Add Mode Only)
+            // PIC Email
+            const headEmailVal = document.getElementById(fields.headEmail).value.trim();
+            let headEmailMsg = validateEmailDetailed(headEmailVal);
+            if (headEmailMsg) { showFieldError(fields.headEmail, headEmailMsg); hasError = true; }
+
+            // PIC Contact
+            const headContactVal = document.getElementById(fields.headContact).value.trim();
+            if (!headContactVal) { showFieldError(fields.headContact, "This field is required."); hasError = true; }
+            else {
+                let headPhoneMsg = validatePhoneDetailed(headContactVal);
+                if (headPhoneMsg) { showFieldError(fields.headContact, headPhoneMsg); hasError = true; }
+            }
+
+            // Image Check (Add Mode Only)
             if (mode === 'add') {
                 const imgInput = document.getElementById('add_branch_images');
                 if (!addFiles || addFiles.length === 0) {
-                    errors.push("At least one Branch Image is required.");
+                    const uploadBox = document.querySelector('#addBranchForm .upload-box');
+                    if(uploadBox) {
+                        uploadBox.classList.add('input-error'); 
+                        let parent = uploadBox.parentNode;
+                        let errorDiv = parent.querySelector('.inline-error');
+                        if (!errorDiv) { errorDiv = document.createElement('div'); errorDiv.className = 'inline-error'; parent.appendChild(errorDiv); }
+                        errorDiv.textContent = "At least one Branch Image is required.";
+                    }
+                    hasError = true;
                 }
             }
 
-            if (errors.length > 0) {
-                // Show floating alert system message
-                showSystemError("Please correct the following errors:<br>" + errors.join("<br>"));
+            if (hasError) {
+                showSystemError("Please correct the highlighted errors.");
                 return false;
             }
 

@@ -600,6 +600,10 @@ $categories = array_keys($categoryPrefixes);
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
         .error-message { color: #dc3545; font-size: 12px; margin-top: 5px; display: none; }
 
+        /* NEW ERROR STYLES (FROM ACTIVITY MANAGEMENT) */
+        .input-error { border-color: #dc3545 !important; background-color: #fff5f5; }
+        .inline-error { color: #dc3545; font-size: 11px; margin-top: 4px; display: block; font-weight: 500; animation: fadeIn 0.3s; }
+
         .file-upload { text-align: center; margin-bottom: 10px; margin-top: 10px; }
         .reward-img-preview { width: 150px; height: 150px; border-radius: 8px; border: 2px dashed #ddd; margin: 0 auto 15px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
         .reward-img-preview img { width: 100%; height: 100%; object-fit: cover; }
@@ -970,7 +974,7 @@ $categories = array_keys($categoryPrefixes);
                             <label for="add_photo" class="file-upload-label">
                                 <i class="fas fa-upload"></i> Choose Image
                             </label>
-                            <input type="file" id="add_photo" name="photo" accept="image/*" required onchange="previewImage(this, 'add-preview-container', 'add-file-info', 'add-file-name')">
+                            <input type="file" id="add_photo" name="photo" accept="image/*" onchange="previewImage(this, 'add-preview-container', 'add-file-info', 'add-file-name')">
                             <div id="add-file-info" class="file-info">
                                 <span id="add-file-name"></span>
                                 <button type="button" class="file-remove" onclick="removeImage('add_photo', 'add-preview-container', 'add-file-info')">
@@ -983,14 +987,14 @@ $categories = array_keys($categoryPrefixes);
 
                     <div class="form-group">
                         <label class="form-label">Item Name <span class="required-star">*</span></label>
-                        <input type="text" name="name" id="add_name" class="form-control" required placeholder="e.g. Handmade Soap">
+                        <input type="text" name="name" id="add_name" class="form-control" placeholder="e.g. Handmade Soap">
                         <span class="form-guide">Unique name for the reward. Avoid duplicate names.</span>
                         <div id="add_name_error" class="error-message">Name cannot contain special symbols.</div>
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label">Category (Will generate ID) <span class="required-star">*</span></label>
-                        <select name="category" id="add_category" class="form-select" required onchange="toggleExpiryField('add_category', 'add_expiry_container')">
+                        <select name="category" id="add_category" class="form-select" onchange="toggleExpiryField('add_category', 'add_expiry_container')">
                             <?php foreach($categories as $cat): ?>
                                 <option value="<?php echo $cat; ?>"><?php echo $cat; ?></option>
                             <?php endforeach; ?>
@@ -1001,12 +1005,12 @@ $categories = array_keys($categoryPrefixes);
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Points Required <span class="required-star">*</span></label>
-                            <input type="number" name="points" id="add_points" class="form-control" required placeholder="0" min="0" oninput="validity.valid||(value='');">
+                            <input type="number" name="points" id="add_points" class="form-control" placeholder="0" min="0" oninput="validity.valid||(value='');">
                             <span class="form-guide">Points needed to redeem one unit.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Stock Quantity (Max 500) <span class="required-star">*</span></label>
-                            <input type="number" name="stock" id="add_stock" class="form-control" required placeholder="0" min="0" max="500" oninput="validity.valid||(value='');">
+                            <input type="number" name="stock" id="add_stock" class="form-control" placeholder="0" min="0" max="500" oninput="validity.valid||(value='');">
                             <span class="form-guide">Initial inventory count. Cannot exceed 500.</span>
                         </div>
                     </div>
@@ -1049,7 +1053,7 @@ $categories = array_keys($categoryPrefixes);
 
                     <div class="form-group">
                         <label class="form-label">Description <span class="required-star">*</span></label>
-                        <textarea name="description" id="add_desc" class="form-control" rows="4" style="resize: vertical;" required placeholder="Enter full details about this item..."></textarea>
+                        <textarea name="description" id="add_desc" class="form-control" rows="4" style="resize: vertical;" placeholder="Enter full details about this item..."></textarea>
                         <span class="form-guide">Include dimensions, material, weight, usage instructions, and any important terms. Be as detailed as possible.</span>
                     </div>
 
@@ -1089,14 +1093,14 @@ $categories = array_keys($categoryPrefixes);
 
                     <div class="form-group">
                         <label class="form-label">Item Name <span class="required-star">*</span></label>
-                        <input type="text" name="name" id="edit_name" class="form-control" required>
+                        <input type="text" name="name" id="edit_name" class="form-control">
                         <span class="form-guide">Update item name if necessary.</span>
                         <div id="edit_name_error" class="error-message">Name cannot contain special symbols.</div>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Category <span class="required-star">*</span></label>
-                        <select name="category" id="edit_category" class="form-select" required onchange="toggleExpiryField('edit_category', 'edit_expiry_container')">
+                        <select name="category" id="edit_category" class="form-select" onchange="toggleExpiryField('edit_category', 'edit_expiry_container')">
                             <?php foreach($categories as $cat): ?>
                                 <option value="<?php echo $cat; ?>"><?php echo $cat; ?></option>
                             <?php endforeach; ?>
@@ -1107,12 +1111,12 @@ $categories = array_keys($categoryPrefixes);
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Points Required <span class="required-star">*</span></label>
-                            <input type="number" name="points" id="edit_points" class="form-control" required min="0" oninput="validity.valid||(value='');">
+                            <input type="number" name="points" id="edit_points" class="form-control" min="0" oninput="validity.valid||(value='');">
                             <span class="form-guide">Points needed to redeem one unit.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Stock Quantity (Max 500) <span class="required-star">*</span></label>
-                            <input type="number" name="stock" id="edit_stock" class="form-control" required min="0" max="500" oninput="validity.valid||(value='');">
+                            <input type="number" name="stock" id="edit_stock" class="form-control" min="0" max="500" oninput="validity.valid||(value='');">
                             <span class="form-guide">Update physical inventory count.</span>
                         </div>
                     </div>
@@ -1165,7 +1169,7 @@ $categories = array_keys($categoryPrefixes);
 
                     <div class="form-group">
                         <label class="form-label">Description <span class="required-star">*</span></label>
-                        <textarea name="description" id="edit_desc" class="form-control" rows="4" style="resize: vertical;" required></textarea>
+                        <textarea name="description" id="edit_desc" class="form-control" rows="4" style="resize: vertical;"></textarea>
                         <span class="form-guide">Ensure description is accurate and up-to-date.</span>
                     </div>
 
@@ -1300,6 +1304,37 @@ $categories = array_keys($categoryPrefixes);
             }
         }
 
+        // --- NEW VALIDATION HELPERS ---
+        function showFieldError(inputId, message) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            input.classList.add('input-error');
+            // Logic to find parent and append error div
+            let parent = input.parentElement;
+            
+            // Adjust parent if inside a specific wrapper like file-upload
+            if (parent.classList.contains('file-upload')) {
+                parent = parent.parentElement; // Go up to form-group
+            }
+
+            let errorDiv = parent.querySelector('.inline-error');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.className = 'inline-error';
+                parent.appendChild(errorDiv);
+            }
+            errorDiv.textContent = message;
+        }
+
+        function clearFormErrors(formId) {
+            const form = document.getElementById(formId);
+            const inputs = form.querySelectorAll('.form-control, .form-select, .file-upload-label');
+            inputs.forEach(i => i.classList.remove('input-error'));
+            form.querySelectorAll('.inline-error').forEach(e => e.remove());
+            const manualErrors = form.querySelectorAll('.error-message');
+            manualErrors.forEach(e => e.style.display = 'none');
+        }
+
         function openAddModal() { 
             document.getElementById('addModal').style.display = 'flex'; 
             document.getElementById('addForm').reset();
@@ -1311,6 +1346,7 @@ $categories = array_keys($categoryPrefixes);
             // Reset Supplier fields
             document.getElementById('add_branch_select').setAttribute('data-current-type', '');
             updateSupplierInput('add');
+            clearFormErrors('addForm');
         }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
@@ -1363,26 +1399,47 @@ $categories = array_keys($categoryPrefixes);
         }
 
         function validateRewardForm(type) {
-            let errors = [];
+            let formId = type === 'add' ? 'addForm' : 'editForm';
+            clearFormErrors(formId);
+            let hasError = false;
             const prefix = (type === 'add') ? 'add' : 'edit';
             
-            const elName = document.getElementById(prefix + '_name');
-            const elPoints = document.getElementById(prefix + '_points');
-            const elStock = document.getElementById(prefix + '_stock');
-            const elDesc = document.getElementById(prefix + '_desc');
-            const elCat = document.getElementById(prefix + '_category');
-            
-            if (!elName.value.trim()) errors.push("Item Name is required.");
-            if (!elCat.value) errors.push("Category is required.");
-            if (!elPoints.value) errors.push("Points Required is required.");
-            if (!elStock.value) errors.push("Stock Quantity is required.");
-            if (!elDesc.value.trim()) errors.push("Description is required.");
+            const getValue = (id) => document.getElementById(id) ? document.getElementById(id).value.trim() : '';
 
-            // Image Check (Add: Required. Edit: Required if no existing)
+            // 1. Basic Required Fields
+            const fields = {
+                name: prefix + '_name',
+                category: prefix + '_category',
+                points: prefix + '_points',
+                stock: prefix + '_stock',
+                desc: prefix + '_desc'
+            };
+
+            for (const [key, id] of Object.entries(fields)) {
+                if (!getValue(id)) {
+                    showFieldError(id, "This field is required.");
+                    hasError = true;
+                }
+            }
+
+            // 2. Image Check
             if (type === 'add') {
                 const elPhoto = document.getElementById('add_photo');
                 if (!elPhoto.files || elPhoto.files.length === 0) {
-                    errors.push("Reward Image is required.");
+                    const label = document.querySelector(`label[for="add_photo"]`);
+                    if(label) {
+                        label.classList.add('input-error');
+                        // Custom logic to show inline error for file input
+                        let parent = label.closest('.form-group');
+                        let errorDiv = parent.querySelector('.inline-error');
+                        if(!errorDiv) {
+                            errorDiv = document.createElement('div');
+                            errorDiv.className = 'inline-error';
+                            parent.appendChild(errorDiv);
+                        }
+                        errorDiv.textContent = "Reward Image is required.";
+                    }
+                    hasError = true;
                 }
             } else if (type === 'edit') {
                 const preview = document.getElementById('edit-preview-container');
@@ -1390,44 +1447,64 @@ $categories = array_keys($categoryPrefixes);
                 const hasNewFile = document.getElementById('edit_photo').files.length > 0;
                 
                 if (!hasExistingImg && !hasNewFile) {
-                    errors.push("Reward Image is required.");
+                    const label = document.querySelector(`label[for="edit_photo"]`);
+                    if(label) label.classList.add('input-error');
+                    let parent = label.closest('.form-group');
+                    let errorDiv = parent.querySelector('.inline-error');
+                    if(!errorDiv) {
+                        errorDiv = document.createElement('div');
+                        errorDiv.className = 'inline-error';
+                        parent.appendChild(errorDiv);
+                    }
+                    errorDiv.textContent = "Reward Image is required.";
+                    hasError = true;
                 }
             }
 
-            // Supplier Check (New Requirement)
-            const sourceType = document.getElementById(prefix + '_source_type').value;
+            // 3. Supplier Check
+            const sourceType = getValue(prefix + '_source_type');
             if (!sourceType) {
-                errors.push("Supplier Source is required.");
+                showFieldError(prefix + '_source_type', "Supplier Source is required.");
+                hasError = true;
             } else if (sourceType === 'Others') {
-                if (!document.getElementById(prefix + '_manual_supplier').value.trim()) errors.push("Supplier Name is required.");
+                if (!getValue(prefix + '_manual_supplier')) {
+                    showFieldError(prefix + '_manual_supplier', "Supplier Name is required.");
+                    hasError = true;
+                }
             } else {
-                if (!document.getElementById(prefix + '_branch_select').value) errors.push("Branch selection is required.");
+                if (!getValue(prefix + '_branch_select')) {
+                    showFieldError(prefix + '_branch_select', "Branch selection is required.");
+                    hasError = true;
+                }
             }
 
-            // Status Check for Edit (New Requirement)
+            // 4. Status Check (Edit Only)
             if (type === 'edit') {
-                const elStatus = document.getElementById('edit_status');
-                if (!elStatus.value) errors.push("Status is required.");
+                if (!getValue('edit_status')) {
+                    showFieldError('edit_status', "Status is required.");
+                    hasError = true;
+                }
             }
 
-            const catVal = elCat.value;
+            // 5. Expiry Check
+            const catVal = getValue(prefix + '_category');
             if (['Food', 'Voucher'].includes(catVal)) {
-                const elExpiry = document.getElementById(prefix + '_expiry');
-                if (!elExpiry.value) errors.push("Expiry Date is required for this category.");
+                if (!getValue(prefix + '_expiry')) {
+                    showFieldError(prefix + '_expiry', "Expiry Date is required.");
+                    hasError = true;
+                }
             }
 
+            // 6. Name Regex Check
             const nameRegex = /^[a-zA-Z0-9\s\-]+$/;
-            const errorDiv = document.getElementById(prefix + '_name_error');
-            
-            if (elName.value.trim() && !nameRegex.test(elName.value.trim())) {
-                errors.push("Name can only contain letters, numbers, spaces and hyphens.");
-                if(errorDiv) errorDiv.style.display = 'block';
-            } else {
-                if(errorDiv) errorDiv.style.display = 'none';
+            const nameVal = getValue(prefix + '_name');
+            if (nameVal && !nameRegex.test(nameVal)) {
+                showFieldError(prefix + '_name', "Name can only contain letters, numbers, spaces and hyphens.");
+                hasError = true;
             }
 
-            if (errors.length > 0) {
-                showSystemError("Please correct the following errors:<br>" + errors.join("<br>"));
+            if (hasError) {
+                showSystemError("Please correct the highlighted errors.");
                 return false;
             }
 
@@ -1463,10 +1540,11 @@ $categories = array_keys($categoryPrefixes);
             const expiringCategories = ['Food', 'Voucher']; 
             if (expiringCategories.includes(category)) {
                 container.style.display = 'block';
-                expiryInput.required = true;
+                // Note: removed 'required' attr to let JS handle it, but keeping it for UX is fine if novalidate is used
+                // However, our JS logic handles the check now.
             } else {
                 container.style.display = 'none';
-                expiryInput.value = ''; expiryInput.required = false;
+                expiryInput.value = ''; 
             }
         }
 
@@ -1540,6 +1618,7 @@ $categories = array_keys($categoryPrefixes);
         }
 
         function openEditModal(data) {
+            clearFormErrors('editForm');
             document.getElementById('edit_id').value = data.Reward_ID;
             document.getElementById('edit_name').value = data.Reward_ItemName;
             document.getElementById('edit_desc').value = data.Reward_Description;

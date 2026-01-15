@@ -56,10 +56,25 @@ function generateStrongRandomPassword($length = 12) {
     return str_shuffle($password);
 }
 
-// --- HELPER: Validate IC match DOB (Server Side) ---
+// --- HELPER: Validate IC match DOB & Structure (Server Side) ---
 function validateIcDobMatch($ic, $dob) {
     $cleanIc = preg_replace('/[^0-9]/', '', $ic);
-    if (strlen($cleanIc) < 6) return false;
+    
+    // 1. Check Full Length (Must be 12 digits)
+    if (strlen($cleanIc) !== 12) return false;
+
+    // 2. Check PB Code (Digits 7-8) - Malaysia Codes
+    $pbCode = (int)substr($cleanIc, 6, 2);
+    $validPBCodes = [
+        1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16, // States
+        21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40, // Extended
+        41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59, // Extended
+        82 // Sarawak Special
+    ];
+    
+    if (!in_array($pbCode, $validPBCodes)) {
+        return false;
+    }
 
     $y = substr($cleanIc, 0, 2);
     $m = substr($cleanIc, 2, 2);
@@ -177,34 +192,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
         }
     }
     
-    // Validations
+    // Validations (PHP Side - Safety Net)
     if (empty($name)) { $errorMessage = "Full Name is required."; }
     elseif (empty($email)) { $errorMessage = "Email is required."; }
     elseif (empty($contactRaw)) { $errorMessage = "Contact Number is required."; }
     elseif (empty($icNumber)) { $errorMessage = "IC Number is required."; }
     elseif (empty($dob)) { $errorMessage = "Date of Birth is required."; } 
-    elseif (!preg_match('/^[a-zA-Z\s]+$/', $name)) { $errorMessage = "Name can only contain letters and spaces."; } 
-    elseif (strpos($email, '@') === false) { $errorMessage = "Invalid email: Missing '@' symbol."; } 
-    elseif (!preg_match('/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) { $errorMessage = "Invalid email: Missing valid domain extension."; } 
+    elseif (!validateIcDobMatch($icNumber, $dob)) { $errorMessage = "IC Number Invalid (Check Length, PB Code) or Mismatch with DOB."; }
     else {
-        $phoneParts = explode('-', $contactRaw);
-        if (count($phoneParts) != 2) {
-            $errorMessage = "Invalid phone format. Use 12-3456789.";
-        } else {
-            $backDigits = $phoneParts[1];
-            if (strlen($backDigits) < 7 || strlen($backDigits) > 8) {
-                $errorMessage = "Invalid phone number: Must be 7-8 digits after hyphen.";
-            }
-        }
-    }
-
-    if (!isset($errorMessage)) {
-        if (!validateIcDobMatch($icNumber, $dob)) {
-            $errorMessage = "IC Number and Date of Birth do not match.";
-        }
-    }
-
-    if (!isset($errorMessage)) {
         if (!empty($dob)) {
             $birthDate = new DateTime($dob);
             $today = new DateTime();
@@ -321,28 +316,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
     elseif (empty($contactRaw)) { $errorMessage = "Contact Number is required."; } 
     elseif (empty($icNumber)) { $errorMessage = "IC Number is required."; } 
     elseif (empty($dob)) { $errorMessage = "Date of Birth is required."; }
-    elseif (!preg_match('/^[a-zA-Z\s]+$/', $name)) { $errorMessage = "Name can only contain letters and spaces."; } 
-    elseif (strpos($email, '@') === false) { $errorMessage = "Invalid email: Missing '@' symbol."; } 
-    elseif (!preg_match('/@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', $email)) { $errorMessage = "Invalid email domain."; } 
+    elseif (!validateIcDobMatch($icNumber, $dob)) { $errorMessage = "IC Number Invalid or Mismatch with DOB."; }
     else {
-        $phoneParts = explode('-', $contactRaw);
-        if (count($phoneParts) != 2) {
-            $errorMessage = "Invalid phone format. Use 12-3456789.";
-        } else {
-            $backDigits = $phoneParts[1];
-            if (strlen($backDigits) < 7 || strlen($backDigits) > 8) {
-                $errorMessage = "Invalid phone number: Must be 7-8 digits after hyphen.";
-            }
-        }
-    }
-
-    if (!isset($errorMessage)) {
-        if (!validateIcDobMatch($icNumber, $dob)) {
-            $errorMessage = "IC Number and Date of Birth do not match.";
-        }
-    }
-
-    if (!isset($errorMessage)) {
         if (!empty($dob)) {
             $birthDate = new DateTime($dob);
             $today = new DateTime();
@@ -621,6 +596,10 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
         @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
         .close-lightbox { position: absolute; top: 20px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; z-index: 2002; }
         .close-lightbox:hover { color: #bbb; text-decoration: none; }
+        
+        /* New Error Styles */
+        .input-error { border-color: var(--danger) !important; background-color: #fff5f5; }
+        .inline-error { color: var(--danger); font-size: 11px; margin-top: 4px; display: block; font-weight: 500; animation: fadeIn 0.3s; }
 
         @media (max-width: 768px) {
             .form-row { flex-direction: column; gap: 0; }
@@ -809,16 +788,15 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                     
                     <div class="form-group">
                         <label class="form-label">Full Name <span class="required">*</span></label>
-                        <input type="text" name="name" class="form-input" required placeholder="e.g. John Doe" oninput="validateName(this)">
+                        <input type="text" id="add_name" name="name" class="form-input" required placeholder="e.g. John Doe" oninput="validateName(this)">
                         <span class="form-guide">Enter full name as per IC. English letters only.</span>
                     </div>
                     
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Email <span class="required">*</span></label>
-                            <input type="email" id="email" name="email" class="form-input" required onblur="validateEmail('email', 'emailError')" placeholder="e.g. admin@example.com">
+                            <input type="email" id="email" name="email" class="form-input" required placeholder="e.g. admin@example.com">
                             <span class="form-guide">Valid email address for login.</span>
-                            <div id="emailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Contact Number <span class="required">*</span></label>
@@ -838,9 +816,8 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                         </div>
                         <div class="form-group">
                             <label class="form-label">Date of Birth <span class="required">*</span></label>
-                            <input type="date" id="dob" name="dob" class="form-input" required onchange="validateAge('dob', 'ageError')">
+                            <input type="date" id="dob" name="dob" class="form-input" required onchange="validateAge('dob')">
                             <span class="form-guide">Select birth date from calendar.</span>
-                            <div id="ageError" class="error-message">Must be at least 18 years old.</div>
                         </div>
                     </div>
                     
@@ -944,9 +921,8 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Email <span class="required">*</span></label>
-                            <input type="email" id="edit_email" name="email" class="form-input" required placeholder="e.g. admin@example.com" onblur="validateEmail('edit_email', 'editEmailError')">
+                            <input type="email" id="edit_email" name="email" class="form-input" required placeholder="e.g. admin@example.com">
                             <span class="form-guide">Valid email address for login.</span>
-                            <div id="editEmailError" class="error-message">Invalid email format.</div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Contact Number <span class="required">*</span></label>
@@ -966,9 +942,8 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                         </div>
                         <div class="form-group">
                             <label class="form-label">Date of Birth <span class="required">*</span></label>
-                            <input type="date" id="edit_dob" name="dob" class="form-input" required onchange="validateAge('edit_dob', 'editAgeError')">
+                            <input type="date" id="edit_dob" name="dob" class="form-input" required onchange="validateAge('edit_dob')">
                             <span class="form-guide">Select birth date from calendar.</span>
-                            <div id="editAgeError" class="error-message">Must be at least 18 years old.</div>
                         </div>
                     </div>
 
@@ -1128,17 +1103,13 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
             }
         }
 
-        // --- NEW: SYSTEM ALERT FUNCTION ---
         function showSystemError(messageHTML) {
             const errorBox = document.getElementById('floatingError');
             const errorText = document.getElementById('floatingErrorText');
             if(errorBox && errorText) {
                 errorText.innerHTML = messageHTML;
                 errorBox.style.display = 'flex';
-                // Auto hide after 5 seconds
-                setTimeout(() => { 
-                    errorBox.style.display = 'none'; 
-                }, 5000);
+                setTimeout(() => { errorBox.style.display = 'none'; }, 5000);
             }
         }
 
@@ -1149,7 +1120,6 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
             setupICInput('ic_number', 'dob'); 
             setupICInput('edit_ic_number', 'edit_dob'); 
             
-            // Auto hide alerts that came from PHP
             const s = document.getElementById('floatingSuccess');
             const e = document.getElementById('floatingError');
             if(s && s.style.display === 'flex') setTimeout(() => { s.style.display='none'; }, 5000);
@@ -1168,14 +1138,12 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
             });
         });
 
-        // Dropdown Logic
         function toggleMenu(e, id) { 
             e.stopPropagation(); 
             document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); 
             document.getElementById('menu-' + id).style.display = 'block'; 
         }
 
-        // --- Image Preview Logic ---
         function previewImage(input, containerId, infoId, nameId) {
             const container = document.getElementById(containerId);
             const info = document.getElementById(infoId);
@@ -1188,13 +1156,13 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
         }
         function removeImage(inputId, containerId, infoId, originalSrc = null) { document.getElementById(inputId).value = ''; if(infoId) document.getElementById(infoId).style.display = 'none'; const container = document.getElementById(containerId); if (originalSrc) { container.innerHTML = `<img src="${originalSrc}" alt="Preview">`; } else { container.innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; } }
 
-        // --- Modal Control Functions ---
         function openAddAdminModal() { 
             const dob = document.getElementById('dob');
             dob.readOnly = false;
             dob.style.backgroundColor = "";
             dob.style.color = "";
             dob.style.cursor = "";
+            clearFormErrors('addAdminForm');
             document.getElementById('addAdminModal').style.display = 'flex'; 
         }
         function closeAddAdminModal() { 
@@ -1202,6 +1170,7 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
             document.getElementById('addAdminForm').reset();
             document.getElementById('add-preview-container').innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>';
             document.getElementById('add-file-info').style.display = 'none';
+            clearFormErrors('addAdminForm');
         }
         
         function openEditAdminModal(admin) {
@@ -1240,40 +1209,22 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                 container.innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>';
             }
             
-            // Re-trigger visual updates for locked fields if needed
+            clearFormErrors('editAdminForm');
             document.getElementById('edit_ic_number').dispatchEvent(new Event('input'));
         }
-        function closeEditAdminModal() { document.getElementById('editAdminModal').style.display = 'none'; document.getElementById('editAdminForm').reset(); }
+        function closeEditAdminModal() { document.getElementById('editAdminModal').style.display = 'none'; }
 
         function openViewAdminModal(admin) {
             const img = document.getElementById('view_profile_picture');
             const icon = document.getElementById('view_default_icon');
-            
-            if (admin.Admin_ProfilePicture) {
-                img.src = admin.Admin_ProfilePicture;
-                img.style.display = 'block';
-                icon.style.display = 'none';
-            } else {
-                img.style.display = 'none';
-                icon.style.display = 'flex';
-            }
-
+            if (admin.Admin_ProfilePicture) { img.src = admin.Admin_ProfilePicture; img.style.display = 'block'; icon.style.display = 'none'; } else { img.style.display = 'none'; icon.style.display = 'flex'; }
             document.getElementById('view_fullname').value = admin.Admin_Name;
             document.getElementById('view_email').value = admin.Admin_Email;
             document.getElementById('view_contact').value = admin.Admin_ContactNumber;
             document.getElementById('view_ic').value = admin.Admin_ICNUMBER;
             document.getElementById('view_dob').value = admin.Admin_DOB;
-            
-            let address = admin.Admin_Address1;
-            if(admin.Admin_Address2) address += ", " + admin.Admin_Address2;
-            if(admin.Admin_Address3) address += ", " + admin.Admin_Address3;
-            address += "\n" + admin.Admin_PostalCode + " " + admin.Admin_City + ", " + admin.Admin_State;
-            
-            document.getElementById('view_address').value = address;
-            document.getElementById('view_role').value = admin.Admin_Role;
-            document.getElementById('view_status').value = admin.Admin_Status;
-            document.getElementById('view_comment').value = admin.Admin_Comment;
-
+            let address = admin.Admin_Address1; if(admin.Admin_Address2) address += ", " + admin.Admin_Address2; if(admin.Admin_Address3) address += ", " + admin.Admin_Address3; address += "\n" + admin.Admin_PostalCode + " " + admin.Admin_City + ", " + admin.Admin_State;
+            document.getElementById('view_address').value = address; document.getElementById('view_role').value = admin.Admin_Role; document.getElementById('view_status').value = admin.Admin_Status; document.getElementById('view_comment').value = admin.Admin_Comment;
             document.getElementById('viewAdminModal').style.display = 'flex';
         }
         function closeViewAdminModal() { document.getElementById('viewAdminModal').style.display = 'none'; }
@@ -1285,195 +1236,153 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
         }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-        // --- NEW: LIGHTBOX FUNCTIONS ---
-        function openLightbox(imageSrc) { 
-            if (!imageSrc) return; 
-            document.getElementById('lightboxImage').src = imageSrc; 
-            document.getElementById('imageLightbox').style.display = "flex"; 
-        }
-        function closeLightbox() { 
-            document.getElementById('imageLightbox').style.display = "none"; 
-        }
+        function openLightbox(imageSrc) { if (!imageSrc) return; document.getElementById('lightboxImage').src = imageSrc; document.getElementById('imageLightbox').style.display = "flex"; }
+        function closeLightbox() { document.getElementById('imageLightbox').style.display = "none"; }
 
-        // --- Helper Functions (Formatting & Validation) ---
         function setupPhoneInput(id) { 
-            const el = document.getElementById(id); 
-            if(!el) return; 
+            const el = document.getElementById(id); if(!el) return; 
             el.addEventListener('input', function() { 
-                let v = this.value.replace(/\D/g, '');
-                if (v.length > 11) v = v.substring(0, 11);
-                let newVal = v;
-                if (v.length > 2) {
-                    newVal = v.substring(0, 2) + '-' + v.substring(2);
-                } 
+                let v = this.value.replace(/\D/g, ''); if (v.length > 11) v = v.substring(0, 11);
+                let newVal = v; if (v.length > 2) { newVal = v.substring(0, 2) + '-' + v.substring(2); } 
                 this.value = newVal;
             }); 
         }
         
         function setupICInput(inputId, dobInputId) {
-            const input = document.getElementById(inputId); 
-            const dobInput = document.getElementById(dobInputId); 
-            if(!input) return;
+            const input = document.getElementById(inputId); const dobInput = document.getElementById(dobInputId); if(!input) return;
             input.addEventListener('input', function(e) {
-                let val = this.value.replace(/\D/g, ''); 
-                if (val.length > 12) val = val.substring(0, 12);
-                let newVal = ''; 
-                newVal += val.substring(0, 6); 
-                if (val.length > 6) newVal += '-' + val.substring(6, 8); 
-                if (val.length > 8) newVal += '-' + val.substring(8, 12);
+                let val = this.value.replace(/\D/g, ''); if (val.length > 12) val = val.substring(0, 12);
+                let newVal = ''; newVal += val.substring(0, 6); if (val.length > 6) newVal += '-' + val.substring(6, 8); if (val.length > 8) newVal += '-' + val.substring(8, 12);
                 this.value = newVal;
                 
                 if (val.length >= 6) {
-                    const yy = parseInt(val.substring(0, 2)); 
-                    const mm = val.substring(2, 4); 
-                    const dd = val.substring(4, 6);
+                    const yy = parseInt(val.substring(0, 2)); const mm = val.substring(2, 4); const dd = val.substring(4, 6);
                     const prefix = (yy > (new Date().getFullYear() % 100)) ? '19' : '20';
                     const fullDate = `${prefix}${val.substring(0, 2)}-${mm}-${dd}`;
                     const dateObj = new Date(fullDate);
                     
                     if (!isNaN(dateObj.getTime()) && parseInt(mm) >= 1 && parseInt(mm) <= 12 && parseInt(dd) >= 1 && parseInt(dd) <= 31) { 
-                        dobInput.value = fullDate;
-                        dobInput.readOnly = true;
-                        dobInput.style.backgroundColor = "#e9ecef";
-                        dobInput.style.color = "#6c757d";
-                        dobInput.style.cursor = "not-allowed";
-
-                        if (inputId === 'ic_number') validateAge('dob', 'ageError');
-                        if (inputId === 'edit_ic_number') validateAge('edit_dob', 'editAgeError');
-                    } else {
-                        dobInput.readOnly = false;
-                        dobInput.style.backgroundColor = "";
-                        dobInput.style.color = "";
-                        dobInput.style.cursor = "";
-                    }
-                } else {
-                    dobInput.readOnly = false;
-                    dobInput.style.backgroundColor = "";
-                    dobInput.style.color = "";
-                    dobInput.style.cursor = "";
-                }
+                        dobInput.value = fullDate; dobInput.readOnly = true; dobInput.style.backgroundColor = "#e9ecef"; dobInput.style.color = "#6c757d"; dobInput.style.cursor = "not-allowed";
+                    } else { dobInput.readOnly = false; dobInput.style.backgroundColor = ""; dobInput.style.color = ""; dobInput.style.cursor = ""; }
+                } else { dobInput.readOnly = false; dobInput.style.backgroundColor = ""; dobInput.style.color = ""; dobInput.style.cursor = ""; }
             });
         }
 
         function autoSelectState(postalInputId, stateSelectId) {
-            const postal = document.getElementById(postalInputId).value;
-            const stateSelect = document.getElementById(stateSelectId);
+            const postal = document.getElementById(postalInputId).value; const stateSelect = document.getElementById(stateSelectId);
             if (postal.length >= 2) {
-                const prefix = parseInt(postal.substring(0, 2));
-                let foundState = "";
-                if ((prefix >= 50 && prefix <= 60)) foundState = "Kuala Lumpur";
-                else if (prefix >= 62 && prefix <= 62) foundState = "Putrajaya";
-                else if (prefix >= 40 && prefix <= 48) foundState = "Selangor";
-                else if (prefix >= 63 && prefix <= 68) foundState = "Selangor";
-                else if (prefix >= 79 && prefix <= 86) foundState = "Johor";
-                else if (prefix >= 75 && prefix <= 78) foundState = "Melaka";
-                else if (prefix >= 70 && prefix <= 73) foundState = "Negeri Sembilan";
-                else if (prefix >= 30 && prefix <= 39) foundState = "Perak";
-                else if (prefix >= 10 && prefix <= 14) foundState = "Penang";
-                else if (prefix >= 1 && prefix <= 2) foundState = "Perlis"; 
-                else if (prefix >= 5 && prefix <= 9) foundState = "Kedah"; 
-                else if (prefix >= 15 && prefix <= 18) foundState = "Kelantan";
-                else if (prefix >= 20 && prefix <= 24) foundState = "Terengganu";
-                else if (prefix >= 25 && prefix <= 28) foundState = "Pahang";
-                else if (prefix >= 88 && prefix <= 91) foundState = "Sabah";
-                else if (prefix >= 93 && prefix <= 98) foundState = "Sarawak";
+                const prefix = parseInt(postal.substring(0, 2)); let foundState = "";
+                if ((prefix >= 50 && prefix <= 60)) foundState = "Kuala Lumpur"; else if (prefix >= 62 && prefix <= 62) foundState = "Putrajaya";
+                else if (prefix >= 40 && prefix <= 48) foundState = "Selangor"; else if (prefix >= 63 && prefix <= 68) foundState = "Selangor";
+                else if (prefix >= 79 && prefix <= 86) foundState = "Johor"; else if (prefix >= 75 && prefix <= 78) foundState = "Melaka";
+                else if (prefix >= 70 && prefix <= 73) foundState = "Negeri Sembilan"; else if (prefix >= 30 && prefix <= 39) foundState = "Perak";
+                else if (prefix >= 10 && prefix <= 14) foundState = "Penang"; else if (prefix >= 1 && prefix <= 2) foundState = "Perlis"; 
+                else if (prefix >= 5 && prefix <= 9) foundState = "Kedah"; else if (prefix >= 15 && prefix <= 18) foundState = "Kelantan";
+                else if (prefix >= 20 && prefix <= 24) foundState = "Terengganu"; else if (prefix >= 25 && prefix <= 28) foundState = "Pahang";
+                else if (prefix >= 88 && prefix <= 91) foundState = "Sabah"; else if (prefix >= 93 && prefix <= 98) foundState = "Sarawak";
                 else if (prefix >= 87 && prefix <= 87) foundState = "Labuan";
-
-                if (foundState !== "") {
-                    stateSelect.value = foundState;
-                }
+                if (foundState !== "") { stateSelect.value = foundState; }
             }
         }
 
         function validateName(input) { input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); }
-        
-        function validateEmail(id, errorId) { 
-            const val = document.getElementById(id).value;
-            const errorDiv = document.getElementById(errorId);
-            const domainPattern = /@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-            if (val.indexOf('@') === -1) {
-                errorDiv.innerText = "Missing '@' symbol";
-                errorDiv.style.display = 'block';
-                return "Missing '@'";
-            }
-            if (!domainPattern.test(val)) {
-                errorDiv.innerText = "Missing valid domain (e.g. .com)";
-                errorDiv.style.display = 'block';
-                return "Invalid domain";
-            }
-            errorDiv.style.display = 'none';
-            return ""; 
-        }
-        
-        function validatePhone(id) {
-            const val = document.getElementById(id).value;
-            if (!val.includes('-')) return "Format must be XX-XXXXXXX (missing dash)";
-            const parts = val.split('-');
-            if (parts.length !== 2) return "Invalid format";
-            const back = parts[1];
-            if (back.length < 7 || back.length > 8) return "Must be 7-8 digits after hyphen";
-            return ""; 
-        }
-        
-        function validateAge(id, errorId) { 
-            const d = document.getElementById(id).value; 
-            if(!d) return false; 
-            const diff = new Date().getFullYear() - new Date(d).getFullYear(); 
-            const valid = diff >= 18; 
-            document.getElementById(errorId).style.display = valid ? 'none' : 'block'; 
-            return valid; 
+        function isAgeValid(dobValue) { if (!dobValue) return true; const age = new Date().getFullYear() - new Date(dobValue).getFullYear(); return age >= 18; }
+
+        // --- NEW VALIDATION HELPERS ---
+        function validateEmailDetailed(email) {
+            if (!email) return "Email is required.";
+            if (!email.includes('@')) return "Missing '@' symbol in email.";
+            const parts = email.split('@');
+            if (parts[1].length === 0) return "Missing domain name (e.g., gmail.com).";
+            if (!parts[1].includes('.')) return "Missing top-level domain (like .com or .org).";
+            const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailPattern.test(email)) return "Invalid email format.";
+            return "";
         }
 
-        // --- UPDATED: REPLACED ALERT WITH CUSTOM SYSTEM ERROR ---
+        function validatePhoneDetailed(val) {
+            if (!val.includes('-')) return "Missing hyphen symbol ( - ). Please use the dash key.";
+            const parts = val.split('-'); 
+            if (parts.length !== 2) return "Invalid format. Only one hyphen ( - ) allowed.";
+            const front = parts[0]; const back = parts[1];
+            if (front.length < 2 || front.length > 3) return "Invalid prefix (e.g., 11, 12).";
+            if (back.length === 0) return "Please enter numbers after the hyphen ( - ).";
+            if (back.length < 7) { let diff = 7 - back.length; return `Number after hyphen ( - ) is too short. Please add at least ${diff} more digit(s).`; }
+            if (back.length > 8) return "Number after hyphen ( - ) is too long. Max 8 digits allowed."; 
+            return ""; 
+        }
+
+        function validateICDetailed(ic) {
+            const clean = ic.replace(/[^0-9]/g, '');
+            if (clean.length !== 12) return "Incomplete IC number. Must be 12 digits (excluding hyphens).";
+            const pbCode = parseInt(clean.substring(6, 8));
+            const validStateCodes = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,82];
+            if (!validStateCodes.includes(pbCode)) return "Invalid State/Place of Birth code (digits 7-8).";
+            return "";
+        }
+
+        function showFieldError(inputId, message) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            input.classList.add('input-error');
+            let parent = input.parentNode;
+            if (parent.classList.contains('phone-format')) { parent = parent.parentNode; }
+            let errorDiv = parent.querySelector('.inline-error');
+            if (!errorDiv) { errorDiv = document.createElement('div'); errorDiv.className = 'inline-error'; parent.appendChild(errorDiv); }
+            errorDiv.textContent = message;
+        }
+
+        function clearFormErrors(formId) {
+            const form = document.getElementById(formId);
+            const inputs = form.querySelectorAll('.form-input, .form-select');
+            inputs.forEach(i => i.classList.remove('input-error'));
+            form.querySelectorAll('.inline-error').forEach(e => e.remove());
+        }
+
         function validateForm(type) { 
-            let errors = [];
-            let name, email, dob, contactId, contactVal, icNum;
+            let formId = type === 'add' ? 'addAdminForm' : 'editAdminForm';
+            clearFormErrors(formId);
+            let hasError = false;
 
-            if (type === 'add') {
-                name = document.getElementsByName('name')[0].value.trim();
-                email = document.getElementById('email').value.trim();
-                dob = document.getElementById('dob').value;
-                contactId = 'add_contact';
-                icNum = document.getElementById('ic_number').value.trim();
+            let nameId = type === 'add' ? 'add_name' : 'edit_name';
+            let emailId = type === 'add' ? 'email' : 'edit_email';
+            let contactId = type === 'add' ? 'add_contact' : 'edit_contact';
+            let icId = type === 'add' ? 'ic_number' : 'edit_ic_number';
+            let dobId = type === 'add' ? 'dob' : 'edit_dob';
+
+            // 1. Name
+            let nameVal = document.getElementById(nameId).value.trim();
+            if (!nameVal) { showFieldError(nameId, "This field is required."); hasError = true; }
+
+            // 2. Email
+            let emailVal = document.getElementById(emailId).value.trim();
+            let emailMsg = validateEmailDetailed(emailVal);
+            if (emailMsg) { showFieldError(emailId, emailMsg); hasError = true; }
+
+            // 3. Contact
+            let contactVal = document.getElementById(contactId).value.trim();
+            if (!contactVal) { showFieldError(contactId, "This field is required."); hasError = true; }
+            else {
+                let phoneMsg = validatePhoneDetailed(contactVal);
+                if (phoneMsg) { showFieldError(contactId, phoneMsg); hasError = true; }
+            }
+
+            // 4. IC (Strict Check)
+            let icVal = document.getElementById(icId).value.trim();
+            if (!icVal) { 
+                showFieldError(icId, "This field is required."); hasError = true; 
             } else {
-                name = document.getElementById('edit_name').value.trim();
-                email = document.getElementById('edit_email').value.trim();
-                dob = document.getElementById('edit_dob').value;
-                contactId = 'edit_contact';
-                icNum = document.getElementById('edit_ic_number').value.trim();
+                let icMsg = validateICDetailed(icVal);
+                if (icMsg) { showFieldError(icId, icMsg); hasError = true; }
             }
 
-            // 1. Basic Required Field Checks (Manual because novalidate is on)
-            if (!name) errors.push("Full Name is required.");
-            if (!email) errors.push("Email is required.");
-            if (!icNum) errors.push("IC Number is required.");
-            if (!dob) errors.push("Date of Birth is required.");
-            
-            contactVal = document.getElementById(contactId).value.trim();
-            if (!contactVal) errors.push("Contact Number is required.");
+            // 5. DOB
+            let dobVal = document.getElementById(dobId).value;
+            if (!dobVal) { showFieldError(dobId, "This field is required."); hasError = true; }
+            else if (!isAgeValid(dobVal)) { showFieldError(dobId, "Must be at least 18 years old."); hasError = true; }
 
-            // 2. Specific Format Validations
-            if (name && /\d/.test(name)) errors.push("Name cannot contain numbers.");
-
-            if (email) {
-                let emailMsg = validateEmail(type === 'add' ? 'email' : 'edit_email', type === 'add' ? 'emailError' : 'editEmailError');
-                if(emailMsg) errors.push("Email: " + emailMsg);
-            }
-
-            if (dob) {
-                if (!validateAge(type === 'add' ? 'dob' : 'edit_dob', type === 'add' ? 'ageError' : 'editAgeError')) {
-                    errors.push("Age: Must be 18+.");
-                }
-            }
-
-            if (contactVal) {
-                let phoneMsg = validatePhone(contactId);
-                if(phoneMsg) errors.push("Contact: " + phoneMsg);
-            }
-
-            if (errors.length > 0) {
-                // Modified: Use showSystemError instead of alert
-                showSystemError("Please correct errors:<br>" + errors.join("<br>"));
+            if (hasError) {
+                showSystemError("Please correct the highlighted errors.");
                 return false; 
             }
             return true; 

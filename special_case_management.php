@@ -53,7 +53,6 @@ $conn->query("UPDATE special_case SET Case_Status = 'Upcoming' WHERE Start_Date 
 
 // --- AJAX: FETCH DONATIONS FOR A SPECIFIC CASE ---
 if (isset($_GET['action']) && $_GET['action'] == 'get_case_donations' && isset($_GET['case_id'])) {
-    // Security check: Staff should not access this data
     if ($isStaff) { echo json_encode([]); exit(); }
 
     $caseId = intval($_GET['case_id']);
@@ -62,7 +61,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_case_donations' && isset($
             FROM orders o 
             JOIN donor d ON o.Donor_ID = d.Donor_ID 
             WHERE o.Case_ID = $caseId 
-            AND o.Order_Status = 'Completed' 
+            AND (o.Order_Status = 'Completed' OR o.Order_Status = 'Success') 
             ORDER BY o.Order_Created_At DESC";
             
     $result = $conn->query($sql);
@@ -85,9 +84,8 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_case_donations' && isset($
     exit();
 }
 
-// --- AJAX: FETCH WITHDRAWAL HISTORY (UPDATED) ---
+// --- AJAX: FETCH WITHDRAWAL HISTORY ---
 if (isset($_GET['action']) && $_GET['action'] == 'get_withdrawal_history' && isset($_GET['case_id'])) {
-    // Security check: Staff should not access this data
     if ($isStaff) { echo json_encode(['history' => [], 'total_withdrawn' => 0, 'available_balance' => 0]); exit(); }
 
     $caseId = intval($_GET['case_id']);
@@ -257,35 +255,9 @@ function handleMultipleImageUpload($files) {
     return $uploadedPaths;
 }
 
-// --- VALIDATION HELPER ---
-function validateCaseInput($post, $mode = 'add') {
-    $errors = [];
-
-    if (preg_match('/\d/', $post['contact_name'])) $errors[] = "Contact Name cannot contain numbers.";
-    if (!empty($post['case_organizer']) && preg_match('/\d/', $post['case_organizer'])) $errors[] = "Organizer Name cannot contain numbers.";
-    if (!empty($post['contact_email']) && !filter_var($post['contact_email'], FILTER_VALIDATE_EMAIL)) $errors[] = "Invalid Contact Email format.";
-
-    $startDate = new DateTime($post['start_date']);
-    $endDate = new DateTime($post['end_date']);
-    $today = new DateTime(); $today->setTime(0, 0, 0); 
-    
-    if ($endDate < $startDate) $errors[] = "End Date cannot be earlier than Start Date.";
-    if ($mode === 'add' && $startDate < $today) $errors[] = "Start Date cannot be before the current date.";
-    if (floatval($post['target_amount']) < 0) $errors[] = "Target Amount cannot be negative.";
-
-    // Bank Validation
-    if (empty($post['bank_name'])) $errors[] = "Bank Name is required.";
-    if (empty($post['bank_account'])) $errors[] = "Bank Account Number is required.";
-
-    if (count($errors) > 0) return implode("<br>", $errors);
-    return true;
-}
-
 // --- ADD LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
-    $validation = validateCaseInput($_POST, 'add');
-    if ($validation !== true) { header("Location: special_case_management.php?error=" . urlencode($validation)); exit(); }
-
+    // Validation is handled via JS, but we do basic sanitization here
     $caseTitle = mysqli_real_escape_string($conn, $_POST['case_title']);
     $caseCategory = mysqli_real_escape_string($conn, $_POST['case_category']);
     $caseDescription = mysqli_real_escape_string($conn, $_POST['case_description']);
@@ -301,7 +273,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
     $caseVenue = mysqli_real_escape_string($conn, $_POST['case_venue']);
     $caseOrganizer = mysqli_real_escape_string($conn, $_POST['case_organizer']);
     $contactName = mysqli_real_escape_string($conn, $_POST['contact_name']);
-    $contactNumber = mysqli_real_escape_string($conn, (strpos($_POST['contact_number'], '+60')===0 ? $_POST['contact_number'] : "+60".$_POST['contact_number']));
+    
+    // Handle Phone Prefix on Server Side (Just in case)
+    $rawPhone = $_POST['contact_number'];
+    $contactNumber = (strpos($rawPhone, '+60') === 0) ? $rawPhone : "+60" . $rawPhone;
+    $contactNumber = mysqli_real_escape_string($conn, $contactNumber);
+
     $contactEmail = mysqli_real_escape_string($conn, $_POST['contact_email']);
     
     $addr1 = mysqli_real_escape_string($conn, $_POST['address1']);
@@ -328,9 +305,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
 
 // --- UPDATE LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_special_case'])) {
-    $validation = validateCaseInput($_POST, 'edit');
-    if ($validation !== true) { header("Location: special_case_management.php?error=" . urlencode($validation)); exit(); }
-
+    
     $caseId = mysqli_real_escape_string($conn, $_POST['case_id']);
     $caseTitle = mysqli_real_escape_string($conn, $_POST['case_title']);
     $caseCategory = mysqli_real_escape_string($conn, $_POST['case_category']); 
@@ -347,7 +322,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_special_case'])
     $caseVenue = mysqli_real_escape_string($conn, $_POST['case_venue']);
     $caseOrganizer = mysqli_real_escape_string($conn, $_POST['case_organizer']);
     $contactName = mysqli_real_escape_string($conn, $_POST['contact_name']);
-    $contactNumber = mysqli_real_escape_string($conn, (strpos($_POST['contact_number'], '+60')===0 ? $_POST['contact_number'] : "+60".$_POST['contact_number']));
+    
+    $rawPhone = $_POST['contact_number'];
+    $contactNumber = (strpos($rawPhone, '+60') === 0) ? $rawPhone : "+60" . $rawPhone;
+    $contactNumber = mysqli_real_escape_string($conn, $contactNumber);
+
     $contactEmail = mysqli_real_escape_string($conn, $_POST['contact_email']);
     
     $addr1 = mysqli_real_escape_string($conn, $_POST['address1']);
@@ -519,6 +498,10 @@ $allCaseImagesMap = [];
         .form-textarea { min-height: 100px; resize: vertical; }
         .required { color: red; margin-left: 3px; font-weight: bold; }
         .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
+
+        /* NEW ERROR STYLES */
+        .input-error { border-color: var(--danger) !important; background-color: #fff5f5; }
+        .inline-error { color: var(--danger); font-size: 11px; margin-top: 4px; display: block; font-weight: 500; animation: fadeIn 0.3s; }
         
         .phone-format { display: flex; align-items: center; }
         .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid #ddd; border-right: none; border-radius: 6px 0 0 6px; color: #666; font-size: 14px; font-weight: bold; }
@@ -619,13 +602,9 @@ $allCaseImagesMap = [];
                         <select name="filter_type" id="filterType" class="filter-select" onchange="toggleFilterInputs()">
                             <option value="">Filter By...</option>
                             <option value="status" <?php echo ($filterType == 'status') ? 'selected' : ''; ?>>Status</option>
-                            <option value="name_sort" <?php echo ($filterType == 'name_sort') ? 'selected' : ''; ?>>Name Sorting</option>
                             <option value="category" <?php echo ($filterType == 'category') ? 'selected' : ''; ?>>Category</option>
                             <option value="phone" <?php echo ($filterType == 'phone') ? 'selected' : ''; ?>>Phone Prefix</option>
                             <option value="city" <?php echo ($filterType == 'city') ? 'selected' : ''; ?>>City</option>
-                            <option value="start_date" <?php echo ($filterType == 'start_date') ? 'selected' : ''; ?>>Starts After</option>
-                            <option value="end_date" <?php echo ($filterType == 'end_date') ? 'selected' : ''; ?>>Ends Before</option>
-                            <option value="year" <?php echo ($filterType == 'year') ? 'selected' : ''; ?>>Created Year</option>
                         </select>
                     </div>
 
@@ -636,23 +615,6 @@ $allCaseImagesMap = [];
                             <option value="Upcoming" <?php echo ($filterValue == 'Upcoming') ? 'selected' : ''; ?>>Upcoming</option>
                             <option value="Completed" <?php echo ($filterValue == 'Completed') ? 'selected' : ''; ?>>Completed</option>
                             <option value="Cancelled" <?php echo ($filterValue == 'Cancelled') ? 'selected' : ''; ?>>Cancelled</option>
-                        </select>
-                    </div>
-
-                    <div id="filter_year_container" class="secondary-filter">
-                        <select name="filter_val_year" class="filter-select">
-                            <option value="">Select Year...</option>
-                            <?php foreach($years as $yr): ?>
-                                <option value="<?php echo $yr; ?>" <?php echo ($filterValue == $yr) ? 'selected' : ''; ?>><?php echo $yr; ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-
-                    <div id="filter_name_container" class="secondary-filter">
-                        <select name="filter_val_name" class="filter-select">
-                            <option value="">Select Order...</option>
-                            <option value="asc" <?php echo ($filterValue == 'asc') ? 'selected' : ''; ?>>Name (A-Z)</option>
-                            <option value="desc" <?php echo ($filterValue == 'desc') ? 'selected' : ''; ?>>Name (Z-A)</option>
                         </select>
                     </div>
 
@@ -681,10 +643,6 @@ $allCaseImagesMap = [];
                                 <option value="<?php echo $cat; ?>" <?php echo ($filterValue == $cat) ? 'selected' : ''; ?>><?php echo $cat; ?></option>
                             <?php endforeach; ?>
                         </select>
-                    </div>
-
-                    <div id="filter_date_container" class="secondary-filter">
-                        <input type="date" name="filter_val_date" class="filter-select" value="<?php echo ($filterType == 'start_date' || $filterType == 'end_date') ? $filterValue : ''; ?>">
                     </div>
 
                     <input type="text" name="search" class="search-input" placeholder="Search by title..." value="<?php echo htmlspecialchars($searchTerm); ?>">
@@ -789,12 +747,9 @@ $allCaseImagesMap = [];
                         if (!empty($filterType)) {
                             $queryParams['filter_type'] = $filterType;
                             if ($filterType == 'status' && !empty($filterValue)) $queryParams['filter_val_status'] = $filterValue;
-                            if ($filterType == 'year' && !empty($filterValue)) $queryParams['filter_val_year'] = $filterValue;
-                            if ($filterType == 'name_sort' && !empty($filterValue)) $queryParams['filter_val_name'] = $filterValue;
                             if ($filterType == 'phone' && !empty($filterValue)) $queryParams['filter_val_phone'] = $filterValue;
                             if ($filterType == 'city' && !empty($filterValue)) $queryParams['filter_val_city'] = $filterValue;
                             if ($filterType == 'category' && !empty($filterValue)) $queryParams['filter_val_category'] = $filterValue;
-                            if (($filterType == 'start_date' || $filterType == 'end_date') && !empty($filterValue)) $queryParams['filter_val_date'] = $filterValue;
                         }
                         $search_query = !empty($queryParams) ? '&' . http_build_query($queryParams) : '';
                         
@@ -862,7 +817,7 @@ $allCaseImagesMap = [];
                     <div class="form-group">
                         <label class="form-label">Case Images (Max 10) <span class="required">*</span></label>
                         <div class="upload-container">
-                            <div class="upload-box"><i class="fas fa-cloud-upload-alt"></i><p>Click or Drag images here</p><input type="file" id="add_case_images" name="case_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'add')" required></div>
+                            <div class="upload-box"><i class="fas fa-cloud-upload-alt"></i><p>Click or Drag images here</p><input type="file" id="add_case_images" name="case_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'add')"></div>
                             <div class="preview-grid" id="add_preview_container"></div>
                         </div>
                         <span class="form-guide">Upload high-quality images to represent the case. Accepted formats: JPG, PNG.</span>
@@ -871,31 +826,31 @@ $allCaseImagesMap = [];
                     <div class="form-section-title">Basic Information</div>
                     <div class="form-group">
                         <label class="form-label">Case Title <span class="required">*</span></label>
-                        <input type="text" id="add_case_title" name="case_title" class="form-input" required placeholder="e.g. Urgent Flood Relief 2026 - Helping Families Rebuild Their Homes">
+                        <input type="text" id="add_case_title" name="case_title" class="form-input" placeholder="e.g. Urgent Flood Relief 2026 - Helping Families Rebuild Their Homes">
                         <span class="form-guide">A clear, urgent title that describes the need.</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Category <span class="required">*</span></label>
-                        <select name="case_category" id="add_case_category" class="form-select" required>
+                        <select name="case_category" id="add_case_category" class="form-select">
                             <?php foreach($categories as $cat) echo "<option value='$cat'>$cat</option>"; ?>
                         </select>
                         <span class="form-guide">Select the category that best fits this case to help donors find it.</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Description <span class="required">*</span></label>
-                        <textarea id="add_case_description" name="case_description" class="form-textarea" rows="6" required placeholder="Please provide a detailed explanation of the situation, why funds are needed, and how they will be effectively used to help the beneficiaries..."></textarea>
+                        <textarea id="add_case_description" name="case_description" class="form-textarea" rows="6" placeholder="Please provide a detailed explanation of the situation, why funds are needed, and how they will be effectively used to help the beneficiaries..."></textarea>
                         <span class="form-guide">Detailed explanation of the situation, why funds are needed, and how they will be used.</span>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Target Amount (RM) <span class="required">*</span></label>
-                            <input type="number" id="add_target_amount" name="target_amount" class="form-input" step="0.01" min="0" required placeholder="Enter the total target amount in Ringgit Malaysia (RM)">
+                            <input type="number" id="add_target_amount" name="target_amount" class="form-input" step="0.01" min="0" placeholder="Enter the total target amount in Ringgit Malaysia (RM)">
                             <div id="add_amount_error" class="error-message">Cannot be negative.</div>
                             <span class="form-guide">Total funds required for this case.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Status <span class="required">*</span></label>
-                            <select id="add_case_status" name="case_status" class="form-select" required>
+                            <select id="add_case_status" name="case_status" class="form-select">
                                 <option value="Active">Active</option>
                                 <option value="Upcoming">Upcoming</option>
                             </select>
@@ -907,12 +862,12 @@ $allCaseImagesMap = [];
                     <div class="form-row">
                          <div class="form-group">
                             <label class="form-label">Start Date <span class="required">*</span></label>
-                            <input type="date" id="add_start_date" name="start_date" class="form-input" required min="<?php echo date('Y-m-d'); ?>">
+                            <input type="date" id="add_start_date" name="start_date" class="form-input" min="<?php echo date('Y-m-d'); ?>">
                             <span class="form-guide">Select the date when the campaign or assistance officially starts.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">End Date <span class="required">*</span></label>
-                            <input type="date" id="add_end_date" name="end_date" class="form-input" required>
+                            <input type="date" id="add_end_date" name="end_date" class="form-input">
                             <span class="form-guide">Select the date when the campaign is expected to end.</span>
                         </div>
                     </div>
@@ -921,7 +876,7 @@ $allCaseImagesMap = [];
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Bank Name <span class="required">*</span></label>
-                            <select name="bank_name" id="add_bank_name" class="form-select" onchange="setupBankValidation('add')" required>
+                            <select name="bank_name" id="add_bank_name" class="form-select" onchange="setupBankValidation('add')">
                                 <option value="">-- Select Bank Name --</option>
                                 <?php foreach($malaysiaBanks as $short => $full): ?>
                                     <option value="<?php echo $short; ?>"><?php echo $full; ?></option>
@@ -930,33 +885,33 @@ $allCaseImagesMap = [];
                         </div>
                         <div class="form-group">
                             <label class="form-label">Account Number <span class="required">*</span></label>
-                            <input type="text" name="bank_account" id="add_bank_account" class="form-input" placeholder="Please select a bank first to enter the account number" oninput="handleBankInput('add')" required>
+                            <input type="text" name="bank_account" id="add_bank_account" class="form-input" placeholder="Please select a bank first" oninput="handleBankInput('add')">
                             <div id="add_bank_counter" style="font-size:11px; margin-top:2px; font-weight:bold;"></div>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Venue Name <span class="required">*</span></label>
-                        <input type="text" id="add_case_venue" name="case_venue" class="form-input" required placeholder="e.g. Community Hall / Victim's House / Specific Location Name">
+                        <input type="text" id="add_case_venue" name="case_venue" class="form-input" placeholder="e.g. Community Hall / Victim's House / Specific Location Name">
                         <span class="form-guide">The specific location name where the event or case is centered.</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Address Line 1 <span class="required">*</span></label>
-                        <input type="text" id="add_address1" name="address1" class="form-input" required placeholder="e.g. No 15, Jalan Bahagia, Unit No, Building Name">
+                        <input type="text" id="add_address1" name="address1" class="form-input" placeholder="e.g. No 15, Jalan Bahagia, Unit No, Building Name">
                         <span class="form-guide">House no, street, building.</span>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" id="add_address2" name="address2" class="form-input" required placeholder="e.g. Taman Melati, Area, Village Name"><span class="form-guide">Area, Taman or Village.</span></div>
+                        <div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" id="add_address2" name="address2" class="form-input" placeholder="e.g. Taman Melati, Area, Village Name"><span class="form-guide">Area, Taman or Village.</span></div>
                         <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" id="add_address3" name="address3" class="form-input" placeholder="e.g. Section 12, Additional Landmark info"><span class="form-guide">Optional additional address info.</span></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" id="add_postal_code" name="postal_code" class="form-input" required placeholder="e.g. 50000"><span class="form-guide">Valid postal code.</span></div>
-                        <div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" id="add_city" name="city" class="form-input" required placeholder="e.g. Kuala Lumpur"><span class="form-guide">City name.</span></div>
+                        <div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" id="add_postal_code" name="postal_code" class="form-input" placeholder="e.g. 50000"><span class="form-guide">Valid postal code.</span></div>
+                        <div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" id="add_city" name="city" class="form-input" placeholder="e.g. Kuala Lumpur"><span class="form-guide">City name.</span></div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">State <span class="required">*</span></label>
-                            <select id="add_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
+                            <select id="add_state" name="state" class="form-select"><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
                             <span class="form-guide">Select state.</span>
                         </div>
                         <div class="form-group">
@@ -970,12 +925,12 @@ $allCaseImagesMap = [];
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Organizer Name <span class="required">*</span></label>
-                            <input type="text" id="add_case_organizer" name="case_organizer" class="form-input" required placeholder="e.g. Hope Foundation Organization">
+                            <input type="text" id="add_case_organizer" name="case_organizer" class="form-input" placeholder="e.g. Hope Foundation Organization">
                             <span class="form-guide">Person or group managing this case (No Numbers).</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Contact Person <span class="required">*</span></label>
-                            <input type="text" id="add_contact_name" name="contact_name" class="form-input" required placeholder="e.g. Mr. Ali Bin Abu (Manager)">
+                            <input type="text" id="add_contact_name" name="contact_name" class="form-input" placeholder="e.g. Mr. Ali Bin Abu (Manager)">
                             <span class="form-guide">Primary point of contact (No Numbers).</span>
                         </div>
                     </div>
@@ -984,13 +939,13 @@ $allCaseImagesMap = [];
                             <label class="form-label">Contact Phone <span class="required">*</span></label>
                             <div class="phone-format">
                                 <span class="phone-prefix">+60</span>
-                                <input type="text" id="add_contact_number" name="contact_number" class="form-input phone-input" maxlength="11" required placeholder="12-3456789">
+                                <input type="text" id="add_contact_number" name="contact_number" class="form-input phone-input" maxlength="11" placeholder="12-3456789">
                             </div>
                             <span class="form-guide">Mobile or office number.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Contact Email <span class="required">*</span></label>
-                            <input type="email" id="add_contact_email" name="contact_email" class="form-input" required placeholder="e.g. contact.person@example.com">
+                            <input type="email" id="add_contact_email" name="contact_email" class="form-input" placeholder="e.g. contact.person@example.com">
                             <div id="addEmailError" class="error-message">Invalid email format.</div>
                             <span class="form-guide">Official contact email.</span>
                         </div>
@@ -1025,31 +980,31 @@ $allCaseImagesMap = [];
                     <div class="form-section-title">Basic Information</div>
                     <div class="form-group">
                         <label class="form-label">Case Title <span class="required">*</span></label>
-                        <input type="text" id="edit_case_title" name="case_title" class="form-input" required>
+                        <input type="text" id="edit_case_title" name="case_title" class="form-input">
                         <span class="form-guide">Title of the case.</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Category <span class="required">*</span></label>
-                        <select name="case_category" id="edit_case_category" class="form-select" required>
+                        <select name="case_category" id="edit_case_category" class="form-select">
                             <?php foreach($categories as $cat) echo "<option value='$cat'>$cat</option>"; ?>
                         </select>
                         <span class="form-guide">Update the category if needed.</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Description <span class="required">*</span></label>
-                        <textarea id="edit_case_description" name="case_description" class="form-textarea" rows="6" required></textarea>
+                        <textarea id="edit_case_description" name="case_description" class="form-textarea" rows="6"></textarea>
                         <span class="form-guide">Full details describing the case.</span>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Target Amount (RM) <span class="required">*</span></label>
-                            <input type="number" id="edit_target_amount" name="target_amount" class="form-input" step="0.01" min="0" required>
+                            <input type="number" id="edit_target_amount" name="target_amount" class="form-input" step="0.01" min="0">
                             <div id="edit_amount_error" class="error-message">Cannot be negative.</div>
                             <span class="form-guide">Fundraising goal.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Status <span class="required">*</span></label>
-                            <select id="edit_case_status" name="case_status" class="form-select" onchange="toggleCancelReason()" required>
+                            <select id="edit_case_status" name="case_status" class="form-select" onchange="toggleCancelReason()">
                                 <option value="Active">Active</option>
                                 <option value="Upcoming">Upcoming</option>
                                 <option value="Completed">Completed</option>
@@ -1069,12 +1024,12 @@ $allCaseImagesMap = [];
                     <div class="form-row">
                          <div class="form-group">
                             <label class="form-label">Start Date <span class="required">*</span></label>
-                            <input type="date" id="edit_start_date" name="start_date" class="form-input" required>
+                            <input type="date" id="edit_start_date" name="start_date" class="form-input">
                             <span class="form-guide">When the campaign or assistance starts.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">End Date <span class="required">*</span></label>
-                            <input type="date" id="edit_end_date" name="end_date" class="form-input" required>
+                            <input type="date" id="edit_end_date" name="end_date" class="form-input">
                             <span class="form-guide">When the campaign is expected to end.</span>
                         </div>
                     </div>
@@ -1083,7 +1038,7 @@ $allCaseImagesMap = [];
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Bank Name <span class="required">*</span></label>
-                            <select name="bank_name" id="edit_bank_name" class="form-select" onchange="setupBankValidation('edit')" required>
+                            <select name="bank_name" id="edit_bank_name" class="form-select" onchange="setupBankValidation('edit')">
                                 <option value="">-- Select Bank --</option>
                                 <?php foreach($malaysiaBanks as $short => $full): ?>
                                     <option value="<?php echo $short; ?>"><?php echo $full; ?></option>
@@ -1092,33 +1047,33 @@ $allCaseImagesMap = [];
                         </div>
                         <div class="form-group">
                             <label class="form-label">Account Number <span class="required">*</span></label>
-                            <input type="text" name="bank_account" id="edit_bank_account" class="form-input" oninput="handleBankInput('edit')" required>
+                            <input type="text" name="bank_account" id="edit_bank_account" class="form-input" oninput="handleBankInput('edit')">
                             <div id="edit_bank_counter" style="font-size:11px; margin-top:2px; font-weight:bold;"></div>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Venue Name <span class="required">*</span></label>
-                        <input type="text" id="edit_case_venue" name="case_venue" class="form-input" required>
+                        <input type="text" id="edit_case_venue" name="case_venue" class="form-input">
                         <span class="form-guide">The specific location name where the event or case is centered.</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Address Line 1 <span class="required">*</span></label>
-                        <input type="text" id="edit_address1" name="address1" class="form-input" required>
+                        <input type="text" id="edit_address1" name="address1" class="form-input">
                         <span class="form-guide">House no, street, building.</span>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" id="edit_address2" name="address2" class="form-input" required><span class="form-guide">Area, Taman or Village.</span></div>
+                        <div class="form-group"><label class="form-label">Address Line 2 <span class="required">*</span></label><input type="text" id="edit_address2" name="address2" class="form-input"><span class="form-guide">Area, Taman or Village.</span></div>
                         <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" id="edit_address3" name="address3" class="form-input"><span class="form-guide">Optional additional address info.</span></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" id="edit_postal_code" name="postal_code" class="form-input" required><span class="form-guide">Valid postal code.</span></div>
-                        <div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" id="edit_city" name="city" class="form-input" required><span class="form-guide">City name.</span></div>
+                        <div class="form-group"><label class="form-label">Postcode <span class="required">*</span></label><input type="text" id="edit_postal_code" name="postal_code" class="form-input"><span class="form-guide">Valid postal code.</span></div>
+                        <div class="form-group"><label class="form-label">City <span class="required">*</span></label><input type="text" id="edit_city" name="city" class="form-input"><span class="form-guide">City name.</span></div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">State <span class="required">*</span></label>
-                            <select id="edit_state" name="state" class="form-select" required><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
+                            <select id="edit_state" name="state" class="form-select"><?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?></select>
                             <span class="form-guide">Select state.</span>
                         </div>
                         <div class="form-group">
@@ -1132,12 +1087,12 @@ $allCaseImagesMap = [];
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Organizer Name <span class="required">*</span></label>
-                            <input type="text" id="edit_case_organizer" name="case_organizer" class="form-input" required>
+                            <input type="text" id="edit_case_organizer" name="case_organizer" class="form-input">
                             <span class="form-guide">Person or group managing this case (No Numbers).</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Contact Person <span class="required">*</span></label>
-                            <input type="text" id="edit_contact_name" name="contact_name" class="form-input" required>
+                            <input type="text" id="edit_contact_name" name="contact_name" class="form-input">
                             <span class="form-guide">Primary point of contact (No Numbers).</span>
                         </div>
                     </div>
@@ -1146,13 +1101,13 @@ $allCaseImagesMap = [];
                             <label class="form-label">Contact Phone <span class="required">*</span></label>
                             <div class="phone-format">
                                 <span class="phone-prefix">+60</span>
-                                <input type="text" id="edit_contact_number" name="contact_number" class="form-input phone-input" maxlength="11" required>
+                                <input type="text" id="edit_contact_number" name="contact_number" class="form-input phone-input" maxlength="11">
                             </div>
                             <span class="form-guide">Mobile or office number.</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Contact Email <span class="required">*</span></label>
-                            <input type="email" id="edit_contact_email" name="contact_email" class="form-input" required>
+                            <input type="email" id="edit_contact_email" name="contact_email" class="form-input">
                             <div id="editEmailError" class="error-message">Invalid email format.</div>
                             <span class="form-guide">Official contact email.</span>
                         </div>
@@ -1182,12 +1137,9 @@ $allCaseImagesMap = [];
             const type = document.getElementById('filterType').value;
             document.querySelectorAll('.secondary-filter').forEach(el => el.classList.remove('active'));
             if (type === 'status') document.getElementById('filter_status_container').classList.add('active');
-            else if (type === 'year') document.getElementById('filter_year_container').classList.add('active');
-            else if (type === 'name_sort') document.getElementById('filter_name_container').classList.add('active');
             else if (type === 'phone') document.getElementById('filter_phone_container').classList.add('active');
             else if (type === 'city') document.getElementById('filter_city_container').classList.add('active');
             else if (type === 'category') document.getElementById('filter_category_container').classList.add('active');
-            else if (type === 'start_date' || type === 'end_date') document.getElementById('filter_date_container').classList.add('active');
         }
 
         function setupPostcodeState(postcodeId, stateSelectId) {
@@ -1269,6 +1221,52 @@ $allCaseImagesMap = [];
                 counter.innerText = `Digits: ${current} / ${rule.digits}`;
                 counter.style.color = (current === rule.digits) ? '#28a745' : '#dc3545';
             }
+        }
+
+        // --- VALIDATION HELPERS ---
+        function showFieldError(inputId, message) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            input.classList.add('input-error');
+            let parent = input.parentNode;
+            if (parent.classList.contains('phone-format') || parent.classList.contains('upload-box')) { parent = parent.parentNode; }
+            let errorDiv = parent.querySelector('.inline-error');
+            if (!errorDiv) {
+                errorDiv = document.createElement('div');
+                errorDiv.className = 'inline-error';
+                parent.appendChild(errorDiv);
+            }
+            errorDiv.textContent = message;
+        }
+
+        function clearFormErrors(formId) {
+            const form = document.getElementById(formId);
+            const inputs = form.querySelectorAll('.form-input, .form-select, .form-textarea, .upload-box');
+            inputs.forEach(i => i.classList.remove('input-error'));
+            form.querySelectorAll('.inline-error').forEach(e => e.remove());
+        }
+
+        function validateEmailDetailed(email) {
+            if (!email) return "This field is required.";
+            if (!email.includes('@')) return "Missing '@' symbol in email.";
+            const parts = email.split('@');
+            if (parts[1].length === 0) return "Missing domain name (e.g., gmail.com).";
+            if (!parts[1].includes('.')) return "Missing top-level domain (like .com or .org).";
+            const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailPattern.test(email)) return "Invalid email format.";
+            return "";
+        }
+
+        function validatePhoneDetailed(val) {
+            if (!val.includes('-')) return "Missing hyphen ( - ).";
+            const parts = val.split('-'); 
+            if (parts.length !== 2) return "Invalid format. Use 1 hyphen.";
+            const front = parts[0]; const back = parts[1];
+            if (front.length < 2 || front.length > 3) return "Invalid prefix (e.g., 12).";
+            if (back.length === 0) return "Enter numbers after hyphen.";
+            if (back.length < 7) { return `Too short. Current: ${back.length}, Need: 7 or 8.`; }
+            if (back.length > 8) return `Too long. Current: ${back.length}, Max: 8.`; 
+            return ""; 
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -1362,23 +1360,23 @@ $allCaseImagesMap = [];
             if (menu) menu.style.display = 'block';
         }
 
-        // --- Withdrawal History JS (UPDATED) ---
+        // --- Withdrawal History JS ---
         function openWithdrawalHistory(caseId) {
             document.querySelectorAll('.dropdown-content').forEach(d=>d.style.display='none');
             document.getElementById('withdrawalModal').style.display='flex';
             const container = document.getElementById('withdrawalListContainer');
             const totalDisplay = document.getElementById('totalWithdrawnDisplay');
-            const availableDisplay = document.getElementById('availableBalanceDisplay'); // NEW
+            const availableDisplay = document.getElementById('availableBalanceDisplay');
             
             container.innerHTML = '<div style="text-align:center; padding:20px;">Loading...</div>';
             totalDisplay.innerText = "RM 0.00";
-            availableDisplay.innerText = "RM 0.00"; // Reset
+            availableDisplay.innerText = "RM 0.00";
             
             fetch(`special_case_management.php?action=get_withdrawal_history&case_id=${caseId}`)
                 .then(r=>r.json()).then(res=>{
                     container.innerHTML = '';
                     totalDisplay.innerText = "RM " + res.total_withdrawn;
-                    availableDisplay.innerText = "RM " + res.available_balance; // NEW: Set Available Balance
+                    availableDisplay.innerText = "RM " + res.available_balance;
                     
                     if(res.history.length === 0) { 
                         container.innerHTML='<div style="text-align:center; padding:20px; color:#888;">No withdrawals found.</div>'; 
@@ -1481,6 +1479,8 @@ $allCaseImagesMap = [];
             addFiles = []; 
             updateFileInput('add_case_images', []);
             document.getElementById('add_preview_container').innerHTML = '';
+            setupBankValidation('add');
+            clearFormErrors('addSpecialCaseForm');
             document.getElementById('addSpecialCaseModal').style.display = 'flex';
         }
 
@@ -1569,6 +1569,7 @@ $allCaseImagesMap = [];
             renderEditPreviews();
 
             toggleCancelReason();
+            clearFormErrors('editSpecialCaseForm');
             document.getElementById('editSpecialCaseModal').style.display = 'flex';
         }
         
@@ -1587,122 +1588,123 @@ $allCaseImagesMap = [];
             }
         }
 
-        function checkEmail(val) {
-            if(!val) return true; 
-            return /^[^\s@]+@[^\s@]+\.(com|net|org|edu|gov|my)$/i.test(val);
-        }
+        // --- MASTER VALIDATION FUNCTION ---
+        function validateSpecialCaseForm(mode) {
+            let formId = mode === 'add' ? 'addSpecialCaseForm' : 'editSpecialCaseForm';
+            clearFormErrors(formId);
+            let hasError = false;
 
-        function checkName(val) {
-            if (!val) return true;
-            return !/\d/.test(val);
-        }
-
-        function validateSpecialCaseForm(type) {
-            let isValid = true;
-            let errors = [];
-            const prefix = (type === 'add') ? 'add' : 'edit';
-            
             const getValue = (id) => document.getElementById(id) ? document.getElementById(id).value.trim() : '';
 
-            if (type === 'add' && addFiles.length === 0) errors.push("At least one image is required.");
-            if (type === 'edit' && editNewFiles.length === 0 && editExistingImages.length === 0) errors.push("At least one image is required.");
+            // 1. Basic Required Fields Check
+            // We use 'novalidate' on form, so we must check manually
+            const requiredFields = {
+                'case_title': 'Title is required.',
+                'case_category': 'Category is required.',
+                'case_description': 'Description is required.',
+                'target_amount': 'Target Amount is required.',
+                'start_date': 'Start Date is required.',
+                'end_date': 'End Date is required.',
+                'case_venue': 'Venue is required.',
+                'address1': 'Address Line 1 is required.',
+                'address2': 'Address Line 2 is required.',
+                'postal_code': 'Postcode is required.',
+                'city': 'City is required.',
+                'state': 'State is required.',
+                'case_organizer': 'Organizer Name is required.',
+                'contact_name': 'Contact Name is required.',
+                'contact_number': 'Contact Phone is required.',
+                'contact_email': 'Contact Email is required.',
+                'bank_name': 'Bank Name is required.',
+                'bank_account': 'Bank Account is required.'
+            };
 
-            if(!getValue(prefix + '_case_title')) errors.push("Title is required.");
-            if(!getValue(prefix + '_case_category')) errors.push("Category is required.");
-            if(!getValue(prefix + '_case_description')) errors.push("Description is required.");
-            if(!getValue(prefix + '_target_amount')) errors.push("Target Amount is required.");
-            
-            if(type === 'add' && !document.getElementById('add_case_status').value) errors.push("Status is required.");
-            
-            if (type === 'edit') {
-                const status = document.getElementById('edit_case_status').value;
-                const cancelReason = document.getElementById('edit_cancel_reason').value.trim();
-                if (status === 'Cancelled' && !cancelReason) {
-                    errors.push("Cancellation Reason is required.");
-                    document.getElementById('edit_cancel_error').style.display = 'block';
-                    isValid = false;
-                } else {
-                    document.getElementById('edit_cancel_error').style.display = 'none';
+            for (const [key, msg] of Object.entries(requiredFields)) {
+                const fullId = mode + '_' + key;
+                if (!getValue(fullId)) {
+                    showFieldError(fullId, msg);
+                    hasError = true;
                 }
             }
-            
-            if(!getValue(prefix + '_start_date')) errors.push("Start Date is required.");
-            if(!getValue(prefix + '_end_date')) errors.push("End Date is required.");
-            if(!getValue(prefix + '_case_venue')) errors.push("Venue is required.");
-            if(!getValue(prefix + '_address1')) errors.push("Address Line 1 is required.");
-            if(!getValue(prefix + '_address2')) errors.push("Address Line 2 is required.");
-            if(!getValue(prefix + '_postal_code')) errors.push("Postcode is required.");
-            if(!getValue(prefix + '_city')) errors.push("City is required.");
-            if(!getValue(prefix + '_state')) errors.push("State is required.");
-            
-            if(!getValue(prefix + '_case_organizer')) errors.push("Organizer is required.");
-            if(!getValue(prefix + '_contact_name')) errors.push("Contact Name is required.");
-            if(!getValue(prefix + '_contact_number')) errors.push("Contact Phone is required.");
-            if(!getValue(prefix + '_contact_email')) errors.push("Contact Email is required.");
 
-            const bankName = document.getElementById(prefix+'_bank_name').value;
-            const bankAcc = document.getElementById(prefix+'_bank_account').value;
-            if(!bankName) errors.push("Bank Name is required.");
-            if(!bankAcc) errors.push("Bank Account is required.");
-            else if(bankName && bankRules[bankName] && bankAcc.length !== bankRules[bankName].digits) {
-                errors.push(`${bankName} account must be ${bankRules[bankName].digits} digits.`);
-                isValid = false;
+            // 2. Name Validation (No Numbers)
+            const orgId = mode + '_case_organizer';
+            const contactNameId = mode + '_contact_name';
+            
+            if (/\d/.test(getValue(orgId))) {
+                showFieldError(orgId, "Organizer name cannot contain numbers.");
+                hasError = true;
+            }
+            if (/\d/.test(getValue(contactNameId))) {
+                showFieldError(contactNameId, "Contact name cannot contain numbers.");
+                hasError = true;
             }
 
-            const start = document.getElementById(prefix + '_start_date').value;
-            const end = document.getElementById(prefix + '_end_date').value;
-            if(start && end) {
-                if(new Date(end) < new Date(start)) {
-                    errors.push("End Date cannot be earlier than Start Date.");
-                    isValid = false;
+            // 3. Email Validation
+            const emailId = mode + '_contact_email';
+            const emailMsg = validateEmailDetailed(getValue(emailId));
+            if (emailMsg) {
+                showFieldError(emailId, emailMsg);
+                hasError = true;
+            }
+
+            // 4. Phone Validation
+            const phoneId = mode + '_contact_number';
+            const phoneMsg = validatePhoneDetailed(getValue(phoneId));
+            if (phoneMsg) {
+                showFieldError(phoneId, phoneMsg);
+                hasError = true;
+            }
+
+            // 5. Bank Account Digits
+            const bankName = getValue(mode + '_bank_name');
+            const bankAcc = getValue(mode + '_bank_account');
+            if (bankName && bankRules[bankName]) {
+                if (bankAcc.length !== bankRules[bankName].digits) {
+                    showFieldError(mode + '_bank_account', `Must be exactly ${bankRules[bankName].digits} digits.`);
+                    hasError = true;
                 }
             }
-            
-            if (type === 'add' && start) {
-                const startDate = new Date(start);
-                const today = new Date();
-                today.setHours(0,0,0,0); 
-                
-                if(startDate < today) {
-                      errors.push("Start Date cannot be in the past.");
-                      isValid = false;
+
+            // 6. Date Logic
+            const startVal = getValue(mode + '_start_date');
+            const endVal = getValue(mode + '_end_date');
+            if (startVal && endVal) {
+                if (endVal < startVal) {
+                    showFieldError(mode + '_end_date', "End Date cannot be before Start Date.");
+                    hasError = true;
+                }
+                const today = new Date().toISOString().split('T')[0];
+                if (endVal < today) {
+                     showFieldError(mode + '_end_date', "End Date cannot be in the past.");
+                     hasError = true;
+                }
+                if (mode === 'add' && startVal < today) {
+                    showFieldError(mode + '_start_date', "Start Date cannot be in the past.");
+                    hasError = true;
                 }
             }
-            
-            const amountVal = document.getElementById(prefix + '_target_amount').value;
-            if (amountVal && parseFloat(amountVal) < 0) {
-                 if(document.getElementById(prefix + '_amount_error')) document.getElementById(prefix + '_amount_error').style.display = 'block';
-                 errors.push("Target Amount cannot be negative.");
-                 isValid = false;
-            } else {
-                 if(document.getElementById(prefix + '_amount_error')) document.getElementById(prefix + '_amount_error').style.display = 'none';
+
+            // 7. Image Check
+            if (mode === 'add' && addFiles.length === 0) {
+                const box = document.querySelector('#addSpecialCaseForm .upload-box');
+                if(box) {
+                    box.classList.add('input-error');
+                    let p = box.parentNode; let ed = p.querySelector('.inline-error');
+                    if(!ed) { ed = document.createElement('div'); ed.className='inline-error'; p.appendChild(ed); }
+                    ed.textContent = "At least one image is required.";
+                }
+                hasError = true;
             }
 
-            const organizerName = document.getElementById(prefix + '_case_organizer').value;
-            const contactName = document.getElementById(prefix + '_contact_name').value;
-            
-            if(!checkName(organizerName)) {
-                errors.push("Organizer Name cannot contain numbers.");
-                isValid = false;
-            }
-            if(!checkName(contactName)) {
-                errors.push("Contact Person Name cannot contain numbers.");
-                isValid = false;
+            // 8. Cancel Reason (Edit Only)
+            if (mode === 'edit' && getValue('edit_case_status') === 'Cancelled' && !getValue('edit_cancel_reason')) {
+                showFieldError('edit_cancel_reason', "Reason is required when Cancelled.");
+                hasError = true;
             }
 
-            const emailId = prefix + '_contact_email';
-            const emailErrId = prefix + 'EmailError';
-            const emailVal = document.getElementById(emailId).value;
-            if(emailVal && !checkEmail(emailVal)) {
-                if(document.getElementById(emailErrId)) document.getElementById(emailErrId).style.display = 'block';
-                errors.push("Invalid Email Format.");
-                isValid = false;
-            } else {
-                if(document.getElementById(emailErrId)) document.getElementById(emailErrId).style.display = 'none';
-            }
-
-            if(!isValid || errors.length > 0) {
-                showSystemError(errors.join("<br>"));
+            if (hasError) {
+                showSystemError("Please correct the highlighted errors.");
                 return false;
             }
             return true;
