@@ -15,20 +15,24 @@ $currentAdminId = $_SESSION['admin_id'];
 $adminSql = "SELECT Admin_Name, Admin_Role, Admin_ProfilePicture FROM admin WHERE Admin_ID = $currentAdminId";
 $adminResult = $conn->query($adminSql);
 
+$adminName = "Admin";
+$adminRole = "Staff";
+$adminProfilePicture = null;
+
 if ($adminResult && $adminResult->num_rows > 0) {
     $adminData = $adminResult->fetch_assoc();
     $adminName = $adminData['Admin_Name'];
+    $adminRole = $adminData['Admin_Role'];
     $adminProfilePicture = $adminData['Admin_ProfilePicture']; 
 }
 
-// --- FILE UPLOAD HELPER (New Function for Multiple Files) ---
+// --- FILE UPLOAD HELPER ---
 function handleWithdrawalUpload($files) {
     $paths = [];
     $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
     $dir = "uploads/withdrawals/";
     if (!is_dir($dir)) mkdir($dir, 0777, true);
 
-    // Re-organize $_FILES structure if needed
     if (!is_array($files['name'])) return [];
 
     $count = count($files['name']);
@@ -47,17 +51,72 @@ function handleWithdrawalUpload($files) {
 }
 
 // ==========================================
+// 0. HANDLE WITHDRAWAL APPROVAL / REJECTION
+// ==========================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type'])) {
+    $action = $_POST['action_type']; // 'approve' or 'reject'
+    $wd_id = intval($_POST['withdrawal_id']);
+    
+    // Only Super Admin can approve/reject
+    if ($adminRole !== 'Super Admin') {
+        header("Location: payment_management.php?error=Permission Denied. Only Super Admin can perform this action.");
+        exit();
+    }
+
+    // Get Withdrawal Details to check who requested it
+    $checkSql = "SELECT Admin_ID, Status FROM withdrawals WHERE Withdrawal_ID = $wd_id";
+    $checkRes = $conn->query($checkSql);
+    
+    if($checkRes->num_rows > 0) {
+        $wdData = $checkRes->fetch_assoc();
+        
+        // Cannot approve own request
+        if ($wdData['Admin_ID'] == $currentAdminId) {
+            header("Location: payment_management.php?error=You cannot approve your own withdrawal request.");
+            exit();
+        }
+
+        if ($wdData['Status'] !== 'Pending') {
+             header("Location: payment_management.php?error=This request has already been processed.");
+             exit();
+        }
+
+        if ($action == 'approve') {
+            // Update to Completed
+            $stmt = $conn->prepare("UPDATE withdrawals SET Status = 'Completed', Approved_By = ?, Processed_Date = NOW() WHERE Withdrawal_ID = ?");
+            $stmt->bind_param("ii", $currentAdminId, $wd_id);
+            if($stmt->execute()) {
+                header("Location: payment_management.php?success=Withdrawal Approved Successfully.");
+                exit();
+            }
+        } elseif ($action == 'reject') {
+            // Update to Rejected
+            $stmt = $conn->prepare("UPDATE withdrawals SET Status = 'Rejected', Approved_By = ?, Processed_Date = NOW() WHERE Withdrawal_ID = ?");
+            $stmt->bind_param("ii", $currentAdminId, $wd_id);
+             if($stmt->execute()) {
+                header("Location: payment_management.php?success=Withdrawal Rejected.");
+                exit();
+            }
+        }
+    } else {
+        header("Location: payment_management.php?error=Record not found.");
+        exit();
+    }
+}
+
+// ==========================================
 // 0. HANDLE WITHDRAWAL FORM SUBMISSION
 // ==========================================
 if (isset($_POST['submit_withdrawal'])) {
-    $errors = []; // 用于收集错误信息
+    $errors = []; 
 
-    $w_type = $_POST['withdrawal_type']; // 'branch', 'activity', 'case'
-    $w_amount = floatval($_POST['amount']); // 确保是数字
-    $w_bank_name = $_POST['bank_name'];
-    $w_bank_acc = $_POST['bank_account'];
+    $w_type = $_POST['withdrawal_type'] ?? '';
+    $w_amount = floatval($_POST['amount'] ?? 0);
+    $w_bank_name = $_POST['bank_name'] ?? '';
+    $w_bank_acc = $_POST['bank_account'] ?? '';
     
-    // 基本验证
+    // PHP Side Validation (Backup)
+    if (empty($w_type)) $errors[] = "Withdrawal Source Type is required.";
     if ($w_amount <= 0) $errors[] = "Amount must be greater than RM 0.00.";
 
     $branch_id = null;
@@ -65,9 +124,8 @@ if (isset($_POST['submit_withdrawal'])) {
     $case_id = null;
     $current_balance = 0;
     
-    // Determine IDs and Validate Balance based on selection
     if ($w_type == 'branch') {
-        $branch_id = $_POST['target_id_branch'];
+        $branch_id = $_POST['target_id_branch'] ?? null;
         if(!$branch_id) $errors[] = "Please select a Branch.";
         else {
             $in = $conn->query("SELECT SUM(Order_Amount) as t FROM orders WHERE Branch_ID = $branch_id AND Order_PaymentStatus IN ('Success','Completed')")->fetch_assoc()['t'] ?? 0;
@@ -76,7 +134,7 @@ if (isset($_POST['submit_withdrawal'])) {
         }
 
     } elseif ($w_type == 'activity') {
-        $activity_id = $_POST['target_id_activity'];
+        $activity_id = $_POST['target_id_activity'] ?? null;
         if(!$activity_id) $errors[] = "Please select an Activity.";
         else {
             $act_sql = "SELECT Branch_ID, Activity_GetAmount FROM activity WHERE Activity_ID = '$activity_id'";
@@ -91,8 +149,8 @@ if (isset($_POST['submit_withdrawal'])) {
         }
 
     } elseif ($w_type == 'case') {
-        $case_id = $_POST['target_id_case'];
-        $branch_id = $_POST['handling_branch_id']; 
+        $case_id = $_POST['target_id_case'] ?? null;
+        $branch_id = $_POST['handling_branch_id'] ?? null; 
         if(!$case_id) $errors[] = "Please select a Special Case.";
         if(!$branch_id) $errors[] = "Please select a Processing Branch.";
         else {
@@ -103,12 +161,10 @@ if (isset($_POST['submit_withdrawal'])) {
         }
     }
 
-    // 检查余额是否足够
     if ($w_amount > $current_balance) {
-        $errors[] = "Insufficient funds! Available: RM " . number_format($current_balance, 2) . ", Request: RM " . number_format($w_amount, 2);
+        $errors[] = "Insufficient funds! Available: RM " . number_format($current_balance, 2);
     }
 
-    // 处理文件上传 (Image/PDF) - Modified for Multiple Files
     $proof_json = "[]";
     if (empty($errors)) {
         if (isset($_FILES['proof_file']) && !empty($_FILES['proof_file']['name'][0])) {
@@ -116,21 +172,21 @@ if (isset($_POST['submit_withdrawal'])) {
             if (empty($uploaded_paths)) {
                 $errors[] = "Failed to upload files or invalid format (Only JPG, PNG, PDF).";
             } else {
-                $proof_json = json_encode($uploaded_paths); // Store as JSON string
+                $proof_json = json_encode($uploaded_paths);
             }
         } else {
             $errors[] = "At least one Reference Proof file is required.";
         }
     }
 
-    // 如果没有错误，执行插入
     if (empty($errors) && $branch_id && $w_amount > 0) {
-        $stmt = $conn->prepare("INSERT INTO withdrawals (Branch_ID, Activity_ID, Case_ID, Amount, Bank_Name, Bank_Account, Reference_Proof, Status, Admin_ID, Request_Date) VALUES (?, ?, ?, ?, ?, ?, ?, 'Completed', ?, NOW())");
+        // Status: Pending
+        $stmt = $conn->prepare("INSERT INTO withdrawals (Branch_ID, Activity_ID, Case_ID, Amount, Bank_Name, Bank_Account, Reference_Proof, Status, Admin_ID, Request_Date) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', ?, NOW())");
         
         $stmt->bind_param("iiidsssi", $branch_id, $activity_id, $case_id, $w_amount, $w_bank_name, $w_bank_acc, $proof_json, $currentAdminId);
         
         if ($stmt->execute()) {
-            header("Location: payment_management.php?success=Withdrawal recorded successfully");
+            header("Location: payment_management.php?success=Withdrawal request submitted. Waiting for Super Admin approval.");
             exit();
         } else {
             $error = "Database Error: " . $stmt->error;
@@ -139,7 +195,6 @@ if (isset($_POST['submit_withdrawal'])) {
         }
         $stmt->close();
     } elseif (!empty($errors)) {
-        // 将错误数组转换为字符串，每行一个
         $errorString = implode("<br>", $errors);
         header("Location: payment_management.php?error=" . urlencode($errorString));
         exit();
@@ -252,7 +307,7 @@ if (isset($_GET['export']) && $_GET['export'] == 'ewallet') {
     exit();
 }
 
-// --- Fetch Data for Withdrawal Dropdowns & Calculate Balance ---
+// --- Fetch Data ---
 $branchList = [];
 $branches = $conn->query("SELECT Branch_ID, Branch_Name, Branch_BankName, Branch_BankAccount FROM branch WHERE Is_Deleted = 0 ORDER BY Branch_Name ASC");
 while($b = $branches->fetch_assoc()) {
@@ -289,7 +344,6 @@ $jsonBranches = json_encode($branchList);
 $jsonActivities = json_encode($activityList);
 $jsonCases = json_encode($caseList);
 
-// --- Stats Functions ---
 $totalRevenue = $conn->query("SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus IN ('Completed', 'Success')")->fetch_assoc()['total'] ?? 0;
 $recurringRevenue = $conn->query("SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus IN ('Completed', 'Success') AND Order_Type = 'Recurring'")->fetch_assoc()['total'] ?? 0;
 $totalWalletBalance = $conn->query("SELECT SUM(Donor_Wallet) as total FROM donor")->fetch_assoc()['total'] ?? 0;
@@ -303,23 +357,24 @@ $page_tx = isset($_GET['page_tx']) && is_numeric($_GET['page_tx']) ? (int)$_GET[
 if ($page_tx < 1) $page_tx = 1;
 $offset_tx = ($page_tx - 1) * $limit;
 
-// Input Variables
 $search_tx = isset($_GET['search_tx']) ? mysqli_real_escape_string($conn, $_GET['search_tx']) : '';
 $filter_type_tx = isset($_GET['filter_type_tx']) ? $_GET['filter_type_tx'] : '';
 $filter_date_tx = isset($_GET['filter_date_tx']) ? $_GET['filter_date_tx'] : '';
 $filter_method_tx = isset($_GET['filter_method_tx']) ? $_GET['filter_method_tx'] : '';
 
-// Build Query with UNION
-// 1. Orders Part (Income)
+// 1. Orders
 $q1 = "SELECT 
         o.Order_ID as ID, 
         o.Order_TXN_Ref as Ref, 
         d.Donor_Name as Name, 
-        d.Donor_Email as Email, 
+        d.Donor_Email as Email,
+        'Donor' as User_Role, 
+        NULL as Request_Admin_ID,
         o.Order_Amount as Amount, 
         o.Order_Created_At as Date, 
         o.Order_PaymentMethod as Method, 
         'Income' as Type,
+        o.Order_Status as Status_Text,
         b.Branch_Name, a.Activity_Name, s.Case_Title
        FROM orders o
        JOIN donor d ON o.Donor_ID = d.Donor_ID
@@ -328,22 +383,26 @@ $q1 = "SELECT
        LEFT JOIN special_case s ON o.Case_ID = s.Case_ID
        WHERE o.Order_PaymentStatus IN ('Success', 'Completed')";
 
-// 2. Withdrawals Part (Expense)
+// 2. Withdrawals
 $q2 = "SELECT 
         w.Withdrawal_ID as ID, 
         CONCAT('WDR-', w.Withdrawal_ID) as Ref, 
-        'System Admin' as Name, 
-        w.Bank_Name as Email, 
+        adm.Admin_Name as Name, 
+        adm.Admin_Email as Email,
+        adm.Admin_Role as User_Role, 
+        w.Admin_ID as Request_Admin_ID,
         w.Amount as Amount, 
         w.Request_Date as Date, 
         'Bank Transfer' as Method, 
         'Withdrawal' as Type,
+        w.Status as Status_Text,
         b.Branch_Name, a.Activity_Name, s.Case_Title
        FROM withdrawals w
+       JOIN admin adm ON w.Admin_ID = adm.Admin_ID
        LEFT JOIN branch b ON w.Branch_ID = b.Branch_ID
        LEFT JOIN activity a ON w.Activity_ID = a.Activity_ID
        LEFT JOIN special_case s ON w.Case_ID = s.Case_ID
-       WHERE w.Status = 'Completed'";
+       WHERE 1=1";
 
 $union_sql = "SELECT * FROM ($q1 UNION ALL $q2) AS Combined_Tx WHERE 1=1";
 
@@ -382,60 +441,29 @@ $recentTransactions = $conn->query($union_sql);
 $start_tx = ($total_tx_recs > 0) ? $offset_tx + 1 : 0;
 $end_tx = min($offset_tx + $limit, $total_tx_recs);
 
-
-// ==========================================
-// LIST 2: E-WALLET LOG
-// ==========================================
+// List 2: E-Wallet
 $page_wl = isset($_GET['page_wl']) && is_numeric($_GET['page_wl']) ? (int)$_GET['page_wl'] : 1;
 if ($page_wl < 1) $page_wl = 1;
 $offset_wl = ($page_wl - 1) * $limit; 
-
 $search_wl = isset($_GET['search_wl']) ? mysqli_real_escape_string($conn, $_GET['search_wl']) : '';
 $filter_type_wl = isset($_GET['filter_type_wl']) ? $_GET['filter_type_wl'] : '';
 $filter_date_wl = isset($_GET['filter_date_wl']) ? $_GET['filter_date_wl'] : '';
 $filter_trans_type_wl = isset($_GET['filter_trans_type_wl']) ? $_GET['filter_trans_type_wl'] : '';
-
 $where_wl = "WHERE 1=1";
-
 if (!empty($filter_type_wl)) {
-    if ($filter_type_wl == 'donor_name' && !empty($search_wl)) {
-        $where_wl .= " AND d.Donor_Name LIKE '%$search_wl%'";
-    }
-    elseif ($filter_type_wl == 'email' && !empty($search_wl)) {
-        $where_wl .= " AND d.Donor_Email LIKE '%$search_wl%'";
-    }
-    elseif ($filter_type_wl == 'date' && !empty($filter_date_wl)) {
-        $where_wl .= " AND DATE(w.Created_At) = '$filter_date_wl'";
-    }
-    elseif ($filter_type_wl == 'type' && !empty($filter_trans_type_wl)) {
-        $where_wl .= " AND w.Transaction_Type = '$filter_trans_type_wl'";
-    }
-    elseif ($filter_type_wl == 'amount' && !empty($search_wl)) {
-        $where_wl .= " AND w.Amount = '$search_wl'";
-    }
+    if ($filter_type_wl == 'donor_name' && !empty($search_wl)) $where_wl .= " AND d.Donor_Name LIKE '%$search_wl%'";
+    elseif ($filter_type_wl == 'email' && !empty($search_wl)) $where_wl .= " AND d.Donor_Email LIKE '%$search_wl%'";
+    elseif ($filter_type_wl == 'date' && !empty($filter_date_wl)) $where_wl .= " AND DATE(w.Created_At) = '$filter_date_wl'";
+    elseif ($filter_type_wl == 'type' && !empty($filter_trans_type_wl)) $where_wl .= " AND w.Transaction_Type = '$filter_trans_type_wl'";
+    elseif ($filter_type_wl == 'amount' && !empty($search_wl)) $where_wl .= " AND w.Amount = '$search_wl'";
 } else {
-    if (!empty($search_wl)) {
-        $where_wl .= " AND (d.Donor_Name LIKE '%$search_wl%' OR d.Donor_Email LIKE '%$search_wl%' OR o.Order_TXN_Ref LIKE '%$search_wl%')";
-    }
+    if (!empty($search_wl)) $where_wl .= " AND (d.Donor_Name LIKE '%$search_wl%' OR d.Donor_Email LIKE '%$search_wl%' OR o.Order_TXN_Ref LIKE '%$search_wl%')";
 }
-
-$sql_wl_count = "SELECT COUNT(*) as total 
-                 FROM wallet_transaction w
-                 JOIN donor d ON w.Donor_ID = d.Donor_ID
-                 LEFT JOIN orders o ON w.Order_ID = o.Order_ID
-                 $where_wl";
+$sql_wl_count = "SELECT COUNT(*) as total FROM wallet_transaction w JOIN donor d ON w.Donor_ID = d.Donor_ID LEFT JOIN orders o ON w.Order_ID = o.Order_ID $where_wl";
 $total_wl_recs = $conn->query($sql_wl_count)->fetch_assoc()['total'];
 $total_pages_wl = ceil($total_wl_recs / $limit);
-
-$sql_wl = "SELECT w.*, d.Donor_Name, d.Donor_Email, d.Donor_ProfilePicture, o.Order_TXN_Ref
-           FROM wallet_transaction w
-           JOIN donor d ON w.Donor_ID = d.Donor_ID
-           LEFT JOIN orders o ON w.Order_ID = o.Order_ID
-           $where_wl
-           ORDER BY w.Created_At DESC 
-           LIMIT $offset_wl, $limit";
+$sql_wl = "SELECT w.*, d.Donor_Name, d.Donor_Email, d.Donor_ProfilePicture, o.Order_TXN_Ref FROM wallet_transaction w JOIN donor d ON w.Donor_ID = d.Donor_ID LEFT JOIN orders o ON w.Order_ID = o.Order_ID $where_wl ORDER BY w.Created_At DESC LIMIT $offset_wl, $limit";
 $walletTransactions = $conn->query($sql_wl);
-
 $start_wl = ($total_wl_recs > 0) ? $offset_wl + 1 : 0;
 $end_wl = min($offset_wl + $limit, $total_wl_recs);
 
@@ -482,20 +510,18 @@ $chartData = getMonthlyRevenueChartData($conn);
         body { background-color: #f4f6f9; }
         .dashboard-content { padding: 25px; }
 
-        /* Floating Alerts */
-        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; animation: slideIn 0.3s; }
+        /* Floating Alerts - INCREASED Z-INDEX TO 9999 TO BE ABOVE MODAL */
+        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 9999; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; animation: slideIn 0.3s; }
         .floating-alert i { margin-top: 3px; }
         .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-        /* Buttons */
         .btn-export { background-color: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 5px; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; transition: background 0.3s; text-decoration: none; }
         .btn-export:hover { background-color: #218838; color: white; }
         .btn-withdraw { background-color: #fd7e14; color: white; border: none; padding: 8px 15px; border-radius: 5px; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; transition: background 0.3s; text-decoration: none; margin-right: 8px; }
         .btn-withdraw:hover { background-color: #e6700c; color: white; }
 
-        /* Search & Filters */
         .admin-search-container { display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px 15px; border-radius: 8px; border: 1px solid #eee; flex-wrap: wrap; width: 100%; margin-top: 15px; box-sizing: border-box; }
         .filter-group { display: flex; align-items: center; gap: 8px; }
         .filter-select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; outline: none; background-color: white; min-width: 150px; cursor: pointer; font-size: 13px; }
@@ -507,7 +533,6 @@ $chartData = getMonthlyRevenueChartData($conn);
         .secondary-filter.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Stats Cards */
         .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-5px); }
@@ -517,14 +542,12 @@ $chartData = getMonthlyRevenueChartData($conn);
         .text-success { color: var(--success); } .text-info { color: var(--info); } .text-warning { color: var(--warning); } .text-danger { color: var(--danger); }
         .stat-icon { width: 60px; height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
         
-        /* Layout */
         .payment-content-grid { display: flex; flex-direction: column; gap: 30px; margin-bottom: 30px; width: 100%; }
         .content-card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05); border: 1px solid #f0f0f0; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0px; }
         .section-header h2 { font-size: 18px; font-weight: 700; color: #333; margin: 0; }
         .header-actions { display: flex; align-items: center; }
 
-        /* Tables */
         .table-container { flex: 1; overflow-x: auto; margin-top: 20px; }
         .custom-table { width: 100%; border-collapse: separate; border-spacing: 0 10px; }
         .custom-table thead th { color: #8898aa; font-weight: 600; text-transform: uppercase; font-size: 13px; padding: 0 15px 10px 15px; text-align: left; white-space: nowrap; }
@@ -534,11 +557,22 @@ $chartData = getMonthlyRevenueChartData($conn);
         .custom-table td:first-child { border-left: 1px solid #f5f5f5; border-radius: 8px 0 0 8px; }
         .custom-table td:last-child { border-right: 1px solid #f5f5f5; border-radius: 0 8px 8px 0; }
 
-        .badge { padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; }
+        .badge { padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; display: inline-block; }
         .badge-credit { background: #e6f4ea; color: #1e7e34; }
         .badge-debit { background: #fce8e6; color: #c5221f; }
+        .badge-role { background: #e3f2fd; color: #0d47a1; margin-left: 5px; font-size: 10px; }
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-rejected { background: #f8d7da; color: #721c24; }
+
         .btn-action { display: inline-flex; align-items: center; justify-content: center; width: 35px; height: 35px; background-color: #e3f2fd; color: #1976d2; border-radius: 50%; text-decoration: none; transition: all 0.2s; border: 1px solid #bbdefb; }
         .btn-action:hover { background-color: #1976d2; color: white; transform: translateY(-2px); }
+
+        /* Approval Buttons in Table */
+        .btn-table-approve { display: inline-flex; align-items: center; justify-content: center; width: 35px; height: 35px; background-color: #e6f4ea; color: #28a745; border-radius: 50%; border: 1px solid #c3e6cb; cursor: pointer; transition: all 0.2s; margin-right: 5px; }
+        .btn-table-approve:hover { background-color: #28a745; color: white; transform: translateY(-2px); }
+        .btn-table-reject { display: inline-flex; align-items: center; justify-content: center; width: 35px; height: 35px; background-color: #f8d7da; color: #dc3545; border-radius: 50%; border: 1px solid #f5c6cb; cursor: pointer; transition: all 0.2s; }
+        .btn-table-reject:hover { background-color: #dc3545; color: white; transform: translateY(-2px); }
+        .table-action-form { display: inline-block; margin: 0; }
 
         .pagination-container { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid #eee; margin-top: auto; }
         .pagination-info { font-size: 13px; color: #8898aa; }
@@ -548,7 +582,6 @@ $chartData = getMonthlyRevenueChartData($conn);
         .pagination-btn.active { background-color: var(--primary); color: white; border-color: var(--primary); cursor: default; }
         .pagination-btn.disabled { color: #ccc; cursor: not-allowed; pointer-events: none; }
 
-        /* Modal Styles */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); animation: fadeIn 0.3s; }
         .modal-content { background-color: #fefefe; margin: 5% auto; padding: 0; border: 1px solid #888; width: 50%; max-width: 600px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideInTop 0.4s; }
         @keyframes slideInTop { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -572,7 +605,6 @@ $chartData = getMonthlyRevenueChartData($conn);
         .balance-display { font-size: 13px; color: var(--success); margin-top: 5px; font-weight: 600; display: none; }
         .balance-error { color: var(--danger); }
 
-        /* Upload & Preview (Design from Branch Management) */
         .upload-container { width: 100%; }
         .upload-box { border: 2px dashed #ccc; padding: 20px; text-align: center; cursor: pointer; border-radius: 8px; position: relative; background: #fafafa; }
         .upload-box:hover { background: #fff5f5; border-color: var(--primary); }
@@ -583,7 +615,7 @@ $chartData = getMonthlyRevenueChartData($conn);
         .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 12px; margin-top: 15px; }
         .preview-item { position: relative; height: 80px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border: 1px solid #eee; background:white; display: flex; align-items: center; justify-content: center; }
         .preview-item img { width: 100%; height: 100%; object-fit: cover; }
-        .preview-item i { font-size: 30px; color: #dc3545; } /* For PDF */
+        .preview-item i { font-size: 30px; color: #dc3545; }
         .remove-img-btn { position: absolute; top: 4px; right: 4px; background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; }
         .remove-img-btn:hover { background: #cc0000; transform: scale(1.1); }
     </style>
@@ -650,7 +682,7 @@ $chartData = getMonthlyRevenueChartData($conn);
                             <select name="filter_type_tx" id="filterTypeTx" class="filter-select" onchange="toggleTxFilters()">
                                 <option value="">Filter By...</option>
                                 <option value="date" <?php echo ($filter_type_tx == 'date') ? 'selected' : ''; ?>>Date</option>
-                                <option value="donor_name" <?php echo ($filter_type_tx == 'donor_name') ? 'selected' : ''; ?>>Donor Name</option>
+                                <option value="donor_name" <?php echo ($filter_type_tx == 'donor_name') ? 'selected' : ''; ?>>Donor/Admin Name</option>
                                 <option value="email" <?php echo ($filter_type_tx == 'email') ? 'selected' : ''; ?>>Email</option>
                                 <option value="target" <?php echo ($filter_type_tx == 'target') ? 'selected' : ''; ?>>Target (Branch/Act)</option>
                                 <option value="amount" <?php echo ($filter_type_tx == 'amount') ? 'selected' : ''; ?>>Amount</option>
@@ -710,14 +742,37 @@ $chartData = getMonthlyRevenueChartData($conn);
                                         $amountColor = $isWithdrawal ? '#dc3545' : '#28a745';
                                         $amountPrefix = $isWithdrawal ? '-' : '';
                                         $detailsLink = $isWithdrawal ? "admin_withdrawal_details.php?id=" . $txn['ID'] : "admin_payment_details.php?id=" . $txn['ID'];
+                                        
+                                        // Status Badge Logic
+                                        $statusBadge = "";
+                                        if($isWithdrawal && $txn['Status_Text'] == 'Pending') {
+                                            $statusBadge = "<br><span class='badge badge-pending'>Pending Approval</span>";
+                                        } elseif($isWithdrawal && $txn['Status_Text'] == 'Rejected') {
+                                            $statusBadge = "<br><span class='badge badge-rejected'>Rejected</span>";
+                                        }
+
+                                        // --- APPROVAL BUTTON LOGIC (New) ---
+                                        $showApproveBtns = false;
+                                        if ($isWithdrawal && 
+                                            $txn['Status_Text'] == 'Pending' && 
+                                            $adminRole == 'Super Admin' && 
+                                            $txn['Request_Admin_ID'] != $currentAdminId) {
+                                            $showApproveBtns = true;
+                                        }
                                     ?>
                                     <tr>
                                         <td>
                                             <div style="font-weight:600; color:#333; font-size:14px;"><?php echo $txn['Ref']; ?></div>
                                             <div style="font-size:12px; color:#888; margin-top:3px;"><?php echo $dateStr . ' ' . $timeStr; ?></div>
+                                            <?php echo $statusBadge; ?>
                                         </td>
                                         <td>
-                                            <div style="font-weight:600; font-size:14px;"><?php echo htmlspecialchars($txn['Name']); ?></div>
+                                            <div style="font-weight:600; font-size:14px;">
+                                                <?php echo htmlspecialchars($txn['Name']); ?>
+                                                <?php if($isWithdrawal && !empty($txn['User_Role'])): ?>
+                                                    <span class="badge badge-role"><?php echo $txn['User_Role']; ?></span>
+                                                <?php endif; ?>
+                                            </div>
                                             <div style="font-size:12px; color:#888; margin-top:3px;"><?php echo htmlspecialchars($txn['Email']); ?></div>
                                         </td>
                                         <td><span style="font-size:13px; display:block; max-width:150px; white-space:normal; line-height:1.4;"><?php echo htmlspecialchars($targetName); ?></span></td>
@@ -726,6 +781,21 @@ $chartData = getMonthlyRevenueChartData($conn);
                                         </td>
                                         <td><span style="font-size:13px; color:#555;"><?php echo $txn['Method']; ?></span></td>
                                         <td>
+                                            <?php if ($showApproveBtns): ?>
+                                                <form method="POST" action="payment_management.php" class="table-action-form" onsubmit="return confirm('Approve this withdrawal?');">
+                                                    <input type="hidden" name="withdrawal_id" value="<?php echo $txn['ID']; ?>">
+                                                    <button type="submit" name="action_type" value="approve" class="btn-table-approve" title="Approve">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                </form>
+                                                <form method="POST" action="payment_management.php" class="table-action-form" onsubmit="return confirm('Reject this withdrawal?');">
+                                                    <input type="hidden" name="withdrawal_id" value="<?php echo $txn['ID']; ?>">
+                                                    <button type="submit" name="action_type" value="reject" class="btn-table-reject" title="Reject">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </form>
+                                            <?php endif; ?>
+
                                             <a href="<?php echo $detailsLink; ?>" class="btn-action" target="_blank" title="View Details">
                                                 <i class="fas fa-eye"></i>
                                             </a>
@@ -941,11 +1011,11 @@ $chartData = getMonthlyRevenueChartData($conn);
                 <h3>Withdrawal Request</h3>
                 <span class="close-modal" onclick="closeWithdrawModal()">&times;</span>
             </div>
-            <form method="POST" action="payment_management.php" enctype="multipart/form-data" onsubmit="return validateWithdrawal()">
+            <form method="POST" action="payment_management.php" enctype="multipart/form-data" onsubmit="return validateWithdrawal()" novalidate>
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="withdrawal_type">Withdrawal Source Type <span style="color:red">*</span></label>
-                        <select name="withdrawal_type" id="withdrawal_type" class="form-control" onchange="toggleWithdrawTarget()" required>
+                        <select name="withdrawal_type" id="withdrawal_type" class="form-control" onchange="toggleWithdrawTarget()">
                             <option value="">-- Select Source --</option>
                             <option value="branch">Branch Fund</option>
                             <option value="activity">Activity Fund</option>
@@ -983,7 +1053,7 @@ $chartData = getMonthlyRevenueChartData($conn);
 
                     <div class="form-group" id="group_handling_branch" style="display:none;">
                         <label for="handling_branch_id">Processing Branch <span style="color:red">*</span></label>
-                        <select name="handling_branch_id" class="form-control">
+                        <select name="handling_branch_id" id="handling_branch_id" class="form-control">
                             <option value="">-- Select Processing Branch --</option>
                         </select>
                         <small class="form-guide">Select the branch responsible for processing this special case withdrawal.</small>
@@ -991,19 +1061,19 @@ $chartData = getMonthlyRevenueChartData($conn);
 
                     <div class="form-group">
                         <label>Amount (RM) <span style="color:red">*</span></label>
-                        <input type="number" step="1" min="0" name="amount" id="withdraw_amount" class="form-control" placeholder="e.g. 500.00" required>
+                        <input type="number" step="1" min="0" name="amount" id="withdraw_amount" class="form-control" placeholder="e.g. 500.00">
                         <small class="form-guide">Specify the total amount to withdraw (e.g. 1000). Arrows increase by RM 1.</small>
                     </div>
 
                     <div class="form-group">
                         <label>Bank Name <span style="color:red">*</span></label>
-                        <input type="text" name="bank_name" id="bank_name" class="form-control" placeholder="The bank name associated with the selected source (Auto-filled)." readonly required>
+                        <input type="text" name="bank_name" id="bank_name" class="form-control" placeholder="The bank name associated with the selected source (Auto-filled)." readonly>
                         <small class="form-guide">The bank associated with the selected source.</small>
                     </div>
 
                     <div class="form-group">
                         <label>Account Number <span style="color:red">*</span></label>
-                        <input type="text" name="bank_account" id="bank_account" class="form-control" placeholder="The account number associated with the selected source (Auto-filled)." readonly required>
+                        <input type="text" name="bank_account" id="bank_account" class="form-control" placeholder="The account number associated with the selected source (Auto-filled)." readonly>
                         <small class="form-guide">The bank account number for the transfer.</small>
                     </div>
 
@@ -1013,7 +1083,7 @@ $chartData = getMonthlyRevenueChartData($conn);
                             <div class="upload-box">
                                 <i class="fas fa-cloud-upload-alt"></i>
                                 <p>Click or Drag Proof files (Max 5, PDF/Images)</p>
-                                <input type="file" id="proof_file" name="proof_file[]" multiple accept=".jpg,.jpeg,.png,.pdf" onchange="handleFileSelect(event)" required>
+                                <input type="file" id="proof_file" name="proof_file[]" multiple accept=".jpg,.jpeg,.png,.pdf" onchange="handleFileSelect(event)">
                             </div>
                             <div class="preview-grid" id="proof_preview_container"></div>
                         </div>
@@ -1029,7 +1099,6 @@ $chartData = getMonthlyRevenueChartData($conn);
     </div>
 
     <script>
-        // Chart JS (Unchanged)
         const ctx = document.getElementById('revenueChart').getContext('2d');
         new Chart(ctx, {
             type: 'line',
@@ -1045,13 +1114,11 @@ $chartData = getMonthlyRevenueChartData($conn);
             options: { responsive: true, maintainAspectRatio: false }
         });
 
-        // Data Injection
         const branchesData = <?php echo $jsonBranches; ?>;
         const activitiesData = <?php echo $jsonActivities; ?>;
         const casesData = <?php echo $jsonCases; ?>;
         let currentMaxBalance = 0;
 
-        // Populate Select Helper
         function populateSelect(id, data, valKey, textKey) {
             const sel = document.getElementById(id);
             sel.innerHTML = '<option value="">-- Select --</option>';
@@ -1076,7 +1143,6 @@ $chartData = getMonthlyRevenueChartData($conn);
             handleSel.add(opt);
         });
 
-        // Filter Toggles (Unchanged logic)
         function toggleTxFilters() {
             const type = document.getElementById('filterTypeTx').value;
             document.querySelectorAll('#filter_date_tx, #filter_method_tx, #filter_text_tx').forEach(el => el.classList.remove('active'));
@@ -1095,7 +1161,6 @@ $chartData = getMonthlyRevenueChartData($conn);
         }
         toggleWlFilters();
 
-        // --- System Message Function (Requirement 1) ---
         function showSystemError(messageHTML) {
             const errorBox = document.getElementById('floatingError');
             const errorText = document.getElementById('floatingErrorText');
@@ -1106,17 +1171,14 @@ $chartData = getMonthlyRevenueChartData($conn);
             }
         }
 
-        // --- FILE UPLOAD LOGIC (Requirement 2 & 3) ---
         let selectedFiles = [];
 
         function handleFileSelect(event) {
             const input = event.target;
             const newFiles = Array.from(input.files);
             
-            // Limit to 5 files total
             if (selectedFiles.length + newFiles.length > 5) {
                 showSystemError("You can only upload a maximum of 5 proof files.");
-                // Reset input to prevent processing
                 input.value = ''; 
                 return;
             }
@@ -1147,7 +1209,6 @@ $chartData = getMonthlyRevenueChartData($conn);
                 const item = document.createElement('div');
                 item.className = 'preview-item';
                 
-                // Check if PDF or Image
                 if (file.type === 'application/pdf') {
                     item.innerHTML = `
                         <i class="fas fa-file-pdf" style="font-size: 24px; color: #dc3545;"></i>
@@ -1165,9 +1226,7 @@ $chartData = getMonthlyRevenueChartData($conn);
             });
         }
 
-        // --- Withdrawal Modal Logic ---
         function openWithdrawModal() {
-            // Reset upload
             selectedFiles = [];
             document.getElementById('proof_preview_container').innerHTML = '';
             document.getElementById('withdrawModal').style.display = 'block';
@@ -1196,22 +1255,13 @@ $chartData = getMonthlyRevenueChartData($conn);
             document.getElementById('withdraw_amount').value = '';
             currentMaxBalance = 0;
 
-            document.querySelector('[name="target_id_branch"]').required = false;
-            document.querySelector('[name="target_id_activity"]').required = false;
-            document.querySelector('[name="target_id_case"]').required = false;
-            document.querySelector('[name="handling_branch_id"]').required = false;
-
             if (type === 'branch') {
                 document.getElementById('group_branch').style.display = 'block';
-                document.querySelector('[name="target_id_branch"]').required = true;
             } else if (type === 'activity') {
                 document.getElementById('group_activity').style.display = 'block';
-                document.querySelector('[name="target_id_activity"]').required = true;
             } else if (type === 'case') {
                 document.getElementById('group_case').style.display = 'block';
                 document.getElementById('group_handling_branch').style.display = 'block';
-                document.querySelector('[name="target_id_case"]').required = true;
-                document.querySelector('[name="handling_branch_id"]').required = true;
             }
         }
 
@@ -1263,9 +1313,25 @@ $chartData = getMonthlyRevenueChartData($conn);
             }
         }
 
+        // Custom Validation (Manually checking instead of using 'required')
         function validateWithdrawal() {
+            const type = document.getElementById('withdrawal_type').value;
             const amt = parseFloat(document.getElementById('withdraw_amount').value);
             const errors = [];
+
+            if(type === "") {
+                errors.push("Please select a Withdrawal Source Type.");
+            }
+
+            // Sub-selection validation
+            if(type === 'branch' && document.getElementById('target_id_branch').value === "") {
+                errors.push("Please select a Branch.");
+            } else if(type === 'activity' && document.getElementById('target_id_activity').value === "") {
+                errors.push("Please select an Activity.");
+            } else if(type === 'case') {
+                if(document.getElementById('target_id_case').value === "") errors.push("Please select a Special Case.");
+                if(document.getElementById('handling_branch_id').value === "") errors.push("Please select a Processing Branch.");
+            }
             
             if (isNaN(amt) || amt <= 0) {
                 errors.push("Amount must be greater than 0.");
@@ -1278,7 +1344,7 @@ $chartData = getMonthlyRevenueChartData($conn);
             }
 
             if (errors.length > 0) {
-                // Use System Error instead of Alert (Requirement 1)
+                // Use Custom System Error
                 showSystemError(errors.join('<br>'));
                 return false;
             }

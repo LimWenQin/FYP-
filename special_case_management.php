@@ -11,6 +11,9 @@ if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
 // Include database connection
 include 'dataconnection.php';
 
+// Determine if user is staff
+$isStaff = isset($_SESSION['staff_id']);
+
 // 设置时区
 date_default_timezone_set('Asia/Kuala_Lumpur');
 
@@ -50,6 +53,9 @@ $conn->query("UPDATE special_case SET Case_Status = 'Upcoming' WHERE Start_Date 
 
 // --- AJAX: FETCH DONATIONS FOR A SPECIFIC CASE ---
 if (isset($_GET['action']) && $_GET['action'] == 'get_case_donations' && isset($_GET['case_id'])) {
+    // Security check: Staff should not access this data
+    if ($isStaff) { echo json_encode([]); exit(); }
+
     $caseId = intval($_GET['case_id']);
     
     $sql = "SELECT o.Order_ID, o.Order_Created_At, o.Order_Amount, o.Order_TXN_Ref, d.Donor_Name, d.Donor_Email 
@@ -79,10 +85,14 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_case_donations' && isset($
     exit();
 }
 
-// --- AJAX: FETCH WITHDRAWAL HISTORY ---
+// --- AJAX: FETCH WITHDRAWAL HISTORY (UPDATED) ---
 if (isset($_GET['action']) && $_GET['action'] == 'get_withdrawal_history' && isset($_GET['case_id'])) {
+    // Security check: Staff should not access this data
+    if ($isStaff) { echo json_encode(['history' => [], 'total_withdrawn' => 0, 'available_balance' => 0]); exit(); }
+
     $caseId = intval($_GET['case_id']);
     
+    // 1. Get Withdrawal History & Total Withdrawn
     $sql = "SELECT * FROM withdrawals 
             WHERE Case_ID = $caseId 
             ORDER BY Request_Date DESC";
@@ -102,9 +112,24 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_withdrawal_history' && iss
             $data[] = $row;
         }
     }
+
+    // 2. Get Total Raised for this Case to calculate Balance
+    $sqlCase = "SELECT Raised_Amount FROM special_case WHERE Case_ID = $caseId";
+    $resCase = $conn->query($sqlCase);
+    $totalRaised = 0;
+    if ($resCase && $r = $resCase->fetch_assoc()) {
+        $totalRaised = floatval($r['Raised_Amount']);
+    }
+
+    // 3. Calculate Available Balance
+    $availableBalance = $totalRaised - $totalWithdrawn;
     
     header('Content-Type: application/json');
-    echo json_encode(['history' => $data, 'total_withdrawn' => number_format($totalWithdrawn, 2)]);
+    echo json_encode([
+        'history' => $data, 
+        'total_withdrawn' => number_format($totalWithdrawn, 2),
+        'available_balance' => number_format($availableBalance, 2)
+    ]);
     exit();
 }
 
@@ -694,8 +719,12 @@ $allCaseImagesMap = [];
                                 <div class="action-menu">
                                     <button class="menu-btn" onclick="toggleMenu(event, <?php echo $case['Case_ID']; ?>)"><i class="fas fa-ellipsis-v"></i></button>
                                     <div id="menu-<?php echo $case['Case_ID']; ?>" class="dropdown-content">
-                                        <div onclick="openViewDonors(<?php echo $case['Case_ID']; ?>)"><i class="fas fa-file-invoice-dollar"></i> View Donor Payment History</div>
-                                        <div onclick="openWithdrawalHistory(<?php echo $case['Case_ID']; ?>)"><i class="fas fa-money-bill-wave"></i> Withdrawal History</div>
+                                        
+                                        <?php if (!$isStaff): // Only show Payment & Withdrawal history to Admins ?>
+                                            <div onclick="openViewDonors(<?php echo $case['Case_ID']; ?>)"><i class="fas fa-file-invoice-dollar"></i> View Donor Payment History</div>
+                                            <div onclick="openWithdrawalHistory(<?php echo $case['Case_ID']; ?>)"><i class="fas fa-money-bill-wave"></i> Withdrawal History</div>
+                                        <?php endif; ?>
+                                        
                                         <div onclick="goToDetailsPage(<?php echo $case['Case_ID']; ?>)"><i class="fas fa-eye"></i> View Full Details</div>
                                         <div onclick='editSpecialCase(<?php echo htmlspecialchars(json_encode($case, JSON_HEX_APOS | JSON_HEX_QUOT)); ?>)'><i class="fas fa-edit"></i> Edit Details</div>
                                         <a href="javascript:confirmDeleteSpecialCase(<?php echo $case['Case_ID']; ?>)" class="text-delete"><i class="fas fa-trash"></i> Delete</a>
@@ -813,6 +842,10 @@ $allCaseImagesMap = [];
                 <div style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
                     <span style="font-size:14px; color:#555; font-weight:600;">Total Withdrawn:</span>
                     <span id="totalWithdrawnDisplay" style="font-size:18px; font-weight:bold; color:#dc3545;">RM 0.00</span>
+                </div>
+                <div style="background:#e8f5e9; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #c3e6cb; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:14px; color:#155724; font-weight:600;">Available Balance:</span>
+                    <span id="availableBalanceDisplay" style="font-size:18px; font-weight:bold; color:#28a745;">RM 0.00</span>
                 </div>
                 <div id="withdrawalListContainer" class="history-list">Loading...</div>
             </div>
@@ -1329,20 +1362,23 @@ $allCaseImagesMap = [];
             if (menu) menu.style.display = 'block';
         }
 
-        // --- Withdrawal History JS ---
+        // --- Withdrawal History JS (UPDATED) ---
         function openWithdrawalHistory(caseId) {
             document.querySelectorAll('.dropdown-content').forEach(d=>d.style.display='none');
             document.getElementById('withdrawalModal').style.display='flex';
             const container = document.getElementById('withdrawalListContainer');
             const totalDisplay = document.getElementById('totalWithdrawnDisplay');
+            const availableDisplay = document.getElementById('availableBalanceDisplay'); // NEW
             
             container.innerHTML = '<div style="text-align:center; padding:20px;">Loading...</div>';
             totalDisplay.innerText = "RM 0.00";
+            availableDisplay.innerText = "RM 0.00"; // Reset
             
             fetch(`special_case_management.php?action=get_withdrawal_history&case_id=${caseId}`)
                 .then(r=>r.json()).then(res=>{
                     container.innerHTML = '';
                     totalDisplay.innerText = "RM " + res.total_withdrawn;
+                    availableDisplay.innerText = "RM " + res.available_balance; // NEW: Set Available Balance
                     
                     if(res.history.length === 0) { 
                         container.innerHTML='<div style="text-align:center; padding:20px; color:#888;">No withdrawals found.</div>'; 
@@ -1354,7 +1390,7 @@ $allCaseImagesMap = [];
                             <div class="history-item" onclick="window.open('admin_withdrawal_details.php?id=${w.Withdrawal_ID}', '_blank')">
                                 <div class="h-left">
                                     <h4>${w.Details}</h4>
-                                    <p>${w.Formatted_Date} | ${w.Status}</p>
+                                    <p>${w.Formatted_Date} | <span style="font-weight:bold; color:${w.Status=='Approved'?'green':'orange'}">${w.Status}</span></p>
                                 </div>
                                 <div class="h-right-negative">- RM ${w.Formatted_Amount}</div>
                             </div>`;

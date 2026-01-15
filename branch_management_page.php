@@ -38,6 +38,8 @@ $adminName = "User";
 $adminPosition = "Role";
 $adminProfilePicture = null;
 $adminId = 0;
+// Check if current user is staff (for UI logic later)
+$isStaff = isset($_SESSION['staff_id']);
 
 if (isset($_SESSION['admin_id'])) {
     $adminId = $_SESSION['admin_id'];
@@ -70,6 +72,11 @@ if (isset($_SESSION['admin_id'])) {
 
 // --- AJAX: Get Branch Payment History ---
 if (isset($_GET['action']) && $_GET['action'] == 'get_payment_history' && isset($_GET['branch_id'])) {
+    // Security check: Staff should not access this via direct URL manipulation strictly speaking, 
+    // but relying on UI hiding is usually sufficient for this level unless strict security is required.
+    // However, keeping consistent with UI:
+    if ($isStaff) { echo json_encode([]); exit(); }
+
     $branchId = intval($_GET['branch_id']);
     $sql = "SELECT o.Order_ID, o.Order_Created_At, o.Order_Amount, o.Order_TXN_Ref, d.Donor_Name 
             FROM orders o 
@@ -87,11 +94,13 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_payment_history' && isset(
     exit();
 }
 
-// --- AJAX: Get Branch Withdrawal History (NEW) ---
+// --- AJAX: Get Branch Withdrawal History (UPDATED) ---
 if (isset($_GET['action']) && $_GET['action'] == 'get_withdrawal_history' && isset($_GET['branch_id'])) {
+    if ($isStaff) { echo json_encode(['history' => [], 'total_withdrawn' => 0, 'available_balance' => 0]); exit(); }
+
     $branchId = intval($_GET['branch_id']);
     
-    // Join with Activity table to show if it's an activity withdrawal
+    // 1. Get Withdrawal History & Total Withdrawn
     $sql = "SELECT w.*, a.Activity_Name 
             FROM withdrawals w 
             LEFT JOIN activity a ON w.Activity_ID = a.Activity_ID 
@@ -113,8 +122,24 @@ if (isset($_GET['action']) && $_GET['action'] == 'get_withdrawal_history' && iss
             $data[] = $row;
         }
     }
+
+    // 2. Get Total Donations (Raised) for this Branch to calculate Balance
+    $sqlDonations = "SELECT SUM(Order_Amount) as total_raised FROM orders 
+                     WHERE Branch_ID = $branchId AND (Order_Status = 'Success' OR Order_Status = 'Completed')";
+    $resDonations = $conn->query($sqlDonations);
+    $totalRaised = 0;
+    if ($resDonations && $rowD = $resDonations->fetch_assoc()) {
+        $totalRaised = (float)$rowD['total_raised'];
+    }
+
+    // 3. Calculate Available Balance
+    $availableBalance = $totalRaised - $totalWithdrawn;
     
-    echo json_encode(['history' => $data, 'total_withdrawn' => number_format($totalWithdrawn, 2)]);
+    echo json_encode([
+        'history' => $data, 
+        'total_withdrawn' => number_format($totalWithdrawn, 2),
+        'available_balance' => number_format($availableBalance, 2)
+    ]);
     exit();
 }
 
@@ -707,8 +732,12 @@ $exportUrl = "?" . http_build_query($exportParams);
                                             <a href="admin_branch_details.php?id=<?php echo $b['Branch_ID']; ?>" class="action-item" target="_blank"><i class="fas fa-eye"></i> View Details</a>
                                             <a href="activity_management.php?filter_type=branch&filter_val_branch=<?php echo $b['Branch_ID']; ?>" class="action-item"><i class="fas fa-calendar-alt"></i> View Activities</a>
                                             <div class="action-item" onclick="openEditModal(<?php echo htmlspecialchars(json_encode($b)); ?>)"><i class="fas fa-edit"></i> Edit Branch</div>
-                                            <div class="action-item" onclick="openPaymentHistory(<?php echo $b['Branch_ID']; ?>)"><i class="fas fa-history"></i> Donation History</div>
-                                            <div class="action-item" onclick="openWithdrawalHistory(<?php echo $b['Branch_ID']; ?>)"><i class="fas fa-money-bill-wave"></i> Withdrawal History</div>
+                                            
+                                            <?php if (!$isStaff): // Only visible to Admin/Super Admin ?>
+                                                <div class="action-item" onclick="openPaymentHistory(<?php echo $b['Branch_ID']; ?>)"><i class="fas fa-history"></i> Donation History</div>
+                                                <div class="action-item" onclick="openWithdrawalHistory(<?php echo $b['Branch_ID']; ?>)"><i class="fas fa-money-bill-wave"></i> Withdrawal History</div>
+                                            <?php endif; ?>
+                                            
                                             <div class="action-item delete" onclick="confirmDelete(<?php echo $b['Branch_ID']; ?>)"><i class="fas fa-trash"></i> Delete</div>
                                         </div>
                                     </div>
@@ -1154,6 +1183,10 @@ $exportUrl = "?" . http_build_query($exportParams);
                     <span style="font-size:14px; color:#555; font-weight:600;">Total Withdrawn:</span>
                     <span id="totalWithdrawnDisplay" style="font-size:18px; font-weight:bold; color:#dc3545;">RM 0.00</span>
                 </div>
+                <div style="background:#e8f5e9; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #c3e6cb; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:14px; color:#155724; font-weight:600;">Available Balance:</span>
+                    <span id="availableBalanceDisplay" style="font-size:18px; font-weight:bold; color:#28a745;">RM 0.00</span>
+                </div>
                 <div id="withdrawalListContainer" class="history-list">Loading...</div>
             </div>
         </div>
@@ -1409,14 +1442,17 @@ $exportUrl = "?" . http_build_query($exportParams);
             document.getElementById('withdrawalModal').style.display = 'flex';
             const container = document.getElementById('withdrawalListContainer');
             const totalDisplay = document.getElementById('totalWithdrawnDisplay');
+            const availableDisplay = document.getElementById('availableBalanceDisplay'); // NEW
             
             container.innerHTML = '<div style="text-align:center; padding:20px;">Loading...</div>';
             totalDisplay.innerText = "RM 0.00";
+            availableDisplay.innerText = "RM 0.00"; // Reset
 
             fetch(`branch_management_page.php?action=get_withdrawal_history&branch_id=${branchId}`)
                 .then(r => r.json()).then(res => {
                     container.innerHTML = '';
                     totalDisplay.innerText = "RM " + res.total_withdrawn;
+                    availableDisplay.innerText = "RM " + res.available_balance; // NEW: Set Available Balance
                     
                     if (res.history.length === 0) { 
                         container.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">No withdrawal records found.</div>'; 
