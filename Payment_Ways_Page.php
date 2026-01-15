@@ -115,25 +115,16 @@ include 'header_UI.php';
     }
     .payment-option:not(.disabled):hover .btn-pay { background-color: #f79c34ff; transform: scale(1.05); }
 
-    /* ⭐ 修改：橙色大号 Back 按钮（修正了链接失效问题） ⭐ */
     .btn-orange-back {
-        display: inline-flex;
-        align-items: center;
-        gap: 12px;
-        background-color: #f79c34; 
-        color: white !important;
-        padding: 15px 35px;         /* ⭐ 加大按钮尺寸 */
-        border-radius: 10px;
-        font-weight: 700;           /* ⭐ 加粗字体 */
-        font-size: 1.2rem;          /* ⭐ 增大字体 */
-        transition: all 0.3s ease;
-        text-decoration: none !important;
-        box-shadow: 0 4px 6px rgba(247, 156, 52, 0.2);
-        margin-bottom: 25px;        
+        display: inline-flex; align-items: center; gap: 12px;
+        background-color: #f79c34; color: white !important;
+        padding: 15px 35px; border-radius: 10px;
+        font-weight: 700; font-size: 1.2rem;
+        transition: all 0.3s ease; text-decoration: none !important;
+        box-shadow: 0 4px 6px rgba(247, 156, 52, 0.2); margin-bottom: 25px;        
     }
     .btn-orange-back:hover {
-        background-color: #e68a20;
-        transform: translateX(-5px);
+        background-color: #e68a20; transform: translateX(-5px);
         box-shadow: 0 6px 12px rgba(247, 156, 52, 0.3);
     }
 </style>
@@ -156,7 +147,6 @@ include 'header_UI.php';
     <div class="container">
         <div class="row">
             <div class="col-lg-4 mb-5">
-                
                 <div class="text-left">
                     <a href="Branch_Selection.php" class="btn-orange-back">
                         <i class="fas fa-arrow-left"></i> Back to Change Details
@@ -182,7 +172,10 @@ include 'header_UI.php';
 
             <div class="col-lg-8">
                 <h3 class="text-cursive text-black mb-4 text-center">Select Payment Method</h3>
-                <form id="paymentForm" method="POST">
+                
+                <form id="paymentForm" method="POST" action="">
+                    <input type="hidden" name="payment_method" id="selected_payment_method" value="">
+
                     <div class="row">
                         <div class="col-md-4">
                             <div class="payment-option <?php echo ($current_balance < $amount) ? 'disabled' : ''; ?>" onclick="handleWalletPay()">
@@ -243,13 +236,31 @@ include 'header_UI.php';
             confirmButtonText: 'Confirm & Pay'
         }).then((result) => {
             if (result.isConfirmed) {
+                // 调用 submitTo，它会自动在隐藏格填入 "E-Wallet Balance" 并提交给 Wallet_Processing.php
                 submitTo('Wallet_Processing.php');
             }
         });
     }
 
+    // 核心函数：捕捉支付方式名称，写入隐藏格，然后跳转
     function submitTo(target) {
         const form = document.getElementById('paymentForm');
+        const methodInput = document.getElementById('selected_payment_method');
+
+        // 根据跳转的文件名判定具体的支付方式名称
+        let methodName = "";
+        if (target.includes('Wallet')) {
+            methodName = "E-Wallet Balance";
+        } else if (target.includes('Credit')) {
+            methodName = "Credit / Debit Card";
+        } else if (target.includes('TNG')) {
+            methodName = "Touch 'n Go";
+        }
+
+        // 将选中的方式名称写入表单
+        methodInput.value = methodName; 
+        
+        // 设置表单跳转目标并执行提交
         form.action = target;
         form.submit();
     }

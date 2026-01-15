@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
         'type' => $type,
         'case_id' => $case_id,
         'activity_id' => $activity_id,
-        'branch_id' => 0, // Special Case 通常不直接关联特定 Branch ID 进行分流
+        'branch_id' => 0, 
         'tax_receipt' => $tax_receipt,
         'source' => $source_type 
     ];
@@ -140,10 +140,25 @@ include 'header_UI.php';
     }
     .payment-option:not(.disabled):hover .btn-pay { background-color: #dc2626; transform: scale(1.05); }
 
-    .nav-buttons { margin-top: 40px; }
-    .btn-prev {
-        display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px;
-        border-radius: 8px; background: #f3f4f6; color: #374151; font-weight: 600; text-decoration: none;
+    .btn-orange-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        background-color: #f79c34; 
+        color: white !important;
+        padding: 15px 35px;         
+        border-radius: 10px;
+        font-weight: 700;           
+        font-size: 1.2rem;          
+        transition: all 0.3s ease;
+        text-decoration: none !important;
+        box-shadow: 0 4px 6px rgba(247, 156, 52, 0.2);
+        margin-bottom: 25px;        
+    }
+    .btn-orange-back:hover {
+        background-color: #e68a20;
+        transform: translateX(-5px);
+        box-shadow: 0 6px 12px rgba(247, 156, 52, 0.3);
     }
 </style>
 
@@ -166,6 +181,15 @@ include 'header_UI.php';
         <div class="row">
             
             <div class="col-lg-4 mb-5">
+                <div class="text-left">
+                    <?php 
+                        $back_link = ($activity_id > 0) ? "S_C_Payment_Page.php?activity_id=$activity_id" : "S_C_Payment_Page.php?case_id=$case_id";
+                    ?>
+                    <a href="<?php echo $back_link; ?>" class="btn-orange-back">
+                        <i class="fas fa-arrow-left"></i> Back to Change Details
+                    </a>
+                </div>
+
                 <h3 class="text-cursive mb-3" style="color: #dc2626;">Summary</h3>
                 <div class="summary-card">
                     <div class="summary-item">
@@ -185,18 +209,14 @@ include 'header_UI.php';
                         <span class="summary-value summary-total">RM <?php echo number_format($amount, 2); ?></span>
                     </div>
                 </div>
-                
-                <div class="nav-buttons">
-                    <a href="javascript:history.back()" class="btn-prev">
-                        <i class="fas fa-arrow-left"></i> Change Donation Details
-                    </a>
-                </div>
             </div>
 
             <div class="col-lg-8">
                 <h3 class="text-cursive text-black mb-4 text-center">Select Payment Method</h3>
                 
                 <form id="paymentForm" method="POST" action="">
+                    <input type="hidden" name="payment_method" id="selected_payment_method" value="">
+
                     <div class="row justify-content-center">
                         
                         <div class="col-md-4">
@@ -260,13 +280,24 @@ include 'header_UI.php';
             confirmButtonText: 'Confirm & Donate'
         }).then((result) => {
             if (result.isConfirmed) {
+                // ⭐ 调用 submitTo，它会自动识别 Wallet 支付方式
                 submitTo('Wallet_Processing.php');
             }
         });
     }
 
+    // ⭐ 修正点 2: 修改后的 submitTo 函数，自动填入支付方式名称 ⭐
     function submitTo(target) {
         const form = document.getElementById('paymentForm');
+        const methodInput = document.getElementById('selected_payment_method');
+
+        // 根据目标文件名设定支付方式名称
+        let methodName = "";
+        if (target.includes('Wallet')) methodName = "E-Wallet Balance";
+        else if (target.includes('Credit')) methodName = "Credit / Debit Card";
+        else if (target.includes('TNG')) methodName = "Touch 'n Go";
+
+        methodInput.value = methodName; // 写入隐藏格子
         form.action = target;
         form.submit();
     }
