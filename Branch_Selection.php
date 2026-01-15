@@ -86,6 +86,8 @@ if ($result->num_rows > 0) {
 include 'header_UI.php'; 
 ?>
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
 <style>
     /* Hero Banner */
     .hero-wrap {
@@ -251,18 +253,42 @@ include 'header_UI.php';
         color: white;
     }
 
+    /* ⭐ [新增] 顶部橙色 Previous 按钮样式 ⭐ */
+    .top-nav-container {
+        margin-bottom: 25px;
+        text-align: left;
+    }
+    .btn-orange-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;                  /* 增加图标和文字之间的间距 */
+        background-color: #f79c34; 
+        color: white !important;
+        padding: 15px 35px;         /* ⭐ 加大数值：15px是上下，35px是左右 */
+        border-radius: 10px;        /* 稍微加大圆角，配合大按钮更协调 */
+        font-weight: 700;           /* 加粗字体 */
+        font-size: 1.2rem;          /* ⭐ 加大字体：从默认大小增加到 1.2rem */
+        text-decoration: none !important;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 8px rgba(247, 156, 52, 0.3);
+    }
+
+    .btn-orange-back:hover {
+        background-color: #e68a20;
+        transform: translateX(-8px); /* 悬停时移动的距离也稍微加大 */
+        box-shadow: 0 6px 15px rgba(247, 156, 52, 0.4);
+    }
+    
+    /* 调整图标大小以适应大按钮 */
+    .btn-orange-back i {
+        font-size: 1.3rem; 
+    }
     /* Responsive */
     @media (max-width: 768px) {
         .branch-card { flex-direction: column; height: auto; }
         .branch-carousel { width: 100%; height: 200px; }
         .branch-info { width: 100%; padding: 20px; }
     }
-
-    /* Navigation Buttons */
-    .nav-buttons { display: flex; gap: 20px; margin-top: 40px; justify-content: center; }
-    .btn-nav { padding: 15px 40px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; border: none; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 10px; transition: 0.2s; }
-    .btn-prev { background: #e5e7eb; color: #374151; border: 1px solid #d1d5db; }
-    .btn-prev:hover { background: #d1d5db; color: #111; }
 </style>
 
 <div class="hero-wrap">
@@ -283,6 +309,12 @@ include 'header_UI.php';
     <div class="container">
         <div class="row justify-content-center">
             <div class="col-lg-10">
+
+                <div class="top-nav-container">
+                    <a href="Payment_Page.php" class="btn-orange-back">
+                        <i class="fas fa-arrow-left"></i> Back to Change Details
+                    </a>
+                </div>
                 
                 <h3 class="text-cursive mb-4 text-center" style="color: #dc2626;">Choose a Branch to Proceed</h3>
                 <p class="text-center text-muted mb-5">Click on any branch card to select and continue to payment.</p>
@@ -388,12 +420,7 @@ include 'header_UI.php';
 
                     </div>
 
-                    <div class="nav-buttons">
-                        <a href="Payment_Page.php" class="btn-nav btn-prev">
-                            <i class="fas fa-arrow-left"></i> Previous Step
-                        </a>
-                    </div>
-                </form>
+                    </form>
 
             </div>
         </div>
