@@ -2,8 +2,9 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
+// SweetAlert2 的标记变量
+$registration_success = false;
 $error_message = "";
-$success_message = "";
 
 // Initialize variables
 $name = $contact = $email = $dob = "";
@@ -11,7 +12,13 @@ $name = $contact = $email = $dob = "";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Get form data
     $name = trim($_POST['name']);
-    $contact = trim($_POST['contact']);
+    
+    // --- 关键修改：处理电话号码 ---
+    // 用户输入的是 "123456789"，我们在存入数据库前手动补上前面的 "0"
+    // 这样数据库里依然是标准的 0123456789 格式
+    $raw_contact = trim($_POST['contact']);
+    $contact = '0' . $raw_contact; 
+
     $email = trim($_POST['email']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
@@ -26,6 +33,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $missing_fields[] = $field;
         }
     }
+    
+    // 注意：这里的 contact 检查的是 $_POST['contact'] (即不带0的)，只要不为空就行
     
     if (!empty($missing_fields)) {
         $error_message = "Please fill in all required fields.";
@@ -88,9 +97,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             
             if ($stmt_action->execute()) {
-                $success_message = "Registration successful! <a href='donor_login.php' class='login-link'>Click here to Login Now <i class='fas fa-arrow-right'></i></a>";
-                $name = $contact = $email = $dob = "";
-                $_POST = array();
+                // --- 关键修改：注册成功，设置标记，清空数据 ---
+                $registration_success = true;
+                $name = $contact = $email = $dob = ""; // 清空表单以便下次显示
+                // $_POST = array(); // 不强制清空POST，避免刷新问题，让JS跳转处理
             } else {
                 $error_message = "Error: " . $stmt_action->error;
             }
@@ -109,6 +119,8 @@ include 'header_UI.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Donor Registration - Love Bridge</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         :root {
             --primary-red: #dc2626;
@@ -206,7 +218,7 @@ include 'header_UI.php';
             border-color: var(--success-green);
         }
         
-        /* --- New CSS for Phone Group (+60) --- */
+        /* --- Phone Group (+60) --- */
         .phone-group {
             display: flex;
             align-items: stretch;
@@ -237,7 +249,6 @@ include 'header_UI.php';
             user-select: none;
         }
 
-        /* Remove border from input inside the group since group has the border */
         .phone-group .form-control {
             border: none;
             border-radius: 0;
@@ -325,38 +336,7 @@ include 'header_UI.php';
             font-weight: 500;
         }
 
-        .success-message {
-            background-color: #d1fae5;
-            color: #065f46;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 25px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .success-message span {
-            width: 100%;
-            display: flex;
-            justify-content: space-between; 
-            align-items: center;
-        }
-
-        .success-message .login-link {
-            background-color: #059669;
-            color: white;
-            padding: 8px 15px;
-            border-radius: 4px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 0.9rem;
-            transition: background-color 0.3s;
-            margin-left: 15px;
-        }
-
-        .success-message .login-link:hover { background-color: #047857; }
+        /* 移除了原有的 .success-message CSS，因为用 SweetAlert2 替代了 */
 
         .button-container {
             display: flex;
@@ -425,8 +405,6 @@ include 'header_UI.php';
             .form-row { grid-template-columns: 1fr; gap: 20px; }
             .button-container { flex-direction: column; gap: 15px; }
             .btn { width: 100%; }
-            .success-message { flex-direction: column; text-align: center; gap: 10px; }
-            .success-message .login-link { margin-left: 0; width: 100%; text-align: center; box-sizing: border-box; }
         }
     </style>
 </head>
@@ -437,12 +415,6 @@ include 'header_UI.php';
             
             <?php if (!empty($error_message)): ?>
                 <div class="error-message"><?php echo $error_message; ?></div>
-            <?php endif; ?>
-            
-            <?php if (!empty($success_message)): ?>
-                <div class="success-message">
-                    <span><?php echo $success_message; ?></span>
-                </div>
             <?php endif; ?>
             
             <form method="POST" action="donor_register.php" id="registerForm" novalidate>
@@ -472,11 +444,11 @@ include 'header_UI.php';
                         <div class="phone-group" id="phoneGroup">
                             <div class="phone-prefix">+60</div>
                             <input type="tel" class="form-control" id="contact" name="contact" 
-                                   placeholder="012-3456789"
+                                   placeholder="12-3456789"
                                    value="<?php echo htmlspecialchars($contact); ?>" 
                                    required>
                         </div>
-                        <span class="form-help">Must start with 0 (e.g., 012-XXXXXXX)</span>
+                        <span class="form-help">Do not enter '0' at the start (e.g., 12-XXXXXXX)</span>
                         <div class="field-error-msg" id="contactError">Contact Number is required.</div>
                     </div>
                 </div>
@@ -544,7 +516,25 @@ include 'header_UI.php';
         </div>
     </div>
  <?php include 'footer.php'; ?>
+
     <script>
+        // --- SweetAlert2 Success Logic ---
+        <?php if ($registration_success): ?>
+        Swal.fire({
+            title: 'Registration Successful!',
+            text: 'Your account has been created successfully.',
+            icon: 'success',
+            confirmButtonText: 'Login Now',
+            confirmButtonColor: '#dc2626', // 使用你的主题红色
+            allowOutsideClick: false
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = 'donor_login.php';
+            }
+        });
+        <?php endif; ?>
+        // ---------------------------------
+
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('registerForm');
             const password = document.getElementById('password');
@@ -553,7 +543,7 @@ include 'header_UI.php';
             const dobInput = document.getElementById('dob');
             const nameInput = document.getElementById('name');
             const contactInput = document.getElementById('contact');
-            const phoneGroup = document.getElementById('phoneGroup'); // Parent container
+            const phoneGroup = document.getElementById('phoneGroup'); 
             const termsInput = document.getElementById('terms');
             
             function setFieldState(elementId, isError, message = "") {
@@ -579,7 +569,7 @@ include 'header_UI.php';
                 }
             }
 
-            // --- 1. Password Logic ---
+            // --- 1. Password Logic (不变) ---
             function checkPasswordMatch() {
                 const matchMsg = document.getElementById('matchMsg');
                 const confirmError = document.getElementById('confirmPasswordError');
@@ -668,23 +658,23 @@ include 'header_UI.php';
             }
             nameInput.addEventListener('input', validateName);
             
+            // --- 关键修改：Contact Validation (Update logic for No-Zero) ---
             function validateContact() {
                  if(!contactInput.value) return true;
                  
-                 // Remove non-digits to check raw number length and start char
                  const rawValue = contactInput.value.replace(/\D/g, '');
 
-                 // 1. Must start with '0'
-                 if (rawValue.length > 0 && rawValue.charAt(0) !== '0') {
+                 // 1. Check if it starts with '0' -> ERROR
+                 if (rawValue.length > 0 && rawValue.charAt(0) === '0') {
                       phoneGroup.classList.add('error');
-                      setFieldState('contactError', true, "Malaysia phone number must start with 0.");
+                      setFieldState('contactError', true, "Do not include the leading '0'.");
                       return false;
                  }
                  
-                 // 2. Check Length (01x-xxxxxxx is usually 10-11 digits)
-                 if(rawValue.length < 10) {
+                 // 2. Check Length (1x-xxxxxxx usually 9-10 digits without the leading 0)
+                 if(rawValue.length < 9) {
                       phoneGroup.classList.add('error');
-                      setFieldState('contactError', true, "Please enter a valid Malaysia contact number.");
+                      setFieldState('contactError', true, "Please enter a valid contact number.");
                       return false;
                  } else {
                       phoneGroup.classList.remove('error');
@@ -694,7 +684,7 @@ include 'header_UI.php';
             }
             contactInput.addEventListener('blur', validateContact);
 
-            // --- Password Strength UI ---
+            // --- Password Strength UI (不变) ---
             const passwordStrengthBar = document.getElementById('passwordStrengthBar');
             const reqs = {
                 length: document.getElementById('lengthReq'),
@@ -752,22 +742,25 @@ include 'header_UI.php';
                 }
             }
             
+            // --- 关键修改：Contact Input Handler (Prevent typing 0) ---
             contactInput.addEventListener('input', function(e) {
                 let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
                 
-                // Enforce formatting 01x-xxxxxxx
-                if (value.length > 3) value = value.substring(0, 3) + '-' + value.substring(3);
-                if (value.length > 12) value = value.substring(0, 12); // Limit length
+                // If user tries to type 0 at the start, remove it immediately
+                if (value.startsWith('0')) {
+                    value = value.substring(1);
+                }
+
+                // Enforce formatting 1xx-xxxxxxx
+                if (value.length > 2) value = value.substring(0, 2) + '-' + value.substring(2);
+                if (value.length > 11) value = value.substring(0, 11); // Limit length
                 
                 e.target.value = value;
                 
-                // Real-time check for "Start with 0"
-                if (value.length > 0 && value.charAt(0) !== '0') {
-                     setFieldState('contactError', true, "Must start with 0.");
-                } else {
-                    // Only clear specific error if format looks ok, but full validation happens on blur/submit
+                // Real-time error clear if length is okay
+                if(value.length >= 2) {
                     const currentError = document.getElementById('contactError').innerText;
-                    if(currentError === "Must start with 0.") {
+                    if(currentError === "Do not include the leading '0'.") {
                          setFieldState('contactError', false);
                     }
                 }
@@ -797,7 +790,7 @@ include 'header_UI.php';
                     }
                 });
                 
-                // Special check for Contact (using group logic)
+                // Special check for Contact
                 if(!contactInput.value.trim()) {
                     phoneGroup.classList.add('error');
                     setFieldState('contactError', true, 'Contact Number is required.');

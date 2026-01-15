@@ -6,22 +6,31 @@ include 'header_function.php';
 // 定义常量
 define('SITE_RED', '#d32f2f');
 
+// 1. 获取当前 PHP 时间（核心修复：统一使用 PHP 时间，避免数据库时区不一致）
+$current_time = date("Y-m-d H:i:s");
+
 $token = $_GET['token'] ?? '';
 $error_message = '';
 $success_message = '';
 $token_valid = false;
 $donor_id = null;
 
-// 1. 验证 Token
+// 2. 验证 Token
 if (!empty($token)) {
+    /* 修复说明：
+       原代码使用 AND reset_expires > NOW()，这依赖 MySQL 的时区。
+       如果 MySQL 是 UTC(+0) 而你是 UTC(+8)，时间会相差8小时，导致看起来“马上过期”。
+       现在改为传入 PHP 的 $current_time。
+    */
     $stmt = $conn->prepare("
         SELECT reset_id, donor_id, reset_expires 
         FROM donor_password_reset 
         WHERE reset_token = ? 
         AND reset_status = 'pending' 
-        AND reset_expires > NOW()
+        AND reset_expires > ?
     ");
-    $stmt->bind_param("s", $token);
+    // 注意这里变成了 "ss"，传入了 token 和 current_time
+    $stmt->bind_param("ss", $token, $current_time);
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -37,7 +46,7 @@ if (!empty($token)) {
     $error_message = "Missing reset token.";
 }
 
-// 2. 处理表单提交
+// 3. 处理表单提交
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $token_valid) {
     $new_password = $_POST['new_password'];
     $confirm_password = $_POST['confirm_password'];
@@ -68,7 +77,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $token_valid) {
 
         if ($current_donor && password_verify($new_password, $current_donor['Donor_Password'])) {
             $error_message = "New password cannot be the same as your current password.";
-            // 注意：这里 token_valid 依然是 true，因为 token 本身没问题，只是业务逻辑拦截了
         } else {
             $hashed_password = password_hash($new_password, PASSWORD_BCRYPT);
             $conn->begin_transaction();
@@ -78,8 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $token_valid) {
                 $update_stmt->bind_param("si", $hashed_password, $donor_id);
                 $update_stmt->execute();
 
-                $token_stmt = $conn->prepare("UPDATE donor_password_reset SET reset_status = 'used', reset_used = 1, reset_updated = NOW() WHERE reset_token = ?");
-                $token_stmt->bind_param("s", $token);
+                $token_stmt = $conn->prepare("UPDATE donor_password_reset SET reset_status = 'used', reset_used = 1, reset_updated = ? WHERE reset_token = ?");
+                $token_stmt->bind_param("ss", $current_time, $token); // 这里也统一用 PHP 时间
                 $token_stmt->execute();
 
                 $ip = $_SERVER['REMOTE_ADDR'];
@@ -250,7 +258,7 @@ include 'header_UI.php';
                 <?php endif; ?>
 
             <?php elseif ($token_valid): ?>
-                <form method="POST" action="" id="resetForm">
+                <form method="POST" action="?token=<?php echo htmlspecialchars($token); ?>" id="resetForm">
                     <input type="hidden" name="token" value="<?php echo htmlspecialchars($token); ?>">
                     
                     <div class="form-group">

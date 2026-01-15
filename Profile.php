@@ -2,12 +2,11 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-// --- [UPDATED] 1. 计算日期限制 ---
-// max设为今天，不block选择，只通过JS报错。min设为100年前，防止年份乱填。
+// --- 1. 计算日期限制 ---
 $current_date = date('Y-m-d');
 $min_date = date('Y-m-d', strtotime('-100 years')); 
 
-// --- 2. Login Check with SweetAlert Logic ---
+// --- 2. Login Check ---
 $show_login_modal = false;
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     $show_login_modal = true;
@@ -52,7 +51,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
     $stmt->close();
 }
 
-// --- 处理逻辑：删除账号 (Soft Delete) ---
+// --- 处理逻辑：删除账号 ---
 $delete_success = false; 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_account'])) {
     $delete_query = "UPDATE donor SET Is_Deleted = 1 WHERE Donor_ID = ?";
@@ -112,8 +111,14 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
     
     $name = $_POST['name'];
     $email = $_POST['email'];
-    $contact = $_POST['contact'];
-    // [UPDATED] Clean IC Number (remove dashes) before saving to DB
+    
+    // [UPDATED] Contact: 用户输入不带0，这里我们手动补上 '0' 存入数据库
+    // 例如用户填 "12-3456789"，我们存 "012-3456789"
+    $raw_contact = $_POST['contact'];
+    // 防止用户某些手段填了0，我们先去0再加0，或者直接加0
+    // 最简单：直接加0，因为JS会控制格式
+    $contact = '0' . $raw_contact; 
+
     $ic_number = str_replace('-', '', $_POST['icnumber']); 
     $dob = $_POST['dob'];            
     $address1 = $_POST['address1'];
@@ -422,8 +427,8 @@ include 'header_UI.php';
                             <div class="phone-group">
                                 <div class="phone-prefix">+60</div>
                                 <input type="tel" id="contact" name="contact" class="track-field" 
-                                       placeholder="012-3456789"
-                                       value="<?php echo htmlspecialchars($donor['Donor_ContactNumber']); ?>" required>
+                                       placeholder="12-3456789"
+                                       value="<?php echo htmlspecialchars(ltrim($donor['Donor_ContactNumber'], '0')); ?>" required>
                             </div>
                             <div class="field-error-msg" id="contactError"></div>
                         </div>
@@ -598,20 +603,16 @@ include 'header_UI.php';
             }
         }
 
-        // --- 1. IC Input & Validation Logic ---
+        // --- 1. IC Input & Validation Logic (UNCHANGED) ---
         const icInput = document.getElementById('icnumber');
         const dobInput = document.getElementById('dob');
         const icError = document.getElementById('icError');
         const icGroup = document.getElementById('icGroup');
 
-       // [UPDATED] Auto-format IC with dashes and cursor fix
         icInput.addEventListener('input', function(e) {
-            // 1. Save Cursor Position
             let cursorStart = this.selectionStart;
-            let cursorEnd = this.selectionEnd;
             let oldVal = this.value;
 
-            // 2. Logic to strip and re-format
             let val = this.value.replace(/\D/g, '');
             let newVal = '';
             
@@ -627,13 +628,8 @@ include 'header_UI.php';
             
             this.value = newVal;
 
-            // 3. Restore Cursor Position logic 
-            // If we added a dash and the cursor was after it, move cursor forward
-            // If we are typing at the end, let browser handle it (it goes to end automatically)
             if (cursorStart < oldVal.length) {
-                 // Check if a dash was added right before the cursor
                  if(oldVal.slice(0, cursorStart).replace(/\D/g, '').length === newVal.slice(0, cursorStart).replace(/\D/g, '').length) {
-                     // length of digits is same, check if dash count changed
                      let oldDashes = (oldVal.slice(0, cursorStart).match(/-/g) || []).length;
                      let newDashes = (newVal.slice(0, cursorStart).match(/-/g) || []).length;
                      if(newDashes > oldDashes) cursorStart++;
@@ -660,7 +656,6 @@ include 'header_UI.php';
                 const day = ic.substring(4, 6);
                 const stateCode = ic.substring(6, 8);
 
-                // Auto-fill DOB logic
                 if (month > 0 && month <= 12 && day > 0 && day <= 31) {
                     const currentYearShort = new Date().getFullYear() % 100;
                     let fullYear = '';
@@ -684,20 +679,28 @@ include 'header_UI.php';
             }
         }
 
-        // --- 2. Contact Input Logic (Visual Formatting Only) ---
+        // --- 2. Contact Input Logic (UPDATED: No leading 0) ---
         const contactInput = document.getElementById('contact');
         const contactError = document.getElementById('contactError');
         const contactGroup = document.querySelector('.phone-group');
 
         contactInput.addEventListener('input', function(e) {
             let val = e.target.value.replace(/\D/g, ''); 
-            if (val.length > 3) val = val.substring(0, 3) + '-' + val.substring(3);
-            if (val.length > 12) val = val.substring(0, 12);
+            
+            // 如果用户尝试输入0开头，立即移除
+            if (val.startsWith('0')) {
+                val = val.substring(1);
+            }
+
+            // 格式化: 12-3456789 (xx-xxxxxxx)
+            if (val.length > 2) val = val.substring(0, 2) + '-' + val.substring(2);
+            if (val.length > 11) val = val.substring(0, 11);
             
             e.target.value = val;
             updateProgress();
             
-            if(val.length > 0 && val.charAt(0) === '0') {
+            // 实时清除错误
+            if(val.length >= 2) {
                 contactError.style.display = 'none';
                 contactGroup.classList.remove('error');
             }
@@ -707,16 +710,17 @@ include 'header_UI.php';
         document.getElementById('profileForm').addEventListener('submit', function(e) {
             let isValid = true;
             
-            // --- A. Validate Contact Number (10-11 digits) ---
+            // --- A. Validate Contact Number (Must not start with 0, length 9-10) ---
             const contactVal = contactInput.value.replace(/\D/g, ''); 
-            if (contactVal.charAt(0) !== '0') {
+            if (contactVal.length > 0 && contactVal.charAt(0) === '0') {
                 isValid = false;
-                contactError.innerText = "Contact number must start with 0.";
+                contactError.innerText = "Do not include the leading '0'.";
                 contactError.style.display = 'block';
                 contactGroup.classList.add('error');
-            } else if (contactVal.length < 10 || contactVal.length > 11) {
+            } else if (contactVal.length < 9 || contactVal.length > 10) {
+                // 原本是 10-11 位 (含0)，现在去掉0变成 9-10 位
                 isValid = false;
-                contactError.innerText = "Phone number must be 10-11 digits (e.g., 012-3456789).";
+                contactError.innerText = "Please enter a valid contact number (e.g. 12-3456789).";
                 contactError.style.display = 'block';
                 contactGroup.classList.add('error');
             } else {
@@ -724,7 +728,7 @@ include 'header_UI.php';
                 contactGroup.classList.remove('error');
             }
 
-            // --- B. Validate Date of Birth (Must be 18+) ---
+            // --- B. Validate Date of Birth ---
             const dobError = document.getElementById('dobError'); 
             const dobVal = dobInput.value;
             
@@ -732,7 +736,6 @@ include 'header_UI.php';
                 const selectedDate = new Date(dobVal);
                 const today = new Date();
                 
-                // Calculate age
                 let age = today.getFullYear() - selectedDate.getFullYear();
                 const m = today.getMonth() - selectedDate.getMonth();
                 if (m < 0 || (m === 0 && today.getDate() < selectedDate.getDate())) {
@@ -750,7 +753,7 @@ include 'header_UI.php';
                 }
             }
 
-            // --- C. Validate IC (Strict Logic) ---
+            // --- C. Validate IC (UNCHANGED) ---
             if (icInput.value.trim() !== '') {
                 const cleanIC = icInput.value.replace(/[^0-9]/g, '');
                 
@@ -762,7 +765,7 @@ include 'header_UI.php';
                     const month = parseInt(cleanIC.substring(2, 4), 10);
                     const day = parseInt(cleanIC.substring(4, 6), 10);
                     const stateCode = cleanIC.substring(6, 8);
-                    const validStateCodes = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40','41','42','43','44','45','46','47','48','49','50','51','52','53','54','55','56','57','58','59'];
+                    const validStateCodes = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16'];
                     
                     let isDateValid = true;
                     if (month < 1 || month > 12) {
@@ -798,7 +801,7 @@ include 'header_UI.php';
             }
         });
 
-        // --- 4. Auto Detect State from Postcode Logic ---
+        // --- 4. Auto Detect State ---
         function handlePostcodeInput(postcode) {
             const stateInput = document.getElementById('state');
             const pc = parseInt(postcode, 10);
@@ -831,7 +834,7 @@ include 'header_UI.php';
             updateProgress();
         }
 
-        // --- 5. Image Preview Logic ---
+        // --- 5. Image Preview ---
         function previewImage(event) {
             const input = event.target;
             const avatarDisplay = document.getElementById('avatar-display');
@@ -845,7 +848,7 @@ include 'header_UI.php';
             }
         }
 
-        // --- 6. Real-time Progress Bar Logic ---
+        // --- 6. Real-time Progress Bar ---
         function updateProgress() {
             const fields = ['name', 'email', 'contact', 'icnumber', 'dob', 'address1', 'city', 'state', 'postalcode', 'country'];
             let filledCount = 0;
