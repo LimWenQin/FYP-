@@ -115,27 +115,26 @@ include 'header_UI.php';
     }
     .payment-option:not(.disabled):hover .btn-pay { background-color: #f79c34ff; transform: scale(1.05); }
 
-    /* 修改后的 Change Details 按钮样式 */
-    .btn-change-details {
+    /* ⭐ 修改：橙色大号 Back 按钮（修正了链接失效问题） ⭐ */
+    .btn-orange-back {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        background-color: #f8f9fa;
-        color: #333;
-        border: 1px solid #ddd;
-        padding: 10px 20px;
-        border-radius: 50px;
-        font-weight: 600;
-        font-size: 0.9rem;
-        transition: 0.3s;
+        gap: 12px;
+        background-color: #f79c34; 
+        color: white !important;
+        padding: 15px 35px;         /* ⭐ 加大按钮尺寸 */
+        border-radius: 10px;
+        font-weight: 700;           /* ⭐ 加粗字体 */
+        font-size: 1.2rem;          /* ⭐ 增大字体 */
+        transition: all 0.3s ease;
         text-decoration: none !important;
-        margin-top: 20px;
+        box-shadow: 0 4px 6px rgba(247, 156, 52, 0.2);
+        margin-bottom: 25px;        
     }
-    .btn-change-details:hover {
-        background-color: #e2e6ea;
-        color: #dc2626;
-        border-color: #ccc;
+    .btn-orange-back:hover {
+        background-color: #e68a20;
         transform: translateX(-5px);
+        box-shadow: 0 6px 12px rgba(247, 156, 52, 0.3);
     }
 </style>
 
@@ -157,6 +156,13 @@ include 'header_UI.php';
     <div class="container">
         <div class="row">
             <div class="col-lg-4 mb-5">
+                
+                <div class="text-left">
+                    <a href="Branch_Selection.php" class="btn-orange-back">
+                        <i class="fas fa-arrow-left"></i> Back to Change Details
+                    </a>
+                </div>
+
                 <h3 class="text-cursive mb-3" style="color: #e16161ff;">Summary</h3>
                 <div class="summary-card">
                     <div class="summary-item">
@@ -171,11 +177,6 @@ include 'header_UI.php';
                         <span class="summary-label">Total</span>
                         <span class="summary-value summary-total">RM <?php echo number_format($amount, 2); ?></span>
                     </div>
-                </div>
-                <div class="text-center">
-                    <a href="javascript:history.back()" class="btn-change-details">
-                        <i class="fas fa-edit"></i> Back to Change Details
-                    </a>
                 </div>
             </div>
 

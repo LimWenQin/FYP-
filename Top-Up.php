@@ -44,20 +44,51 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
 
     if ($amount > 0 && !empty($method)) {
         
-        // 开启数据库事务
-        $conn->begin_transaction();
+        // --- 后端安全校验 ---
+if ($method == 'Credit/Debit Card') {
+    $exp = $_POST['exp'] ?? '';
+    $cvc_check = $_POST['cvc'] ?? '';
 
+    if (strlen($exp) !== 5 || strpos($exp, '/') === false) {
+        echo "<script>alert('Error: Invalid expiration date format.'); window.history.back();</script>";
+        exit();
+    }
+
+    $exp_parts = explode('/', $exp);
+    $mm = (int)$exp_parts[0];
+    $yy = (int)$exp_parts[1]; 
+
+    // 获取当前年份（2位数字）和月份
+    $current_y = (int)date('y'); // 比如 2026年返回 26
+    $current_m = (int)date('m');
+
+    // 修复点：确保使用了 $ 符号
+    if ($mm < 1 || $mm > 12) {
+        echo "<script>alert('Error: Invalid month (01-12).'); window.history.back();</script>";
+        exit();
+    }
+    
+    // 检查是否过期
+    if ($yy < $current_y || ($yy == $current_y && $mm < $current_m)) {
+        echo "<script>alert('Error: Card has expired.'); window.history.back();</script>";
+        exit();
+    }
+    
+    if (!preg_match('/^\d{3}$/', $cvc_check)) {
+        echo "<script>alert('Error: CVC must be 3 digits.'); window.history.back();</script>";
+        exit();
+    }
+}
+
+        $conn->begin_transaction();
         try {
-            // A. 更新 Donor Wallet (加钱)
             $stmt = $conn->prepare("UPDATE donor SET Donor_Wallet = Donor_Wallet + ? WHERE Donor_ID = ?");
             $stmt->bind_param("di", $amount, $current_donor_id);
             $stmt->execute();
             $stmt->close();
 
-            // B. 记录 Payment
             $txn_ref = "TXN-TOPUP-" . date("YmdHis") . "-" . rand(100, 999);
             $now = date("Y-m-d H:i:s");
-            
             $bank_name = ($method == 'TNG eWallet') ? 'TNG eWallet' : ($_POST['bank_display'] ?? 'Credit Card');
             $masked = "Top-up Account";
             
@@ -67,12 +98,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
             }
 
             $stmt_pay = $conn->prepare("INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At) VALUES (?, 'Success', ?, ?, ?, ?, ?, ?)");
-            $stmt_pay->bind_param("sssisss", $method, $txn_ref, $amount, $now, $bank_name, $masked, $now);
+            $stmt_pay->bind_param("sssdsss", $method, $txn_ref, $amount, $now, $bank_name, $masked, $now);
             $stmt_pay->execute();
             $payment_id = $stmt_pay->insert_id;
             $stmt_pay->close();
 
-            // C. 插入 Order 记录
             $order_type_val = "Top-up"; 
             $sql_insert = "INSERT INTO orders (Donor_ID, Payment_ID, Order_Amount, Order_Status, Order_Type, Order_TXN_Ref, Order_Created_At, Order_Name, Order_PaymentMethod, Order_ContactNumber, Order_ICNumber, Order_Email, Order_Updated_At) VALUES (?, ?, ?, 'Completed', ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt_ord = $conn->prepare($sql_insert);
@@ -81,46 +111,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
             $new_order_id = $stmt_ord->insert_id;
             $stmt_ord->close();
 
-            // D. 计算并更新积分 (每 RM 10 = 1 PT)
             $points_earned = floor($amount / 10);
             if ($points_earned > 0) {
-                $pt_sql = "INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) 
-                           VALUES (?, ?, NOW(), ?) 
-                           ON DUPLICATE KEY UPDATE 
-                           Points_Earned = ?, 
-                           Points_Total = Points_Total + ?, 
-                           Points_Updated_At = NOW()";
+                $pt_sql = "INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES (?, ?, NOW(), ?) ON DUPLICATE KEY UPDATE Points_Earned = ?, Points_Total = Points_Total + ?, Points_Updated_At = NOW()";
                 $stmt_pt = $conn->prepare($pt_sql);
                 $stmt_pt->bind_param("iiiii", $points_earned, $points_earned, $current_donor_id, $points_earned, $points_earned);
                 $stmt_pt->execute();
                 $stmt_pt->close();
             }
 
-            // E. 存入 Wallet Transaction 流水表 (Transaction_Type 为 'Credit')
             $description = "Top-up via " . $method;
-            $wt_sql = "INSERT INTO wallet_transaction (Donor_ID, Order_ID, Amount, Transaction_Type, Description, Created_At) VALUES (?, ?, ?, 'Credit', ?, NOW())";
+            $trans_type = 'Credit';
+            $wt_sql = "INSERT INTO wallet_transaction (Donor_ID, Order_ID, Amount, Transaction_Type, Description, Created_At) VALUES (?, ?, ?, ?, ?, NOW())";
             $wt_stmt = $conn->prepare($wt_sql);
-            $wt_stmt->bind_param("iids", $current_donor_id, $new_order_id, $amount, $description);
+            $wt_stmt->bind_param("iidss", $current_donor_id, $new_order_id, $amount, $trans_type, $description);
             $wt_stmt->execute();
             $wt_stmt->close();
 
-            // 提交事务
             $conn->commit();
-            
             $topup_successful = true;
             $success_amount = $amount;
-
         } catch (Exception $e) {
-            // 检查连接是否还在，如果还在则执行回滚
-            if ($conn && $conn->ping()) {
-                $conn->rollback();
-            }
-            // 打印真实的错误原因，帮助调试
+            if ($conn && $conn->ping()) { $conn->rollback(); }
             die("Transaction Error: " . $e->getMessage());
         }
     }
 }
-
 include 'header_UI.php'; 
 ?>
 
@@ -151,12 +167,13 @@ include 'header_UI.php';
     .btn-submit.ready { opacity: 1; pointer-events: all; }
     .qr-box { text-align: center; }
     .qr-box img { width: 180px; border-radius: 10px; }
+    /* 新增错误高亮样式 */
+    .is-invalid { border: 2px solid #dc3545 !important; background-color: #fff8f8 !important; }
 </style>
 
 <div class="topup-wrapper">
     <div class="card-box">
         <h2><i class="fas fa-wallet" style="color:#0057B7;"></i> Top Up Wallet</h2>
-        
         <form id="topupForm" method="POST" action="">
             <input type="hidden" id="amount" name="amount" value="">
             <input type="hidden" id="payment_method" name="payment_method" value="">
@@ -174,7 +191,6 @@ include 'header_UI.php';
 
             <div class="section-title">2. Payment Method</div>
             <div class="payment-methods">
-                
                 <div class="method-container" id="card-option" onclick="selectMethod('Credit/Debit Card', this)">
                     <div class="method-header">
                         <div class="m-left" style="display:flex; align-items:center; gap:15px;">
@@ -221,20 +237,18 @@ include 'header_UI.php';
                         </div>
                     </div>
                 </div>
-
             </div>
-
             <button type="submit" name="confirm_topup" id="btnPay" class="btn-submit">Pay Now</button>
         </form>
     </div>
 </div>
 
 <script>
-    let selectedAmount = 0;
-    let selectedMethod = "";
+    let currentSelectedAmount = 0;
+    let currentSelectedMethod = "";
 
     function selectAmount(val, btn) {
-        selectedAmount = val;
+        currentSelectedAmount = val;
         document.getElementById('amount').value = val;
         document.getElementById('custom_amount').value = ""; 
         document.querySelectorAll('.btn-amt').forEach(b => b.classList.remove('active'));
@@ -243,14 +257,14 @@ include 'header_UI.php';
     }
 
     function manualAmount(val) {
-        selectedAmount = val;
+        currentSelectedAmount = val;
         document.getElementById('amount').value = val;
         document.querySelectorAll('.btn-amt').forEach(b => b.classList.remove('active'));
         checkForm();
     }
 
     function selectMethod(method, element) {
-        selectedMethod = method;
+        currentSelectedMethod = method;
         document.getElementById('payment_method').value = method;
         document.querySelectorAll('.method-container').forEach(c => c.classList.remove('selected'));
         element.classList.add('selected');
@@ -261,13 +275,13 @@ include 'header_UI.php';
         const btn = document.getElementById('btnPay');
         let isValid = false;
 
-        if (selectedAmount > 0 && selectedMethod !== "") {
-            if (selectedMethod === 'Credit/Debit Card') {
+        if (currentSelectedAmount > 0 && currentSelectedMethod !== "") {
+            if (currentSelectedMethod === 'Credit/Debit Card') {
                 const card = document.getElementById('card').value.replace(/\s/g, '');
                 const exp = document.getElementById('exp').value;
                 const cvc = document.getElementById('cvc').value;
-                
-                if (card.length === 16 && exp.length === 5 && cvc.length === 3) {
+                const cvcPattern = /^\d{3}$/;
+                if (card.length === 16 && exp.length === 5 && cvcPattern.test(cvc)) {
                     isValid = true;
                 }
             } else {
@@ -277,7 +291,7 @@ include 'header_UI.php';
 
         if (isValid) {
             btn.classList.add('ready');
-            btn.innerText = `Pay RM ${parseFloat(selectedAmount).toFixed(2)}`;
+            btn.innerText = `Pay RM ${parseFloat(currentSelectedAmount).toFixed(2)}`;
             btn.disabled = false;
         } else {
             btn.classList.remove('ready');
@@ -287,64 +301,110 @@ include 'header_UI.php';
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        const topupForm = document.getElementById('topupForm');
         const cardInput = document.getElementById('card');
-        const bankDisplay = document.getElementById('bank_display');
-        const cardIcon = document.getElementById('card-brand-icon');
         const expInput = document.getElementById('exp');
         const cvcInput = document.getElementById('cvc');
+        const bankDisplay = document.getElementById('bank_display');
+        const cardIcon = document.getElementById('card-brand-icon');
 
-        document.querySelectorAll('.card-input').forEach(input => {
-            input.addEventListener('input', checkForm);
+        cardInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            let formattedValue = '';
+            for (let i = 0; i < value.length; i++) {
+                if (i > 0 && i % 4 === 0) formattedValue += ' ';
+                formattedValue += value[i];
+            }
+            e.target.value = formattedValue;
+            identifyCardType(value);
+            checkForm();
         });
 
-        if(cardInput) {
-            cardInput.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, '');
-                let formattedValue = '';
-                for (let i = 0; i < value.length; i++) {
-                    if (i > 0 && i % 4 === 0) formattedValue += ' ';
-                    formattedValue += value[i];
-                }
-                e.target.value = formattedValue;
-                identifyCardType(value);
-            });
-        }
+        expInput.addEventListener('input', function(e) {
+            // 输入时自动清除红色边框
+            expInput.classList.remove('is-invalid');
+            let value = e.target.value.replace(/\D/g, ''); 
+            if (value.length >= 3) {
+                e.target.value = value.slice(0, 2) + '/' + value.slice(2, 4);
+            } else {
+                e.target.value = value;
+            }
+            checkForm();
+        });
 
-        if(expInput) {
-            expInput.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, '');
-                if (value.length >= 2) {
-                    e.target.value = value.slice(0, 2) + '/' + value.slice(2, 4);
-                } else {
-                    e.target.value = value;
-                }
-            });
-        }
+        cvcInput.addEventListener('input', function(e) {
+            e.target.value = e.target.value.replace(/\D/g, '');
+            checkForm();
+        });
 
-        if(cvcInput) {
-            cvcInput.addEventListener('input', function(e) {
-                e.target.value = e.target.value.replace(/\D/g, '');
-            });
-        }
+        topupForm.addEventListener('submit', function(e) {
+            if (document.getElementById('payment_method').value === 'Credit/Debit Card') {
+                const expValue = expInput.value; 
+                
+                if (expValue.length !== 5) {
+                    e.preventDefault();
+                    expInput.classList.add('is-invalid');
+                    Swal.fire({ title: 'Error', text: 'Please enter a valid expiration date (MM/YY).', icon: 'warning', confirmButtonColor: '#0057B7' });
+                    return;
+                }
+
+                const [mmStr, yyStr] = expValue.split('/');
+                const mm = parseInt(mmStr, 10);
+                const yy = parseInt(yyStr, 10);
+                
+                const now = new Date();
+                const currentYear = parseInt(now.getFullYear().toString().substr(-2)); 
+                const currentMonth = now.getMonth() + 1; 
+
+                // 错误处理逻辑：变红、通知、清除内容
+                if (mm < 1 || mm > 12) {
+                    e.preventDefault();
+                    expInput.classList.add('is-invalid');
+                    Swal.fire({ 
+                        title: 'Invalid Month', 
+                        text: 'Please enter a month between 01 and 12.', 
+                        icon: 'error', 
+                        confirmButtonColor: '#0057B7' 
+                    }).then(() => {
+                        expInput.value = ''; // 清除内容
+                        expInput.focus();
+                        checkForm();
+                    });
+                    return;
+                }
+
+                if (yy < currentYear || (yy === currentYear && mm < currentMonth)) {
+                    e.preventDefault(); 
+                    expInput.classList.add('is-invalid');
+                    Swal.fire({ 
+                        title: 'Card Expired', 
+                        text: 'The expiration date entered has already passed.', 
+                        icon: 'error', 
+                        confirmButtonColor: '#0057B7' 
+                    }).then(() => {
+                        expInput.value = ''; // 清除内容
+                        expInput.focus();
+                        checkForm();
+                    });
+                    return;
+                }
+            }
+        });
 
         function identifyCardType(number) {
             const patterns = { visa: /^4/, mastercard: /^5[1-5]/, amex: /^3[47]/ };
             const icons = { visa: 'fa-cc-visa', mastercard: 'fa-cc-mastercard', amex: 'fa-cc-amex', unknown: 'fa-credit-card' };
             let type = 'unknown';
             let bankName = 'Unknown Card';
-
             if (patterns.visa.test(number)) { type = 'visa'; bankName = 'Visa Card'; } 
             else if (patterns.mastercard.test(number)) { type = 'mastercard'; bankName = 'MasterCard'; } 
             else if (patterns.amex.test(number)) { type = 'amex'; bankName = 'American Express'; }
-
             if(bankDisplay) bankDisplay.value = bankName;
             if(cardIcon) {
                 cardIcon.className = `fab ${icons[type]} card-icon`;
                 cardIcon.style.color = type === 'unknown' ? '#999' : '#0057B7';
             }
         }
-        
-        checkForm();
     });
 
     <?php if ($topup_successful): ?>
@@ -356,5 +416,4 @@ include 'header_UI.php';
     }).then(() => { window.location.href = 'E_Wallet.php'; });
     <?php endif; ?>
 </script>
-
 <?php include 'footer.php'; ?>

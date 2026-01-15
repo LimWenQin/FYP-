@@ -323,9 +323,14 @@ while ($row = $notif_result->fetch_assoc()) {
         <p class="page-subtitle">Manage your monthly contributions, modify schedules, or download receipts.</p>
     </div>
 
-    <div class="info-alert">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-        <span><strong>Note:</strong> You can pause your donation plan temporarily and resume it at any time without losing your records.</span>
+    <div class="info-alert" style="flex-direction: column; align-items: flex-start;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <span><strong>Note:</strong> You can pause your donation plan temporarily and resume it at any time.</span>
+        </div>
+        <div style="background: #fffbeb; color: #92400e; padding: 10px; border-radius: 6px; border: 1px solid #fde68a; font-size: 0.9rem; width: 100%;">
+            <i class="fas fa-wallet"></i> <strong>E-Wallet Users:</strong> Please ensure your wallet balance is <strong>sufficient</strong> before the "Next Charge Date". If the balance is too low, the deduction will fail and your plan may be paused.
+        </div>
     </div>
 
     <div class="content-card">
@@ -406,13 +411,14 @@ while ($row = $notif_result->fetch_assoc()) {
     </div>
 
     <div class="download-section">
-        <h3 class="download-title">Monthly Receipts</h3>
-        <p class="download-desc">Need a copy of your transaction history for tax purposes? Download your official receipt here.</p>
-        <button class="btn-download">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            Download PDF Receipt (Last Month)
-        </button>
-    </div>
+    <h3 class="download-title">Donation Receipts</h3>
+    <p class="download-desc">Access and download your complete history of official tax-deductible receipts.</p>
+    
+    <a href="my_receipts.php" class="btn-download" style="text-decoration: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        View & Download All Receipts
+    </a>
+</div>
 
 </div>
 
