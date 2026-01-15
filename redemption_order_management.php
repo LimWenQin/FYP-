@@ -134,7 +134,8 @@ if (isset($_SESSION['admin_id'])) {
 // --- SEARCH & FILTER ---
 $searchTerm = "";
 $whereConditions = ["1=1"]; 
-$orderClause = "ORDER BY CASE WHEN r.Redemption_Status = 'Pending' THEN 1 ELSE 2 END, r.Redemption_ID DESC"; 
+// 修改：让 Processing 和 Pending 一样排在最前面
+$orderClause = "ORDER BY CASE WHEN r.Redemption_Status IN ('Pending', 'Processing') THEN 1 ELSE 2 END, r.Redemption_ID DESC"; 
 
 // 1. Keyword Search
 if (isset($_GET['search']) && !empty($_GET['search'])) {
@@ -144,10 +145,15 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                            OR rw.Reward_ItemName LIKE '%$searchTerm%')";
 }
 
-// 2. Specific Status Button (Legacy Support for your Pending Button)
+// 2. Specific Status Button
 if (isset($_GET['status']) && !empty($_GET['status'])) {
     $val = $conn->real_escape_string($_GET['status']);
-    $whereConditions[] = "r.Redemption_Status = '$val'";
+    if ($val == 'Pending') {
+        // 如果选 Pending，也显示 Processing
+        $whereConditions[] = "r.Redemption_Status IN ('Pending', 'Processing')";
+    } else {
+        $whereConditions[] = "r.Redemption_Status = '$val'";
+    }
 }
 
 // 3. New Filters from Dropdown
@@ -471,10 +477,10 @@ if ($result->num_rows > 0) {
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
 $end_record = min($start_from + $results_per_page, $total_records);
 
-// --- STATS CALCULATION ---
+// --- STATS CALCULATION (Modified to include Processing in Pending) ---
 $statsSql = "SELECT 
                 COUNT(*) as TotalOrders,
-                SUM(CASE WHEN Redemption_Status = 'Pending' THEN 1 ELSE 0 END) as PendingOrders,
+                SUM(CASE WHEN Redemption_Status IN ('Pending', 'Processing') THEN 1 ELSE 0 END) as PendingOrders,
                 SUM(CASE WHEN Redemption_Status = 'Shipped' THEN 1 ELSE 0 END) as ShippedOrders,
                 SUM(CASE WHEN Redemption_Status = 'Completed' THEN 1 ELSE 0 END) as CompletedOrders,
                 SUM(Redemption_PointsSpent) as TotalPoints
@@ -777,7 +783,7 @@ try {
                                     <td style="padding: 15px; vertical-align: top; text-align:center;"> 
                                         <?php 
                                             $s = $order['Redemption_Status'];
-                                            $class = 'status-pending';
+                                            $class = 'status-pending'; // Default Yellow
                                             if($s == 'Shipped') $class = 'status-shipped';
                                             if($s == 'Completed') $class = 'status-completed';
                                             if($s == 'Cancelled') $class = 'status-cancelled';
@@ -795,9 +801,12 @@ try {
                                                     // Fix for JS syntax errors with quotes in data
                                                     $orderJson = htmlspecialchars(json_encode($order), ENT_QUOTES, 'UTF-8'); 
                                                     
-                                                    // If Pending: Show Manage AND View
-                                                    if ($order['Redemption_Status'] == 'Pending') {
-                                                        echo "<div onclick='openManageModal($orderJson)'><i class='fas fa-tasks'></i> Manage Order</div>";
+                                                    // 修复：确保 Pending 和 Processing 状态下都显示 Process 按钮
+                                                    $statusCheck = trim($order['Redemption_Status']);
+                                                    $isPending = (strcasecmp($statusCheck, 'Pending') === 0 || strcasecmp($statusCheck, 'Processing') === 0);
+                                                    
+                                                    if ($isPending) {
+                                                        echo "<div onclick='openManageModal($orderJson)'><i class='fas fa-tasks'></i> Process / Manage Order</div>";
                                                         echo "<a href='admin_redemption_details.php?id=" . $order['Redemption_ID'] . "' target='_blank'><i class='fas fa-info-circle'></i> View Full Details</a>";
                                                     } else {
                                                         // Non-Pending: Only View Details (New Page)
@@ -1189,7 +1198,13 @@ try {
             document.getElementById('mPoints').innerText = order.Redemption_PointsSpent;
             document.getElementById('mItemImg').src = order.Reward_PhotoPath ? 'uploads/rewards/' + order.Reward_PhotoPath : 'uploads/rewards/default.jpg';
             
-            document.getElementById('mStatusSelect').value = order.Redemption_Status;
+            // --- 修复：如果状态是 Processing，在下拉菜单中自动选 Pending ---
+            let currentStatus = order.Redemption_Status.trim();
+            if (currentStatus === 'Processing') {
+                currentStatus = 'Pending';
+            }
+            document.getElementById('mStatusSelect').value = currentStatus;
+            
             document.getElementById('mTracking').value = order.Redemption_TrackingNumber || '';
             document.getElementById('mCancelReason').value = order.Redemption_CancelReason || '';
             
@@ -1197,14 +1212,17 @@ try {
             calculateAI(order.Redemption_State); 
             toggleEditInfo(false); // Reset edit state
 
-            // LOGIC: Disable management if not Pending
+            // LOGIC: Disable management if not Pending OR Processing
             const statusSelect = document.getElementById('mStatusSelect');
             const actionBtns = document.getElementById('actionButtonsGroup');
             const editBtn = document.getElementById('btnEditInfo');
             const trackingInput = document.getElementById('mTracking');
             const reasonInput = document.getElementById('mCancelReason');
 
-            if (order.Redemption_Status !== 'Pending') {
+            // 检查逻辑：是否为待处理状态 (Pending 或 Processing)
+            const isPending = (order.Redemption_Status.trim() === 'Pending' || order.Redemption_Status.trim() === 'Processing');
+
+            if (!isPending) {
                 // View Only Mode
                 statusSelect.disabled = true;
                 actionBtns.style.display = 'none';
@@ -1219,7 +1237,7 @@ try {
                     document.getElementById('cancelReasonGroup').style.display = 'none';
                 }
             } else {
-                // Edit Mode (Pending)
+                // Edit Mode (Pending/Processing)
                 statusSelect.disabled = false;
                 actionBtns.style.display = 'flex';
                 editBtn.style.display = 'block';

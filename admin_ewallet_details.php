@@ -32,31 +32,30 @@ $txn = $result->fetch_assoc();
 
 // --- 逻辑处理：类型与颜色 ---
 
-// 1. 获取类型，如果为空显示 (-)
-$transType = $txn['Transaction_Type'];
-if (empty($transType)) {
-    $transType = "-";
-    
-    // 尝试根据描述智能推断 (仅用于显示颜色)
-    if (stripos($txn['Description'], 'Top-up') !== false) {
-        $inferredType = 'Credit';
-    } elseif (stripos($txn['Description'], 'Donate') !== false) {
-        $inferredType = 'Debit';
-    } else {
-        $inferredType = 'Unknown';
-    }
-} else {
-    $inferredType = $transType;
-}
+// 1. 获取数据库存储的类型
+$dbType = $txn['Transaction_Type'];
 
-// 2. 决定颜色和符号
-$amountClass = 'text-dark'; // 默认黑色
+// 2. 决定显示在 "Transaction Type" 栏的文字 (如果数据库为空，显示 "-")
+$displayType = !empty($dbType) ? ucfirst($dbType) : "-";
+
+// 3. 智能推断 (用于决定颜色和符号)
+// 默认值 (黑色，无符号)
+$amountClass = 'text-dark'; 
 $amountSign = '';
 
-if (strtolower($inferredType) == 'credit') {
+$desc = $txn['Description']; // 获取描述
+
+// --- 判定逻辑 ---
+
+// Check for CREDIT (进钱: Green, +)
+// 条件: 数据库是 Credit 或 描述包含 Top-up, Refund, Deposit
+if (strcasecmp($dbType, 'Credit') === 0 || stripos($desc, 'Top-up') !== false || stripos($desc, 'Refund') !== false || stripos($desc, 'Deposit') !== false) {
     $amountClass = 'text-success'; // 绿色
     $amountSign = '+';
-} elseif (strtolower($inferredType) == 'debit') {
+} 
+// Check for DEBIT (出钱: Red, -)
+// 条件: 数据库是 Debit 或 描述包含 Donate, Donation, Pay, Debit
+elseif (strcasecmp($dbType, 'Debit') === 0 || stripos($desc, 'Donate') !== false || stripos($desc, 'Donation') !== false || stripos($desc, 'Debit') !== false || stripos($desc, 'Pay') !== false) {
     $amountClass = 'text-danger'; // 红色
     $amountSign = '-';
 }
@@ -72,15 +71,13 @@ if (strtolower($inferredType) == 'credit') {
     <style>
         body { background: #f4f6f9; padding: 40px; font-family: 'Poppins', sans-serif; }
         
-        /* --- 修改重点：调整了 max-width 为 700px --- */
         .details-container { 
-            max-width: 700px; /* 之前是 1100px，改小一点会让看起来更紧凑，右边不会空太多 */
+            max-width: 700px; 
             margin: 0 auto; 
             background: white; 
             border-radius: 10px; 
             box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
             overflow: hidden;
-            /* 高度自适应 */
         }
 
         .details-header { background: #17a2b8; color: white; padding: 25px 40px; display: flex; justify-content: space-between; align-items: center; }
@@ -95,20 +92,19 @@ if (strtolower($inferredType) == 'credit') {
         .info-list { display: flex; flex-direction: column; gap: 0; }
         .info-item { display: flex; align-items: center; border-bottom: 1px dashed #f0f0f0; padding: 12px 0; }
         
-        /* 稍微调整了 label 宽度以适应较窄的容器 */
         .label { width: 180px; min-width: 180px; color: #888; font-weight: 500; font-size: 15px; }
         .colon { width: 20px; text-align: center; color: #888; font-weight: 500; margin-right: 15px; }
         .value { font-weight: 600; color: #333; font-size: 15px; flex-grow: 1; word-break: break-word; }
         
         .amount-display { font-size: 32px; font-weight: bold; text-align: center; margin: 10px 0 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; }
         
+        /* 颜色样式 */
         .text-success { color: #28a745 !important; } 
         .text-danger { color: #dc3545 !important; } 
         .text-dark { color: #333 !important; }
 
         .action-buttons { margin-top: 30px; display: flex; justify-content: space-between; align-items: center; }
         
-        /* 按钮样式 */
         .btn-print { background: #17a2b8; color: white; border: none; padding: 10px 25px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; transition: background 0.3s; }
         .btn-print:hover { background: #138496; }
         
@@ -146,7 +142,7 @@ if (strtolower($inferredType) == 'credit') {
                     <div class="info-item">
                         <span class="label">Transaction Type</span>
                         <span class="colon">:</span>
-                        <span class="value"><?php echo ucfirst($transType); ?></span>
+                        <span class="value"><?php echo $displayType; ?></span>
                     </div>
                     <div class="info-item">
                         <span class="label">Purpose / Description</span>
@@ -159,7 +155,7 @@ if (strtolower($inferredType) == 'credit') {
                         <span class="colon">:</span>
                         <span class="value">
                             <?php echo $txn['Order_TXN_Ref']; ?>
-                            <a href="admin_payment_details.php?id=<?php echo $txn['Order_ID']; ?>" target="_blank" style="font-size: 12px; margin-left: 10px; color: #17a2b8;">(View Order)</a>
+                            <a href="admin_payment_details.php?id=<?php echo $txn['Order_ID']; ?>" target="_blank" style="font-size: 12px; margin-left: 10px; color: #17a2b8;">(View Payment Details)</a>
                         </span>
                     </div>
                     <?php endif; ?>

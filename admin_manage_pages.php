@@ -11,16 +11,13 @@ if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
 include 'dataconnection.php';
 
 // 获取页面类型
-// 可用类型: about_us, terms_condition, privacy_policy, contact_messages, contact_settings
 $pageKey = isset($_GET['type']) ? $_GET['type'] : 'about_us';
-$mode = isset($_GET['mode']) ? $_GET['mode'] : 'view'; // 'view' or 'edit'
+$mode = isset($_GET['mode']) ? $_GET['mode'] : 'view'; 
 
-// 防止空白页：如果旧链接传了 contact_us，强制转为 contact_settings
 if ($pageKey == 'contact_us') {
     $pageKey = 'contact_settings';
 }
 
-// 页面显示标题逻辑
 $displayTitle = ucwords(str_replace('_', ' ', $pageKey));
 
 if ($pageKey == 'terms_condition') $displayTitle = "Terms & Conditions";
@@ -31,8 +28,13 @@ elseif ($pageKey == 'contact_settings') $displayTitle = "Contact Us (Settings)";
 $successMsg = "";
 $errorMsg = "";
 
+// MMU Melaka 的地图链接 (Embed URL)
+$defaultMMUMap = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3986.7570420789075!2d102.27367637583344!3d2.245656058045656!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31d1e56b9710cf4b%3A0x66b6b12b75469278!2sMultimedia%20University%2C%20Melaka%20Campus!5e0!3m2!1sen!2smy";
+// MMU Melaka 的文字地址
+$defaultMMUAddress = "Jalan Ayer Keroh Lama,<br>75450 Bukit Beruang, Melaka<br>(MULTIMEDIA UNIVERSITY)";
+
 // ========================================================
-// 逻辑 1: About Us (about_us_info 表) - 保持不变
+// 逻辑 1: About Us
 // ========================================================
 if ($pageKey == 'about_us') {
     // 保存处理
@@ -43,7 +45,8 @@ if ($pageKey == 'about_us') {
         $story_content = $_POST['story_content'];
         $vision_desc = $_POST['vision_desc'];
         $mission_desc = $_POST['mission_desc'];
-        
+        $map_src = $_POST['map_src']; // 获取提交的地图链接
+
         $vision_points = isset($_POST['vision_points']) ? json_encode(array_filter($_POST['vision_points'])) : '[]';
         $mission_points = isset($_POST['mission_points']) ? json_encode(array_filter($_POST['mission_points'])) : '[]';
         
@@ -67,7 +70,7 @@ if ($pageKey == 'about_us') {
         }
         $focus_json = json_encode($focus);
 
-        // Update ID=1
+        // 1. 更新 About Us Info
         $check = $conn->query("SELECT id FROM about_us_info LIMIT 1");
         if ($check->num_rows > 0) {
             $stmt = $conn->prepare("UPDATE about_us_info SET hero_title=?, hero_description=?, story_title=?, story_content=?, vision_desc=?, vision_points=?, mission_desc=?, mission_points=?, core_values=?, focus_areas=?, updated_at=NOW() WHERE id=1");
@@ -78,19 +81,38 @@ if ($pageKey == 'about_us') {
         }
 
         if ($stmt->execute()) {
-            $successMsg = "About Us content updated successfully!";
+            // 2. 同时更新 Contact Settings 中的地图链接
+            $checkContact = $conn->query("SELECT Setting_ID FROM contact_settings LIMIT 1");
+            if ($checkContact->num_rows > 0) {
+                $stmtMap = $conn->prepare("UPDATE contact_settings SET Map_Embed_Src=?, Updated_At=NOW() LIMIT 1");
+                $stmtMap->bind_param("s", $map_src);
+                $stmtMap->execute();
+            } else {
+                // 如果不存在，创建一个新的并填入 MMU 地址和地图
+                $stmtMap = $conn->prepare("INSERT INTO contact_settings (Map_Embed_Src, Address, Phone, Email, Working_Hours) VALUES (?, ?, '', '', '')");
+                $stmtMap->bind_param("ss", $map_src, $defaultMMUAddress);
+                $stmtMap->execute();
+            }
+
+            $successMsg = "About Us content and Map updated successfully!";
             $mode = 'view';
         } else {
             $errorMsg = "Error updating: " . $stmt->error;
         }
     }
 
-    // 获取数据
+    // 获取 About Us 数据
     $res = $conn->query("SELECT * FROM about_us_info LIMIT 1");
     $aboutData = $res->fetch_assoc();
     if (!$aboutData) {
         $aboutData = ['hero_title'=>'', 'hero_description'=>'', 'story_title'=>'', 'story_content'=>'', 'vision_desc'=>'', 'vision_points'=>'[]', 'mission_desc'=>'', 'mission_points'=>'[]', 'core_values'=>'[]', 'focus_areas'=>'[]'];
     }
+
+    // 获取 Map 数据 (从 contact_settings 表)
+    $resMap = $conn->query("SELECT Map_Embed_Src FROM contact_settings LIMIT 1");
+    $mapData = $resMap->fetch_assoc();
+    // [修改点] 如果数据库是空的，使用 MMU 的默认链接
+    $currentMapSrc = (!empty($mapData['Map_Embed_Src'])) ? $mapData['Map_Embed_Src'] : $defaultMMUMap;
     
     $vPoints = json_decode($aboutData['vision_points'], true) ?? [];
     $mPoints = json_decode($aboutData['mission_points'], true) ?? [];
@@ -99,7 +121,7 @@ if ($pageKey == 'about_us') {
 }
 
 // ========================================================
-// 逻辑 2: Terms & Privacy (纯文本编辑模式)
+// 逻辑 2: Terms & Privacy
 // ========================================================
 elseif ($pageKey == 'terms_condition' || $pageKey == 'privacy_policy') {
     $table = ($pageKey == 'terms_condition') ? 'terms_conditions' : 'privacy_policy';
@@ -124,12 +146,12 @@ elseif ($pageKey == 'terms_condition' || $pageKey == 'privacy_policy') {
     $res = $conn->query("SELECT * FROM $table WHERE is_active=1 ORDER BY created_at DESC LIMIT 1");
     $docData = $res->fetch_assoc();
     $rawContent = $docData ? $docData['content'] : '';
-    $cleanContentForEdit = strip_tags($rawContent); // 去除 HTML 用于编辑
+    $cleanContentForEdit = strip_tags($rawContent); 
     if(empty($cleanContentForEdit) && !empty($rawContent)) $cleanContentForEdit = $rawContent;
 }
 
 // ========================================================
-// 逻辑 3: Contact Settings (contact_settings 表)
+// 逻辑 3: Contact Settings
 // ========================================================
 elseif ($pageKey == 'contact_settings') {
     // 保存处理
@@ -161,20 +183,27 @@ elseif ($pageKey == 'contact_settings') {
 
     $res = $conn->query("SELECT * FROM contact_settings LIMIT 1");
     $contactData = $res->fetch_assoc();
+    
+    // [修改点] 如果数据库里没有数据，默认填入 MMU 的资料
     if (!$contactData) {
-        $contactData = ['Address'=>'', 'Phone'=>'', 'Whatsapp_Link'=>'', 'Email'=>'', 'Working_Hours'=>'', 'Map_Embed_Src'=>''];
+        $contactData = [
+            'Address' => $defaultMMUAddress,
+            'Phone' => '',
+            'Whatsapp_Link' => '',
+            'Email' => '',
+            'Working_Hours' => '',
+            'Map_Embed_Src' => $defaultMMUMap
+        ];
     }
 }
 
 // ========================================================
-// 逻辑 4: Contact Messages (contact_messages 表 - 只读 + 回复 + 附件)
+// 逻辑 4: Contact Messages
 // ========================================================
 elseif ($pageKey == 'contact_messages') {
-    // 标记为已读
     if(isset($_GET['mark_read'])) {
         $mid = intval($_GET['mark_read']);
         $conn->query("UPDATE contact_messages SET Status='Read' WHERE Contact_ID=$mid");
-        // 重定向去掉参数
         echo "<script>window.location.href='admin_manage_pages.php?type=contact_messages';</script>";
         exit();
     }
@@ -220,7 +249,7 @@ elseif ($pageKey == 'contact_messages') {
         .badge-new { background: #e3f2fd; color: #1976d2; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .badge-read { background: #f5f5f5; color: #777; padding: 4px 8px; border-radius: 4px; font-size: 11px; }
 
-        /* New Button Styles for Contact Messages */
+        /* Buttons */
         .btn-action-reply { color: #fff; background: #17a2b8; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 5px; margin-right: 5px; }
         .btn-action-reply:hover { background: #138496; }
         .btn-action-read { color: #007bff; border: 1px solid #007bff; padding: 4px 9px; border-radius: 4px; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 5px; }
@@ -232,7 +261,7 @@ elseif ($pageKey == 'contact_messages') {
         @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
         
         /* Map Preview */
-        .map-preview { width: 100%; height: 250px; background: #eee; display: flex; align-items: center; justify-content: center; color: #888; border-radius: 6px; overflow: hidden; }
+        .map-preview { width: 100%; height: 250px; background: #eee; display: flex; align-items: center; justify-content: center; color: #888; border-radius: 6px; overflow: hidden; margin-top: 10px; }
         .map-preview iframe { width: 100%; height: 100%; border: 0; }
         .policy-content-view { padding: 20px; background: #fff; border: 1px solid #eee; border-radius: 5px; min-height: 200px; }
     </style>
@@ -327,6 +356,13 @@ elseif ($pageKey == 'contact_messages') {
                                 </div>
                             <?php endfor; ?>
 
+                            <h3 class="form-section-title"><i class="fas fa-map-marked-alt"></i> Location Map</h3>
+                            <div class="form-group">
+                                <label>Google Map Embed URL (src="..." attribute)</label>
+                                <input type="text" name="map_src" class="form-control" value="<?php echo htmlspecialchars($currentMapSrc); ?>" placeholder="https://www.google.com/maps/embed?pb=...">
+                                <small style="color:#666;">This setting is shared with the Contact Us page.</small>
+                            </div>
+
                             <div style="margin-top:30px; border-top:1px solid #eee; padding-top:20px; text-align:right;">
                                 <a href="?type=about_us&mode=view" class="btn-cancel">Cancel</a>
                                 <button type="submit" class="btn-save">Save Changes</button>
@@ -383,6 +419,16 @@ elseif ($pageKey == 'contact_messages') {
                                 </div>
                             <?php endforeach; ?>
                         </div>
+
+                        <h3 class="form-section-title">Location Map</h3>
+                        <div class="map-preview">
+                            <?php if(!empty($currentMapSrc)): ?>
+                                <iframe src="<?php echo htmlspecialchars($currentMapSrc); ?>" allowfullscreen="" loading="lazy"></iframe>
+                            <?php else: ?>
+                                <span>No Map URL Provided</span>
+                            <?php endif; ?>
+                        </div>
+
                     <?php endif; ?>
                 </div>
 

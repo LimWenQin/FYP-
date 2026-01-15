@@ -1431,6 +1431,14 @@ $exportUrl = "?" . http_build_query($exportParams);
                     if (data.length === 0) { container.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">No donation history found.</div>'; return; }
                     data.forEach(txn => {
                         const item = document.createElement('div'); item.className = 'history-item';
+                        
+                        // --- ADD CLICK EVENT HERE ---
+                        item.style.cursor = 'pointer';
+                        item.title = "Click to view full details";
+                        item.onclick = function() {
+                            window.open('admin_payment_details.php?id=' + txn.Order_ID, '_blank');
+                        };
+
                         item.innerHTML = `<div class="h-left"><h4>${txn.Donor_Name}</h4><p>${txn.Formatted_Date} | Ref: ${txn.Order_TXN_Ref}</p></div><div class="h-right">+ RM ${txn.Formatted_Amount}</div>`;
                         container.appendChild(item);
                     });
