@@ -54,8 +54,10 @@ if ($current_balance < $amount) {
 $txn_ref = "TXN-EW-" . date("YmdHis") . "-" . rand(100, 999); 
 $now = date("Y-m-d H:i:s");
 $status = "Success";
-$payment_method = "E-Wallet";
-$bank_name = "My E-Wallet Balance";
+
+// ⭐ 统一支付名称，确保带到数据库和结算页
+$payment_method = "System E-Wallet"; 
+$bank_name = "Internal Wallet";
 $masked_card = "Wallet-Spending";
 
 $order_type = ($donation_type == "monthly") ? "Recurring" : "One-time";
@@ -92,7 +94,7 @@ try {
     $stmt_pay->execute();
     $payment_id = $stmt_pay->insert_id;
 
-    // C. 插入 Orders 表
+    // C. 插入 Orders 表 (在这里确保存入 Order_PaymentMethod)
     $sql_ord = "INSERT INTO orders 
         (Order_Name, Order_ContactNumber, Order_ICNumber, Order_Email, 
          Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, 
@@ -109,7 +111,7 @@ try {
     $stmt_ord->execute();
     $new_order_id = $stmt_ord->insert_id;
 
-    // D. 【修正重点】插入 Wallet Transaction 表 (匹配你的数据库字段：Amount, Created_At, Description, Transaction_Type)
+    // D. 插入 Wallet Transaction 表 (消费记录)
     $wt_sql = "INSERT INTO wallet_transaction (Donor_ID, Order_ID, Amount, Transaction_Type, Description, Created_At) 
                VALUES (?, ?, ?, 'Spending', ?, NOW())";
     $stmt_wt = $conn->prepare($wt_sql);
@@ -124,13 +126,14 @@ try {
             (Recurring_Amount, Recurring_Payment_Method, Recurring_Deduction_Date, Recurring_Status, Recurring_Created_At, Recurring_Updated_At, Donor_ID, Branch_ID, Activity_ID, Case_ID) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt_rec = $conn->prepare($sql_rec);
+        // ⭐ 这里的 Recurring_Payment_Method 也同步存入 "E-Wallet Balance"
         $stmt_rec->bind_param("dsssssiiii", $amount, $payment_method, $deduction_date, $recurring_status, $now, $now, $current_donor_id, $branch_id, $activity_id, $case_id);
         $stmt_rec->execute();
     }
 
-    // F. 更新项目筹款进度
+    // F. 更新项目筹款进度 (并增加捐赠人数统计)
     if ($case_id != null) {
-        $stmt_upd = $conn->prepare("UPDATE special_case SET Raised_Amount = Raised_Amount + ? WHERE Case_ID = ?");
+        $stmt_upd = $conn->prepare("UPDATE special_case SET Raised_Amount = Raised_Amount + ?, Donor_Count = Donor_Count + 1 WHERE Case_ID = ?");
         $stmt_upd->bind_param("di", $amount, $case_id);
         $stmt_upd->execute();
     }
@@ -150,9 +153,13 @@ try {
 }
 
 // ==========================================
-// 5. 完成并跳转
+// 5. 完成并跳转 (带上支付方式识别)
 // ==========================================
 $_SESSION['last_txn_ref'] = $txn_ref;
+
+// 支付成功清理 Session 金额，防止刷新页面导致重复扣款
+unset($_SESSION['donation_data']['amount']);
+
 header("Location: Payment_Settlement_Page.php?txn_ref=" . $txn_ref);
 exit();
 ?>

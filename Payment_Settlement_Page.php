@@ -138,40 +138,7 @@ if ($points_to_add > 0 && $is_success_status && !isset($_SESSION[$sess_key_point
     $_SESSION[$sess_key_points] = true;
 }
 
-// ==========================================
-// 7. ⭐ 关键新增：更新捐款人数和资金 (Update Fund & Count)
-// ==========================================
-// 使用 Session 锁防止刷新页面重复增加
-$sess_key_fund = 'fund_updated_' . $txn_ref;
-
-if (!isset($_SESSION[$sess_key_fund]) && $is_success_status) {
-
-    // A. 如果是 Special Case
-    if (!empty($row['Case_ID'])) {
-        $case_id = $row['Case_ID'];
-
-$upd_case = $conn->prepare("UPDATE special_case 
-                            SET Raised_Amount = Raised_Amount + ?, 
-                                Donor_Count = Donor_Count + 1 
-                            WHERE Case_ID = ?");
-        $upd_case->bind_param("di", $amount_val, $case_id);
-        $upd_case->execute();
-        $upd_case->close();
-    }
-    
-    // B. 如果是 Activity (如果 Activity 也有筹款额字段)
-    elseif (!empty($row['Activity_ID'])) {
-        $act_id = $row['Activity_ID'];
-        // 假设 Activity 表有 'Activity_GetAmount' 字段，如果没有请注释掉下面三行
-        $upd_act = $conn->prepare("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + ? WHERE Activity_ID = ?");
-        $upd_act->bind_param("di", $amount_val, $act_id);
-        $upd_act->execute();
-        // $upd_act->close();
-    }
-
-    // 标记为已更新
-    $_SESSION[$sess_key_fund] = true;
-}
+// ⭐ 原 Section 7 (Update Fund & Count) 已根据要求删除，防止重复加钱 ⭐
 
 include 'header_UI.php'; 
 ?>
@@ -252,9 +219,8 @@ include 'header_UI.php';
 </div>
 
 <?php 
-    $current_step = 4; // 假设结算页是第4步
+    $current_step = 4; 
     $flow_type = ($project_type == 'Special Case') ? 'special' : 'standard';
-    // 确保你的目录下有 stepper.php
     if (file_exists('stepper.php')) {
         include 'stepper.php';
     }

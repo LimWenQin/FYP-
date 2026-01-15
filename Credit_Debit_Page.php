@@ -23,7 +23,10 @@ $sess_data = $_SESSION['donation_data'];
 $amount = $sess_data['amount'];
 $donation_type = $sess_data['type'];
 
-// ⭐⭐ [关键修复]：如果 ID 是 0 或空，必须转为 null，否则会报外键错误 ⭐⭐
+// 获取 Tax Receipt 状态
+$is_tax_requested = (isset($sess_data['tax_receipt']) && $sess_data['tax_receipt'] == 1) ? 1 : 0;
+
+// 如果 ID 是 0 或空，必须转为 null，防止外键错误
 $branch_id = (!empty($sess_data['branch_id']) && $sess_data['branch_id'] > 0) ? $sess_data['branch_id'] : null;
 $case_id = (!empty($sess_data['case_id']) && $sess_data['case_id'] > 0) ? $sess_data['case_id'] : null;
 $activity_id = (!empty($sess_data['activity_id']) && $sess_data['activity_id'] > 0) ? $sess_data['activity_id'] : null;
@@ -45,7 +48,7 @@ if (!$user_data) {
 }
 
 // ---------------------------------------------------------
-// PHP 处理逻辑
+// PHP 处理逻辑 (处理提交后的数据库存入)
 // ---------------------------------------------------------
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
 
@@ -54,26 +57,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
     $bank_name = $_POST['bank_display']; 
     $card_number = str_replace(' ', '', $_POST['card']); 
     
-    $txn_ref = "TXN-" . date("YmdHis") . "-" . rand(100, 999);
+    // ⭐ 判定逻辑：优先获取 JS 识别出的详细名称，如果没有则使用通用的 "Credit / Debit Card"
+    if (isset($_POST['payment_method_value']) && !empty($_POST['payment_method_value'])) {
+        $payment_method = $_POST['payment_method_value'];
+    } else {
+        $payment_method = "Credit Card";
+    }
+    
+    $txn_ref = "TXN-CD-" . date("YmdHis") . "-" . rand(100, 999);
     $now = date("Y-m-d H:i:s");
     $status = "Success";
-    $payment_method = "Credit/Debit Card";
     $masked_card = substr($card_number, 0, 4) . " **** **** " . substr($card_number, -4);
 
-    // 1️⃣ 插入 payment
+    // 1️⃣ 插入 payment 表
     $stmt = $conn->prepare("INSERT INTO payment (Payment_Method, Payment_Status, Payment_TXN_Ref, Payment_Amount, Payment_Paid_At, Payment_Bank_Name, Payment_Bank_Masked, Payment_Created_At) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("sssissss", $payment_method, $status, $txn_ref, $p_amount, $now, $bank_name, $masked_card, $now);
     $stmt->execute();
     $payment_id = $stmt->insert_id;
     $stmt->close();
 
-    // 2️⃣ 插入 orders
+    // 2️⃣ 插入 orders 表
     $order_type = ($p_type == "monthly") ? "Recurring" : "One-time";
     $order_status = "Completed";
-    $tax_status = (isset($sess_data['tax_receipt']) && $sess_data['tax_receipt'] == 1) ? 'Requested' : 'Not_Requested';
+    $tax_status_str = ($is_tax_requested == 1) ? 'Requested' : 'Not_Requested';
     $full_name = $user_data['Donor_Name']; 
 
-    // 注意：bind_param 的类型字符串 'iiiii' 对应最后的 ID，mysqli 会自动把 PHP 的 null 处理为 SQL NULL
     $stmt = $conn->prepare("INSERT INTO orders 
         (Order_Name, Order_ContactNumber, Order_ICNumber, Order_Email, 
          Order_Amount, Order_Currency, Order_PaymentMethod, Order_PaymentStatus, 
@@ -83,16 +91,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
 
     $stmt->bind_param("ssssdssssssssiiiii", 
         $full_name, $user_data['Donor_ContactNumber'], $user_data['Donor_ICNumber'], $user_data['Donor_Email'], 
-        $p_amount, $payment_method, $status, $txn_ref, $order_type, $order_status, $tax_status, $now, $now, 
+        $p_amount, $payment_method, $status, $txn_ref, $order_type, $order_status, $tax_status_str, $now, $now, 
         $current_donor_id, $payment_id, $branch_id, $activity_id, $case_id
     );
     
     if (!$stmt->execute()) {
-        die("Error placing order: " . $stmt->error); // 调试用
+        die("Error placing order: " . $stmt->error);
     }
     $stmt->close();
 
-    // 3️⃣ 插入 recurring_donation
+    // 3️⃣ 插入 recurring_donation (如果是月捐)
     if ($p_type == "monthly") {
         $deduction_date = date("Y-m-d", strtotime("+1 month"));
         $rec_status = 'Active';
@@ -102,14 +110,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cvc'])) {
         $stmt->close();
     }
 
-    // 4️⃣ 更新进度 [这里修改了]
+    // 4️⃣ 更新项目进度
     if ($case_id != null) {
-        // 关键修改：加上 Donor_Count = Donor_Count + 1
         $conn->query("UPDATE special_case SET Raised_Amount = Raised_Amount + $p_amount, Donor_Count = Donor_Count + 1 WHERE Case_ID = $case_id");
     }
     if ($activity_id != null) {
         $conn->query("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + $p_amount WHERE Activity_ID = $activity_id");
     }
+
+    // 支付成功清理 Session 缓存
+    unset($_SESSION['donation_data']['amount']);
 
     header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
     exit();
@@ -121,61 +131,29 @@ include 'header_UI.php';
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
-    /* Hero Banner */
-    .hero-wrap {
-        height: 400px;
-        position: relative;
-        background-image: url('images/hero_4.jpg');
-        background-size: cover;
-        background-position: center;
-        display: flex; align-items: center; justify-content: center; text-align: center;
-    }
+    /* 保持原本的所有 CSS 样式 */
+    .hero-wrap { height: 400px; position: relative; background-image: url('images/hero_4.jpg'); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; text-align: center; }
     .hero-wrap .overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); }
     .hero-content { position: relative; z-index: 2; max-width: 800px; }
     .hero-content h1 { font-family: 'Segoe UI', sans-serif; color: #fff; font-size: 4rem; margin-bottom: 10px; }
     .hero-content p { font-size: 1.2rem; color: rgba(255, 255, 255, 0.9); }
-
-    /* 图片横向铺满 */
-    .banner-container {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    .banner-img {
-        width: 50%;
-        height: 400px;
-        object-fit: cover;
-        border-radius: 12px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    }
-
-    /* 表单样式 */
-    .payment-card {
-        background: #fff; padding: 40px; border-radius: 12px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1); border: 1px solid #f0f0f0;
-    }
+    .banner-container { text-align: center; margin-bottom: 30px; }
+    .banner-img { width: 50%; height: 400px; object-fit: cover; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    .payment-card { background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); border: 1px solid #f0f0f0; }
     .form-group label { font-weight: bold; color: #555; margin-bottom: 8px; display: block; }
-    .form-control {
-        height: 50px; border-radius: 4px; border: 1px solid #ddd;
-        padding: 10px 15px; font-size: 16px; width: 100%;
-    }
+    .form-control { height: 50px; border-radius: 4px; border: 1px solid #ddd; padding: 10px 15px; font-size: 16px; width: 100%; }
     .form-control:focus { border-color: #00a651; box-shadow: none; outline: none; }
     
+    .is-invalid { border: 2px solid #dc3545 !important; background-color: #fff8f8 !important; }
+
     .card-icon { position: absolute; right: 15px; top: 45px; font-size: 24px; color: #999; }
     .input-wrapper { position: relative; }
-
     .nav-buttons { display: flex; gap: 20px; margin-top: 30px; }
-    .btn-nav {
-        flex: 1; padding: 15px; border-radius: 8px; font-size: 1.1rem; font-weight: bold;
-        cursor: pointer; border: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; transition: 0.2s;
-        text-decoration: none; 
-    }
-    
+    .btn-nav { flex: 1; padding: 15px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; border: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; transition: 0.2s; text-decoration: none; }
     .btn-prev { background: #e5e7eb; color: #374151; border: 1px solid #d1d5db; }
     .btn-prev:hover { background: #d1d5db; color: #111; text-decoration: none; }
-
     .btn-confirm { background: #00a651; color: white; }
     .btn-confirm:hover { background: #008f45; color: white; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 166, 81, 0.3); }
-
     .card-row { display: flex; gap: 20px; }
     .card-col { flex: 1; }
 </style>
@@ -192,33 +170,22 @@ include 'header_UI.php';
 
 <?php 
     if ($source == 'special_case') {
-        $flow_type = 'special';
-        $current_step = 3; 
+        $flow_type = 'special'; $current_step = 3; 
     } else {
-        $flow_type = 'standard';
-        $current_step = 4; 
+        $flow_type = 'standard'; $current_step = 4; 
     }
-    
-    if (file_exists('stepper.php')) {
-        include 'stepper.php';
-    }
+    if (file_exists('stepper.php')) include 'stepper.php';
 ?>
 
 <div class="site-section" style="padding: 5em 0;">
     <div class="container">
-        
         <div class="row justify-content-center">
-            
             <div class="col-12">
                 <div class="banner-container">
-                    <img src="images/hero_7.jpg" alt="Donation Story" class="banner-img">
+                    <img src="images/hero_7.jpg" alt="Donation" class="banner-img">
                     <div style="margin-top: 20px;">
                         <h3 class="text-cursive" style="color: #00a651;">Thank You for Your Support!</h3>
-                        <p class="text-muted">Your donation of <strong style="font-size:1.2rem; color:#dc2626;">RM <?php echo number_format($amount, 2); ?></strong> makes a real difference.</p>
-                        
-                        <div style="display:inline-block; background:#e8f5e9; color:#00a651; padding:8px 20px; border-radius:20px; font-size:0.9rem;">
-                            <i class="fas fa-shield-alt"></i> Your card information is encrypted and secure.
-                        </div>
+                        <p class="text-muted">Donation: <strong style="font-size:1.2rem; color:#dc2626;">RM <?php echo number_format($amount, 2); ?></strong></p>
                     </div>
                 </div>
             </div>
@@ -227,8 +194,8 @@ include 'header_UI.php';
                 <div class="payment-card">
                     <h3 class="text-cursive text-black text-center mb-4">Card Details</h3>
                     
-                    <form class="bank-form" method="POST" action="">
-                        
+                    <form id="bank-form" class="bank-form" method="POST" action="">
+                        <input type="hidden" name="payment_method_value" id="payment_method_value" value="Credit / Debit Card">
                         <input type="hidden" name="donation_type" value="<?php echo htmlspecialchars($donation_type); ?>">
                         <input type="hidden" name="amount" value="<?php echo htmlspecialchars($amount); ?>">
 
@@ -255,32 +222,20 @@ include 'header_UI.php';
                         </div>
 
                         <div class="nav-buttons">
-                            <?php
-                                $back_url = "Payment_Ways_Page.php"; 
-                                if ($source == 'special_case') {
-                                    $back_url = "S_C_Payment_Ways_Page.php";
-                                }
-                            ?>
-                            <a href="<?php echo $back_url; ?>" class="btn-nav btn-prev">
-                                <i class="fas fa-arrow-left"></i> Previous
-                            </a>
-
-                            <button type="submit" class="btn-nav btn-confirm">
-                                Confirm Payment
-                            </button>
+                            <?php $back_url = ($source == 'special_case') ? "S_C_Payment_Ways_Page.php" : "Payment_Ways_Page.php"; ?>
+                            <a href="<?php echo $back_url; ?>" class="btn-nav btn-prev"><i class="fas fa-arrow-left"></i> Previous</a>
+                            <button type="submit" class="btn-nav btn-confirm">Confirm Payment</button>
                         </div>
-                        
                     </form>
                 </div>
             </div>
-
         </div>
     </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.querySelector('.bank-form'); 
+    const form = document.getElementById('bank-form'); 
     const cardInput = document.getElementById('card');
     const bankDisplay = document.getElementById('bank_display');
     const cardIcon = document.getElementById('card-brand-icon');
@@ -299,6 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     expInput.addEventListener('input', function(e) {
+        expInput.classList.remove('is-invalid'); 
         let value = e.target.value.replace(/\D/g, ''); 
         if (value.length >= 3) {
             e.target.value = value.slice(0, 2) + '/' + value.slice(2, 4);
@@ -316,23 +272,36 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (expValue.length !== 5) {
             e.preventDefault();
+            expInput.classList.add('is-invalid');
             Swal.fire({ title: 'Error', text: 'Please enter a valid expiration date (MM/YY).', icon: 'warning', confirmButtonColor: '#00a651' });
             return;
         }
 
-        const [mm, yy] = expValue.split('/').map(num => parseInt(num, 10));
+        const [mmStr, yyStr] = expValue.split('/');
+        const mm = parseInt(mmStr, 10);
+        const yy = parseInt(yyStr, 10);
+        
         const now = new Date();
         const currentYear = parseInt(now.getFullYear().toString().substr(-2)); 
         const currentMonth = now.getMonth() + 1; 
 
-        let errorMsg = '';
-        if (mm < 1 || mm > 12) errorMsg = "Invalid month.";
-        else if (yy < currentYear) errorMsg = "Card has expired.";
-        else if (yy === currentYear && mm < currentMonth) errorMsg = "Card has expired.";
+        if (mm < 1 || mm > 12) {
+            e.preventDefault();
+            expInput.classList.add('is-invalid');
+            Swal.fire({ title: 'Invalid Month', text: 'Please enter a month between 01 and 12.', icon: 'error', confirmButtonColor: '#00a651' }).then(() => {
+                expInput.value = ''; 
+                expInput.focus(); 
+            });
+            return;
+        }
 
-        if (errorMsg !== '') {
+        if (yy < currentYear || (yy === currentYear && mm < currentMonth)) {
             e.preventDefault(); 
-            Swal.fire({ title: 'Error', text: errorMsg, icon: 'error', confirmButtonColor: '#00a651' });
+            expInput.classList.add('is-invalid');
+            Swal.fire({ title: 'Card Expired', text: 'The expiration date entered has already passed.', icon: 'error', confirmButtonColor: '#00a651' }).then(() => {
+                expInput.value = ''; 
+                expInput.focus(); 
+            });
         }
     });
 
@@ -347,6 +316,9 @@ document.addEventListener('DOMContentLoaded', function() {
         else if (patterns.amex.test(number)) { type = 'amex'; bankName = 'American Express'; }
 
         bankDisplay.value = bankName;
+        // 将具体的支付方式存入隐藏字段
+        document.getElementById('payment_method_value').value = "Credit Card";
+        
         cardIcon.className = `fab ${icons[type]} card-icon`;
         cardIcon.style.color = type === 'unknown' ? '#999' : '#00a651';
     }

@@ -65,9 +65,9 @@ if ($case_id) {
 // -------------------------
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 
-    // 生成交易信息
+    // ⭐ 判定逻辑：强制设定支付方式为 "Touch 'n Go eWallet"
     $payment_method = "TNG eWallet";
-    $txn_ref = "TXN-" . date("YmdHis") . "-" . rand(100, 999);
+    $txn_ref = "TXN-TNG-" . date("YmdHis") . "-" . rand(100, 999);
     $now = date("Y-m-d H:i:s");
     $status = "Success"; 
     $bank_name = "TNG eWallet";
@@ -121,25 +121,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         $stmt->close();
     }
 
-    // =========================================================================
-    // 🔴【重要修改】把这里的 UPDATE 代码删掉/注释掉
-    // 因为 Payment_Settlement_Page.php 那边应该已经有同样的逻辑了。
-    // 如果两边都跑，钱就会加两次。
-    // =========================================================================
-
-    /* // 4️⃣ 更新筹款进度 & 捐赠人数 (Special Case)
+    // 更新项目筹款进度和捐赠人数统计
     if ($case_id != null) {
         $conn->query("UPDATE special_case SET Raised_Amount = Raised_Amount + $amount, Donor_Count = Donor_Count + 1 WHERE Case_ID = $case_id");
     }
-    
-    // 5️⃣ 更新 Activity 筹款进度 (Activity)
     if ($activity_id != null) {
         $conn->query("UPDATE activity SET Activity_GetAmount = Activity_GetAmount + $amount WHERE Activity_ID = $activity_id");
     }
-    */
+
+    // 支付成功清理 Session 缓存
+    unset($_SESSION['donation_data']['amount']);
 
     // 跳转到结算页 (Settlement Page)
-    // 结算页会根据 txn_ref 查找订单，如果那边没有加钱逻辑，请再把上面的代码取消注释。
     header("Location: Payment_Settlement_Page.php?txn_ref=$txn_ref");
     exit();
 }
@@ -173,7 +166,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     .order-summary p { margin: 8px 0; font-size: 15px; }
     .order-summary .total { font-size: 18px; font-weight: bold; text-align: right; color: #F28585; margin-top: 15px; }
 
-    /* Buttons Style */
     .nav-buttons { display: flex; gap: 15px; margin-top: 30px; }
     .btn-nav {
         flex: 1; padding: 12px; border-radius: 8px; font-size: 1rem; font-weight: bold;
@@ -196,7 +188,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     </div>
 
     <?php 
-        // 动态 Stepper
         if ($source == 'special_case') {
             $flow_type = 'special';
             $current_step = 3; 
@@ -234,8 +225,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 
                 <div class="nav-buttons">
                     <?php
-                        // 动态生成返回链接
-                        $back_url = "Payment_Ways_Page.php"; // 默认
+                        $back_url = "Payment_Ways_Page.php";
                         if ($source == 'special_case') {
                             $back_url = "S_C_Payment_Ways_Page.php";
                         }
@@ -255,7 +245,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         <div class="order-summary">
             <h3>Order Summary</h3>
             <p><b>Merchant:</b> LOVE BRIDGE</p>
-            <p><b>Ref ID:</b> <?php echo "TXN-" . date("YmdHis"); ?></p>
+            <p><b>Ref ID:</b> <?php echo "TXN-TNG-" . date("YmdHis"); ?></p>
             <p><b>Project:</b><br><?php echo htmlspecialchars($display_project_name); ?></p>
             
             <div style="border-top:1px dashed #ccc; margin:15px 0;"></div>
