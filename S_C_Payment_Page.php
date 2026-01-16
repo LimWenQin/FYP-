@@ -103,9 +103,6 @@ $stmt_other->bind_param("i", $param_id);
 $stmt_other->execute();
 $other_res = $stmt_other->get_result();
 
-$sess_amount = $_SESSION['donation_data']['amount'] ?? '';
-$sess_type = $_SESSION['donation_data']['type'] ?? 'one-time';
-
 $check_sql = "SELECT Donor_ICNumber, Donor_Address1, Donor_City, Donor_PostalCode FROM donor WHERE Donor_ID = ?";
 $stmt = $conn->prepare($check_sql);
 $stmt->bind_param("i", $current_donor_id);
@@ -142,9 +139,10 @@ include 'header_UI.php';
     .donation-card { background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #f0f0f0; }
     .form-header { text-align: center; margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
     .form-header h2 { font-size: 1.8rem; font-weight: 700; color: #333; margin-bottom: 5px; }
-    .type-group { display: flex; margin-bottom: 25px; border: 1px solid #dc2626; border-radius: 6px; overflow: hidden; }
-    .type-option { flex: 1; text-align: center; padding: 12px; cursor: pointer; background: #fff; color: #dc2626; font-weight: bold; transition: 0.2s; }
-    .type-option.active { background: #dc2626; color: #fff; }
+    
+    /* 替换原本切换按钮的样式 */
+    .one-time-badge { text-align: center; padding: 12px; background: #fef2f2; color: #dc2626; border: 1px solid #dc2626; border-radius: 6px; font-weight: bold; margin-bottom: 10px; }
+    
     .amount-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
     .btn-amount { padding: 15px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; border-radius: 8px; font-size: 16px; font-weight: 600; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
     .btn-amount:hover { border-color: #dc2626; color: #dc2626; }
@@ -152,7 +150,6 @@ include 'header_UI.php';
     .input-custom { width: 100%; padding: 15px; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 20px; font-size: 16px; transition: 0.3s; text-align: center;}
     .input-custom:focus { border-color: #dc2626; outline: none; }
     
-    /* ⭐ 统一后的 Tax Section 样式 ⭐ */
     .tax-receipt-section { background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #dc2626; }
     .checkbox-label { display: flex; align-items: center; cursor: pointer; font-weight: 600; color: #333; }
     .checkbox-label input { width: 18px; height: 18px; margin-right: 10px; cursor: pointer; accent-color: #dc2626; }
@@ -160,8 +157,7 @@ include 'header_UI.php';
 
     .nav-buttons { display: flex; gap: 15px; margin-top: 20px; }
     .btn-nav { flex: 1; padding: 15px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; border: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; transition: 0.2s; }
-    .btn-prev { background: #e5e7eb; color: #374151; }
-    .btn-next { background: #00a651; color: white; box-shadow: 0 4px 15px rgba(0, 166, 81, 0.3); }
+    .btn-next { background: #00a651; color: white; box-shadow: 0 4px 15px rgba(0, 166, 81, 0.3); width: 100%; }
     .btn-next:hover { background: #008f45; }
 
     .bottom-section { background-color: #f8f9fa; border-top: 1px solid #eee; }
@@ -228,9 +224,13 @@ include 'header_UI.php';
                         <input type="hidden" id="tax_receipt" name="tax_receipt" value="0">
                         <input type="hidden" name="<?php echo $mode; ?>_id" value="<?php echo $main_data['id']; ?>">
 
-                        <div class="type-group">
-                            <div class="type-option active" id="btn-once" onclick="selectType('one-time')">One-time</div>
-                            <div class="type-option" id="btn-monthly" onclick="selectType('monthly')">Monthly</div>
+                        <div style="margin-bottom: 25px;">
+                            <div class="one-time-badge">
+                                <i class="fas fa-hand-holding-heart"></i> One-time Donation
+                            </div>
+                            <p style="font-size: 0.85rem; color: #666; text-align: center;">
+                                * This is an urgent case. Only one-time contributions are accepted.
+                            </p>
                         </div>
                         
                         <div class="amount-grid" id="amount-grid"></div>
@@ -304,7 +304,7 @@ include 'header_UI.php';
     const taxAmounts = [30, 50, 100, 200, 300, 500];
 
     document.addEventListener('DOMContentLoaded', function() {
-        resetForm(); // ⭐ 每次进入确保不残留
+        resetForm(); 
     });
 
     function renderButtons(amounts) {
@@ -319,12 +319,6 @@ include 'header_UI.php';
         });
     }
 
-    function selectType(type) {
-        document.getElementById("donation_type").value = type;
-        document.getElementById('btn-once').classList.toggle('active', type === 'one-time');
-        document.getElementById('btn-monthly').classList.toggle('active', type === 'monthly');
-    }
-
     function selectAmount(amount, btnElement) {
         document.getElementById("amount").value = amount;
         document.getElementById("custom_amount").value = amount;
@@ -337,13 +331,11 @@ include 'header_UI.php';
         document.querySelectorAll('.btn-amount').forEach(b => b.classList.remove('selected'));
     });
 
-    // ⭐ 修改后的两层逻辑，按钮颜色统一为红色 ⭐
     function toggleTaxReceipt() {
         const checkbox = document.getElementById('receipt_checkbox');
         const hiddenInput = document.getElementById('tax_receipt');
 
         if (checkbox.checked) {
-            // 第一层：个人资料检查
             if (!isProfileComplete) {
                 checkbox.checked = false; 
                 Swal.fire({
@@ -351,7 +343,7 @@ include 'header_UI.php';
                     text: 'To issue a Tax Exemption Receipt, we need your IC Number and complete Address. Please update your profile.',
                     icon: 'info',
                     showCancelButton: true,
-                    confirmButtonColor: '#dc2626', // 红色确认
+                    confirmButtonColor: '#dc2626',
                     confirmButtonText: 'Go to Profile',
                     cancelButtonText: 'Not now'
                 }).then((result) => {
@@ -360,14 +352,13 @@ include 'header_UI.php';
                 return;
             }
 
-            // 第二层：最低 RM 30 政策确认
             checkbox.checked = false; 
             Swal.fire({
                 title: 'Tax Receipt Policy',
                 html: 'The minimum donation amount for a tax-deductible receipt is <b>RM 30.00</b>.<br><br>Do you agree to this condition?',
                 icon: 'question',
                 showCancelButton: true,
-                confirmButtonColor: '#dc2626', // 红色确认
+                confirmButtonColor: '#dc2626',
                 confirmButtonText: 'Yes, I agree',
                 cancelButtonText: 'No, cancel'
             }).then((result) => {
@@ -398,9 +389,9 @@ include 'header_UI.php';
         form.reset();
         document.getElementById('amount').value = "";
         document.getElementById('tax_receipt').value = "0";
+        document.getElementById('donation_type').value = "one-time"; 
         document.getElementById('receipt_checkbox').checked = false;
         renderButtons(defaultAmounts);
-        selectType("<?php echo $sess_type; ?>");
     }
 
     document.getElementById('donationForm').addEventListener('submit', function(e) {

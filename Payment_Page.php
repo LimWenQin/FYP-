@@ -1,5 +1,5 @@
 <?php
-// 1. PHP 后端逻辑
+// Payment_Page.php
 include 'dataconnection.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -14,36 +14,46 @@ if (!isset($_SESSION['donor_id'])) {
 
 $current_donor_id = $_SESSION['donor_id'];
 
-// ⭐ 修改点 1: 每次刷新页面，彻底清除金额记忆和 Tax Receipt 勾选记忆
-if (isset($_SESSION['donation_data'])) {
-    unset($_SESSION['donation_data']['amount']);
-    unset($_SESSION['donation_data']['tax_receipt']); // 确保后端记忆也被清除
+// ==========================================
+// 1. [核心修改] 接收并存储分行选择数据
+// ==========================================
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['branch_id'])) {
+    // 将选中的 branch_id 存入 Session
+    $_SESSION['donation_data']['branch_id'] = $_POST['branch_id'];
 }
-$sess_amount = ''; 
-$sess_receipt = '0'; // 强制默认不勾选
 
-// 恢复 Session 数据的其他项 (如类型、项目ID等可保留)
-$sess_type = isset($_SESSION['donation_data']['type']) ? $_SESSION['donation_data']['type'] : 'one-time';
-$sess_case_id = isset($_SESSION['donation_data']['case_id']) ? $_SESSION['donation_data']['case_id'] : '';
-$sess_activity_id = isset($_SESSION['donation_data']['activity_id']) ? $_SESSION['donation_data']['activity_id'] : '';
+// 安全检查：如果没有分行选择信息，退回到第一步
+if (!isset($_SESSION['donation_data']['branch_id'])) {
+    header("Location: Branch_Selection.php");
+    exit();
+}
 
-// 1. 获取最新的 Special Case
-$case_sql = "SELECT * FROM special_case WHERE Case_Status = 'Active' ORDER BY Created_At DESC LIMIT 1";
-$case_res = $conn->query($case_sql);
-$special_case = $case_res->fetch_assoc();
+// 获取当前捐赠目标名称
+$branch_id = $_SESSION['donation_data']['branch_id'];
+$display_target_name = "Love Bridge General Fund"; // 默认
 
-// 2. 获取即将开始的 Activity
-$act_sql = "SELECT * FROM activity WHERE Activity_Status = 'Active' AND (Activity_Date >= CURDATE() OR Activity_StartDate >= CURDATE()) ORDER BY Activity_StartDate ASC LIMIT 1";
-$act_res = $conn->query($act_sql);
-$activity = $act_res->fetch_assoc();
+if ($branch_id == '0') {
+    $res = $conn->query("SELECT HQ_Name FROM headquarters WHERE HQ_ID = 1");
+    if($r = $res->fetch_assoc()) $display_target_name = $r['HQ_Name'];
+} else {
+    $stmt = $conn->prepare("SELECT Branch_Name FROM branch WHERE Branch_ID = ?");
+    $stmt->bind_param("i", $branch_id);
+    $stmt->execute();
+    if($r = $stmt->get_result()->fetch_assoc()) $display_target_name = $r['Branch_Name'];
+}
 
-// 3. 检查用户资料完整性
+// 彻底清除旧的金额和 Tax 勾选记忆
+unset($_SESSION['donation_data']['amount']);
+unset($_SESSION['donation_data']['tax_receipt']);
+
+$sess_type = $_SESSION['donation_data']['type'] ?? 'one-time';
+
+// 检查用户资料完整性（用于报税收据检查）
 $check_sql = "SELECT Donor_ICNumber, Donor_Address1, Donor_City, Donor_PostalCode FROM donor WHERE Donor_ID = ?";
 $stmt = $conn->prepare($check_sql);
 $stmt->bind_param("i", $current_donor_id);
 $stmt->execute();
-$res = $stmt->get_result();
-$user_data = $res->fetch_assoc();
+$user_data = $stmt->get_result()->fetch_assoc();
 
 $is_profile_complete = (!empty($user_data['Donor_ICNumber']) && !empty($user_data['Donor_Address1']) && !empty($user_data['Donor_City']) && !empty($user_data['Donor_PostalCode'])) ? 'true' : 'false';
 
@@ -126,149 +136,76 @@ include 'header_UI.php';
 <div class="hero">
     <div class="hero-overlay"></div>
     <div class="hero-text">
-        <h1>Make a Difference</h1>
-        <p>Your support helps us build a better future.</p>
+        <h1>Step 2: Donation Amount</h1>
+        <p>Your generosity fuels our mission at <?php echo htmlspecialchars($display_target_name); ?>.</p>
     </div>
 </div>
 
 <?php 
-    $current_step = 1; 
+    $current_step = 2; 
     $flow_type = 'standard'; 
     include 'stepper.php'; 
 ?>
 
-<div class="container">
-    <div class="top-section">
-        <div class="col-left">
-            <img src="images/hero_3.jpg" alt="Donation Story" class="story-img">
-        </div>
-        <div class="col-right">
-            <div class="donation-card" id="donation-card-anchor">
-                <h2 style="text-align:center;" id="form-title">General Donation</h2>
-                <p style="text-align:center; color:#777; font-size:0.9rem; margin-bottom:20px;" id="form-subtitle">Supporting our main fund</p>
-                
-                <form id="donationForm" method="POST" action="Branch_Selection.php" autocomplete="off">
-                    <div class="type-group">
-                        <div class="type-option active" id="btn-once" onclick="selectType('one-time')">One-time</div>
-                        <div class="type-option" id="btn-monthly" onclick="selectType('monthly')">Monthly</div>
+<div class="top-section">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-7">
+
+                <div class="target-confirm-box">
+                    <div class="target-icon"><i class="fas fa-building"></i></div>
+                    <div class="target-info">
+                        <p>Selected Destination:</p>
+                        <h4><?php echo htmlspecialchars($display_target_name); ?></h4>
                     </div>
-                    <input type="hidden" id="donation_type" name="donation_type" value="one-time">
-                    <input type="hidden" id="amount" name="amount">
-                    <input type="hidden" id="tax_receipt" name="tax_receipt" value="0">
-                    <input type="hidden" id="branch_id" name="branch_id" value=""> 
-                    <input type="hidden" id="case_id" name="case_id" value="">
-                    <input type="hidden" id="activity_id" name="activity_id" value="">
-                    
-                    <div class="amount-grid" id="amount-grid"></div>
-                    <input type="number" id="custom_amount" name="custom_amount" class="input-custom" placeholder="Enter custom amount (RM)">
-                    
-                    <div class="tax-receipt-section">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="receipt_checkbox" onchange="toggleTaxReceipt()">I need a Tax Exemption Receipt
-                        </label>
-                        <div class="tax-note">* Minimum donation: <strong>RM 30</strong><br>* Requires complete Profile (IC & Address)</div>
-                    </div>
-                    
-                    <div class="nav-buttons">
-                        <button type="submit" class="btn-nav btn-next">Next <i class="fas fa-arrow-right"></i></button>
-                    </div>
-                    
-                    <div style="text-align:center; margin-top:10px; display:none;" id="reset-link">
-                        <a href="#" onclick="resetForm(); return false;" style="color:#999; font-size:0.85rem; text-decoration:none;"><i class="fas fa-undo"></i> Cancel selection</a>
-                    </div>
-                </form>
+                </div>
+
+                <div class="donation-card">
+                    <form id="donationForm" method="POST" action="Payment_Ways_Page.php" autocomplete="off">
+                        <div class="type-group">
+                            <div class="type-option <?php echo ($sess_type == 'one-time') ? 'active' : ''; ?>" id="btn-once" onclick="selectType('one-time')">One-time</div>
+                            <div class="type-option <?php echo ($sess_type == 'monthly') ? 'active' : ''; ?>" id="btn-monthly" onclick="selectType('monthly')">Monthly</div>
+                        </div>
+                        <input type="hidden" id="donation_type" name="donation_type" value="<?php echo $sess_type; ?>">
+                        <input type="hidden" id="amount" name="amount">
+                        <input type="hidden" id="tax_receipt" name="tax_receipt" value="0">
+
+                        <div class="amount-grid" id="amount-grid"></div>
+                        
+                        <input type="number" id="custom_amount" name="custom_amount" class="input-custom" placeholder="Or enter RM amount">
+                        
+                        <div class="tax-receipt-section">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="receipt_checkbox" onchange="toggleTaxReceipt()">I need a Tax Exemption Receipt
+                            </label>
+                            <div class="tax-note">
+                                * Minimum donation for receipt: <strong>RM 30</strong><br>
+                                * IC and Full Address must be updated in your profile.
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn-next">Continue to Payment <i class="fas fa-arrow-right ml-2"></i></button>
+                        
+                        <a href="Branch_Selection.php" class="btn-back"><i class="fas fa-undo mr-2"></i> Change branch selection</a>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-    </div>
+</div>
 
 <script>
-    // 后端传入变量
     const isProfileComplete = <?php echo $is_profile_complete; ?>;
     const defaultAmounts = [20, 50, 100, 200, 300, 500];
     const taxAmounts = [30, 50, 100, 200, 300, 500];
 
-    // ⭐ 修改点 2: 页面加载初始化逻辑优化，确保不恢复 Tax 勾选
     document.addEventListener('DOMContentLoaded', function() {
-        // 1. 强制清空表单和输入框
-        const form = document.getElementById('donationForm');
-        form.reset(); 
+        renderButtons(defaultAmounts);
+        // 强制重置
         document.getElementById('amount').value = "";
         document.getElementById('custom_amount').value = "";
-        document.getElementById('tax_receipt').value = "0";
-        document.getElementById('receipt_checkbox').checked = false; // ⭐ 确保默认不勾选
-
-        // 2. 初始化默认按钮
-        renderButtons(defaultAmounts);
-        
-        // 3. 恢复 Session 状态 (仅限捐赠类型，不恢复金额和 Tax 勾选)
-        const savedType = "<?php echo $sess_type; ?>";
-        if(savedType) selectType(savedType);
-
-        // 彻底移除之前针对 savedReceipt === '1' 的自动恢复勾选逻辑
     });
 
-    // 处理用户手动点击勾选逻辑
-    function toggleTaxReceipt() {
-        const checkbox = document.getElementById('receipt_checkbox');
-        const hiddenInput = document.getElementById('tax_receipt');
-
-        if (checkbox.checked) {
-            // 1. 判定资料完整性
-            if (!isProfileComplete) {
-                checkbox.checked = false; 
-                Swal.fire({
-                    title: 'Action Required',
-                    text: 'To issue a Tax Exemption Receipt, we need your IC Number and complete Address. Please update your profile.',
-                    icon: 'info',
-                    showCancelButton: true,
-                    confirmButtonColor: '#00a651',
-                    cancelButtonColor: '#d33',
-                    confirmButtonText: 'Go to Profile',
-                    cancelButtonText: 'Not now'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        window.location.href = 'Profile.php';
-                    }
-                });
-                return;
-            }
-
-            // 2. 触发最低金额协议确认
-            checkbox.checked = false; 
-            Swal.fire({
-                title: 'Tax Receipt Policy',
-                html: 'The minimum donation amount for a tax-deductible receipt is <b>RM 30.00</b>.<br><br>Do you agree to this condition?',
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#00a651',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Yes, I agree',
-                cancelButtonText: 'No, cancel'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    checkbox.checked = true;
-                    renderButtons(taxAmounts);
-                    hiddenInput.value = "1";
-                    
-                    let currentAmt = parseFloat(document.getElementById('amount').value);
-                    if(currentAmt < 30) {
-                        document.getElementById('amount').value = "";
-                        document.getElementById('custom_amount').value = "";
-                        document.querySelectorAll('.btn-amount').forEach(b => b.classList.remove('selected'));
-                    }
-                } else {
-                    checkbox.checked = false;
-                    hiddenInput.value = "0";
-                }
-            });
-        } else {
-            renderButtons(defaultAmounts);
-            hiddenInput.value = "0";
-        }
-    }
-
-    // --- 其他基础函数 ---
     function renderButtons(amounts) {
         const grid = document.getElementById('amount-grid');
         grid.innerHTML = ''; 
@@ -295,22 +232,75 @@ include 'header_UI.php';
         if(btnElement) btnElement.classList.add('selected');
     }
 
+    document.getElementById('custom_amount').addEventListener('input', function() {
+        document.getElementById("amount").value = this.value;
+        document.querySelectorAll('.btn-amount').forEach(b => b.classList.remove('selected'));
+    });
+
+    function toggleTaxReceipt() {
+        const checkbox = document.getElementById('receipt_checkbox');
+        const hiddenInput = document.getElementById('tax_receipt');
+
+        if (checkbox.checked) {
+            if (!isProfileComplete) {
+                checkbox.checked = false; 
+                Swal.fire({
+                    title: 'Action Required',
+                    text: 'To issue a Tax Exemption Receipt, we need your IC Number and complete Address. Please update your profile.',
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonColor: '#dc2626',
+                    confirmButtonText: 'Go to Profile',
+                    cancelButtonText: 'Not now'
+                }).then((result) => {
+                    if (result.isConfirmed) window.location.href = 'Profile.php';
+                });
+                return;
+            }
+
+            checkbox.checked = false; 
+            Swal.fire({
+                title: 'Tax Receipt Policy',
+                html: 'The minimum donation amount for a tax-deductible receipt is <b>RM 30.00</b>.<br><br>Do you agree to this condition?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                confirmButtonText: 'Yes, I agree',
+                cancelButtonText: 'No, cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    checkbox.checked = true;
+                    renderButtons(taxAmounts);
+                    hiddenInput.value = "1";
+                    
+                    let currentAmt = parseFloat(document.getElementById('amount').value);
+                    if(currentAmt < 30) {
+                        document.getElementById('amount').value = "";
+                        document.getElementById('custom_amount').value = "";
+                        document.querySelectorAll('.btn-amount').forEach(b => b.classList.remove('selected'));
+                    }
+                } else {
+                    checkbox.checked = false;
+                    hiddenInput.value = "0";
+                }
+            });
+        } else {
+            renderButtons(defaultAmounts);
+            hiddenInput.value = "0";
+        }
+    }
+
     document.getElementById('donationForm').addEventListener('submit', function(e) {
         const amount = parseFloat(document.getElementById("amount").value) || 0;
         const needsReceipt = document.getElementById('tax_receipt').value === "1";
         
         if (amount <= 0) {
             e.preventDefault();
-            Swal.fire({ icon: 'warning', title: 'Oops...', text: 'Please select a donation amount.' });
+            Swal.fire({ icon: 'warning', title: 'Invalid Amount', text: 'Please select or enter a donation amount.', confirmButtonColor: '#dc2626' });
         } else if (needsReceipt && amount < 30) {
             e.preventDefault();
-            Swal.fire({ icon: 'error', title: 'Invalid Amount', text: 'Tax receipts require a minimum donation of RM 30.' });
+            Swal.fire({ icon: 'error', title: 'Minimum RM 30 Required', text: 'To qualify for a tax-deductible receipt, the amount must be at least RM 30.', confirmButtonColor: '#dc2626' });
         }
-    });
-
-    document.getElementById('custom_amount').addEventListener('input', function() {
-        document.getElementById("amount").value = this.value;
-        document.querySelectorAll('.btn-amount').forEach(b => b.classList.remove('selected'));
     });
 </script>
 

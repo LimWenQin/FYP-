@@ -3,84 +3,70 @@
 session_start();
 include 'dataconnection.php';
 
-// 登录检查
+// 1. 登录检查
 if (!isset($_SESSION['donor_id'])) {
     echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
     exit();
 }
 
 // ==========================================
-// 1. 接收上一页数据并存入 Session
+// 2. 初始化流程数据 (Step 1)
 // ==========================================
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+// 如果是从 Homepage 或其它地方直接进入，初始化捐赠数据 Session
+if (!isset($_SESSION['donation_data'])) {
     $_SESSION['donation_data'] = [
-        'amount' => $_POST['amount'],
-        'type' => $_POST['donation_type'],
-        'tax_receipt' => $_POST['tax_receipt'],
-        'case_id' => $_POST['case_id'] ?? '',
-        'activity_id' => $_POST['activity_id'] ?? '',
-        'branch_id' => $_SESSION['donation_data']['branch_id'] ?? ''
+        'amount' => '',
+        'type' => 'one-time',
+        'tax_receipt' => '0',
+        'case_id' => '',
+        'activity_id' => '',
+        'branch_id' => ''
     ];
 }
 
-// 安全检查
-if (empty($_SESSION['donation_data'])) {
-    header("Location: Donate_Page.php");
-    exit();
+// 检查是否有通过 GET 传来的特殊个案或活动 ID (从详情页点进来的情况)
+if (isset($_GET['case_id'])) {
+    $_SESSION['donation_data']['case_id'] = $_GET['case_id'];
+    $_SESSION['donation_data']['activity_id'] = ''; // 清除活动ID
+}
+if (isset($_GET['activity_id'])) {
+    $_SESSION['donation_data']['activity_id'] = $_GET['activity_id'];
+    $_SESSION['donation_data']['case_id'] = ''; // 清除个案ID
 }
 
-// 从 Session 获取之前选中的分行（如果有）
-$pre_selected_branch = $_SESSION['donation_data']['branch_id'];
+$pre_selected_branch = $_SESSION['donation_data']['branch_id'] ?? '';
 
 // ==========================================
-// 2. [FIXED] 获取总部 (HQ) 数据
+// 3. 获取总部 (HQ) 数据
 // ==========================================
-$hq_sql = "SELECT HQ_Name, HQ_Description, HQ_Image, Headquarters_State 
-           FROM headquarters 
-           WHERE HQ_ID = 1 LIMIT 1";
+$hq_sql = "SELECT HQ_Name, HQ_Description, HQ_Image, Headquarters_State FROM headquarters WHERE HQ_ID = 1 LIMIT 1";
 $hq_result = $conn->query($hq_sql);
 $hq_data = $hq_result->fetch_assoc();
 
 $hq_branch = null;
-
 if ($hq_data) {
     $hq_branch = [
-        'Branch_ID' => '', 
+        'Branch_ID' => '0', // 总部 ID 约定为 0
         'Branch_Name' => $hq_data['HQ_Name'],
         'Branch_Type' => 'Headquarters', 
         'Branch_Description' => $hq_data['HQ_Description'],
         'Branch_City' => $hq_data['Headquarters_State'], 
-        'decoded_images' => [] 
+        'decoded_images' => [!empty($hq_data['HQ_Image']) ? $hq_data['HQ_Image'] : 'images/hero_3.jpg']
     ];
-
-    if (!empty($hq_data['HQ_Image'])) {
-        $hq_branch['decoded_images'][] = $hq_data['HQ_Image'];
-    } else {
-        $hq_branch['decoded_images'][] = 'images/hero_3.jpg'; 
-    }
 }
 
 // ==========================================
-// 3. [FIXED] 获取其他分行 (Branches) 数据
+// 4. 获取其他分行 (Branches) 数据
 // ==========================================
-$sql = "SELECT Branch_ID, Branch_Name, Branch_Type, Branch_Description, Branch_Address1, Branch_City, Branch_Images 
+$sql = "SELECT Branch_ID, Branch_Name, Branch_Type, Branch_Description, Branch_City, Branch_Images 
         FROM branch 
         WHERE Is_Deleted = 0 AND Branch_OperationalStatus = 'Open'
         ORDER BY Branch_ID ASC";
 $result = $conn->query($sql);
-
 $other_branches = [];
-
-if ($result->num_rows > 0) {
-    while($row = $result->fetch_assoc()) {
-        $row['decoded_images'] = !empty($row['Branch_Images']) ? json_decode($row['Branch_Images'], true) : [];
-        
-        if (!is_array($row['decoded_images'])) {
-            $row['decoded_images'] = [];
-        }
-        
-        $other_branches[] = $row;
-    }
+while($row = $result->fetch_assoc()) {
+    $row['decoded_images'] = !empty($row['Branch_Images']) ? json_decode($row['Branch_Images'], true) : ['images/hero_3.jpg'];
+    $other_branches[] = $row;
 }
 
 include 'header_UI.php'; 
@@ -294,133 +280,82 @@ include 'header_UI.php';
 <div class="hero-wrap">
     <div class="overlay"></div>
     <div class="hero-content">
-        <h1>Select Beneficiary</h1>
-        <p>Choose where your donation goes.</p>
+        <h1>Step 1: Choose Your Destination</h1>
+        <p>Select the branch or fund you wish to support.</p>
     </div>
 </div>
 
 <?php 
-    $current_step = 2; 
+    $current_step = 1; 
     $flow_type = 'standard'; 
     include 'stepper.php'; 
 ?>
 
-<div class="site-section" style="padding: 5em 0;">
+<div class="site-section" style="padding: 4em 0;">
     <div class="container">
         <div class="row justify-content-center">
             <div class="col-lg-10">
-
-                <div class="top-nav-container">
-                    <a href="Payment_Page.php" class="btn-orange-back">
-                        <i class="fas fa-arrow-left"></i> Back to Change Details
-                    </a>
-                </div>
                 
-                <h3 class="text-cursive mb-4 text-center" style="color: #dc2626;">Choose a Branch to Proceed</h3>
-                <p class="text-center text-muted mb-5">Click on any branch card to select and continue to payment.</p>
+                <h2 class="text-center font-weight-bold mb-2" style="color: #111;">Where should your love land?</h2>
+                <p class="text-center text-muted mb-5">Your donation will be directly allocated to the selected center's operating fund.</p>
 
-                <form action="Payment_Ways_Page.php" method="POST" id="branchForm">
+                <form action="Payment_Page.php" method="POST" id="branchForm">
                     <div class="branch-container">
 
+                        <?php if ($hq_branch): ?>
                         <label class="branch-option">
-                            <input type="radio" name="branch_id" value="" 
-                                <?php echo ($pre_selected_branch == '') ? 'checked' : ''; ?>
-                                onclick="this.form.submit()">
-                            
+                            <input type="radio" name="branch_id" value="0" onclick="this.form.submit()">
                             <div class="branch-card">
-                                <div class="branch-carousel" id="carousel-hq">
-                                    <?php 
-                                        if ($hq_branch && !empty($hq_branch['decoded_images'])) {
-                                            foreach ($hq_branch['decoded_images'] as $index => $img_path) {
-                                                $activeClass = ($index === 0) ? 'active' : '';
-                                                echo '<img src="'.htmlspecialchars($img_path).'" class="carousel-img '.$activeClass.'" alt="HQ Image">';
-                                            }
-                                        } else {
-                                            echo '<img src="images/hero_3.jpg" class="default-img" alt="General Fund">';
-                                        }
-                                    ?>
+                                <div class="branch-carousel">
+                                    <img src="<?php echo htmlspecialchars($hq_branch['decoded_images'][0]); ?>" class="carousel-img active" alt="HQ">
                                 </div>
                                 <div class="branch-info">
-                                    <div>
-                                        <div class="info-header">
-                                            <h4 class="branch-title">
-                                                <?php echo $hq_branch ? htmlspecialchars($hq_branch['Branch_Name']) : 'Love Bridge HQ'; ?>
-                                            </h4>
-                                            <span class="branch-type type-hq">Headquarters</span>
-                                        </div>
-                                        <p class="branch-desc">
-                                            <?php 
-                                                if ($hq_branch && !empty($hq_branch['Branch_Description'])) {
-                                                    echo nl2br(htmlspecialchars($hq_branch['Branch_Description']));
-                                                } else {
-                                                    echo "Donating to the General Fund allows us to allocate resources where they are needed most urgently across all our branches and initiatives.";
-                                                }
-                                            ?>
-                                        </p>
+                                    <div class="info-header">
+                                        <h4 class="branch-title"><?php echo htmlspecialchars($hq_branch['Branch_Name']); ?></h4>
+                                        <span class="branch-type" style="background:#fef3c7; color:#d97706;">Headquarters</span>
                                     </div>
+                                    <p class="branch-desc"><?php echo htmlspecialchars($hq_branch['Branch_Description']); ?></p>
                                     <div class="branch-footer">
-                                        <div class="branch-location">
-                                            <i class="fas fa-map-marker-alt"></i> 
-                                            <?php echo $hq_branch ? htmlspecialchars($hq_branch['Branch_City']) : 'Kuala Lumpur'; ?>
-                                        </div>
-                                        <div class="btn-group-actions">
-                                            <a href="Branch_Details.php?id=0" class="details-btn" onclick="event.stopPropagation();">Details</a>
-                                            <div class="select-btn">Select & Pay <i class="fas fa-chevron-right" style="font-size: 0.8em; margin-left: 5px;"></i></div>
+                                        <div class="branch-location"><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($hq_branch['Branch_City']); ?></div>
+                                        <div>
+                                            <a href="Branch_Details.php?id=0" class="details-btn" onclick="event.stopPropagation();">Read More</a>
+                                            <span class="select-btn">Support HQ <i class="fas fa-arrow-right ml-2"></i></span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </label>
-
-                        <?php if (!empty($other_branches)): ?>
-                            <?php foreach ($other_branches as $row): ?>
-                                <label class="branch-option">
-                                    <input type="radio" name="branch_id" value="<?php echo $row['Branch_ID']; ?>"
-                                        <?php echo ($pre_selected_branch == $row['Branch_ID']) ? 'checked' : ''; ?>
-                                        onclick="this.form.submit()">
-                                    
-                                    <div class="branch-card">
-                                        <div class="branch-carousel" id="carousel-<?php echo $row['Branch_ID']; ?>">
-                                            <?php 
-                                                $images = $row['decoded_images'];
-                                                if (!empty($images) && is_array($images)) {
-                                                    foreach ($images as $index => $img_path) {
-                                                        $activeClass = ($index === 0) ? 'active' : '';
-                                                        echo '<img src="'.htmlspecialchars($img_path).'" class="carousel-img '.$activeClass.'" alt="Branch Image">';
-                                                    }
-                                                } else {
-                                                    echo '<img src="images/hero_3.jpg" class="default-img" alt="No Image">';
-                                                }
-                                            ?>
-                                        </div>
-
-                                        <div class="branch-info">
-                                            <div>
-                                                <div class="info-header">
-                                                    <h4 class="branch-title"><?php echo htmlspecialchars($row['Branch_Name']); ?></h4>
-                                                    <span class="branch-type"><?php echo htmlspecialchars($row['Branch_Type']); ?></span>
-                                                </div>
-                                                <p class="branch-desc"><?php echo nl2br(htmlspecialchars($row['Branch_Description'])); ?></p>
-                                            </div>
-                                            <div class="branch-footer">
-                                                <div class="branch-location">
-                                                    <i class="fas fa-map-marker-alt"></i> 
-                                                    <?php echo htmlspecialchars($row['Branch_City']); ?>
-                                                </div>
-                                                <div class="btn-group-actions">
-                                                    <a href="Branch_Details.php?id=<?php echo $row['Branch_ID']; ?>" class="details-btn" onclick="event.stopPropagation();">Details</a>
-                                                    <div class="select-btn">Select & Pay <i class="fas fa-chevron-right" style="font-size: 0.8em; margin-left: 5px;"></i></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </label>
-                            <?php endforeach; ?>
                         <?php endif; ?>
 
-                    </div>
+                        <?php foreach ($other_branches as $row): ?>
+                        <label class="branch-option">
+                            <input type="radio" name="branch_id" value="<?php echo $row['Branch_ID']; ?>" onclick="this.form.submit()">
+                            <div class="branch-card">
+                                <div class="branch-carousel" id="carousel-<?php echo $row['Branch_ID']; ?>">
+                                    <?php foreach ($row['decoded_images'] as $idx => $img): ?>
+                                        <img src="<?php echo htmlspecialchars($img); ?>" class="carousel-img <?php echo $idx==0?'active':''; ?>">
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="branch-info">
+                                    <div class="info-header">
+                                        <h4 class="branch-title"><?php echo htmlspecialchars($row['Branch_Name']); ?></h4>
+                                        <span class="branch-type"><?php echo htmlspecialchars($row['Branch_Type']); ?></span>
+                                    </div>
+                                    <p class="branch-desc"><?php echo htmlspecialchars($row['Branch_Description']); ?></p>
+                                    <div class="branch-footer">
+                                        <div class="branch-location"><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($row['Branch_City']); ?></div>
+                                        <div>
+                                            <a href="Branch_Details.php?id=<?php echo $row['Branch_ID']; ?>" class="details-btn" onclick="event.stopPropagation();">Read More</a>
+                                            <span class="select-btn">Donate to Branch <i class="fas fa-arrow-right ml-2"></i></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </label>
+                        <?php endforeach; ?>
 
-                    </form>
+                    </div>
+                </form>
 
             </div>
         </div>
@@ -428,25 +363,20 @@ include 'header_UI.php';
 </div>
 
 <script>
+    // 简单的轮播图逻辑
     document.addEventListener("DOMContentLoaded", function() {
-        // Image Carousel Logic
-        const carousels = document.querySelectorAll('.branch-carousel');
-
-        carousels.forEach(carousel => {
-            const images = carousel.querySelectorAll('.carousel-img');
-            
-            if (images.length > 1) {
-                let currentIndex = 0;
-
+        document.querySelectorAll('.branch-carousel').forEach(carousel => {
+            const imgs = carousel.querySelectorAll('.carousel-img');
+            if (imgs.length > 1) {
+                let cur = 0;
                 setInterval(() => {
-                    images[currentIndex].classList.remove('active');
-                    currentIndex = (currentIndex + 1) % images.length;
-                    images[currentIndex].classList.add('active');
-                }, 5000); 
+                    imgs[cur].classList.remove('active');
+                    cur = (cur + 1) % imgs.length;
+                    imgs[cur].classList.add('active');
+                }, 4000);
             }
         });
     });
 </script>
 
 <?php include 'footer.php'; ?>
-<?php $conn->close(); ?>

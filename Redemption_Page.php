@@ -201,75 +201,94 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         <?php } ?>
     </div>
 
-    <div id="history-tab" class="history-container">
-        <?php if ($current_donor_id): ?>
-            <table class="history-table">
-                <thead>
-                    <tr>
-                        <th>Item</th>
-                        <th>Date Redeemed</th>
-                        <th>Points</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                    $h_sql = "SELECT ro.*, ri.Reward_ItemName, ri.Reward_PhotoPath 
-                              FROM redemption_order ro 
-                              JOIN reward_item ri ON ro.Reward_ID = ri.Reward_ID 
-                              WHERE ro.Donor_ID = ? 
-                              ORDER BY ro.Redemption_Updated_At DESC";
-                    $h_stmt = $conn->prepare($h_sql);
-                    $h_stmt->bind_param("i", $current_donor_id);
-                    $h_stmt->execute();
-                    $h_res = $h_stmt->get_result();
+<div id="history-tab" class="history-container">
+    <?php if ($current_donor_id): ?>
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Date Redeemed</th>
+                    <th>Points spent</th>
+                    <th>Status</th> <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                $h_sql = "SELECT ro.*, ri.Reward_ItemName, ri.Reward_PhotoPath 
+                          FROM redemption_order ro 
+                          JOIN reward_item ri ON ro.Reward_ID = ri.Reward_ID 
+                          WHERE ro.Donor_ID = ? 
+                          ORDER BY ro.Redemption_Updated_At DESC";
+                $h_stmt = $conn->prepare($h_sql);
+                $h_stmt->bind_param("i", $current_donor_id);
+                $h_stmt->execute();
+                $h_res = $h_stmt->get_result();
 
-                    if ($h_res->num_rows > 0):
-                        while ($hist = $h_res->fetch_assoc()):
-                            $status = $hist['Redemption_Status']; 
-                            // ⭐ 历史记录图片路径处理
-                            $hist_path = str_replace('\\', '/', $hist['Reward_PhotoPath']);
-                            $hist_src = (strpos($hist_path, 'reward_') === 0) ? "uploads/rewards/" . $hist_path : $hist_path;
-                            ?>
-                            <tr>
-                                <td>
-                                    <div style="display:flex; align-items:center; gap:10px;">
-                                        <img src="<?php echo $hist_src; ?>" style="width:40px; height:40px; object-fit:cover; border-radius:4px;" onerror="this.src='images/hero_3.jpg';">
+                if ($h_res->num_rows > 0):
+                    while ($hist = $h_res->fetch_assoc()):
+                        $status = $hist['Redemption_Status']; 
+                        // 图片路径处理
+                        $hist_path = str_replace('\\', '/', $hist['Reward_PhotoPath']);
+                        $hist_src = (strpos($hist_path, 'reward_') === 0) ? "uploads/rewards/" . $hist_path : $hist_path;
+                        ?>
+                        <tr>
+                            <td>
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <img src="<?php echo $hist_src; ?>" style="width:50px; height:50px; object-fit:cover; border-radius:8px; border:1px solid #eee;" onerror="this.src='images/hero_3.jpg';">
+                                    <div>
                                         <strong><?php echo htmlspecialchars($hist['Reward_ItemName']); ?></strong>
+                                        <div style="font-size: 0.75rem; color: #888;">Order ID: #<?php echo $hist['Redemption_ID']; ?></div>
                                     </div>
-                                </td>
-                                <td><?php echo date("d M Y", strtotime($hist['Redemption_Updated_At'])); ?></td>
-                                <td style="font-weight:bold; color:var(--primary-red);">-<?php echo $hist['Redemption_PointsSpent']; ?></td>
-                                <td>
-                                    <?php 
-                                        if($status == 'Processing') echo '<span class="status-badge st-processing">Processing</span>';
-                                        elseif($status == 'Shipped') echo '<span class="status-badge st-shipped">Shipped</span>';
-                                        elseif($status == 'Completed') echo '<span class="status-badge st-completed">Completed</span>';
-                                    ?>
-                                </td>
-                                <td>
-                                    <?php if ($status == 'Shipped'): ?>
-                                        <button type="button" class="btn-receive" onclick="confirmReceive(<?php echo $hist['Redemption_ID']; ?>)">
-                                            <i class="fas fa-check-circle"></i> Receive
-                                        </button>
-                                    <?php elseif ($status == 'Completed'): ?>
-                                        <span style="color:green; font-size:0.9rem;"><i class="fas fa-check"></i> Received</span>
-                                    <?php else: ?>
-                                        <span style="color:#999; font-size:0.9rem;">Wait for shipment</span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endwhile; 
-                    else: ?>
-                        <tr><td colspan="5" style="text-align:center;">No redemption history found.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        <?php else: ?>
-            <p style="text-align:center; padding:20px;">Please login to view history.</p>
-        <?php endif; ?>
-    </div>
+                                </div>
+                            </td>
+                            <td><?php echo date("d M Y, h:i A", strtotime($hist['Redemption_Updated_At'])); ?></td>
+                            <td style="font-weight:bold; color:var(--primary-red);">-<?php echo number_format($hist['Redemption_PointsSpent']); ?> PT</td>
+                            <td>
+                                <?php 
+                                    // 根据不同状态显示不同的标签样式
+                                    if($status == 'Pending') {
+                                        echo '<span class="status-badge" style="background:#f3f4f6; color:#6b7280;"><i class="fas fa-hourglass-half"></i> Pending</span>';
+                                    } elseif($status == 'Processing') {
+                                        echo '<span class="status-badge st-processing"><i class="fas fa-box"></i> Processing</span>';
+                                    } elseif($status == 'Shipped') {
+                                        echo '<span class="status-badge st-shipped"><i class="fas fa-truck"></i> Shipped</span>';
+                                    } elseif($status == 'Completed') {
+                                        echo '<span class="status-badge st-completed"><i class="fas fa-check-circle"></i> Received</span>';
+                                    } elseif($status == 'Cancelled') {
+                                        echo '<span class="status-badge" style="background:#fee2e2; color:#991b1b;"><i class="fas fa-times-circle"></i> Cancelled</span>';
+                                    }
+                                ?>
+                            </td>
+                            <td>
+                                <?php if ($status == 'Shipped'): ?>
+                                    <button type="button" class="btn-receive" onclick="confirmReceive(<?php echo $hist['Redemption_ID']; ?>)">
+                                        <i class="fas fa-hand-holding-heart"></i> Confirm Received
+                                    </button>
+                                <?php elseif ($status == 'Completed'): ?>
+                                    <span style="color:var(--success-green); font-weight:600;"><i class="fas fa-heart"></i> Enjoy your gift!</span>
+                                <?php elseif ($status == 'Processing'): ?>
+                                    <span style="color:#f59e0b; font-size:0.85rem;"><b>Preparing for shipping...</b></span>
+                                <?php elseif ($status == 'Cancelled'): ?>
+                                    <span style="color:#999; font-size:0.85rem;">Order Void</span>
+                                <?php else: ?>
+                                    <span style="color:#999; font-size:0.85rem;">Waiting for Admin</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endwhile; 
+                else: ?>
+                    <tr><td colspan="5" style="text-align:center; padding:50px; color:#999;">You haven't redeemed any rewards yet.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    <?php else: ?>
+        <div style="text-align:center; padding:50px;">
+            <i class="fas fa-user-lock" style="font-size:3rem; color:#ccc; margin-bottom:15px;"></i>
+            <p>Please login to view your redemption history.</p>
+            <a href="donor_login.php" class="btn-redeem" style="display:inline-block; width:auto; padding:10px 30px;">Login Now</a>
+        </div>
+    <?php endif; ?>
+</div>
 </div>
 
 <form id="redeemForm" method="POST" style="display:none;"><input type="hidden" name="redeem_item_id" id="hidden_id"></form>
