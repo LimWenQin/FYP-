@@ -12,28 +12,22 @@ if (!isset($_SESSION['donor_id'])) {
 $current_donor_id = $_SESSION['donor_id'];
 
 // ==========================================
-// 2. 接收上一页数据并存入 Session
+// 2. 接收数据并同步 Session
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
-    
     $amount = (float)$_POST['amount'];
-    // 接收两个可能的 ID
     $case_id = isset($_POST['case_id']) ? (int)$_POST['case_id'] : 0;
     $activity_id = isset($_POST['activity_id']) ? (int)$_POST['activity_id'] : 0;
-    
     $type = $_POST['donation_type'];
     $tax_receipt = isset($_POST['tax_receipt']) ? 1 : 0;
 
-    // 验证逻辑：只要其中一个ID有效即可
     if ($amount <= 0 || ($case_id <= 0 && $activity_id <= 0)) {
         echo "<script>alert('Invalid data. No project selected.'); window.history.back();</script>";
         exit();
     }
 
-    // 确定来源类型
     $source_type = ($activity_id > 0) ? 'activity' : 'special_case';
 
-    // 存入 Session 供后续 Processing 页面使用
     $_SESSION['donation_data'] = [
         'amount' => $amount,
         'type' => $type,
@@ -45,51 +39,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
     ];
 }
 
-// Session 检查
 if (empty($_SESSION['donation_data'])) {
     header("Location: Homepage.php");
     exit();
 }
 
-// 提取数据用于显示
 $amount = $_SESSION['donation_data']['amount'];
 $donation_type = $_SESSION['donation_data']['type'];
 $case_id = $_SESSION['donation_data']['case_id'];
 $activity_id = $_SESSION['donation_data']['activity_id'];
-$tax_status = $_SESSION['donation_data']['tax_receipt'];
 
 // 3. 获取钱包余额
 $wallet_sql = "SELECT Donor_Wallet FROM donor WHERE Donor_ID = ?";
 $w_stmt = $conn->prepare($wallet_sql);
 $w_stmt->bind_param("i", $current_donor_id);
 $w_stmt->execute();
-$w_res = $w_stmt->get_result()->fetch_assoc();
-$current_balance = $w_res['Donor_Wallet'] ?? 0.00;
-$w_stmt->close();
+$current_balance = $w_stmt->get_result()->fetch_assoc()['Donor_Wallet'] ?? 0.00;
 
 // 4. 动态查询项目名称
 $project_title = "Unknown Project";
-$display_category = "General";
-
 if ($activity_id > 0) {
-    $sql = "SELECT Activity_Name as title FROM activity WHERE Activity_ID = ?";
-    $param_id = $activity_id;
-    $display_category = "Activity";
+    $res = $conn->query("SELECT Activity_Name as title FROM activity WHERE Activity_ID = $activity_id");
 } else {
-    $sql = "SELECT Case_Title as title FROM special_case WHERE Case_ID = ?";
-    $param_id = $case_id;
-    $display_category = "Special Case";
+    $res = $conn->query("SELECT Case_Title as title FROM special_case WHERE Case_ID = $case_id");
 }
-
-if ($stmt = $conn->prepare($sql)) {
-    $stmt->bind_param("i", $param_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    if ($r = $res->fetch_assoc()) {
-        $project_title = $r['title'];
-    }
-    $stmt->close();
-}
+if ($r = $res->fetch_assoc()) $project_title = $r['title'];
 
 include 'header_UI.php'; 
 ?>
@@ -98,75 +72,80 @@ include 'header_UI.php';
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <style>
+    /* 同步 Hero 样式 */
     .hero-wrap {
-        height: 350px; position: relative;
-        background-image: url('images/hero_3.jpg'); 
-        background-size: cover; background-position: center;
+        height: 280px; position: relative;
+        background-image: url('images/hero_3.jpg'); background-size: cover; background-position: center;
         display: flex; align-items: center; justify-content: center; text-align: center;
     }
-    .hero-wrap .overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); }
-    .hero-content { position: relative; z-index: 2; max-width: 800px; }
-    .hero-content h1 { font-family: 'Segoe UI', sans-serif; color: #fff; font-size: 3.5rem; margin-bottom: 10px; }
-    .hero-content p { font-size: 1.2rem; color: rgba(255, 255, 255, 0.9); }
+    .hero-wrap .overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4); }
+    .hero-content { position: relative; z-index: 2; color: #fff; }
+    .hero-content h1 { font-family: 'Segoe UI', sans-serif; font-size: 2.8rem; margin-bottom: 5px; }
 
+    /* 同步 Summary 设计 */
+    .summary-section-title { font-weight: bold; color: #e16161ff; font-size: 1.2rem; margin-bottom: 10px; }
     .summary-card {
-        background: #fff; padding: 30px; border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 5px solid #dc2626;
+        background: #fff; padding: 20px 40px; border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 6px solid #e16161ff;
+        margin-bottom: 30px;
     }
-    .summary-item { display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px dashed #eee; padding-bottom: 15px; }
+    .summary-item { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px dashed #eee; padding-bottom: 10px; }
     .summary-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
     .summary-label { font-weight: 600; color: #555; }
-    .summary-value { font-weight: 700; color: #333; font-size: 1.05rem; text-align: right; max-width: 60%; }
+    .summary-value { font-weight: 700; color: #333; }
     .summary-total { color: #dc2626; font-size: 1.2rem; }
 
+    /* 同步支付方式水平网格排列 */
+    .payment-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-bottom: 50px;
+    }
     .payment-option {
-        border: 2px solid #eee; border-radius: 12px; padding: 30px 20px;
+        border: 2px solid #eee; border-radius: 12px; padding: 25px 15px;
         text-align: center; cursor: pointer; transition: all 0.3s ease;
-        margin-bottom: 20px; background: #fff; display: flex; flex-direction: column; 
-        align-items: center; justify-content: center; height: 100%; min-height: 280px;
+        background: #fff; display: flex; flex-direction: column; 
+        align-items: center; justify-content: center; min-height: 260px;
     }
-    .payment-option:hover {
-        border-color: #dc2626; box-shadow: 0 8px 20px rgba(220, 38, 38, 0.15); transform: translateY(-5px);
-    }
+    .payment-option:hover { border-color: #e16161ff; box-shadow: 0 8px 25px rgba(225, 97, 97, 0.15); transform: translateY(-5px); }
     .payment-option.disabled { opacity: 0.6; cursor: not-allowed; background: #fafafa; }
-    
-    .payment-img { height: 65px; object-fit: contain; margin-bottom: 20px; }
-    .payment-title { font-weight: 700; color: #333; font-size: 1.15rem; display: block; margin-bottom: 5px; }
-    .payment-desc { font-size: 0.9rem; color: #777; margin-bottom: 20px; flex-grow: 1; } 
-    
-    .btn-pay {
-        background-color: #ffbb6dff; color: white; border: none; padding: 12px 35px;
-        border-radius: 30px; font-weight: bold; transition: 0.3s; width: 100%; margin-top: auto;
+    .payment-img { height: 50px; object-fit: contain; margin-bottom: 15px; }
+    .payment-title { font-weight: 700; color: #333; font-size: 1rem; margin-bottom: 5px; }
+    .payment-desc { font-size: 0.8rem; color: #777; margin-bottom: 15px; line-height: 1.4; flex-grow: 1; }
+    .btn-pay { background-color: #ffbb6dff; color: white; border: none; padding: 8px 15px; border-radius: 30px; font-weight: bold; width: 100%; transition: 0.3s; }
+    .payment-option:not(.disabled):hover .btn-pay { background-color: #f79c34ff; }
+
+    /* 同步底部横幅设计 */
+    .cta-section { 
+        padding: 60px 20px;
+        background: linear-gradient(rgba(220, 38, 38, 0.9), rgba(185, 28, 28, 0.9)), 
+                    url('https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80'); 
+        background-size: cover; background-position: center; background-attachment: fixed; 
+        text-align: center; color: white; border-radius: 15px; margin-top: 40px;
+        box-shadow: 0 10px 30px rgba(220, 38, 38, 0.2);
     }
-    .payment-option:not(.disabled):hover .btn-pay { background-color: #dc2626; transform: scale(1.05); }
+    .cta-content h2 { font-size: 2.5rem; margin-bottom: 15px; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .cta-content p { font-size: 1.1rem; max-width: 800px; margin: 0 auto; line-height: 1.6; opacity: 0.95; }
 
     .btn-orange-back {
-        display: inline-flex;
-        align-items: center;
-        gap: 12px;
-        background-color: #f79c34; 
-        color: white !important;
-        padding: 15px 35px;         
-        border-radius: 10px;
-        font-weight: 700;           
-        font-size: 1.2rem;          
-        transition: all 0.3s ease;
-        text-decoration: none !important;
-        box-shadow: 0 4px 6px rgba(247, 156, 52, 0.2);
-        margin-bottom: 25px;        
+        display: inline-flex; align-items: center; gap: 10px;
+        background-color: #f79c34; color: white !important;
+        padding: 10px 20px; border-radius: 8px; font-weight: 700;
+        transition: 0.2s; text-decoration: none !important; margin-bottom: 20px;
     }
-    .btn-orange-back:hover {
-        background-color: #e68a20;
-        transform: translateX(-5px);
-        box-shadow: 0 6px 12px rgba(247, 156, 52, 0.3);
+
+    @media (max-width: 991px) {
+        .payment-grid { grid-template-columns: 1fr; }
+        .cta-content h2 { font-size: 1.8rem; }
     }
 </style>
 
 <div class="hero-wrap">
     <div class="overlay"></div>
     <div class="hero-content">
-        <h1>Secure Payment</h1>
-        <p>Your support makes a huge difference for this cause.</p>
+        <h1>Payment Confirmation</h1>
+        <p>Your journey of compassion continues here.</p>
     </div>
 </div>
 
@@ -176,132 +155,103 @@ include 'header_UI.php';
     include 'stepper.php'; 
 ?>
 
-<div class="site-section" style="padding: 5em 0;">
+<div class="site-section">
     <div class="container">
-        <div class="row">
-            
-            <div class="col-lg-4 mb-5">
-                <div class="text-left">
-                    <?php 
-                        $back_link = ($activity_id > 0) ? "S_C_Payment_Page.php?activity_id=$activity_id" : "S_C_Payment_Page.php?case_id=$case_id";
-                    ?>
-                    <a href="<?php echo $back_link; ?>" class="btn-orange-back">
-                        <i class="fas fa-arrow-left"></i> Back to Change Details
-                    </a>
-                </div>
-
-                <h3 class="text-cursive mb-3" style="color: #dc2626;">Summary</h3>
-                <div class="summary-card">
-                    <div class="summary-item">
-                        <span class="summary-label">Category</span>
-                        <span class="summary-value badge badge-info p-2"><?php echo $display_category; ?></span>
-                    </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Target</span>
-                        <span class="summary-value"><?php echo htmlspecialchars($project_title); ?></span>
-                    </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Frequency</span>
-                        <span class="summary-value text-uppercase"><?php echo htmlspecialchars($donation_type); ?></span>
-                    </div>
-                    <div class="summary-item">
-                        <span class="summary-label">Total Amount</span>
-                        <span class="summary-value summary-total">RM <?php echo number_format($amount, 2); ?></span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-8">
-                <h3 class="text-cursive text-black mb-4 text-center">Select Payment Method</h3>
-                
-                <form id="paymentForm" method="POST" action="">
-                    <input type="hidden" name="payment_method" id="selected_payment_method" value="">
-
-                    <div class="row justify-content-center">
-                        
-                        <div class="col-md-4">
-                            <div class="payment-option <?php echo ($current_balance < $amount) ? 'disabled' : ''; ?>" onclick="handleWalletPay()">
-                                <img src="images/e-wallet.png" alt="Wallet" class="payment-img">
-                                <span class="payment-title">E-Wallet</span>
-                                <p class="payment-desc">
-                                    Balance: <b style="color:<?php echo ($current_balance < $amount)?'red':'green';?>">RM <?php echo number_format($current_balance, 2); ?></b>
-                                </p>
-                                <button type="button" class="btn-pay"><?php echo ($current_balance < $amount)?'Insufficient':'Use Balance';?></button>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <div class="payment-option" onclick="submitTo('Credit_Debit_Page.php')">
-                                <img src="images/BankTransfer.jpg" alt="Card" class="payment-img">
-                                <span class="payment-title">Credit / Debit</span>
-                                <p class="payment-desc">Pay via Visa or Mastercard<br><small class="text-success">+ Earn Points</small></p>
-                                <button type="button" class="btn-pay">Pay Now</button>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <div class="payment-option" onclick="submitTo('TNG_Page.php')">
-                                <img src="images/TNG.png" alt="TNG" class="payment-img">
-                                <span class="payment-title">Touch 'n Go</span>
-                                <p class="payment-desc">Scan QR to Complete Pay<br><small class="text-success">+ Earn Points</small></p>
-                                <button type="button" class="btn-pay">Pay Now</button>
-                            </div>
-                        </div>
-
-                    </div>
-                </form>
-            </div>
-
+        
+        <div class="text-left">
+            <?php $back_link = ($activity_id > 0) ? "S_C_Payment_Page.php?activity_id=$activity_id" : "S_C_Payment_Page.php?case_id=$case_id"; ?>
+            <a href="<?php echo $back_link; ?>" class="btn-orange-back">
+                <i class="fas fa-arrow-left"></i> Back to Change Details
+            </a>
         </div>
+
+        <h3 class="summary-section-title">Summary</h3>
+        <div class="summary-card">
+            <div class="summary-item">
+                <span class="summary-label">Project / Case</span>
+                <span class="summary-value"><?php echo htmlspecialchars($project_title); ?></span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Frequency</span>
+                <span class="summary-value text-uppercase"><?php echo htmlspecialchars($donation_type); ?></span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Total Amount</span>
+                <span class="summary-value summary-total">RM <?php echo number_format($amount, 2); ?></span>
+            </div>
+        </div>
+
+        <h3 class="text-center mb-4" style="font-weight: 700; color: #333;">Select Payment Method</h3>
+        
+        <form id="paymentForm" method="POST" action="">
+            <input type="hidden" name="payment_method" id="selected_payment_method" value="">
+
+            <div class="payment-grid">
+                <div class="payment-option <?php echo ($current_balance < $amount) ? 'disabled' : ''; ?>" 
+                     onclick="<?php echo ($current_balance >= $amount) ? 'handleWalletPay()' : 'insufficientAlert()'; ?>">
+                    <img src="images/e-wallet.png" alt="Wallet" class="payment-img">
+                    <span class="payment-title">Internal Wallet</span>
+                    <p class="payment-desc">Available: <b>RM <?php echo number_format($current_balance, 2); ?></b></p>
+                    <button type="button" class="btn-pay"><?php echo ($current_balance < $amount)?'Insufficient':'Pay Now';?></button>
+                </div>
+
+                <div class="payment-option" onclick="submitTo('Credit_Debit_Page.php')">
+                    <img src="images/BankTransfer.jpg" alt="Card" class="payment-img">
+                    <span class="payment-title">Credit / Debit Card</span>
+                    <p class="payment-desc">Safe & secure checkout via Visa or Mastercard.<br><small>Support local banks</small></p>
+                    <button type="button" class="btn-pay">Select</button>
+                </div>
+
+                <div class="payment-option" onclick="submitTo('TNG_Page.php')">
+                    <img src="images/TNG.png" alt="TNG" class="payment-img">
+                    <span class="payment-title">Touch 'n Go eWallet</span>
+                    <p class="payment-desc">Scan QR to pay with TNG App.<br><small>Malaysia's No.1 Wallet</small></p>
+                    <button type="button" class="btn-pay">Select</button>
+                </div>
+            </div>
+        </form>
+
+        <section class="cta-section">
+            <div class="cta-content">
+                <h2>Bridge to a Brighter Future</h2>
+                <p>Your contribution is more than just a transaction; it's a lifeline of hope. <br>
+                    Please select your preferred secure payment method above to finalize your support.</p>
+                <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 15px;">
+                    <i class="fas fa-shield-alt"></i> Your security is our priority. All transactions are encrypted and secure.
+                </div>
+            </div>
+        </section>
+
     </div>
 </div>
 
 <script>
-    const currentBalance = <?php echo $current_balance; ?>;
-    const donationAmount = <?php echo $amount; ?>;
+    const balance = <?php echo $current_balance; ?>;
+    const required = <?php echo $amount; ?>;
+
+    function insufficientAlert() {
+        Swal.fire({ icon: 'error', title: 'Insufficient Balance', text: 'Please top up your wallet first.', footer: '<a href="Top-Up.php">Go to Top-up</a>' });
+    }
 
     function handleWalletPay() {
-        if (currentBalance < donationAmount) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Insufficient Balance',
-                text: 'You need RM ' + (donationAmount - currentBalance).toFixed(2) + ' more in your wallet.',
-                footer: '<a href="Wallet_Page.php">Top up your wallet now?</a>'
-            });
-            return;
-        }
-
         Swal.fire({
             title: 'Confirm Payment',
-            text: "RM " + donationAmount.toFixed(2) + " will be deducted from your e-wallet balance.",
-            icon: 'question',
+            text: "RM " + required.toFixed(2) + " will be deducted from your wallet.",
+            icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#dc2626',
-            confirmButtonText: 'Confirm & Donate'
+            confirmButtonText: 'Confirm & Pay'
         }).then((result) => {
-            if (result.isConfirmed) {
-                // ⭐ 调用 submitTo，它会自动识别 Wallet 支付方式
-                submitTo('Wallet_Processing.php');
-            }
+            if (result.isConfirmed) { submitTo('Wallet_Processing.php'); }
         });
     }
 
-    // ⭐ 修正点 2: 修改后的 submitTo 函数，自动填入支付方式名称 ⭐
     function submitTo(target) {
         const form = document.getElementById('paymentForm');
-        const methodInput = document.getElementById('selected_payment_method');
-
-        // 根据目标文件名设定支付方式名称
-        let methodName = "";
-        if (target.includes('Wallet')) methodName = "E-Wallet Balance";
-        else if (target.includes('Credit')) methodName = "Credit / Debit Card";
-        else if (target.includes('TNG')) methodName = "Touch 'n Go";
-
-        methodInput.value = methodName; // 写入隐藏格子
+        document.getElementById('selected_payment_method').value = target.includes('Wallet') ? "E-Wallet Balance" : (target.includes('Credit') ? "Credit / Debit Card" : "Touch 'n Go");
         form.action = target;
         form.submit();
     }
 </script>
 
 <?php include 'footer.php'; ?>
-<?php $conn->close(); ?>
