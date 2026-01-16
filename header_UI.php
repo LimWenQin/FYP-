@@ -606,7 +606,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 </form>
 
                 <?php if ($logged_in): ?>
-                    <a href="Payment_page.php" class="header-donate-btn">Donate</a>
+                    <a href="Branch_Selection.php" class="header-donate-btn">Donate</a>
                 <?php else: ?>
                     <a href="#" class="header-donate-btn" onclick="showLoginAlert(event)">Donate</a>
                 <?php endif; ?>
