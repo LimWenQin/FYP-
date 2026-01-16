@@ -280,7 +280,7 @@ include 'header_UI.php';
 <div class="hero-wrap">
     <div class="overlay"></div>
     <div class="hero-content">
-        <h1>Step 1: Choose Your Destination</h1>
+        <h1>Choose Your Destination</h1>
         <p>Select the branch or fund you wish to support.</p>
     </div>
 </div>
