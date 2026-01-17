@@ -2,43 +2,43 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-// --- 1. 定义分类配置 ---
+// --- 1. 定义分类配置 (Emergency红色，其他橙色) ---
 $categories = [
     'emergency' => [
         'db_name' => 'Emergency Relief', 
         'name' => 'Emergency Relief', 
         'icon' => 'fas fa-first-aid', 
-        'color' => '#d32f2f'
+        'color' => '#d32f2f' // 红色
     ],
     'medical' => [
         'db_name' => 'Medical', 
         'name' => 'Medical Aid', 
         'icon' => 'fas fa-heartbeat', 
-        'color' => '#f57c00'
+        'color' => '#f57c00' // 橙色
     ],
     'disability' => [
         'db_name' => 'Disability Support', 
         'name' => 'Disability Support', 
         'icon' => 'fas fa-wheelchair', 
-        'color' => '#f57c00'
+        'color' => '#f57c00' // 橙色
     ],
     'elderly' => [
         'db_name' => 'Elderly Care', 
         'name' => 'Elderly Care', 
         'icon' => 'fas fa-user-friends', 
-        'color' => '#f57c00'
+        'color' => '#f57c00' // 橙色
     ],
     'children' => [
         'db_name' => 'Children Support', 
         'name' => 'Children Support', 
         'icon' => 'fas fa-child', 
-        'color' => '#f57c00'
+        'color' => '#f57c00' // 橙色
     ],
     'other' => [
         'db_name' => 'Other Cases', 
         'name' => 'Other Cases', 
         'icon' => 'fas fa-hand-holding-heart', 
-        'color' => '#f57c00'
+        'color' => '#f57c00' // 橙色
     ]
 ];
 
@@ -53,7 +53,6 @@ $category_filter = isset($_GET['category']) ? $_GET['category'] : 'all';
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 
 // --- 3. 构建查询条件 ---
-// 【修改点】这里改成了 IN ('Active', 'Completed')，这样满额的案例也能显示出来
 $where_conditions = ["Case_Status IN ('Active', 'Completed')"];
 
 if ($category_filter !== 'all') {
@@ -183,12 +182,57 @@ include 'header_UI.php';
         .detail-value { font-size: 22px; font-weight: 700; display: block; }
         .detail-label { font-size: 13px; color: #8a8686; text-transform: uppercase; letter-spacing: 1px; }
         
-        /* Donate Button */
-        .case-actions { margin-top: auto; }
-        .btn-donate { display: block; width: 100%; padding: 15px; color: var(--white); border: none; border-radius: 10px; font-size: 18px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .btn-donate:hover { filter: brightness(0.9); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
-        /* 【新增】禁用按钮样式 */
-        .btn-donate.disabled { background-color: #9e9e9e !important; cursor: not-allowed; transform: none; box-shadow: none; filter: none; }
+        /* --- 按钮部分 --- */
+        .case-actions { 
+            margin-top: auto; 
+            display: flex; 
+            gap: 12px; /* 按钮之间的间距 */
+        }
+        
+        /* 两个按钮的基础样式 */
+        .btn-donate, .btn-details { 
+            flex: 1; /* 让它们平分宽度 */
+            padding: 12px; 
+            border-radius: 10px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: all 0.3s ease; 
+            text-decoration: none; 
+            text-align: center; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 8px; 
+            border: none;
+        }
+
+        /* Donate 按钮特定样式 */
+        .btn-donate { 
+            color: var(--white); 
+        }
+        .btn-donate:hover { 
+            filter: brightness(0.9); 
+            transform: translateY(-2px); 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15); 
+        }
+        .btn-donate.disabled { 
+            background-color: #9e9e9e !important; 
+            cursor: not-allowed; 
+            transform: none; 
+            box-shadow: none; 
+            filter: none; 
+        }
+
+        /* Detail 按钮特定样式 */
+        .btn-details {
+            background-color: transparent;
+            border: 2px solid; /* 边框颜色由内联样式控制 */
+        }
+        .btn-details:hover {
+            background-color: #f5f5f5; /* 鼠标悬停时的浅灰色背景 */
+            transform: translateY(-2px);
+        }
         
         /* No Cases */
         .no-cases { grid-column: 1 / -1; text-align: center; padding: 80px 20px; background: var(--white); border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
@@ -207,7 +251,10 @@ include 'header_UI.php';
         @media (max-width: 1200px) { .page-title { font-size: 42px; } }
         @media (max-width: 992px) { .cases-grid { grid-template-columns: 1fr; gap: 25px; } .case-image-container { height: 220px; } .page-title { font-size: 36px; } .page-description { font-size: 18px; padding: 0 20px; } .categories-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
         @media (max-width: 768px) { .page-header { padding: 80px 20px; } .stats-container { grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: -40px; } .stat-box { padding: 20px 15px; } .stat-number { font-size: 28px; } }
-        @media (max-width: 576px) { .page-title { font-size: 32px; } .stats-container { grid-template-columns: 1fr; } .case-image-container { height: 200px; } .categories-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 576px) { .page-title { font-size: 32px; } .stats-container { grid-template-columns: 1fr; } .case-image-container { height: 200px; } .categories-grid { grid-template-columns: repeat(2, 1fr); } 
+            /* 手机端按钮调整为上下排列 */
+            .case-actions { flex-direction: column; gap: 10px; }
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -223,7 +270,6 @@ include 'header_UI.php';
     <div class="case-container">
         <div class="stats-container">
             <?php 
-            // 统计总数时也包含 Active 和 Completed
             $total_query = "SELECT COUNT(*) as total, SUM(Raised_Amount) as total_raised FROM special_case WHERE Case_Status IN ('Active', 'Completed')";
             $total_result = $conn->query($total_query);
             $stats = $total_result->fetch_assoc();
@@ -281,20 +327,16 @@ include 'header_UI.php';
         <div class="cases-grid">
             <?php if ($result->num_rows > 0): ?>
                 <?php while($case = $result->fetch_assoc()): 
-                    // 计算进度百分比
                     $raised = isset($case['Raised_Amount']) ? floatval($case['Raised_Amount']) : 0;
                     $target = isset($case['Target_Amount']) && floatval($case['Target_Amount']) > 0 ? floatval($case['Target_Amount']) : 1;
                     
                     $progress = ($raised / $target) * 100;
                     $progress = min($progress, 100);
                     
-                    // --- 【新增】判断是否完成 ---
-                    // 这里判断：进度满了 或者 状态已经是 Completed
                     $is_completed = ($progress >= 100) || ($case['Case_Status'] === 'Completed');
 
-                    // --- 自动匹配数据库样式 ---
                     $db_category_value = $case['Case_Category'];
-                    $current_cat_info = $categories['other']; // 默认值
+                    $current_cat_info = $categories['other'];
                     
                     if (isset($db_value_map[$db_category_value])) {
                         $current_cat_info = $db_value_map[$db_category_value];
@@ -307,7 +349,6 @@ include 'header_UI.php';
                     $is_urgent = isset($case['Urgency']) && $case['Urgency'] === 'high';
                     $donor_count = isset($case['Donor_Count']) ? $case['Donor_Count'] : 0;
                     
-                    // JSON 图片处理
                     $default_image = 'images/case-default.jpg';
                     $image_path = $default_image;
 
@@ -335,7 +376,7 @@ include 'header_UI.php';
                                 <?php if ($is_urgent): ?>
                                     <span class="case-badge badge-urgent">URGENT</span>
                                 <?php endif; ?>
-                                <?php if ($is_completed): // 如果完成了，也加个 Completed 标签 ?>
+                                <?php if ($is_completed): ?>
                                     <span class="case-badge" style="background: #2e7d32;">COMPLETED</span>
                                 <?php endif; ?>
                             </div>
@@ -405,6 +446,12 @@ include 'header_UI.php';
                                         <i class="fas fa-heart"></i> Donate Now
                                     </a>
                                 <?php endif; ?>
+
+                                <a href="Special_Case_Detail.php?case_id=<?php echo $case['Case_ID']; ?>" 
+                                   class="btn-details"
+                                   style="border-color: <?php echo $category_color; ?>; color: <?php echo $category_color; ?>;">
+                                    Details
+                                </a>
                             </div>
                         </div>
                     </div>
