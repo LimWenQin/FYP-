@@ -220,7 +220,15 @@ $imgSrc = !empty($order['Reward_PhotoPath']) ? 'uploads/rewards/' . $order['Rewa
                     <div class="info-item">
                         <span class="label">Current Status</span>
                         <span class="colon">:</span>
-                        <span class="value <?php echo $statusClass; ?>"><?php echo strtoupper($order['Redemption_Status']); ?></span>
+                        <span class="value <?php echo $statusClass; ?>">
+                            <?php echo strtoupper($order['Redemption_Status']); ?>
+                            
+                            <?php if (strtolower($order['Redemption_Status']) == 'pending'): ?>
+                                <a href="redemption_order_management.php?search=<?php echo $order['Redemption_ID']; ?>" target="_blank" style="margin-left: 15px; font-size: 14px; color: #007bff; text-decoration: underline;">
+                                    <i class="fas fa-external-link-alt"></i> Manage Order
+                                </a>
+                            <?php endif; ?>
+                        </span>
                     </div>
                     <?php if($statusLower == 'cancelled' || $statusLower == 'rejected'): ?>
                     <div class="info-item">
@@ -255,18 +263,26 @@ $imgSrc = !empty($order['Reward_PhotoPath']) ? 'uploads/rewards/' . $order['Rewa
                     <div class="info-item">
                         <span class="label">Contact</span>
                         <span class="colon">:</span>
-                        <span class="value"><?php echo htmlspecialchars($order['Redemption_ContactNumber']); ?></span>
+                        <span class="value"><?php echo htmlspecialchars($order['Donor_ContactNumber']); ?></span>
                     </div>
                     <div class="info-item">
                         <span class="label">Address</span>
                         <span class="colon">:</span>
                         <span class="value">
                             <?php 
-                            echo htmlspecialchars($order['Redemption_Address1']);
-                            if($order['Redemption_Address2']) echo ", " . htmlspecialchars($order['Redemption_Address2']);
-                            if($order['Redemption_Address3']) echo ", " . htmlspecialchars($order['Redemption_Address3']);
-                            echo "<br>" . htmlspecialchars($order['Redemption_PostalCode']) . " " . htmlspecialchars($order['Redemption_City']);
-                            echo ", " . htmlspecialchars($order['Redemption_State']);
+                            // Check if fields exist in $order array before using them to prevent errors if column names differ
+                            $addr1 = isset($order['Redemption_Address1']) ? $order['Redemption_Address1'] : (isset($order['Donor_Address1']) ? $order['Donor_Address1'] : '');
+                            $addr2 = isset($order['Redemption_Address2']) ? $order['Redemption_Address2'] : '';
+                            $addr3 = isset($order['Redemption_Address3']) ? $order['Redemption_Address3'] : '';
+                            $postCode = isset($order['Redemption_PostalCode']) ? $order['Redemption_PostalCode'] : '';
+                            $city = isset($order['Redemption_City']) ? $order['Redemption_City'] : '';
+                            $state = isset($order['Redemption_State']) ? $order['Redemption_State'] : '';
+
+                            echo htmlspecialchars($addr1);
+                            if($addr2) echo ", " . htmlspecialchars($addr2);
+                            if($addr3) echo ", " . htmlspecialchars($addr3);
+                            echo "<br>" . htmlspecialchars($postCode) . " " . htmlspecialchars($city);
+                            echo ", " . htmlspecialchars($state);
                             ?>
                         </span>
                     </div>
@@ -289,7 +305,7 @@ $imgSrc = !empty($order['Reward_PhotoPath']) ? 'uploads/rewards/' . $order['Rewa
                     <div class="info-item">
                         <span class="label">Quantity Redeemed</span>
                         <span class="colon">:</span>
-                        <span class="value"><?php echo $order['Redemption_Quantity']; ?></span>
+                        <span class="value"><?php echo isset($order['Redemption_Quantity']) ? $order['Redemption_Quantity'] : 1; ?></span>
                     </div>
                 </div>
             </div>

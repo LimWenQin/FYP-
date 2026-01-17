@@ -49,7 +49,9 @@ $filterType = "";
 $filterValue = "";
 $whereConditions = [];
 $havingConditions = []; 
-$orderClause = "ORDER BY d.Donor_RegisteredAt DESC, d.Donor_ID DESC"; 
+
+$sort = isset($_GET['sort']) ? $_GET['sort'] : 'date';
+$order = isset($_GET['order']) ? $_GET['order'] : 'desc';
 
 // Only show active (not deleted)
 $whereConditions[] = "d.Is_Deleted = 0";
@@ -68,8 +70,6 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
     
     if ($filterType == 'name_sort' && isset($_GET['filter_val_name']) && !empty($_GET['filter_val_name'])) {
         $filterValue = $_GET['filter_val_name'];
-        if ($filterValue == 'asc') $orderClause = "ORDER BY d.Donor_Name ASC";
-        elseif ($filterValue == 'desc') $orderClause = "ORDER BY d.Donor_Name DESC";
     }
     elseif ($filterType == 'phone' && isset($_GET['filter_val_phone']) && !empty($_GET['filter_val_phone'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_phone']);
@@ -99,7 +99,18 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
     }
 }
 
-// Combine Clauses
+$sortMap = [
+    'date' => 'd.Donor_RegisteredAt',
+    'name' => 'd.Donor_Name',
+    'contact' => 'd.Donor_ContactNumber',
+    'address' => 'd.Donor_State',
+    'payment' => 'TotalPayment',
+    'points' => 'CurrentPoints'
+];
+$orderByCol = isset($sortMap[$sort]) ? $sortMap[$sort] : 'd.Donor_RegisteredAt';
+$orderDir = ($order === 'asc') ? 'ASC' : 'DESC';
+$orderClause = "ORDER BY $orderByCol $orderDir";
+
 $whereClause = "";
 if (count($whereConditions) > 0) $whereClause = "WHERE " . implode(" AND ", $whereConditions);
 
@@ -146,169 +157,6 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
     }
     echo '</table>';
     exit();
-}
-
-// --- AJAX HANDLER FOR HISTORY ---
-if (isset($_GET['action']) && $_GET['action'] == 'get_donor_history' && isset($_GET['donor_id'])) {
-    $histDonorId = intval($_GET['donor_id']);
-    $type = $_GET['type'];
-    
-    if ($type == 'payment') {
-        $histSql = "SELECT Order_ID, Order_Created_At, Order_TXN_Ref, Order_Amount, Order_Status, Order_PaymentMethod 
-                    FROM orders WHERE Donor_ID = $histDonorId ORDER BY Order_Created_At DESC";
-        $histResult = $conn->query($histSql);
-        $data = []; while($r = $histResult->fetch_assoc()) { $data[] = $r; }
-        echo json_encode($data);
-    } 
-    elseif ($type == 'redemption') {
-        $histSql = "SELECT r.Redemption_ID, r.Redemption_Updated_At, r.Redemption_PointsSpent, r.Redemption_Status, i.Reward_ItemName 
-                    FROM redemption_order r 
-                    JOIN reward_item i ON r.Reward_ID = i.Reward_ID 
-                    WHERE r.Donor_ID = $histDonorId ORDER BY r.Redemption_Updated_At DESC";
-        $histResult = $conn->query($histSql);
-        $data = []; while($r = $histResult->fetch_assoc()) { $data[] = $r; }
-        echo json_encode($data);
-    }
-    elseif ($type == 'wallet') {
-        $histSql = "SELECT w.Wallet_Trans_ID, w.Created_At, w.Amount, w.Transaction_Type, w.Description 
-                    FROM wallet_transaction w 
-                    WHERE w.Donor_ID = $histDonorId 
-                    ORDER BY w.Created_At DESC";
-        $histResult = $conn->query($histSql);
-        $data = []; while($r = $histResult->fetch_assoc()) { $data[] = $r; }
-        echo json_encode($data);
-    }
-    exit(); 
-}
-
-// --- HELPERS ---
-function handleProfileUpload($file) {
-    if (isset($file) && $file['error'] == 0) {
-        $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-        if (in_array($file['type'], $allowedTypes)) {
-            $uploadDir = 'uploads/donors/';
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
-            $fileExtension = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $fileName = 'donor_' . time() . '_' . uniqid() . '.' . $fileExtension;
-            $uploadPath = $uploadDir . $fileName;
-            if (move_uploaded_file($file['tmp_name'], $uploadPath)) return $uploadPath;
-        }
-    }
-    return null;
-}
-
-function generateStrongRandomPassword($length = 12) {
-    $upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; $lower = "abcdefghijklmnopqrstuvwxyz";
-    $numbers = "0123456789"; $symbols = "!@#$%^&*()";
-    $password = $upper[rand(0, strlen($upper) - 1)] . $lower[rand(0, strlen($lower) - 1)] . $numbers[rand(0, strlen($numbers) - 1)] . $symbols[rand(0, strlen($symbols) - 1)];
-    $allChars = $upper . $lower . $numbers . $symbols;
-    for ($i = 0; $i < $length - 4; $i++) { $password .= $allChars[rand(0, strlen($allChars) - 1)]; }
-    return str_shuffle($password);
-}
-
-// --- PHP VALIDATION HELPER FOR IC ---
-function validateMalaysianIcStructure($ic) {
-    $cleanIc = preg_replace('/[^0-9]/', '', $ic);
-    // 1. Length Check
-    if (strlen($cleanIc) !== 12) return false;
-    
-    // 2. PB Code Check (Digits 7-8)
-    $pbCode = (int)substr($cleanIc, 6, 2);
-    $validPBCodes = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,82];
-    
-    return in_array($pbCode, $validPBCodes);
-}
-
-// --- FORM HANDLING ---
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['add_donor'])) {
-        $donorName = mysqli_real_escape_string($conn, $_POST['donor_name']);
-        $email = mysqli_real_escape_string($conn, $_POST['email']);
-        $contactRaw = $_POST['contact']; $contact = "+60" . $contactRaw; 
-        $icNumber = mysqli_real_escape_string($conn, $_POST['ic_number']);
-        $dob = mysqli_real_escape_string($conn, $_POST['dob']);
-        $address1 = mysqli_real_escape_string($conn, $_POST['address1']);
-        $address2 = mysqli_real_escape_string($conn, $_POST['address2']);
-        $address3 = mysqli_real_escape_string($conn, $_POST['address3']);
-        $city = mysqli_real_escape_string($conn, $_POST['city']);
-        $state = mysqli_real_escape_string($conn, $_POST['state']);
-        $postalCode = mysqli_real_escape_string($conn, $_POST['postal_code']);
-        $country = mysqli_real_escape_string($conn, $_POST['country']);
-        $description = mysqli_real_escape_string($conn, $_POST['description']); 
-        
-        $profilePicture = null;
-        if (isset($_FILES['profile_picture'])) {
-            $uploadedPath = handleProfileUpload($_FILES['profile_picture']);
-            if ($uploadedPath) $profilePicture = $uploadedPath;
-        }
-
-        // Validate IC if provided
-        if (!empty($icNumber) && !validateMalaysianIcStructure($icNumber)) {
-             header("Location: admin_donor_page.php?error=" . urlencode("Invalid IC Number (Length or State Code).")); exit();
-        }
-
-        $checkEmailSql = "SELECT Donor_ID FROM donor WHERE Donor_Email = '$email'";
-        if ($conn->query($checkEmailSql)->num_rows > 0) {
-            header("Location: admin_donor_page.php?error=" . urlencode("Email exists.")); exit();
-        }
-
-        $rawPassword = generateStrongRandomPassword(12);
-        $hashedPassword = password_hash($rawPassword, PASSWORD_DEFAULT);
-        $cols = "Donor_Name, Donor_ContactNumber, Donor_ICNumber, Donor_Email, Donor_Password, Donor_Address1, Donor_Address2, Donor_Address3, Donor_City, Donor_State, Donor_PostalCode, Donor_Country, Donor_DOB, Donor_Description, Donor_RegisteredAt, Is_Deleted";
-        $vals = "'$donorName', '$contact', '$icNumber', '$email', '$hashedPassword', '$address1', '$address2', '$address3', '$city', '$state', '$postalCode', '$country', '$dob', '$description', NOW(), 0";
-        if ($profilePicture) { $cols .= ", Donor_ProfilePicture"; $vals .= ", '$profilePicture'"; }
-        
-        $conn->query("INSERT INTO donor ($cols) VALUES ($vals)");
-        $newId = $conn->insert_id;
-        // Points initialized to 0, trigger handles updates later
-        $conn->query("INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES (0, 0, NOW(), $newId)");
-        
-        header("Location: admin_donor_page.php?success=" . urlencode("Donor added successfully.")); exit();
-
-    } elseif (isset($_POST['update_donor'])) {
-        $donorId = mysqli_real_escape_string($conn, $_POST['donor_id']);
-        $donorName = mysqli_real_escape_string($conn, $_POST['donor_name']);
-        $email = mysqli_real_escape_string($conn, $_POST['email']);
-        $contactRaw = $_POST['contact']; $contact = "+60" . $contactRaw;
-        $icNumber = mysqli_real_escape_string($conn, $_POST['ic_number']);
-        $dob = mysqli_real_escape_string($conn, $_POST['dob']);
-        $address1 = mysqli_real_escape_string($conn, $_POST['address1']);
-        $address2 = mysqli_real_escape_string($conn, $_POST['address2']);
-        $address3 = mysqli_real_escape_string($conn, $_POST['address3']);
-        $city = mysqli_real_escape_string($conn, $_POST['city']);
-        $state = mysqli_real_escape_string($conn, $_POST['state']);
-        $postalCode = mysqli_real_escape_string($conn, $_POST['postal_code']);
-        $country = mysqli_real_escape_string($conn, $_POST['country']);
-        $description = mysqli_real_escape_string($conn, $_POST['description']);
-
-        $picSql = "";
-        if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] == 0) {
-            $uploadedPath = handleProfileUpload($_FILES['profile_picture']);
-            if ($uploadedPath) $picSql = ", Donor_ProfilePicture = '$uploadedPath'";
-        }
-
-        // Validate IC if provided
-        if (!empty($icNumber) && !validateMalaysianIcStructure($icNumber)) {
-             header("Location: admin_donor_page.php?error=" . urlencode("Invalid IC Number (Length or State Code).")); exit();
-        }
-
-        $sql = "UPDATE donor SET Donor_Name = '$donorName', Donor_ContactNumber = '$contact', Donor_ICNumber = '$icNumber', 
-                Donor_Email = '$email', Donor_Address1 = '$address1', Donor_Address2 = '$address2', Donor_Address3 = '$address3',
-                Donor_City = '$city', Donor_State = '$state', Donor_PostalCode = '$postalCode', Donor_Country = '$country', 
-                Donor_DOB = '$dob', Donor_Description = '$description' $picSql WHERE Donor_ID = $donorId";
-        
-        $conn->query($sql);
-        header("Location: admin_donor_page.php?success=" . urlencode("Donor updated successfully.")); exit();
-
-    } elseif (isset($_POST['block_donor'])) {
-        if ($adminPosition === 'Super Admin') {
-            $blockId = intval($_POST['block_donor_id']);
-            $conn->query("UPDATE donor SET Is_Deleted = 1 WHERE Donor_ID = $blockId");
-            header("Location: admin_donor_page.php?success=" . urlencode("Donor blocked successfully!")); exit();
-        } else {
-            header("Location: admin_donor_page.php?error=" . urlencode("Access Denied.")); exit();
-        }
-    }
 }
 
 // --- PAGINATION ---
@@ -393,6 +241,13 @@ function formatAddress($donor) {
     return implode("<br>", $addressParts);
 }
 
+// 辅助函数：构建URL
+function buildUrl($params = []) {
+    $current = $_GET;
+    $merged = array_merge($current, $params);
+    return '?' . http_build_query($merged);
+}
+
 $malaysiaStates = [ 'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu' ];
 $years = range(date('Y'), 2020); 
 $phonePrefixes = ['010', '011', '012', '013', '014', '015', '016', '017', '018', '019'];
@@ -412,7 +267,7 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin_common.css">
     <style>
-        /* (Existing CSS) */
+        /* (Existing CSS - Strictly Kept) */
         .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-5px); }
@@ -442,9 +297,13 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
         .secondary-filter { display: none; animation: fadeIn 0.3s; }
         .secondary-filter.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        
         .donor-table { width: 100%; border-collapse: collapse; }
         .donor-table th, .donor-table td { padding: 15px; text-align: left; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
-        .donor-table th { font-weight: 600; color: var(--gray); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .donor-table th { font-weight: 600; color: var(--gray); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; }
+        .donor-table th:hover { background-color: #f8f9fa; color: var(--primary); }
+        .donor-table th i { margin-left: 5px; opacity: 0.5; }
+
         .donor-info { display: flex; align-items: center; }
         .donor-avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 15px; background: var(--primary-light); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; overflow: hidden; cursor: pointer; }
         .donor-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -459,38 +318,13 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
         .dropdown-content div, .dropdown-content a { color: #333; padding: 12px 16px; text-decoration: none; display: block; font-size: 13px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 10px; }
         .dropdown-content div:hover, .dropdown-content a:hover { background-color: #f8f9fa; color: var(--primary); }
         .text-delete { color: var(--danger) !important; border-top: 1px solid #eee; }
+        
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background-color: white; border-radius: 10px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--gray-light); }
         .modal-header h2 { font-size: 18px; font-weight: 600; margin: 0; }
         .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--gray); }
         .modal-body { padding: 20px; background-color: #fdfdfd; }
-        .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
-        .form-row .form-group { flex: 1; margin-bottom: 0; }
-        .form-group { margin-bottom: 15px; }
-        .form-label { display: block; margin-bottom: 5px; font-weight: 500; color: var(--dark); font-size: 14px;}
-        .form-input, .form-select, .form-textarea { width: 100%; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; transition: 0.3s; }
-        .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
-        .form-input:read-only, .form-textarea:read-only { background-color: #f8f9fa; color: #555; cursor: default; }
-
-        .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
-
-        .file-upload { text-align: center; margin-bottom: 20px; }
-        .profile-picture-preview { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #f8f9fa; margin: 0 auto 15px; background: #eee; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
-        .profile-picture-preview img { width: 100%; height: 100%; object-fit: cover; }
-        .default-avatar-icon { font-size: 48px; color: #ccc; }
-        .file-upload-label { display: inline-block; padding: 8px 15px; background: #f8f9fa; border: 1px dashed #ccc; border-radius: 5px; cursor: pointer; font-size: 13px; transition: all 0.3s; }
-        .file-upload-label:hover { border-color: var(--primary); background: #fff5f5; color: var(--primary); }
-        .file-upload input[type="file"] { display: none; }
-        .file-info { display: none; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; background: #f1f1f1; padding: 5px 10px; border-radius: 5px; }
-        .file-info.active { display: inline-flex; }
-        .file-remove { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 14px; padding: 0 5px; }
-
-        .error-message { color: var(--danger); font-size: 12px; margin-top: 5px; display: none; }
-        
-        .phone-format { display: flex; align-items: center; }
-        .phone-prefix { padding: 10px 12px; background: #f8f9fa; border: 1px solid var(--gray-light); border-right: none; border-radius: 5px 0 0 5px; color: var(--gray); font-weight: bold; }
-        .phone-input { border-radius: 0 5px 5px 0 !important; }
         
         .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; display: none; }
         .floating-alert div { line-height: 1.6; }
@@ -503,37 +337,24 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
         .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; }
         .pagination-btn.active { background-color: #F28585; color: white; border-color: #F28585; }
         .pagination-btn.disabled { color: #ccc; cursor: not-allowed; }
-        .required { color: red; margin-left: 3px; font-weight: bold; }
         
-        .history-list { display: flex; flex-direction: column; gap: 15px; max-height: 500px; overflow-y: auto; padding-right: 5px; }
-        .history-card { background: white; border: 1px solid #eee; border-radius: 8px; padding: 15px; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
-        .history-card:hover { box-shadow: 0 5px 15px rgba(0,0,0,0.08); border-color: #ddd; transform: translateY(-2px); }
-        .h-info-left { display: flex; flex-direction: column; gap: 4px; }
-        .h-date { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; }
-        .h-title { font-size: 14px; font-weight: 600; color: #333; }
-        .h-subtitle { font-size: 12px; color: #666; font-family: monospace; }
-        .h-info-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-        .h-amount { font-size: 16px; font-weight: 700; color: var(--primary); }
-        .h-points { font-size: 15px; font-weight: 700; color: #666; }
-        .status-badge { font-size: 10px; padding: 3px 8px; border-radius: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-        .status-success { background-color: #e6f9ed; color: #28a745; border: 1px solid #c3e6cb; }
-        .status-failed { background-color: #ffe6e6; color: #dc3545; border: 1px solid #f5c6cb; }
-        .status-pending { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-        .empty-state-card { text-align: center; padding: 40px 20px; color: #999; background: #f8f9fa; border-radius: 8px; border: 2px dashed #eee; }
-        .empty-state-card i { font-size: 32px; margin-bottom: 10px; color: #ddd; }
-        .text-center { text-align: center !important; }
-
         .lightbox-modal { display: none; position: fixed; z-index: 2000; padding-top: 50px; left: 0; top: 0; width: 100%; height: 100%; overflow: hidden; background-color: rgba(0, 0, 0, 0.9); flex-direction: column; justify-content: center; align-items: center; }
         .lightbox-content { margin: auto; display: block; max-width: 90%; max-height: 80vh; border-radius: 5px; box-shadow: 0 0 20px rgba(255,255,255,0.1); object-fit: contain; animation: zoomIn 0.3s; }
         @keyframes zoomIn { from {transform:scale(0)} to {transform:scale(1)} }
         .close-lightbox { position: absolute; top: 20px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; z-index: 2002; }
         .close-lightbox:hover, .close-lightbox:focus { color: #bbb; text-decoration: none; cursor: pointer; }
         
-        /* New Error Styles */
-        .input-error { border-color: var(--danger) !important; background-color: #fff5f5; }
-        .inline-error { color: var(--danger); font-size: 11px; margin-top: 4px; display: block; font-weight: 500; animation: fadeIn 0.3s; }
+        @media (max-width: 768px) { .stats-cards { grid-template-columns: repeat(2, 1fr); } .pagination-container { flex-direction: column; gap: 15px; } .donor-search { flex-direction: column; align-items: stretch; } .filter-group { flex-wrap: wrap; } }
 
-        @media (max-width: 768px) { .stats-cards { grid-template-columns: repeat(2, 1fr); } .form-row { flex-direction: column; gap: 0; } .pagination-container { flex-direction: column; gap: 15px; } .donor-search { flex-direction: column; align-items: stretch; } .filter-group { flex-wrap: wrap; } .history-card { flex-direction: column; align-items: flex-start; gap: 10px; } .h-info-right { align-items: flex-start; width: 100%; flex-direction: row; justify-content: space-between; } }
+        /* Sort Modal Styles */
+        .sort-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 2000; justify-content: center; align-items: center; }
+        .sort-modal-content { background: white; width: 300px; border-radius: 10px; padding: 20px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); animation: fadeIn 0.2s; }
+        .sort-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .sort-header h3 { margin: 0; font-size: 16px; color: #333; }
+        .sort-close { cursor: pointer; font-size: 20px; color: #999; }
+        .sort-btn { display: block; width: 100%; padding: 10px; margin-bottom: 5px; border: 1px solid #eee; background: #fff; text-align: left; border-radius: 5px; cursor: pointer; transition: 0.2s; font-size: 14px; color: #555; text-decoration: none; }
+        .sort-btn:hover { background: #f8f9fa; border-color: #ddd; color: var(--primary); }
+        .sort-btn i { width: 20px; text-align: center; margin-right: 8px; }
     </style>
 </head>
 <body>
@@ -571,7 +392,7 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                 <div class="section-header">
                     <h2>Donor List</h2>
                     <div class="action-buttons">
-                        <button class="btn btn-primary" onclick="openAddDonorModal()"><i class="fas fa-plus"></i> Add New Donor</button>
+                        <a href="admin_donor_add.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Donor</a>
                         <a href="<?php echo $exportUrl; ?>" class="btn btn-success" target="_blank"><i class="fas fa-download"></i> Export Data</a>
                     </div>
                 </div>
@@ -603,7 +424,31 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                 </form>
 
                 <table class="donor-table">
-                    <thead><tr><th>DONOR NAME</th><th>CONTACT INFO</th><th style="width: 30%;">ADDRESS</th><th>TOTAL PAYMENT</th><th style="text-align: center;">TOTAL POINTS</th><th style="text-align: center;">ACTIONS</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th onclick="openModal('nameSortModal')">
+                                DONOR NAME 
+                                <?php if($sort=='name') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?>
+                            </th>
+                            <th onclick="openModal('contactSortModal')">
+                                CONTACT INFO
+                                <?php if($sort=='contact') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?>
+                            </th>
+                            <th style="width: 30%;" onclick="openModal('addressSortModal')">
+                                ADDRESS
+                                <?php if($sort=='address') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?>
+                            </th>
+                            <th onclick="openModal('paymentSortModal')">
+                                TOTAL PAYMENT
+                                <?php if($sort=='payment') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?>
+                            </th>
+                            <th style="text-align: center;" onclick="openModal('pointsSortModal')">
+                                TOTAL POINTS
+                                <?php if($sort=='points') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?>
+                            </th>
+                            <th style="text-align: center;">ACTIONS</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         <?php if (count($donors) > 0): ?>
                             <?php foreach($donors as $donor): ?>
@@ -630,11 +475,12 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                                         <div class="action-menu">
                                             <button class="menu-btn" onclick="toggleMenu(event, <?php echo $donor['Donor_ID']; ?>)"><i class="fas fa-ellipsis-v"></i></button>
                                             <div id="menu-<?php echo $donor['Donor_ID']; ?>" class="dropdown-content">
-                                                <div onclick="openViewDonorModal(<?php echo htmlspecialchars(json_encode($donor)); ?>)"><i class="fas fa-eye"></i> View Details</div>
-                                                <div onclick='openEditDonorModal(<?php echo json_encode($donor); ?>)'><i class="fas fa-edit"></i> Edit Details</div>
-                                                <div onclick="openPaymentHistory(<?php echo $donor['Donor_ID']; ?>)"><i class="fas fa-history"></i> Payment History</div>
-                                                <div onclick="openRedemptionHistory(<?php echo $donor['Donor_ID']; ?>)"><i class="fas fa-gift"></i> Redemption History</div>
-                                                <div onclick="openWalletHistory(<?php echo $donor['Donor_ID']; ?>)"><i class="fas fa-wallet"></i> Wallet History</div>
+                                                <a href="admin_donor_view_edit.php?id=<?php echo $donor['Donor_ID']; ?>&mode=view"><i class="fas fa-eye"></i> View Details</a>
+                                                <a href="admin_donor_view_edit.php?id=<?php echo $donor['Donor_ID']; ?>&mode=edit"><i class="fas fa-edit"></i> Edit Details</a>
+                                                
+                                                <a href="admin_donor_payment_history.php?donor_id=<?php echo $donor['Donor_ID']; ?>" target="_blank"><i class="fas fa-history"></i> Payment History</a>
+                                                <a href="admin_donor_redemption_history.php?donor_id=<?php echo $donor['Donor_ID']; ?>" target="_blank"><i class="fas fa-gift"></i> Redemption History</a>
+                                                <a href="admin_donor_wallet_history.php?donor_id=<?php echo $donor['Donor_ID']; ?>" target="_blank"><i class="fas fa-wallet"></i> Wallet History</a>
                                                 
                                                 <?php if($adminPosition === 'Super Admin'): ?>
                                                 <div onclick="openBlockModal(<?php echo $donor['Donor_ID']; ?>, '<?php echo addslashes($donor['Donor_Name']); ?>')" class="text-delete"><i class="fas fa-ban"></i> Block User</div>
@@ -666,6 +512,11 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                             if($filterType == 'phone' && !empty($filterValue)) $queryParams['filter_val_phone'] = $filterValue;
                             if($filterType == 'amount' && !empty($filterValue)) $queryParams['filter_val_amount'] = $filterValue;
                         }
+                        if($sort != 'date' || $order != 'desc') {
+                            $queryParams['sort'] = $sort;
+                            $queryParams['order'] = $order;
+                        }
+                        
                         $queryString = !empty($queryParams) ? '&' . http_build_query($queryParams) : '';
 
                         if ($page > 1) echo '<a href="?page=' . ($page - 1) . $queryString . '" class="pagination-btn">Previous</a>'; 
@@ -690,252 +541,44 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
         </div>
     </div>
 
-    <div class="modal" id="addDonorModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Add New Donor</h2><button class="close-btn" onclick="closeAddDonorModal()">&times;</button></div>
-            <div class="modal-body">
-                <form id="addDonorForm" action="admin_donor_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateForm('add')" novalidate>
-                    <input type="hidden" name="add_donor" value="1">
-                    <div class="form-group">
-                        <label>Profile Picture</label>
-                        <div class="profile-picture-preview" id="add-preview-container"><div class="default-avatar-icon"><i class="fas fa-user"></i></div></div>
-                        <div class="file-upload"><label for="add_profile_picture" class="file-upload-label"><i class="fas fa-upload"></i> Choose Profile Picture</label><input type="file" id="add_profile_picture" name="profile_picture" accept="image/*" onchange="previewImage(this, 'add-preview-container', 'add-file-info', 'add-file-name')"><div id="add-file-info" class="file-info"><span id="add-file-name" class="file-name"></span><button type="button" class="file-remove" onclick="removeImage('add_profile_picture', 'add-preview-container', 'add-file-info')"><i class="fas fa-times"></i></button></div></div>
-                        <span class="form-guide" style="display:block; text-align:center;">Upload a clear photo (JPG/PNG).</span>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Full Name <span class="required">*</span></label>
-                        <input type="text" name="donor_name" id="donor_name" class="form-input" required oninput="validateName(this)" placeholder="e.g. John Doe">
-                        <span class="form-guide">Enter full name as per IC. English letters only.</span>
-                        <div id="nameError" class="error-message">Name cannot contain numbers.</div>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Email <span class="required">*</span></label>
-                            <input type="email" id="email" name="email" class="form-input" required placeholder="e.g. user@example.com">
-                            <span class="form-guide">Valid email address for receipts.</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Contact Number <span class="required">*</span></label>
-                            <div class="phone-format">
-                                <span class="phone-prefix">+60</span>
-                                <input type="text" id="contact" name="contact" class="form-input phone-input" required placeholder="11-12345678" maxlength="11">
-                            </div>
-                            <span class="form-guide">Format: 12-3456789 or 11-12345678.</span>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">IC Number</label>
-                            <input type="text" id="ic_number" name="ic_number" class="form-input" placeholder="e.g. 990101-14-5678" maxlength="14">
-                            <span class="form-guide">Malaysian NRIC format (hyphens optional).</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Date of Birth</label>
-                            <input type="date" id="dob" name="dob" class="form-input">
-                            <span class="form-guide">Select birth date from calendar.</span>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Address Line 1</label>
-                        <input type="text" name="address1" class="form-input" placeholder="e.g. No. 123, Jalan Merdeka">
-                        <span class="form-guide">House number, unit, and street name.</span>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Address Line 2</label>
-                        <input type="text" name="address2" class="form-input" placeholder="e.g. Taman Melawati">
-                        <span class="form-guide">Residential area, village, or building name.</span>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Address Line 3</label>
-                        <input type="text" name="address3" class="form-input" placeholder="e.g. Section 5">
-                        <span class="form-guide">Additional address info (Optional).</span>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Postal Code</label>
-                            <input type="text" id="postal_code" name="postal_code" class="form-input" placeholder="e.g. 50000">
-                            <span class="form-guide">5-digit postal code.</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">City</label>
-                            <input type="text" name="city" class="form-input" placeholder="e.g. Kuala Lumpur">
-                            <span class="form-guide">City or district name.</span>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">State</label>
-                            <select id="state_select" name="state" class="form-select">
-                                <option value="">Select State</option>
-                                <?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?>
-                            </select>
-                            <span class="form-guide">Select state from dropdown.</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Country</label>
-                            <input type="text" name="country" class="form-input" value="Malaysia" readonly>
-                            <span class="form-guide">Default country is Malaysia.</span>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Remarks</label>
-                        <textarea name="description" class="form-textarea" rows="2" placeholder="e.g. Donor prefers anonymous receipt..."></textarea>
-                        <span class="form-guide">Internal notes for admin use only.</span>
-                    </div>
-
-                    <div class="form-group"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Donor</button></div>
-                </form>
-            </div>
+    <div id="nameSortModal" class="sort-modal" onclick="closeModal(event, 'nameSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Sort by Name</h3><span class="sort-close" onclick="document.getElementById('nameSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'name', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-alpha-down"></i> Name (A - Z)</a>
+            <a href="<?php echo buildUrl(['sort'=>'name', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-alpha-up"></i> Name (Z - A)</a>
         </div>
     </div>
 
-    <div class="modal" id="editDonorModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Edit Donor</h2><button class="close-btn" onclick="closeEditDonorModal()">&times;</button></div>
-            <div class="modal-body">
-                <form id="editDonorForm" action="admin_donor_page.php" method="POST" enctype="multipart/form-data" onsubmit="return validateEditForm()" novalidate>
-                    <input type="hidden" name="update_donor" value="1"><input type="hidden" id="edit_donor_id" name="donor_id">
-                    
-                    <div class="form-group">
-                        <label>Profile Picture</label>
-                        <div class="profile-picture-preview" id="edit-preview-container"><div class="default-avatar-icon"><i class="fas fa-user"></i></div></div>
-                        <div class="file-upload"><label for="edit_profile_picture" class="file-upload-label"><i class="fas fa-upload"></i> Change</label><input type="file" id="edit_profile_picture" name="profile_picture" accept="image/*" onchange="previewImage(this, 'edit-preview-container', 'edit-file-info', 'edit-file-name')"><div id="edit-file-info" class="file-info"><span id="edit-file-name" class="file-name"></span><button type="button" class="file-remove" onclick="removeImage('edit_profile_picture', 'edit-preview-container', 'edit-file-info')"><i class="fas fa-times"></i></button></div></div>
-                        <span class="form-guide" style="display:block; text-align:center;">Update photo if necessary (JPG/PNG).</span>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Full Name <span class="required">*</span></label>
-                        <input type="text" id="edit_donor_name" name="donor_name" class="form-input" required oninput="validateName(this)" placeholder="e.g. John Doe">
-                        <span class="form-guide">Enter full name as per IC. English letters only.</span>
-                        <div id="editNameError" class="error-message">Name cannot contain numbers.</div>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Email <span class="required">*</span></label>
-                            <input type="email" id="edit_email" name="email" class="form-input" required placeholder="e.g. user@example.com">
-                            <span class="form-guide">Valid email address for receipts.</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Contact <span class="required">*</span></label>
-                            <div class="phone-format">
-                                <span class="phone-prefix">+60</span>
-                                <input type="text" id="edit_contact" name="contact" class="form-input phone-input" required maxlength="11" placeholder="11-12345678">
-                            </div>
-                            <span class="form-guide">Format: 12-3456789 or 11-12345678.</span>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">IC Number</label>
-                            <input type="text" id="edit_ic_number" name="ic_number" class="form-input" maxlength="14" placeholder="e.g. 990101-14-5678">
-                            <span class="form-guide">Malaysian NRIC format (hyphens optional).</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">DOB</label>
-                            <input type="date" id="edit_dob" name="dob" class="form-input">
-                            <span class="form-guide">Select birth date from calendar.</span>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Address 1</label>
-                        <input type="text" id="edit_address1" name="address1" class="form-input" placeholder="e.g. No. 123, Jalan Merdeka">
-                        <span class="form-guide">House number, unit, and street name.</span>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Address 2</label>
-                        <input type="text" id="edit_address2" name="address2" class="form-input" placeholder="e.g. Taman Melawati">
-                        <span class="form-guide">Residential area, village, or building name.</span>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Address 3</label>
-                        <input type="text" id="edit_address3" name="address3" class="form-input" placeholder="e.g. Section 5">
-                        <span class="form-guide">Additional address info (Optional).</span>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Postal Code</label>
-                            <input type="text" id="edit_postal_code" name="postal_code" class="form-input" placeholder="e.g. 50000">
-                            <span class="form-guide">5-digit postal code.</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">City</label>
-                            <input type="text" id="edit_city" name="city" class="form-input" placeholder="e.g. Kuala Lumpur">
-                            <span class="form-guide">City or district name.</span>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">State</label>
-                            <select id="edit_state" name="state" class="form-select">
-                                <option value="">Select State</option>
-                                <?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?>
-                            </select>
-                            <span class="form-guide">Select state from dropdown.</span>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Country</label>
-                            <input type="text" id="edit_country" name="country" class="form-input" value="Malaysia" readonly>
-                            <span class="form-guide">Default country is Malaysia.</span>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Remarks</label>
-                        <textarea id="edit_description" name="description" class="form-textarea" rows="2" placeholder="e.g. Donor prefers anonymous receipt..."></textarea>
-                        <span class="form-guide">Internal notes for admin use only.</span>
-                    </div>
-
-                    <div class="form-group"><button type="submit" class="btn btn-primary">Update Donor</button></div>
-                </form>
-            </div>
+    <div id="contactSortModal" class="sort-modal" onclick="closeModal(event, 'contactSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Sort by Contact</h3><span class="sort-close" onclick="document.getElementById('contactSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'contact', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-down"></i> Phone (Ascending)</a>
+            <a href="<?php echo buildUrl(['sort'=>'contact', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-up"></i> Phone (Descending)</a>
         </div>
     </div>
 
-    <div class="modal" id="viewDonorModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Donor Details</h2><button class="close-btn" onclick="closeModal('viewDonorModal')">&times;</button></div>
-            <div class="modal-body">
-                <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="view_donor_name" class="form-input" readonly></div>
-                <div class="form-row"><div class="form-group"><label class="form-label">Email</label><input type="text" id="view_email" class="form-input" readonly></div><div class="form-group"><label class="form-label">Contact</label><input type="text" id="view_contact" class="form-input" readonly></div></div>
-                <div class="form-row"><div class="form-group"><label class="form-label">IC Number</label><input type="text" id="view_ic" class="form-input" readonly></div><div class="form-group"><label class="form-label">DOB</label><input type="text" id="view_dob" class="form-input" readonly></div></div>
-                <div class="form-group"><label class="form-label">Registered At</label><input type="text" id="view_registered" class="form-input" readonly></div>
-                <div class="form-group"><label class="form-label">Last Login</label><input type="text" id="view_last_login" class="form-input" readonly></div>
-                <div class="form-group"><label class="form-label">Address</label><textarea id="view_address" class="form-input" readonly rows="3"></textarea></div>
-                <div class="form-group"><label class="form-label">Remarks</label><textarea id="view_description" class="form-input" readonly rows="2"></textarea></div>
-            </div>
+    <div id="addressSortModal" class="sort-modal" onclick="closeModal(event, 'addressSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Sort by Location</h3><span class="sort-close" onclick="document.getElementById('addressSortModal').style.display='none'">&times;</span></div>
+            <span style="display:block; font-size:12px; color:#999; margin-bottom:10px;">Sorting based on State</span>
+            <a href="<?php echo buildUrl(['sort'=>'address', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-map-marker-alt"></i> State (A - Z)</a>
+            <a href="<?php echo buildUrl(['sort'=>'address', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-map-marker-alt"></i> State (Z - A)</a>
         </div>
     </div>
 
-    <div class="modal" id="paymentHistoryModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Payment History</h2><button class="close-btn" onclick="closeModal('paymentHistoryModal')">&times;</button></div>
-            <div class="modal-body"><div id="paymentHistoryList" class="history-list"></div></div>
+    <div id="paymentSortModal" class="sort-modal" onclick="closeModal(event, 'paymentSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Sort by Total Payment</h3><span class="sort-close" onclick="document.getElementById('paymentSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'payment', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-amount-up"></i> Low to High</a>
+            <a href="<?php echo buildUrl(['sort'=>'payment', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-amount-down"></i> High to Low</a>
         </div>
     </div>
 
-    <div class="modal" id="redemptionHistoryModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Redemption History</h2><button class="close-btn" onclick="closeModal('redemptionHistoryModal')">&times;</button></div>
-            <div class="modal-body"><div id="redemptionHistoryList" class="history-list"></div></div>
-        </div>
-    </div>
-
-    <div class="modal" id="walletHistoryModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Wallet Transaction History</h2><button class="close-btn" onclick="closeModal('walletHistoryModal')">&times;</button></div>
-            <div class="modal-body"><div id="walletHistoryList" class="history-list"></div></div>
+    <div id="pointsSortModal" class="sort-modal" onclick="closeModal(event, 'pointsSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Sort by Points</h3><span class="sort-close" onclick="document.getElementById('pointsSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'points', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-down"></i> Low to High</a>
+            <a href="<?php echo buildUrl(['sort'=>'points', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-up"></i> High to Low</a>
         </div>
     </div>
 
@@ -977,26 +620,13 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
             else if (type === 'phone') { document.getElementById('filter_phone_container').classList.add('active'); document.getElementById('filter_phone_container').querySelector('select').disabled = false; }
         }
 
-        function showSystemError(messageHTML) {
-            const errorBox = document.getElementById('floatingError');
-            const errorText = document.getElementById('floatingErrorText');
-            if(errorBox && errorText) {
-                errorText.innerHTML = messageHTML;
-                errorBox.style.display = 'flex';
-                setTimeout(() => { errorBox.style.display = 'none'; }, 5000);
-            }
-        }
-
         document.addEventListener('DOMContentLoaded', function() {
             toggleFilterInputs();
-            setupPhoneInput('contact'); setupPhoneInput('edit_contact');
-            setupICInput('ic_number', 'dob'); setupICInput('edit_ic_number', 'edit_dob'); 
-            setupPostcodeState('postal_code', 'state_select'); setupPostcodeState('edit_postal_code', 'edit_state');
             const s = document.getElementById('floatingSuccess'); const e = document.getElementById('floatingError');
             if(s) setTimeout(() => s.style.display='none', 5000); if(e) setTimeout(() => e.style.display='none', 5000);
             window.addEventListener('click', function(event) {
                 if (!event.target.matches('.menu-btn') && !event.target.matches('.menu-btn *')) document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
-                if (event.target.classList.contains('modal')) event.target.style.display = "none";
+                if (event.target.classList.contains('modal') && !event.target.classList.contains('sort-modal')) event.target.style.display = "none";
                 if (event.target.id == 'imageLightbox') closeLightbox();
             });
             document.addEventListener('keydown', function(event) {
@@ -1008,345 +638,17 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
         function closeLightbox() { document.getElementById('imageLightbox').style.display = "none"; }
         function openBlockModal(id, name) { document.getElementById('block_donor_id').value = id; document.getElementById('block_donor_name_display').textContent = name; document.getElementById('blockDonorModal').style.display = 'flex'; }
         
-        function setupPostcodeState(postcodeId, stateSelectId) {
-            const pcInput = document.getElementById(postcodeId); const stateSelect = document.getElementById(stateSelectId);
-            if (!pcInput || !stateSelect) return;
-            pcInput.addEventListener('input', function() {
-                const val = this.value.replace(/\D/g, '');
-                if (val.length >= 2) {
-                    const prefix = parseInt(val.substring(0, 2));
-                    let state = "";
-                    if (prefix >= 1 && prefix <= 2) state = "Perlis"; else if (prefix >= 5 && prefix <= 9) state = "Kedah"; else if (prefix >= 10 && prefix <= 14) state = "Penang";
-                    else if (prefix >= 15 && prefix <= 18) state = "Kelantan"; else if (prefix >= 20 && prefix <= 24) state = "Terengganu"; else if (prefix >= 25 && prefix <= 28) state = "Pahang";
-                    else if (prefix >= 30 && prefix <= 36) state = "Perak"; else if (prefix >= 40 && prefix <= 48) state = "Selangor"; else if (prefix >= 50 && prefix <= 60) state = "Kuala Lumpur";
-                    else if (prefix >= 62 && prefix <= 62) state = "Putrajaya"; else if (prefix >= 63 && prefix <= 68) state = "Selangor"; else if (prefix >= 70 && prefix <= 73) state = "Negeri Sembilan";
-                    else if (prefix >= 75 && prefix <= 78) state = "Melaka"; else if (prefix >= 79 && prefix <= 86) state = "Johor"; else if (prefix == 87) state = "Labuan";
-                    else if (prefix >= 88 && prefix <= 91) state = "Sabah"; else if (prefix >= 93 && prefix <= 98) state = "Sarawak";
-                    if (state) stateSelect.value = state;
-                }
-            });
-        }
-        function setupPhoneInput(inputId) { const input = document.getElementById(inputId); if(!input) return; input.addEventListener('input', function(e) { let val = this.value.replace(/\D/g, ''); if (val.length > 11) val = val.substring(0, 11); let newVal = val; if (val.length > 2) newVal = val.substring(0, 2) + '-' + val.substring(2); this.value = newVal; }); }
-        function setupICInput(inputId, dobInputId) {
-            const input = document.getElementById(inputId); const dobInput = document.getElementById(dobInputId); if(!input) return;
-            input.addEventListener('input', function(e) {
-                let val = this.value.replace(/\D/g, ''); if (val.length > 12) val = val.substring(0, 12);
-                let newVal = ''; newVal += val.substring(0, 6); if (val.length > 6) newVal += '-' + val.substring(6, 8); if (val.length > 8) newVal += '-' + val.substring(8, 12);
-                this.value = newVal;
-                if (val.length >= 6 && dobInput) {
-                    const yy = parseInt(val.substring(0, 2)); const mm = val.substring(2, 4); const dd = val.substring(4, 6);
-                    const prefix = (yy > (new Date().getFullYear() % 100)) ? '19' : '20';
-                    const fullDate = `${prefix}${val.substring(0, 2)}-${mm}-${dd}`;
-                    const dateObj = new Date(fullDate); if (!isNaN(dateObj.getTime())) { dobInput.value = fullDate; }
-                }
-            });
-        }
-        function previewImage(input, containerId, infoId, nameId) {
-            const container = document.getElementById(containerId); const info = document.getElementById(infoId); const nameSpan = document.getElementById(nameId);
-            if (input.files && input.files[0]) { const reader = new FileReader(); reader.onload = function(e) { container.innerHTML = `<img src="${e.target.result}" alt="Preview">`; if(info) { info.style.display = 'inline-flex'; nameSpan.textContent = input.files[0].name; } }; reader.readAsDataURL(input.files[0]); }
-        }
-        function removeImage(inputId, containerId, infoId, originalSrc = null) {
-            document.getElementById(inputId).value = ''; if(infoId) document.getElementById(infoId).style.display = 'none'; 
-            const container = document.getElementById(containerId); if (originalSrc) { container.innerHTML = `<img src="${originalSrc}" alt="Preview">`; } else { container.innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; } 
-        }
-
         function toggleMenu(e, id) { e.stopPropagation(); document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); document.getElementById('menu-' + id).style.display = 'block'; }
         
-        function openViewDonorModal(donor) {
-            document.getElementById('view_donor_name').value = donor.Donor_Name;
-            document.getElementById('view_email').value = donor.Donor_Email;
-            document.getElementById('view_contact').value = donor.Donor_ContactNumber;
-            document.getElementById('view_ic').value = donor.Donor_ICNumber;
-            document.getElementById('view_dob').value = donor.Donor_DOB;
-            document.getElementById('view_registered').value = donor.Donor_RegisteredAt;
-            document.getElementById('view_last_login').value = donor.Donor_LastLogin ? donor.Donor_LastLogin : 'Never';
-            document.getElementById('view_description').value = donor.Donor_Description ? donor.Donor_Description : ''; 
-            let address = donor.Donor_Address1; if(donor.Donor_Address2) address += ", " + donor.Donor_Address2; if(donor.Donor_Address3) address += ", " + donor.Donor_Address3; address += "\n" + donor.Donor_PostalCode + " " + donor.Donor_City + ", " + donor.Donor_State;
-            document.getElementById('view_address').value = address;
-            document.getElementById('viewDonorModal').style.display = 'flex';
-        }
-
-        // --- HISTORY FETCHING FUNCTIONS ---
-        function openPaymentHistory(donorId) { fetchHistory(donorId, 'payment', 'paymentHistoryList', 'paymentHistoryModal'); }
-        function openRedemptionHistory(donorId) { fetchHistory(donorId, 'redemption', 'redemptionHistoryList', 'redemptionHistoryModal'); }
-        
-        function openWalletHistory(donorId) { 
-            const listContainer = document.getElementById('walletHistoryList');
-            listContainer.innerHTML = '<div class="empty-state-card"><i class="fas fa-spinner fa-spin"></i><br>Loading...</div>';
-            document.getElementById('walletHistoryModal').style.display = 'flex';
-            
-            fetch(`admin_donor_page.php?action=get_donor_history&donor_id=${donorId}&type=wallet`)
-            .then(res => res.json())
-            .then(data => {
-                listContainer.innerHTML = '';
-                if(data.length === 0) { 
-                    listContainer.innerHTML = '<div class="empty-state-card"><i class="fas fa-wallet"></i><br>No wallet history found.</div>'; 
-                } else { 
-                    data.forEach(row => { 
-                        let amountClass = 'text-dark';
-                        let amountSign = '';
-                        let type = row.Transaction_Type || '';
-                        if(!type) {
-                            if(row.Description && row.Description.toLowerCase().includes('top-up')) type = 'Credit';
-                            else if(row.Description && row.Description.toLowerCase().includes('donate')) type = 'Debit';
-                        }
-                        if(type === 'Credit') { amountClass = 'text-success'; amountSign = '+'; }
-                        else if(type === 'Debit') { amountClass = 'text-danger'; amountSign = '-'; }
-
-                        const url = `admin_ewallet_details.php?id=${row.Wallet_Trans_ID}`;
-                        const html = `
-                        <a href="${url}" target="_blank" style="text-decoration:none; color:inherit; display:block; width:100%;">
-                            <div class="history-card">
-                                <div class="h-info-left">
-                                    <span class="h-date">${row.Created_At}</span>
-                                    <span class="h-title">${row.Description || 'Transaction'}</span>
-                                    <span class="h-subtitle">Type: ${type}</span>
-                                </div>
-                                <div class="h-info-right">
-                                    <span class="h-amount ${amountClass}">${amountSign} RM ${row.Amount}</span>
-                                </div>
-                            </div>
-                        </a>`;
-                        listContainer.innerHTML += html;
-                    }); 
-                }
-            });
-        }
-
-        function fetchHistory(donorId, type, containerId, modalId) {
-            const listContainer = document.getElementById(containerId);
-            listContainer.innerHTML = '<div class="empty-state-card"><i class="fas fa-spinner fa-spin"></i><br>Loading...</div>';
-            document.getElementById(modalId).style.display = 'flex';
-            
-            fetch(`admin_donor_page.php?action=get_donor_history&donor_id=${donorId}&type=${type}`)
-            .then(res => res.json())
-            .then(data => {
-                listContainer.innerHTML = '';
-                if(data.length === 0) { 
-                    const icon = type === 'payment' ? 'fa-file-invoice-dollar' : 'fa-gift';
-                    listContainer.innerHTML = `<div class="empty-state-card"><i class="fas ${icon}"></i><br>No ${type} history found.</div>`; 
-                } else { 
-                    data.forEach(row => { 
-                        let html = '';
-                        if (type === 'payment') {
-                             let statusClass = (row.Order_Status.toLowerCase() === 'completed' || row.Order_Status.toLowerCase() === 'success') ? 'status-success' : 'status-pending';
-                             html = `<a href="admin_payment_details.php?id=${row.Order_ID}" target="_blank" style="text-decoration:none;color:inherit;display:block;width:100%;"><div class="history-card"><div class="h-info-left"><span class="h-date">${row.Order_Created_At}</span><span class="h-title">${row.Order_PaymentMethod}</span><span class="h-subtitle">Ref: ${row.Order_TXN_Ref}</span></div><div class="h-info-right"><span class="h-amount">RM ${row.Order_Amount}</span><span class="status-badge ${statusClass}">${row.Order_Status}</span></div></div></a>`;
-                        } else {
-                             let statusClass = (row.Redemption_Status.toLowerCase() === 'shipped') ? 'status-success' : 'status-pending';
-                             html = `<a href="admin_redemption_details.php?id=${row.Redemption_ID}" target="_blank" style="text-decoration:none;color:inherit;display:block;width:100%;"><div class="history-card"><div class="h-info-left"><span class="h-date">${row.Redemption_Updated_At}</span><span class="h-title">${row.Reward_ItemName}</span></div><div class="h-info-right"><span class="h-points">-${row.Redemption_PointsSpent} pts</span><span class="status-badge ${statusClass}">${row.Redemption_Status}</span></div></div></a>`;
-                        }
-                        listContainer.innerHTML += html;
-                    }); 
-                }
-            });
-        }
-
-        function openAddDonorModal() { document.getElementById('addDonorModal').style.display = 'flex'; }
-        function closeAddDonorModal() { 
-            document.getElementById('addDonorModal').style.display = 'none'; document.getElementById('addDonorForm').reset(); 
-            document.getElementById('add-preview-container').innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; 
-            document.getElementById('add-file-info').style.display = 'none'; document.getElementById('nameError').style.display = 'none';
-            clearFormErrors('addDonorForm');
-        }
-        
-        function openEditDonorModal(donor) {
-            document.getElementById('edit_donor_id').value = donor.Donor_ID;
-            document.getElementById('edit_donor_name').value = donor.Donor_Name;
-            document.getElementById('edit_email').value = donor.Donor_Email;
-            let phone = donor.Donor_ContactNumber.replace(/^\+60/, ''); document.getElementById('edit_contact').value = phone;
-            let icInput = document.getElementById('edit_ic_number'); icInput.value = donor.Donor_ICNumber; icInput.dispatchEvent(new Event('input')); 
-            document.getElementById('edit_dob').value = donor.Donor_DOB;
-            document.getElementById('edit_address1').value = donor.Donor_Address1; document.getElementById('edit_address2').value = donor.Donor_Address2; document.getElementById('edit_address3').value = donor.Donor_Address3;
-            document.getElementById('edit_city').value = donor.Donor_City; document.getElementById('edit_state').value = donor.Donor_State; document.getElementById('edit_postal_code').value = donor.Donor_PostalCode;
-            document.getElementById('edit_country').value = donor.Donor_Country; document.getElementById('edit_description').value = donor.Donor_Description ? donor.Donor_Description : ''; 
-            const container = document.getElementById('edit-preview-container');
-            if (donor.Donor_ProfilePicture) { container.innerHTML = `<img src="${donor.Donor_ProfilePicture}" alt="Preview">`; } else { container.innerHTML = '<div class="default-avatar-icon"><i class="fas fa-user"></i></div>'; }
-            document.getElementById('edit_profile_picture').value = ''; document.getElementById('edit-file-info').style.display = 'none'; document.getElementById('editNameError').style.display = 'none';
-            clearFormErrors('editDonorForm');
-            document.getElementById('editDonorModal').style.display = 'flex';
-        }
-        function closeEditDonorModal() { document.getElementById('editDonorModal').style.display = 'none'; }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-        
-        function validateName(input) { 
-            const hasNumber = /\d/.test(input.value); const errorDiv = input.id === 'donor_name' ? document.getElementById('nameError') : document.getElementById('editNameError');
-            if (hasNumber) { input.value = input.value.replace(/\d/g, ''); errorDiv.style.display = 'block'; setTimeout(() => { errorDiv.style.display = 'none'; }, 3000); }
-            input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); 
-        }
-
-        function isAgeValid(dobValue) { if (!dobValue) return true; const age = new Date().getFullYear() - new Date(dobValue).getFullYear(); return age >= 18; }
-        
-        // --- NEW VALIDATION HELPERS ---
-        
-        function validateEmailDetailed(email) {
-            if (!email) return "Email is required.";
-            if (!email.includes('@')) return "Missing '@' symbol in email.";
-            
-            const parts = email.split('@');
-            if (parts[1].length === 0) return "Missing domain name (e.g., gmail.com).";
-            
-            // Check for dot in domain part (simple check)
-            if (!parts[1].includes('.')) return "Missing top-level domain (like .com or .org).";
-            
-            // Final Regex Check for stricter validation
-            const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-            if (!emailPattern.test(email)) return "Invalid email format.";
-            
-            return "";
-        }
-
-        function validatePhone(val) {
-            if (!val.includes('-')) return "Missing hyphen symbol ( - ). Please use the dash key.";
-            const parts = val.split('-'); 
-            
-            if (parts.length !== 2) return "Invalid format. Only one hyphen ( - ) allowed.";
-            
-            const front = parts[0];
-            const back = parts[1];
-
-            // Validate Prefix (Front)
-            if (front.length < 2 || front.length > 3) return "Invalid prefix (e.g., 11, 12).";
-
-            // Validate Suffix (Back) - Detailed Length Check
-            if (back.length === 0) return "Please enter numbers after the hyphen ( - ).";
-            
-            if (back.length < 7) {
-                let diff = 7 - back.length;
-                return `Number after hyphen ( - ) is too short. Please add at least ${diff} more digit(s).`;
-            }
-            
-            if (back.length > 8) return "Number after hyphen ( - ) is too long. Max 8 digits allowed."; 
-            
-            return ""; 
-        }
-
-        // --- UPDATED IC VALIDATION LOGIC (For Optional IC Field) ---
-        function validateICDetailed(ic) {
-            // Remove hyphens for length check
-            const clean = ic.replace(/[^0-9]/g, '');
-
-            // 1. Length Check
-            if (clean.length !== 12) {
-                return "Incomplete IC number. Must be 12 digits (excluding hyphens).";
-            }
-
-            // 2. State/PB Code Check (Digits 7 & 8)
-            // Extract the PB code
-            const pbCode = parseInt(clean.substring(6, 8));
-            
-            // Valid JPN State Codes for Malaysia (including WP and Sarawak specific)
-            // 01-16, 21-59, 82
-            const validStateCodes = [
-                1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16, // Standard States
-                21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40, // Extended States
-                41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59, // Extended States
-                82 // Sarawak Special
-            ];
-            
-            if (!validStateCodes.includes(pbCode)) {
-                return "Invalid State/Place of Birth code (digits 7-8).";
-            }
-
-            return "";
-        }
-
-        function showFieldError(inputId, message) {
-            const input = document.getElementById(inputId);
-            if (!input) return;
-            
-            // Add red border
-            input.classList.add('input-error');
-            
-            // Find parent to append error message
-            let parent = input.parentNode;
-            if (parent.classList.contains('phone-format')) {
-                parent = parent.parentNode; // Go one level up for phone input
-            }
-            
-            // Check if error message already exists
-            let errorDiv = parent.querySelector('.inline-error');
-            if (!errorDiv) {
-                errorDiv = document.createElement('div');
-                errorDiv.className = 'inline-error';
-                parent.appendChild(errorDiv);
-            }
-            errorDiv.textContent = message;
-        }
-
-        function clearFormErrors(formId) {
-            const form = document.getElementById(formId);
-            const inputs = form.querySelectorAll('.form-input, .form-select');
-            inputs.forEach(i => i.classList.remove('input-error'));
-            form.querySelectorAll('.inline-error').forEach(e => e.remove());
-        }
-
-        function validateForm(type) {
-            let formId = type === 'add' ? 'addDonorForm' : 'editDonorForm';
-            clearFormErrors(formId);
-            
-            let hasError = false;
-            let nameId = type === 'add' ? 'donor_name' : 'edit_donor_name';
-            let emailId = type === 'add' ? 'email' : 'edit_email';
-            let contactId = type === 'add' ? 'contact' : 'edit_contact';
-            let dobId = type === 'add' ? 'dob' : 'edit_dob';
-            let icId = type === 'add' ? 'ic_number' : 'edit_ic_number';
-
-            // 1. Name Check
-            let nameVal = document.getElementById(nameId).value.trim();
-            if (!nameVal) {
-                showFieldError(nameId, "This field is required.");
-                hasError = true;
-            } else if (/\d/.test(nameVal)) {
-                 showFieldError(nameId, "Name cannot contain numbers.");
-                 hasError = true;
-            }
-
-            // 2. Email Check (Improved)
-            let emailVal = document.getElementById(emailId).value.trim();
-            let emailError = validateEmailDetailed(emailVal);
-            if (emailError) {
-                showFieldError(emailId, emailError);
-                hasError = true;
-            }
-
-            // 3. Contact Check (Improved)
-            let contactVal = document.getElementById(contactId).value.trim();
-            if (!contactVal) {
-                showFieldError(contactId, "This field is required.");
-                hasError = true;
+        function closeModal(e, id) { 
+            if(typeof e === 'string') {
+                document.getElementById(e).style.display = 'none';
             } else {
-                let phoneErr = validatePhone(contactVal);
-                if (phoneErr) {
-                    showFieldError(contactId, phoneErr);
-                    hasError = true;
-                }
+                if(e.target.id === id) document.getElementById(id).style.display = 'none';
             }
-
-            // 4. IC Check (Strict Validation if Inputted)
-            let icVal = document.getElementById(icId).value.trim();
-            if (icVal) { // Only run if field is NOT empty
-                let icMsg = validateICDetailed(icVal);
-                if (icMsg) {
-                    showFieldError(icId, icMsg);
-                    hasError = true;
-                }
-            }
-            
-            // 5. DOB/Age Check
-            let dobVal = document.getElementById(dobId).value;
-            if (dobVal && !isAgeValid(dobVal)) {
-                showFieldError(dobId, "Donor must be at least 18 years old.");
-                hasError = true;
-            }
-
-            if (hasError) {
-                showSystemError("Please correct the highlighted errors.");
-                return false; 
-            }
-            return true;
         }
-        function validateEditForm() { return validateForm('edit'); }
-
+        
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     </script>
 </body>
 </html>

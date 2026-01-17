@@ -1,0 +1,446 @@
+<?php
+// admin_donor_payment_history.php
+session_start();
+
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
+    header("Location: admin_login.php");
+    exit();
+}
+
+include 'dataconnection.php';
+
+if (!isset($_GET['donor_id'])) {
+    header("Location: admin_donor_page.php");
+    exit();
+}
+
+$donorId = intval($_GET['donor_id']);
+$currentTab = isset($_GET['type']) ? $_GET['type'] : 'All'; 
+
+// Fetch Donor Info
+$donorSql = "SELECT Donor_Name FROM donor WHERE Donor_ID = $donorId";
+$donorRes = $conn->query($donorSql);
+if ($donorRes->num_rows == 0) die("Donor not found.");
+$donorName = $donorRes->fetch_assoc()['Donor_Name'];
+
+// --- 1. 获取筛选和排序参数 ---
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$sort = isset($_GET['sort']) ? $_GET['sort'] : 'date';
+$order = isset($_GET['order']) ? $_GET['order'] : 'desc';
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$results_per_page = 10; 
+
+// 日期特定筛选
+$filterDate = isset($_GET['f_date']) ? $_GET['f_date'] : '';
+$filterMonth = isset($_GET['f_month']) ? $_GET['f_month'] : '';
+$filterYear = isset($_GET['f_year']) ? $_GET['f_year'] : '';
+
+// 支付方式 & 状态 筛选
+$filterMethod = isset($_GET['f_method']) ? $_GET['f_method'] : '';
+$filterStatus = isset($_GET['f_status']) ? $_GET['f_status'] : '';
+
+// 金额范围筛选
+$minAmount = isset($_GET['min_amount']) && $_GET['min_amount'] !== '' ? floatval($_GET['min_amount']) : '';
+$maxAmount = isset($_GET['max_amount']) && $_GET['max_amount'] !== '' ? floatval($_GET['max_amount']) : '';
+
+// --- 2. 构建 SQL 查询条件 ---
+$conditions = [];
+$conditions[] = "o.Donor_ID = $donorId";
+
+if ($currentTab == 'Monthly') {
+    $conditions[] = "(o.Order_Type = 'Monthly' OR o.Order_Type = 'Recurring')";
+} elseif ($currentTab == 'One-time') {
+    $conditions[] = "o.Order_Type = 'One-time'";
+} elseif ($currentTab == 'Top-up') {
+    $conditions[] = "o.Order_Type = 'Top-up'";
+}
+
+if (!empty($search)) {
+    $s = $conn->real_escape_string($search);
+    $conditions[] = "(o.Order_TXN_Ref LIKE '%$s%' OR o.Order_PaymentMethod LIKE '%$s%' OR o.Order_Amount LIKE '%$s%')";
+}
+
+if (!empty($filterDate)) {
+    $d = $conn->real_escape_string($filterDate);
+    $conditions[] = "DATE(o.Order_Created_At) = '$d'";
+} elseif (!empty($filterMonth) && !empty($filterYear)) {
+    $m = intval($filterMonth);
+    $y = intval($filterYear);
+    $conditions[] = "MONTH(o.Order_Created_At) = $m AND YEAR(o.Order_Created_At) = $y";
+} elseif (!empty($filterYear)) {
+    $y = intval($filterYear);
+    $conditions[] = "YEAR(o.Order_Created_At) = $y";
+}
+
+if (!empty($filterMethod)) {
+    $fm = $conn->real_escape_string($filterMethod);
+    if ($fm == 'tng') {
+        $conditions[] = "(o.Order_PaymentMethod LIKE '%Touch%' OR o.Order_PaymentMethod LIKE '%TNG%')";
+    } elseif ($fm == 'ewallet') {
+        $conditions[] = "o.Order_PaymentMethod LIKE '%System%'"; 
+    } elseif ($fm == 'card') {
+        $conditions[] = "o.Order_PaymentMethod LIKE '%Credit%'"; 
+    }
+}
+
+if (!empty($filterStatus)) {
+    $fs = $conn->real_escape_string($filterStatus);
+    if ($fs == 'success') {
+        $conditions[] = "(o.Order_PaymentStatus = 'Success' OR o.Order_PaymentStatus = 'Completed' OR o.Order_Status = 'Completed')";
+    } elseif ($fs == 'pending') {
+        $conditions[] = "o.Order_PaymentStatus = 'Pending'";
+    } elseif ($fs == 'cancelled') {
+        $conditions[] = "(o.Order_PaymentStatus = 'Cancelled' OR o.Order_PaymentStatus = 'Failed')";
+    }
+}
+
+if ($minAmount !== '') {
+    $conditions[] = "o.Order_Amount >= $minAmount";
+}
+if ($maxAmount !== '') {
+    $conditions[] = "o.Order_Amount <= $maxAmount";
+}
+
+$whereSql = "WHERE " . implode(" AND ", $conditions);
+
+// --- 3. 计算总金额 ---
+$sumSql = "SELECT SUM(o.Order_Amount) as total FROM orders o $whereSql AND (o.Order_PaymentStatus = 'Success' OR o.Order_PaymentStatus = 'Completed' OR o.Order_Status = 'Completed')";
+$sumResult = $conn->query($sumSql);
+$totalAmount = ($sumResult && $row = $sumResult->fetch_assoc()) ? (float)$row['total'] : 0;
+
+// --- 4. 分页计算 ---
+$countSql = "SELECT COUNT(*) as total FROM orders o $whereSql";
+$countRes = $conn->query($countSql);
+$total_records = ($countRes && $row = $countRes->fetch_assoc()) ? $row['total'] : 0;
+$total_pages = ceil($total_records / $results_per_page);
+
+if ($page > $total_pages && $total_pages > 0) $page = $total_pages;
+$start_from = ($page - 1) * $results_per_page;
+$start_record = ($total_records > 0) ? $start_from + 1 : 0;
+$end_record = min($start_from + $results_per_page, $total_records);
+
+// --- 5. 获取数据 ---
+$sortMap = [
+    'date' => 'o.Order_Created_At',
+    'amount' => 'o.Order_Amount',
+    'ref' => 'o.Order_TXN_Ref',
+    'method' => 'o.Order_PaymentMethod',
+    'status' => 'o.Order_PaymentStatus'
+];
+$orderBy = isset($sortMap[$sort]) ? $sortMap[$sort] : 'o.Order_Created_At';
+$orderDir = ($order == 'asc') ? 'ASC' : 'DESC';
+
+$sql = "SELECT o.* FROM orders o $whereSql ORDER BY $orderBy $orderDir LIMIT $start_from, $results_per_page";
+$result = $conn->query($sql);
+$orders = [];
+while($row = $result->fetch_assoc()) {
+    $orders[] = $row;
+}
+
+function buildUrl($params = []) {
+    $current = $_GET;
+    $merged = array_merge($current, $params);
+    return '?' . http_build_query($merged);
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Payment History - <?php echo htmlspecialchars($donorName); ?></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="admin_common.css">
+    <style>
+        .page-header-compact { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-top: 10px; }
+        
+        /* [Modified Back Button Style] */
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: #666; font-weight: 600; font-size: 14px; padding: 8px 12px; border-radius: 5px; background: #f8f9fa; border: 1px solid #eee; transition: all 0.2s; cursor: pointer; }
+        .back-btn:hover { background: #e9ecef; color: #333; }
+        
+        .header-title { flex: 1; text-align: center; padding-right: 80px; }
+        .header-title h1 { margin: 0; font-size: 24px; color: #333; font-weight: 700; }
+        .header-title p { margin: 5px 0 0; color: #666; font-size: 14px; }
+
+        .history-container { background: white; border-radius: 10px; padding: 30px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); max-width: 1000px; margin: 0 auto 30px; }
+        
+        .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 25px; }
+        .tab-item { padding: 15px 30px; font-size: 15px; font-weight: 600; color: #888; text-decoration: none; cursor: pointer; transition: 0.3s; position: relative; }
+        .tab-item:hover { color: #555; background: #f9f9f9; }
+        .tab-item.active { color: var(--primary); }
+        .tab-item.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 2px; background: var(--primary); }
+        
+        .summary-banner { background: #e3f2fd; color: #0d47a1; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #bbdefb; }
+        .summary-label { font-size: 14px; font-weight: 600; }
+        .summary-value { font-size: 20px; font-weight: 700; }
+
+        .search-filter-container { display: flex; gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #eee; align-items: center; }
+        .search-input { flex: 1; padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; outline: none; }
+        .search-btn { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; display:flex; align-items:center; gap:5px; }
+        .search-btn:hover { background: #e07070; }
+        .clear-btn { padding: 10px 15px; background: #fff; border: 1px solid #ddd; color: #555; border-radius: 5px; cursor: pointer; text-decoration: none; display:flex; align-items:center; gap:5px; }
+        .clear-btn:hover { background: #f1f1f1; }
+
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th { text-align: left; padding: 15px; background: #f8f9fa; color: #555; font-weight: 600; font-size: 13px; text-transform: uppercase; border-bottom: 2px solid #eee; cursor:pointer; user-select: none; }
+        .data-table td { padding: 15px; border-bottom: 1px solid #eee; color: #333; font-size: 14px; vertical-align: middle; }
+        .data-table th:hover { background-color: #e9ecef; color: var(--primary); }
+        .data-table th i { margin-left: 5px; opacity: 0.5; }
+
+        .sort-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 2000; justify-content: center; align-items: center; }
+        .sort-modal-content { background: white; width: 300px; border-radius: 10px; padding: 20px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); animation: fadeIn 0.2s; }
+        .sort-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .sort-header h3 { margin: 0; font-size: 16px; color: #333; }
+        .sort-close { cursor: pointer; font-size: 20px; color: #999; }
+        .sort-title { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; margin-bottom: 8px; display: block; }
+        .sort-btn { display: block; width: 100%; padding: 10px; margin-bottom: 5px; border: 1px solid #eee; background: #fff; text-align: left; border-radius: 5px; cursor: pointer; text-decoration: none; color: #555; }
+        .sort-btn:hover { background: #f8f9fa; color: var(--primary); }
+        
+        .status-badge { font-weight: 600; font-size: 12px; padding: 4px 8px; border-radius: 4px; }
+        .status-success { background: #e6f9ed; color: #28a745; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-cancelled { background: #ffe6e6; color: #dc3545; }
+
+        .filter-row { display: flex; gap: 5px; margin-bottom: 5px; }
+        .filter-input { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+        .filter-go { padding: 8px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .filter-go:hover { background: #5a6268; }
+
+        .amount-input-group { display: flex; flex-direction: column; gap: 10px; }
+        .amount-row { display: flex; align-items: center; gap: 10px; }
+        .amount-label { width: 60px; font-size: 13px; color: #666; font-weight: 600; }
+        .btn-apply-full { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; margin-top: 5px; }
+        .btn-apply-full:hover { background: #e07070; }
+
+        /* Pagination Styles */
+        .pagination-container { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid #eee; margin-top: 10px; }
+        .pagination-controls { display: flex; gap: 5px; align-items: center; }
+        .pagination-btn { padding: 8px 14px; border: 1px solid #eee; background-color: #f8f9fa; color: #333; text-decoration: none; border-radius: 5px; font-size: 14px; }
+        .pagination-btn.active { background-color: #F28585; color: white; border-color: #F28585; }
+        .pagination-btn.disabled { color: #ccc; cursor: not-allowed; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 768px) { .pagination-container { flex-direction: column; gap: 15px; } }
+    </style>
+</head>
+<body>
+    <?php include 'admin_sidebar.php'; ?>
+    <div class="main-content">
+        <?php include 'admin_header.php'; ?>
+        
+        <div class="dashboard-content" style="padding-top: 10px;">
+            <div class="page-header-compact">
+                <a onclick="window.close(); return false;" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+                <div class="header-title">
+                    <h1>Payment History</h1>
+                    <p>Donor: <?php echo htmlspecialchars($donorName); ?></p>
+                </div>
+                <div style="width: 80px;"></div>
+            </div>
+
+            <div class="history-container">
+                <div class="tabs">
+                    <a href="<?php echo buildUrl(['type' => 'All', 'page' => 1]); ?>" class="tab-item <?php echo $currentTab == 'All' ? 'active' : ''; ?>">All</a>
+                    <a href="<?php echo buildUrl(['type' => 'One-time', 'page' => 1]); ?>" class="tab-item <?php echo $currentTab == 'One-time' ? 'active' : ''; ?>">One-Time</a>
+                    <a href="<?php echo buildUrl(['type' => 'Monthly', 'page' => 1]); ?>" class="tab-item <?php echo $currentTab == 'Monthly' ? 'active' : ''; ?>">Monthly</a>
+                    <a href="<?php echo buildUrl(['type' => 'Top-up', 'page' => 1]); ?>" class="tab-item <?php echo $currentTab == 'Top-up' ? 'active' : ''; ?>">Top-up</a>
+                </div>
+
+                <div class="summary-banner">
+                    <span class="summary-label">Total Successful Payment (<?php echo $currentTab; ?>)</span>
+                    <span class="summary-value">RM <?php echo number_format($totalAmount, 2); ?></span>
+                </div>
+
+                <form class="search-filter-container" method="GET">
+                    <input type="hidden" name="donor_id" value="<?php echo $donorId; ?>">
+                    <input type="hidden" name="type" value="<?php echo $currentTab; ?>">
+                    <input type="hidden" name="sort" value="<?php echo $sort; ?>">
+                    <input type="hidden" name="order" value="<?php echo $order; ?>">
+                    
+                    <?php if(!empty($filterMethod)) echo "<input type='hidden' name='f_method' value='$filterMethod'>"; ?>
+                    <?php if(!empty($filterStatus)) echo "<input type='hidden' name='f_status' value='$filterStatus'>"; ?>
+                    <?php if(!empty($filterDate)) echo "<input type='hidden' name='f_date' value='$filterDate'>"; ?>
+                    <?php if(!empty($filterMonth)) echo "<input type='hidden' name='f_month' value='$filterMonth'>"; ?>
+                    <?php if(!empty($filterYear)) echo "<input type='hidden' name='f_year' value='$filterYear'>"; ?>
+                    <?php if($minAmount !== '') echo "<input type='hidden' name='min_amount' value='$minAmount'>"; ?>
+                    <?php if($maxAmount !== '') echo "<input type='hidden' name='max_amount' value='$maxAmount'>"; ?>
+
+                    <input type="text" name="search" class="search-input" placeholder="Search Ref No, Method or Amount..." value="<?php echo htmlspecialchars($search); ?>">
+                    <button type="submit" class="search-btn"><i class="fas fa-search"></i> Search</button>
+                    
+                    <?php if(!empty($search) || !empty($filterMethod) || !empty($filterStatus) || !empty($filterDate) || $minAmount !== '' || $maxAmount !== ''): ?>
+                        <a href="?donor_id=<?php echo $donorId; ?>&type=<?php echo $currentTab; ?>" class="clear-btn"><i class="fas fa-times"></i> Clear</a>
+                    <?php endif; ?>
+                </form>
+
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th onclick="openModal('dateSortModal')">Date <i class="fas fa-sort"></i></th>
+                            <th onclick="openModal('refSortModal')">Ref No <i class="fas fa-sort"></i></th>
+                            <th onclick="openModal('methodSortModal')">Method <i class="fas fa-sort"></i></th>
+                            <th onclick="openModal('amountSortModal')">Amount <i class="fas fa-sort"></i></th>
+                            <th onclick="openModal('statusSortModal')">Status <i class="fas fa-sort"></i></th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (count($orders) > 0): ?>
+                            <?php foreach($orders as $o): ?>
+                                <tr>
+                                    <td>
+                                        <div><?php echo date('d M Y', strtotime($o['Order_Created_At'])); ?></div>
+                                        <div style="font-size:12px; color:#888;"><?php echo date('h:i A', strtotime($o['Order_Created_At'])); ?></div>
+                                    </td>
+                                    <td style="color:#666; font-weight:500;"><?php echo $o['Order_TXN_Ref']; ?></td>
+                                    <td><?php echo htmlspecialchars($o['Order_PaymentMethod']); ?></td>
+                                    <td style="font-weight:bold; color:var(--primary);">RM <?php echo number_format($o['Order_Amount'], 2); ?></td>
+                                    <td>
+                                        <?php 
+                                            $st = $o['Order_PaymentStatus'];
+                                            if (empty($st) && ($o['Order_Status'] == 'Completed' || $o['Order_Admin_Status'] == 'Completed')) {
+                                                $st = 'Success';
+                                            }
+                                            $stClass = 'status-pending';
+                                            if($st == 'Success' || $st == 'Completed') $stClass = 'status-success';
+                                            elseif($st == 'Cancelled' || $st == 'Failed') $stClass = 'status-cancelled';
+                                            $displaySt = ($st == 'Completed') ? 'Success' : (empty($st) ? 'Pending' : $st);
+                                            echo "<span class='status-badge $stClass'>$displaySt</span>";
+                                        ?>
+                                    </td>
+                                    <td><a href="admin_payment_details.php?id=<?php echo $o['Order_ID']; ?>" style="color:var(--primary); font-size:13px; font-weight:600;">View <i class="fas fa-chevron-right"></i></a></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr><td colspan="6" style="text-align:center; padding:30px; color:#999;">No records found.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+
+                <div class="pagination-container">
+                    <div class="pagination-info">Showing <?php echo $start_record; ?> to <?php echo $end_record; ?> of <?php echo $total_records; ?> results</div>
+                    <div class="pagination-controls">
+                        <?php 
+                        $queryParams = $_GET;
+                        unset($queryParams['page']);
+                        $queryString = http_build_query($queryParams);
+                        $prefix = !empty($queryString) ? "&" : "";
+
+                        if ($page > 1) echo '<a href="?' . $queryString . $prefix . 'page=' . ($page - 1) . '" class="pagination-btn">Previous</a>'; 
+                        else echo '<span class="pagination-btn disabled">Previous</span>';
+
+                        $start_window = max(1, $page - 1);
+                        $end_window = min($total_pages, $page + 1);
+                        if ($page == 1) $end_window = min($total_pages, 3);
+                        if ($page == $total_pages) $start_window = max(1, $total_pages - 2);
+
+                        for ($i = $start_window; $i <= $end_window; $i++) {
+                            if ($i == $page) echo '<span class="pagination-btn active">' . $i . '</span>';
+                            else echo '<a href="?' . $queryString . $prefix . 'page=' . $i . '" class="pagination-btn">' . $i . '</a>';
+                        }
+
+                        if ($page < $total_pages) echo '<a href="?' . $queryString . $prefix . 'page=' . ($page + 1) . '" class="pagination-btn">Next</a>'; 
+                        else echo '<span class="pagination-btn disabled">Next</span>';
+                        ?>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="dateSortModal" class="sort-modal" onclick="closeModal(event, 'dateSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Date Options</h3><span class="sort-close" onclick="document.getElementById('dateSortModal').style.display='none'">&times;</span></div>
+            <span class="sort-title">Sorting</span>
+            <a href="<?php echo buildUrl(['sort'=>'date', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-amount-down"></i> Newest to Oldest</a>
+            <a href="<?php echo buildUrl(['sort'=>'date', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-amount-up"></i> Oldest to Newest</a>
+            <hr style="border:0; border-top:1px dashed #eee; margin:15px 0;">
+            <span class="sort-title">Filter by Specific Date</span>
+            <form class="filter-row" method="GET">
+                <?php foreach($_GET as $key => $val) if(!in_array($key, ['f_date', 'f_month', 'f_year', 'page'])) echo "<input type='hidden' name='$key' value='$val'>"; ?>
+                <input type="date" name="f_date" class="filter-input" required>
+                <button type="submit" class="filter-go">Go</button>
+            </form>
+            <span class="sort-title" style="margin-top:10px;">Filter by Month & Year</span>
+            <form class="filter-row" method="GET">
+                <?php foreach($_GET as $key => $val) if(!in_array($key, ['f_date', 'f_month', 'f_year', 'page'])) echo "<input type='hidden' name='$key' value='$val'>"; ?>
+                <select name="f_month" class="filter-input">
+                    <option value="">Month</option>
+                    <?php for($i=1; $i<=12; $i++) echo "<option value='$i'>".date("M", mktime(0,0,0,$i,10))."</option>"; ?>
+                </select>
+                <select name="f_year" class="filter-input" required>
+                    <option value="">Year</option>
+                    <?php for($y=date('Y'); $y>=2020; $y--) echo "<option value='$y'>$y</option>"; ?>
+                </select>
+                <button type="submit" class="filter-go">Go</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="amountSortModal" class="sort-modal" onclick="closeModal(event, 'amountSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Amount Options</h3><span class="sort-close" onclick="document.getElementById('amountSortModal').style.display='none'">&times;</span></div>
+            <span class="sort-title">Sorting</span>
+            <a href="<?php echo buildUrl(['sort'=>'amount', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-down"></i> Small to Large</a>
+            <a href="<?php echo buildUrl(['sort'=>'amount', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-up"></i> Large to Small</a>
+            <hr style="border:0; border-top:1px dashed #eee; margin:15px 0;">
+            <span class="sort-title">Filter by Amount Range</span>
+            <form class="amount-input-group" method="GET">
+                <?php foreach($_GET as $key => $val) if(!in_array($key, ['min_amount', 'max_amount', 'page'])) echo "<input type='hidden' name='$key' value='$val'>"; ?>
+                <div class="amount-row">
+                    <span class="amount-label">Min (RM):</span>
+                    <input type="number" name="min_amount" class="filter-input" placeholder="0.00" step="0.01" min="0" value="<?php echo htmlspecialchars($minAmount); ?>">
+                </div>
+                <div class="amount-row">
+                    <span class="amount-label">Max (RM):</span>
+                    <input type="number" name="max_amount" class="filter-input" placeholder="No Limit" step="0.01" min="0" value="<?php echo htmlspecialchars($maxAmount); ?>">
+                </div>
+                <button type="submit" class="btn-apply-full">Apply Filter</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="refSortModal" class="sort-modal" onclick="closeModal(event, 'refSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Ref Options</h3><span class="sort-close" onclick="document.getElementById('refSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'ref', 'order'=>'asc']); ?>" class="sort-btn">A - Z</a>
+            <a href="<?php echo buildUrl(['sort'=>'ref', 'order'=>'desc']); ?>" class="sort-btn">Z - A</a>
+        </div>
+    </div>
+
+    <div id="methodSortModal" class="sort-modal" onclick="closeModal(event, 'methodSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Method Options</h3><span class="sort-close" onclick="document.getElementById('methodSortModal').style.display='none'">&times;</span></div>
+            <span class="sort-title">Sorting</span>
+            <a href="<?php echo buildUrl(['sort'=>'method', 'order'=>'asc']); ?>" class="sort-btn">A - Z</a>
+            <a href="<?php echo buildUrl(['sort'=>'method', 'order'=>'desc']); ?>" class="sort-btn">Z - A</a>
+            <hr style="border:0; border-top:1px dashed #eee; margin:15px 0;">
+            <span class="sort-title">Filter by</span>
+            <a href="<?php echo buildUrl(['f_method'=>'ewallet']); ?>" class="sort-btn"><i class="fas fa-wallet"></i> System E-Wallet</a>
+            <a href="<?php echo buildUrl(['f_method'=>'card']); ?>" class="sort-btn"><i class="fas fa-credit-card"></i> Credit Card</a>
+            <a href="<?php echo buildUrl(['f_method'=>'tng']); ?>" class="sort-btn"><i class="fas fa-mobile-alt"></i> Touch 'n Go</a>
+        </div>
+    </div>
+
+    <div id="statusSortModal" class="sort-modal" onclick="closeModal(event, 'statusSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Status Options</h3><span class="sort-close" onclick="document.getElementById('statusSortModal').style.display='none'">&times;</span></div>
+            <span class="sort-title">Sorting</span>
+            <a href="<?php echo buildUrl(['sort'=>'status', 'order'=>'asc']); ?>" class="sort-btn">A - Z</a>
+            <a href="<?php echo buildUrl(['sort'=>'status', 'order'=>'desc']); ?>" class="sort-btn">Z - A</a>
+            <hr style="border:0; border-top:1px dashed #eee; margin:15px 0;">
+            <span class="sort-title">Filter by</span>
+            <a href="<?php echo buildUrl(['f_status'=>'success']); ?>" class="sort-btn"><span class="status-badge status-success">Success</span></a>
+            <a href="<?php echo buildUrl(['f_status'=>'pending']); ?>" class="sort-btn"><span class="status-badge status-pending">Pending</span></a>
+            <a href="<?php echo buildUrl(['f_status'=>'cancelled']); ?>" class="sort-btn"><span class="status-badge status-cancelled">Cancelled</span></a>
+        </div>
+    </div>
+
+    <script>
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(e, id) { if(e.target.id === id) document.getElementById(id).style.display = 'none'; }
+    </script>
+</body>
+</html>

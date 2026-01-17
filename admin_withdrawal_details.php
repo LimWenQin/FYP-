@@ -16,16 +16,19 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 $withdrawalId = intval($_GET['id']);
 
 // 获取 Withdrawal 详细信息
+// Join admin 表两次，一次是 Requester (w.Admin_ID), 一次是 Approver (w.Approved_By)
 $sql = "SELECT w.*, 
         b.Branch_Name, 
         s.Case_Title, 
         a.Activity_Name, 
-        ad.Admin_Name as Processor_Name
+        req.Admin_Name as Requester_Name,
+        app.Admin_Name as Approver_Name
         FROM withdrawals w
         LEFT JOIN branch b ON w.Branch_ID = b.Branch_ID
         LEFT JOIN special_case s ON w.Case_ID = s.Case_ID
         LEFT JOIN activity a ON w.Activity_ID = a.Activity_ID
-        LEFT JOIN admin ad ON w.Admin_ID = ad.Admin_ID
+        LEFT JOIN admin req ON w.Admin_ID = req.Admin_ID
+        LEFT JOIN admin app ON w.Approved_By = app.Admin_ID
         WHERE w.Withdrawal_ID = $withdrawalId";
 
 $result = $conn->query($sql);
@@ -107,20 +110,24 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
         .btn-back:hover { background: #5a6268; }
 
         /* --- 缩略图列表样式 --- */
-        .proof-gallery { display: flex; flex-wrap: wrap; gap: 10px; }
+        .proof-gallery { display: flex; flex-wrap: wrap; gap: 15px; }
         .proof-item { 
             cursor: pointer; position: relative; display: block; 
-            border: 1px solid #ddd; padding: 4px; border-radius: 5px; 
+            border: 1px solid #ddd; padding: 5px; border-radius: 8px; 
             background: #fff; transition: transform 0.2s, box-shadow 0.2s; 
+            width: 120px; height: 120px;
+            overflow: hidden;
         }
-        .proof-item:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-color: #F28585; }
-        .proof-img { width: 150px; height: 150px; object-fit: cover; border-radius: 3px; display: block; }
+        .proof-item:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); border-color: #F28585; }
+        
+        .proof-img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; display: block; }
+        
         .proof-pdf { 
-            width: 150px; height: 100px; display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; background: #fdf2f2; 
-            color: #dc3545; font-size: 14px; 
+            width: 100%; height: 100%; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; background: #f8f9fa; 
+            color: #dc3545; font-size: 12px; font-weight: 600; text-align: center;
         }
-        .proof-pdf i { font-size: 30px; margin-bottom: 8px; }
+        .proof-pdf i { font-size: 32px; margin-bottom: 8px; }
 
         /* --- 全屏查看 Modal 样式 --- */
         .modal-overlay {
@@ -131,49 +138,57 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
             top: 0;
             width: 100%;
             height: 100%;
-            overflow: hidden;
-            background-color: rgba(0,0,0,0.9); /* 黑色背景 */
+            background-color: rgba(0,0,0,0.85); /* 深色背景 */
+            backdrop-filter: blur(5px);
             justify-content: center;
             align-items: center;
             flex-direction: column;
         }
 
-        /* 关闭按钮：右上角 */
-        .modal-close-btn {
+        /* 顶部工具栏 */
+        .modal-toolbar {
             position: absolute;
-            top: 20px;
-            right: 30px; /* 改为右上角 */
-            color: #f1f1f1;
-            font-size: 40px;
-            font-weight: bold;
-            transition: 0.3s;
-            cursor: pointer;
-            z-index: 10001;
-            background: rgba(0,0,0,0.5);
-            width: 50px;
-            height: 50px;
-            line-height: 45px;
-            text-align: center;
-            border-radius: 50%;
+            top: 0; left: 0; right: 0;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            z-index: 10002;
         }
-        .modal-close-btn:hover { color: #F28585; background: rgba(255,255,255,0.2); }
+
+        .modal-btn {
+            color: white;
+            font-size: 16px;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: 0.3s;
+            display: flex; align-items: center; gap: 8px;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .modal-btn:hover { background: rgba(255,255,255,0.4); }
+        .btn-close { background: #dc3545; border-color: #dc3545; }
+        .btn-close:hover { background: #c82333; }
 
         /* 图片容器 */
         .modal-content-img {
-            margin: auto;
-            display: block;
             max-width: 90%;
-            max-height: 90vh;
-            border: 2px solid white;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            max-height: 85vh;
+            border-radius: 4px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            margin-top: 40px;
         }
 
         /* PDF 容器 */
         .modal-content-pdf {
             width: 80%;
-            height: 90vh;
+            height: 85vh;
             background: white;
-            border: none;
+            border-radius: 4px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            margin-top: 40px;
         }
 
         @media print {
@@ -210,11 +225,21 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
                     </div>
                     <div class="info-item">
                         <span class="label">Request Date</span><span class="colon">:</span>
-                        <span class="value"><?php echo $requestDate; ?></span>
+                        <span class="value">
+                            <?php echo $requestDate; ?>
+                            <br><span style="font-size:12px; color:#888;">(Requested by: <?php echo htmlspecialchars($row['Requester_Name']); ?>)</span>
+                        </span>
                     </div>
                     <div class="info-item">
                         <span class="label">Processed Date</span><span class="colon">:</span>
-                        <span class="value"><?php echo $processedDate; ?></span>
+                        <span class="value">
+                            <?php echo $processedDate; ?>
+                            <?php if($row['Processed_Date']): ?>
+                                <br><span style="font-size:12px; color:#888;">(Approved by: <?php echo htmlspecialchars($row['Approver_Name']); ?>)</span>
+                            <?php else: ?>
+                                <br><span style="font-size:12px; color:#888;">(Pending)</span>
+                            <?php endif; ?>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -238,22 +263,28 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
                                 <div class="proof-gallery">
                                     <?php 
                                     $rawProof = $row['Reference_Proof'];
+                                    // 尝试解析 JSON，如果失败则视为单个路径
                                     $proofFiles = json_decode($rawProof, true);
-                                    if (!is_array($proofFiles)) { $proofFiles = array($rawProof); }
+                                    if (!is_array($proofFiles)) { 
+                                        $proofFiles = array($rawProof); 
+                                    }
 
                                     foreach($proofFiles as $filePath):
                                         $filePath = trim($filePath);
+                                        // 跳过空路径，防止显示幽灵图标
+                                        if (empty($filePath)) continue;
+
                                         $displayPath = str_replace('\\', '/', $filePath); 
                                         $ext = strtolower(pathinfo($displayPath, PATHINFO_EXTENSION));
                                         $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp']);
                                         $type = $isImage ? 'image' : 'pdf';
                                     ?>
                                         <?php if($isImage): ?>
-                                            <div class="proof-item" onclick="openModal('<?php echo $displayPath; ?>', 'image')" title="Click to view">
+                                            <div class="proof-item" onclick="openModal('<?php echo $displayPath; ?>', 'image')" title="View Image">
                                                 <img src="<?php echo $displayPath; ?>" alt="Proof" class="proof-img">
                                             </div>
                                         <?php else: ?>
-                                            <div class="proof-item proof-pdf" onclick="openModal('<?php echo $displayPath; ?>', 'pdf')" title="Click to view PDF">
+                                            <div class="proof-item proof-pdf" onclick="openModal('<?php echo $displayPath; ?>', 'pdf')" title="View PDF">
                                                 <i class="fas fa-file-pdf"></i>
                                                 <span>View PDF</span>
                                             </div>
@@ -261,7 +292,7 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
                                     <?php endforeach; ?>
                                 </div>
                             <?php else: ?>
-                                <span style="color:#aaa;">N/A</span>
+                                <span style="color:#aaa;">No proof documents uploaded.</span>
                             <?php endif; ?>
                         </span>
                     </div>
@@ -273,7 +304,7 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
                 <div class="info-list">
                     <div class="info-item">
                         <span class="label">Processed By</span><span class="colon">:</span>
-                        <span class="value"><?php echo htmlspecialchars($row['Processor_Name'] ?: 'System / Pending'); ?></span>
+                        <span class="value"><?php echo htmlspecialchars($row['Approver_Name'] ?: 'System / Pending'); ?></span>
                     </div>
                     <div class="info-item">
                         <span class="label">Withdrawal ID</span><span class="colon">:</span>
@@ -284,7 +315,7 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
             
             <div class="action-buttons">
                 <button class="btn-back" onclick="window.close();">
-                    <i class="fas fa-arrow-left"></i> Back to Payment Management
+                    <i class="fas fa-arrow-left"></i> Close
                 </button>
                 <button class="btn-print" onclick="window.print()">
                     <i class="fas fa-print"></i> Print Details
@@ -294,10 +325,16 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
     </div>
 
     <div id="fileModal" class="modal-overlay">
-        <span class="modal-close-btn" onclick="closeModal()">&times;</span>
+        <div class="modal-toolbar">
+            <a id="downloadBtn" href="#" download class="modal-btn" title="Download File">
+                <i class="fas fa-download"></i> Download
+            </a>
+            <span class="modal-btn btn-close" onclick="closeModal()">
+                <i class="fas fa-times"></i> Close
+            </span>
+        </div>
         
         <img class="modal-content-img" id="modalImg" style="display:none;">
-        
         <iframe class="modal-content-pdf" id="modalPdf" style="display:none;"></iframe>
     </div>
 
@@ -307,6 +344,10 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
             var modal = document.getElementById("fileModal");
             var img = document.getElementById("modalImg");
             var pdf = document.getElementById("modalPdf");
+            var dlBtn = document.getElementById("downloadBtn");
+
+            // 设置下载链接
+            dlBtn.href = src;
 
             // 显示 Modal
             modal.style.display = "flex";
@@ -315,7 +356,7 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
                 img.src = src;
                 img.style.display = "block";
                 pdf.style.display = "none";
-                pdf.src = ""; // 清空 PDF 以停止加载
+                pdf.src = ""; // 清空 PDF 防止后台播放
             } else {
                 pdf.src = src;
                 pdf.style.display = "block";
@@ -335,7 +376,7 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
             pdf.src = ""; // 清理资源
         }
 
-        // 点击背景也可以关闭（可选）
+        // 点击背景关闭
         document.getElementById("fileModal").onclick = function(e) {
             if (e.target === this) {
                 closeModal();
