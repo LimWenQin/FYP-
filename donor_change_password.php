@@ -2,7 +2,7 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-// 检查是否已登录
+// Check if logged in
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
     exit();
@@ -10,13 +10,14 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
 
 $error_message = "";
 $success_message = "";
+$password_changed = false; // Flag to trigger SweetAlert
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $current_password = $_POST['current_password'];
     $new_password = $_POST['new_password'];
     $confirm_password = $_POST['confirm_password'];
     
-    // 1. 获取数据库中当前的密码哈希
+    // 1. Get current password hash from database
     $query = "SELECT Donor_Password FROM donor WHERE Donor_ID = ?";
     $stmt = $conn->prepare($query);
     $stmt->bind_param("i", $_SESSION['donor_id']);
@@ -27,12 +28,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $row = $result->fetch_assoc();
         $db_password_hash = $row['Donor_Password'];
         
-        // 2. 验证用户输入的 "Current Password" 是否匹配数据库
+        // 2. Verify if the "Current Password" entered matches the database
         if (password_verify($current_password, $db_password_hash)) {
             
-            // 3. 验证新密码规则
+            // 3. Validate new password rules
             if ($current_password == $new_password) {
-                // 【新增】检查新旧密码是否相同
                 $error_message = "New password cannot be the same as your current password.";
             } elseif (strlen($new_password) < 8 || strlen($new_password) > 15) {
                 $error_message = "New password must be between 8 and 15 characters.";
@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             } elseif ($new_password !== $confirm_password) {
                 $error_message = "New passwords do not match.";
             } else {
-                // 4. 一切正常，加密新密码并更新数据库
+                // 4. Everything is fine, hash the new password and update database
                 $new_hashed_password = password_hash($new_password, PASSWORD_BCRYPT);
                 
                 $update_query = "UPDATE donor SET Donor_Password = ? WHERE Donor_ID = ?";
@@ -55,7 +55,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $update_stmt->bind_param("si", $new_hashed_password, $_SESSION['donor_id']);
                 
                 if ($update_stmt->execute()) {
-                    $success_message = "Password changed successfully!";
+                    // Password changed successfully!
+                    // Destroy session now
+                    session_unset();
+                    session_destroy();
+                    
+                    // Set flag to true to trigger SweetAlert in HTML below
+                    $password_changed = true; 
+                    
                 } else {
                     $error_message = "Database error: Could not update password.";
                 }
@@ -63,7 +70,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
             
         } else {
-            // 当前密码错误
             $error_message = "Current password is incorrect.";
         }
     } else {
@@ -82,6 +88,9 @@ include 'header_UI.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Change Password - Love Bridge</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         :root {
             --primary-red: #dc2626;
@@ -185,10 +194,6 @@ include 'header_UI.php';
                 <div class="error-message"><i class="fas fa-exclamation-triangle"></i> <?php echo $error_message; ?></div>
             <?php endif; ?>
             
-            <?php if (!empty($success_message)): ?>
-                <div class="success-message"><i class="fas fa-check-circle"></i> <?php echo $success_message; ?></div>
-            <?php endif; ?>
-            
             <form method="POST" action="" id="passwordForm">
                 <div class="form-group">
                     <label for="current_password">Current Password</label>
@@ -245,15 +250,31 @@ include 'header_UI.php';
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Check if PHP successful change flag is set
+            <?php if ($password_changed): ?>
+                Swal.fire({
+                    title: 'Password Changed!',
+                    text: 'Your password has been changed successfully. Please login again.',
+                    icon: 'success',
+                    confirmButtonText: 'Login Now',
+                    confirmButtonColor: '#dc2626',
+                    allowOutsideClick: false
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = 'donor_login.php';
+                    }
+                });
+            <?php endif; ?>
+
             const passwordForm = document.getElementById('passwordForm');
-            const currentPassword = document.getElementById('current_password'); // 【新增】
+            const currentPassword = document.getElementById('current_password');
             const newPassword = document.getElementById('new_password');
             const confirmPassword = document.getElementById('confirm_password');
             const passwordStrengthBar = document.getElementById('passwordStrengthBar');
             const submitBtn = document.getElementById('submitBtn');
             const passwordMatchError = document.getElementById('passwordMatchError');
             const passwordMatchSuccess = document.getElementById('passwordMatchSuccess');
-            const samePasswordError = document.getElementById('samePasswordError'); // 【新增】
+            const samePasswordError = document.getElementById('samePasswordError');
             
             // Requirements Elements
             const lengthReq = document.getElementById('lengthReq');
@@ -294,17 +315,16 @@ include 'header_UI.php';
                 return hasLength && hasUppercase && hasLowercase && hasNumber && hasSpecial;
             }
             
-            // 【新增】检查新密码是否与旧密码相同
             function checkSamePassword() {
                 const currentVal = currentPassword.value;
                 const newVal = newPassword.value;
 
                 if (currentVal !== '' && newVal !== '' && currentVal === newVal) {
                     samePasswordError.classList.add('show');
-                    return true; // 是相同的（有错误）
+                    return true;
                 } else {
                     samePasswordError.classList.remove('show');
-                    return false; // 不相同（没有错误）
+                    return false;
                 }
             }
             
@@ -335,9 +355,8 @@ include 'header_UI.php';
             function updateSubmitButton() {
                 const requirementsMet = checkAllRequirements();
                 const passwordsMatch = checkPasswordMatch();
-                const isSamePassword = checkSamePassword(); // 【新增】
+                const isSamePassword = checkSamePassword();
                 
-                // 只有当：要求满足 + 确认密码匹配 + 新密码不为空 + 新旧密码不相同 时，按钮才可用
                 if (requirementsMet && passwordsMatch && newPassword.value !== '' && !isSamePassword) {
                     submitBtn.disabled = false;
                 } else {
@@ -345,13 +364,11 @@ include 'header_UI.php';
                 }
             }
             
-            // 【新增】监听 Current Password 输入
             currentPassword.addEventListener('input', function() {
                 checkSamePassword();
                 updateSubmitButton();
             });
 
-            // Strength Checker & Same Password Checker
             newPassword.addEventListener('input', function() {
                 const value = newPassword.value;
                 let strength = 0;
@@ -380,7 +397,7 @@ include 'header_UI.php';
                 else if (strength === 3 || strength === 4) passwordStrengthBar.classList.add('strength-strong');
                 else if (strength >= 5) passwordStrengthBar.classList.add('strength-very-strong');
                 
-                checkSamePassword(); // 【新增】检查是否相同
+                checkSamePassword();
                 updateSubmitButton();
                 if (confirmPassword.value !== '') checkPasswordMatch();
             });
@@ -394,26 +411,49 @@ include 'header_UI.php';
                 const currentPasswordValue = document.getElementById('current_password').value;
                 
                 if (currentPasswordValue === '') {
-                    alert('Please enter your current password.');
+                    // Replaced alert with SweetAlert
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Oops...',
+                        text: 'Please enter your current password.',
+                        confirmButtonColor: '#dc2626'
+                    });
                     e.preventDefault();
                     return false;
                 }
 
-                // 【新增】提交前再次检查
                 if (currentPasswordValue === newPassword.value) {
-                    alert('New password cannot be the same as your current password.');
+                    // Replaced alert with SweetAlert
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Invalid Password',
+                        text: 'New password cannot be the same as your current password.',
+                        confirmButtonColor: '#dc2626'
+                    });
                     e.preventDefault();
                     return false;
                 }
                 
                 if (!checkAllRequirements()) {
-                    alert('Please ensure all password requirements are met.');
+                    // Replaced alert with SweetAlert
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Weak Password',
+                        text: 'Please ensure all password requirements are met.',
+                        confirmButtonColor: '#dc2626'
+                    });
                     e.preventDefault();
                     return false;
                 }
                 
                 if (newPassword.value !== confirmPassword.value) {
-                    alert('New passwords do not match.');
+                    // Replaced alert with SweetAlert
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Mismatch',
+                        text: 'New passwords do not match.',
+                        confirmButtonColor: '#dc2626'
+                    });
                     e.preventDefault();
                     return false;
                 }

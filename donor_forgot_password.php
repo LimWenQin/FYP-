@@ -19,6 +19,7 @@ define('SITE_RED', '#d32f2f');
 define('SITE_RED_DARK', '#b71c1c');
 define('RESET_TOKEN_EXPIRY_MINUTES', 15); // Token 有效期 15 分钟
 define('MAX_RESET_ATTEMPTS_PER_DAY', 5);  // 每天最多重置 5 次
+define('RESEND_COOLDOWN_SECONDS', 60);    // 【新增】Resend 冷却时间 60秒
 
 // Initialize variables
 $email = '';
@@ -26,6 +27,17 @@ $error_message = '';
 $success_message = '';
 $email_sent = false;
 $rate_limit_exceeded = false;
+
+// 【新增】计算剩余冷却时间
+$seconds_remaining = 0;
+if (isset($_SESSION['last_mail_time'])) {
+    $elapsed = time() - $_SESSION['last_mail_time'];
+    if ($elapsed < RESEND_COOLDOWN_SECONDS) {
+        $seconds_remaining = RESEND_COOLDOWN_SECONDS - $elapsed;
+    } else {
+        unset($_SESSION['last_mail_time']); // 超过时间清除session
+    }
+}
 
 // Function to log security events
 function logSecurityEvent($donor_id, $action, $details = '') {
@@ -35,7 +47,9 @@ function logSecurityEvent($donor_id, $action, $details = '') {
     
     $stmt = $conn->prepare("INSERT INTO donor_security_logs (donor_id, log_type, log_action, ip_address, user_agent, log_details) VALUES (?, 'password_reset', ?, ?, ?, ?)");
     $stmt->bind_param("issss", $donor_id, $action, $ip_address, $user_agent, $details);
-    return $stmt->execute();
+    $return = $stmt->execute();
+    $stmt->close();
+    return $return;
 }
 
 // Function to check rate limiting
@@ -52,6 +66,7 @@ function checkRateLimit($donor_id, $email) {
     $stmt->execute();
     $result = $stmt->get_result();
     $data = $result->fetch_assoc();
+    $stmt->close();
     return $data['attempt_count'] < MAX_RESET_ATTEMPTS_PER_DAY;
 }
 
@@ -64,7 +79,9 @@ function invalidateOldTokens($donor_id) {
         AND reset_status = 'pending'
     ");
     $stmt->bind_param("i", $donor_id);
-    return $stmt->execute();
+    $return = $stmt->execute();
+    $stmt->close();
+    return $return;
 }
 
 // Function to generate secure token
@@ -128,7 +145,13 @@ function sendPasswordResetEmail($donor_name, $donor_email, $reset_token) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
     
-    if (empty($email)) {
+    // 【新增】PHP端检查冷却时间 (防止绕过前端JS)
+    if (isset($_SESSION['last_mail_time']) && (time() - $_SESSION['last_mail_time'] < RESEND_COOLDOWN_SECONDS)) {
+        $seconds_wait = RESEND_COOLDOWN_SECONDS - (time() - $_SESSION['last_mail_time']);
+        $error_message = "Please wait $seconds_wait seconds before sending another email.";
+        $email_sent = true; // 保持停留在 sent 界面
+    } 
+    elseif (empty($email)) {
         $error_message = 'Email address is required.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_message = 'Please enter a valid email address.';
@@ -164,7 +187,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     if (sendPasswordResetEmail($donor_name, $email, $reset_token)) {
                         $email_sent = true;
-                        // 如果是 Resend 操作，提示语可以稍微不同，这里保持通用即可
+                        // 【新增】设置发送时间 Session
+                        $_SESSION['last_mail_time'] = time();
+                        // 重新计算剩余时间传给前端
+                        $seconds_remaining = RESEND_COOLDOWN_SECONDS;
+                        
                         $success_message = 'Password reset instructions have been sent to your email.';
                         logSecurityEvent($donor_id, 'reset_email_sent', "Success");
                     } else {
@@ -179,6 +206,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Security: Don't reveal user doesn't exist
             $email_sent = true;
+            // Fake timer logic for security (optional, but good practice)
+            $_SESSION['last_mail_time'] = time();
+            $seconds_remaining = RESEND_COOLDOWN_SECONDS;
+            
             $success_message = 'If an account exists with this email, password reset instructions have been sent.';
             logSecurityEvent(NULL, 'failed_reset_attempt', "Non-existent: $email");
         }
@@ -300,9 +331,11 @@ include 'header_UI.php';
             background-color: #b71c1c; 
         }
 
-        .btn:disabled {
-            background: #cccccc;
-            cursor: not-allowed;
+        .btn:disabled, .btn.disabled {
+            background: #cccccc !important;
+            color: #666 !important;
+            cursor: not-allowed !important;
+            border-color: #cccccc !important;
         }
 
         .secondary-btn {
@@ -369,7 +402,7 @@ include 'header_UI.php';
                 <div style="text-align:center;">
                     <a href="donor_login.php" class="btn">Back to Login</a>
                 </div>
-            <?php elseif (!empty($error_message)): ?>
+            <?php elseif (!empty($error_message) && !$email_sent): // 只有在没有成功发送邮件时显示大错误框 ?>
                 <div class="error-message">
                     <i class="fas fa-exclamation-circle"></i>
                     <?php echo htmlspecialchars($error_message); ?>
@@ -390,11 +423,21 @@ include 'header_UI.php';
                     </form>
                 </div>
 
-            <?php elseif (!empty($success_message)): ?>
-                <div class="success-message">
-                    <i class="fas fa-check-circle"></i>
-                    <div><?php echo htmlspecialchars($success_message); ?></div>
-                </div>
+            <?php elseif (!empty($success_message) || $email_sent): ?>
+                
+                <?php if(!empty($error_message)): ?>
+                    <div class="error-message">
+                        <i class="fas fa-clock"></i>
+                        <?php echo htmlspecialchars($error_message); ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php if(!empty($success_message)): ?>
+                    <div class="success-message">
+                        <i class="fas fa-check-circle"></i>
+                        <div><?php echo htmlspecialchars($success_message); ?></div>
+                    </div>
+                <?php endif; ?>
             <?php endif; ?>
             
             <?php if (!$email_sent && !$rate_limit_exceeded && empty($error_message)): ?>
@@ -450,6 +493,9 @@ include 'header_UI.php';
     <?php include 'footer.php'; ?>
     
     <script>
+        // 获取 PHP 传递的剩余秒数
+        let cooldownSeconds = <?php echo $seconds_remaining; ?>;
+        
         // Handle standard submit
         document.getElementById('forgotPasswordForm')?.addEventListener('submit', function() {
             const btn = document.getElementById('submitBtn');
@@ -463,7 +509,13 @@ include 'header_UI.php';
         });
 
         // Handle Resend submit
-        document.getElementById('resendForm')?.addEventListener('submit', function() {
+        document.getElementById('resendForm')?.addEventListener('submit', function(e) {
+            // 前端再次检查，防止手快
+            if(cooldownSeconds > 0) {
+                e.preventDefault();
+                return false;
+            }
+
             const btn = document.getElementById('resendBtn');
             const txt = document.getElementById('resendBtnText');
             const spin = document.getElementById('resendSpinner');
@@ -484,6 +536,40 @@ include 'header_UI.php';
             btn.style.opacity = '0.8';
             txt.style.display = 'none';
             spin.style.display = 'block';
+        });
+
+        // --- 倒计时逻辑 ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const resendBtn = document.getElementById('resendBtn');
+            const resendBtnText = document.getElementById('resendBtnText');
+
+            if (resendBtn && cooldownSeconds > 0) {
+                // 冻结按钮
+                disableResendButton();
+                
+                // 开始倒计时
+                const timer = setInterval(function() {
+                    cooldownSeconds--;
+                    resendBtnText.innerText = `Resend in ${cooldownSeconds}s`;
+                    
+                    if (cooldownSeconds <= 0) {
+                        clearInterval(timer);
+                        enableResendButton();
+                    }
+                }, 1000);
+            }
+
+            function disableResendButton() {
+                resendBtn.disabled = true;
+                resendBtn.classList.add('disabled'); // Add helper class
+                resendBtnText.innerText = `Resend in ${cooldownSeconds}s`;
+            }
+
+            function enableResendButton() {
+                resendBtn.disabled = false;
+                resendBtn.classList.remove('disabled');
+                resendBtnText.innerText = "Resend Email";
+            }
         });
     </script>
 </body>
