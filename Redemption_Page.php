@@ -30,7 +30,6 @@ if ($current_donor_id) {
     
     if (!empty($donor_data['Donor_Address1']) && 
         !empty($donor_data['Donor_City']) && 
-        !empty($donor_data['Donor_State']) && 
         !empty($donor_data['Donor_PostalCode'])) {
         $donor_address_complete = true;
     }
@@ -44,7 +43,7 @@ $alert_script = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
     
-    // 地址更新处理
+    // 功能一：地址更新处理 (保留)
     if (isset($_POST['update_address'])) {
         $addr1 = $_POST['addr1']; $addr2 = $_POST['addr2']; $city = $_POST['city']; $state = $_POST['state']; $zip = $_POST['zip'];
         $sql = "UPDATE donor SET Donor_Address1=?, Donor_Address2=?, Donor_City=?, Donor_State=?, Donor_PostalCode=? WHERE Donor_ID=?";
@@ -55,21 +54,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         }
     }
 
-    // 兑换请求处理
+    // 功能二：兑换请求处理 (保留，已包含 Low Stock 逻辑)
     if (isset($_POST['redeem_item_id'])) {
-    $item_id = $_POST['redeem_item_id'];
-    
-    // ⭐ 修改这里的 WHERE 子句，允许 Active 或 Low Stock
-    $stmt = $conn->prepare("SELECT * FROM reward_item WHERE Reward_ID = ? AND (Reward_Status = 'Active' OR Reward_Status = 'Low Stock')");
-    $stmt->bind_param("i", $item_id);
-    $stmt->execute();
-    $item = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+        $item_id = $_POST['redeem_item_id'];
+        $stmt = $conn->prepare("SELECT * FROM reward_item WHERE Reward_ID = ? AND (Reward_Status = 'Active' OR Reward_Status = 'Low Stock')");
+        $stmt->bind_param("i", $item_id);
+        $stmt->execute();
+        $item = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
 
-    // 验证：商品存在、库存大于0、积分足够、地址完整
-    if (!$item || $item['Reward_Stock'] <= 0 || $donor_points < $item['Reward_RequiredPoint'] || !$donor_address_complete) {
-        $alert_script = "Swal.fire('Error', 'Unable to redeem. Please check your points or stock.', 'error');";
-    } else {
+        if (!$item || $item['Reward_Stock'] <= 0 || $donor_points < $item['Reward_RequiredPoint'] || !$donor_address_complete) {
+            $alert_script = "Swal.fire('Error', 'Unable to redeem. Please check your points or stock.', 'error');";
+        } else {
             $conn->begin_transaction();
             try {
                 $new_points = $donor_points - $item['Reward_RequiredPoint'];
@@ -89,14 +85,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         }
     }
 
-    // 确认收货处理
+    // ⭐ 新增功能：确认收货处理 (用于更新数据库状态)
     if (isset($_POST['confirm_receive_id'])) {
         $order_id = $_POST['confirm_receive_id'];
+        // 只有状态为 Shipped 的订单才能被改为 Completed
         $stmt = $conn->prepare("UPDATE redemption_order SET Redemption_Status = 'Completed', Redemption_Updated_At = NOW() WHERE Redemption_ID = ? AND Donor_ID = ? AND Redemption_Status = 'Shipped'");
         $stmt->bind_param("ii", $order_id, $current_donor_id);
         if ($stmt->execute()) {
-            $alert_script = "Swal.fire({ title: 'Completed!', text: 'Order marked as received.', icon: 'success' }).then(() => { window.location.href='Redemption_Page.php'; });";
+            $alert_script = "Swal.fire({ title: 'Order Received!', text: 'Thank you for your confirmation.', icon: 'success' }).then(() => { window.location.href='Redemption_Page.php'; });";
         }
+        $stmt->close();
     }
 }
 ?>
@@ -119,36 +117,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         .tab-btn.active { color: var(--primary-red); }
         .tab-btn.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 3px; background: var(--primary-red); }
         
-        /* Grid and Cards */
         .rewards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 30px; }
         .reward-card { background: var(--white); border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.3s ease; display: flex; flex-direction: column; position: relative; }
         .reward-card:not(.disabled):hover { transform: translateY(-5px); }
-        
-        /* 关键修复：只有状态非Active或库存为0才显示disabled效果 */
         .reward-card.disabled { opacity: 0.7; filter: grayscale(0.8); cursor: not-allowed; }
         .reward-card.disabled .btn-redeem { background-color: #999 !important; pointer-events: none; }
         
-        /* Badge Styles */
         .stock-badge { position: absolute; top: 10px; left: 10px; padding: 5px 12px; border-radius: 5px; font-size: 0.75rem; font-weight: bold; color: white; z-index: 2; text-transform: uppercase; }
-        .badge-out { background: #444; } /* Out of Stock - 灰色/黑色 */
-        .badge-inactive { background: #dc2626; } /* Not Available - 红色 */
-        .badge-low { background: var(--warning-orange); box-shadow: 0 2px 4px rgba(0,0,0,0.2); } /* Low Stock - 橙色 */
+        .badge-out { background: #444; } 
+        .badge-inactive { background: #dc2626; } 
+        .badge-low { background: var(--warning-orange); box-shadow: 0 2px 4px rgba(0,0,0,0.2); } 
 
         .reward-img { width: 100%; height: 200px; object-fit: cover; background: #eee; }
         .reward-body { padding: 20px; flex-grow: 1; display: flex; flex-direction: column; }
         .reward-meta { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 15px; border-top: 1px solid #eee; }
         .btn-redeem { background-color: var(--primary-red); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; margin-top: 15px; transition: background 0.2s; }
-        .btn-redeem:hover:not(:disabled) { background-color: var(--dark-red); }
 
-        /* History UI */
         .history-container { display: none; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .history-table { width: 100%; border-collapse: collapse; }
         .history-table th { text-align: left; padding: 15px; background: #eee; color: #555; }
         .history-table td { padding: 15px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+        
         .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; }
         .st-processing { background: #fef3c7; color: #92400e; }
         .st-shipped { background: #dbeafe; color: #1e40af; }
         .st-completed { background: #dcfce7; color: #166534; }
+        .st-cancelled { background: #fee2e2; color: #991b1b; }
+
+        /* 新增：确认收货按钮样式 */
+        .btn-received { 
+            background-color: var(--success-green); 
+            color: white; border: none; 
+            padding: 8px 15px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: 0.2s;
+        }
+        .btn-received:hover { background-color: #059669; transform: translateY(-1px); }
     </style>
 </head>
 <body>
@@ -167,65 +176,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
     </div>
     
     <div id="redeem-tab" class="rewards-grid">
-    <?php
-    // 获取所有商品，按状态排序（Active/Low Stock优先）
-    $sql = "SELECT * FROM reward_item ORDER BY FIELD(Reward_Status, 'Active', 'Low Stock', 'Inactive') ASC, Reward_RequiredPoint ASC";
-    $result = $conn->query($sql);
+        <?php
+        $sql = "SELECT * FROM reward_item ORDER BY FIELD(Reward_Status, 'Active', 'Low Stock', 'Inactive') ASC, Reward_RequiredPoint ASC";
+        $result = $conn->query($sql);
+        while ($row = $result->fetch_assoc()) {
+            $status = $row['Reward_Status'];
+            $stock = (int)$row['Reward_Stock'];
+            $is_inactive = ($status === 'Inactive');
+            $is_out_of_stock = ($stock <= 0);
+            $is_low_stock = ($status === 'Low Stock' || ($stock > 0 && $stock <= 10));
+            $can_redeem = (!$is_inactive && !$is_out_of_stock);
+            
+            $raw_path = $row['Reward_PhotoPath'];
+            $clean_path = str_replace('\\', '/', $raw_path);
+            $final_src = (strpos($clean_path, 'reward_') === 0) ? "uploads/rewards/" . $clean_path : $clean_path;
 
-    while ($row = $result->fetch_assoc()) {
-        $status = $row['Reward_Status'];
-        $stock = (int)$row['Reward_Stock'];
+            $badge_html = "";
+            $btn_text = "Redeem Now";
+            $card_class = $can_redeem ? "" : "disabled";
 
-        // ⭐ 核心逻辑修改：只要状态不是 Inactive 且库存大于 0，就可以兑换
-        $is_inactive = ($status === 'Inactive');
-        $is_out_of_stock = ($stock <= 0);
-        $is_low_stock = ($status === 'Low Stock' || ($stock > 0 && $stock <= 10));
-
-        // 只要不是 Inactive 且 有货，就是可兑换状态
-        $can_redeem = (!$is_inactive && !$is_out_of_stock);
-
-        // 处理图片路径
-        $img_path = str_replace('\\', '/', $row['Reward_PhotoPath']);
-        $final_src = (strpos($img_path, 'reward_') === 0) ? "uploads/rewards/" . $img_path : $img_path;
-
-        // 样式类：只有真正不能兑换的才加 disabled
-        $card_class = $can_redeem ? "" : "disabled";
-        
-        // 标签显示逻辑
-        $badge_html = "";
-        $btn_text = "Redeem Now";
-
-        if ($is_inactive) {
-            $badge_html = '<div class="stock-badge badge-inactive">Not Available</div>';
-            $btn_text = "Not Available";
-        } elseif ($is_out_of_stock) {
-            $badge_html = '<div class="stock-badge badge-out">Out of Stock</div>';
-            $btn_text = "Out of Stock";
-        } elseif ($is_low_stock) {
-            // ⭐ 针对您的需求：显示橙色 Low Stock 标签，但保持按钮可用
-            $badge_html = '<div class="stock-badge badge-low">Low Stock</div>';
-        }
-    ?>
-        <div class="reward-card <?php echo $card_class; ?>">
-            <?php echo $badge_html; ?>
-            <img src="<?php echo htmlspecialchars($final_src); ?>" class="reward-img" onerror="this.src='images/hero_3.jpg';">
-            <div class="reward-body">
-                <div style="font-weight:bold; font-size:1.1rem;"><?php echo htmlspecialchars($row['Reward_ItemName']); ?></div>
-                <div style="color:#666; font-size:0.9rem; margin-top:5px; flex-grow:1;"><?php echo htmlspecialchars($row['Reward_Description']); ?></div>
-                <div class="reward-meta">
-                    <div style="color:var(--primary-red); font-weight:800;"><?php echo $row['Reward_RequiredPoint']; ?> PTS</div>
-                    <div style="font-size:0.8rem; <?php echo $is_low_stock ? 'color:var(--warning-orange); font-weight:bold;' : 'color:#888;'; ?>">
-                        <?php echo $stock; ?> left
+            if ($is_inactive) {
+                $badge_html = '<div class="stock-badge badge-inactive">Not Available</div>';
+                $btn_text = "Not Available";
+            } elseif ($is_out_of_stock) {
+                $badge_html = '<div class="stock-badge badge-out">Out of Stock</div>';
+                $btn_text = "Out of Stock";
+            } elseif ($is_low_stock) {
+                $badge_html = '<div class="stock-badge badge-low">Low Stock</div>';
+            }
+            ?>
+            <div class="reward-card <?php echo $card_class; ?>">
+                <?php echo $badge_html; ?>
+                <img src="<?php echo htmlspecialchars($final_src); ?>" class="reward-img" onerror="this.src='images/hero_3.jpg';">
+                <div class="reward-body">
+                    <div style="font-weight:bold; font-size:1.1rem;"><?php echo htmlspecialchars($row['Reward_ItemName']); ?></div>
+                    <div style="color:#666; font-size:0.9rem; margin-top:5px; flex-grow:1;"><?php echo htmlspecialchars($row['Reward_Description']); ?></div>
+                    <div class="reward-meta">
+                        <div style="color:var(--primary-red); font-weight:800;"><?php echo $row['Reward_RequiredPoint']; ?> PTS</div>
+                        <div style="font-size:0.8rem; <?php echo $is_low_stock ? 'color:var(--warning-orange); font-weight:bold;' : 'color:#888;'; ?>">
+                            <?php echo $stock; ?> left
+                        </div>
                     </div>
+                    <button class="btn-redeem" <?php echo !$can_redeem ? 'disabled' : ''; ?>
+                        onclick="handleRedeem(<?php echo $row['Reward_ID']; ?>, <?php echo $row['Reward_RequiredPoint']; ?>, '<?php echo addslashes($row['Reward_ItemName']); ?>')">
+                        <?php echo $btn_text; ?>
+                    </button>
                 </div>
-                <button class="btn-redeem" <?php echo !$can_redeem ? 'disabled' : ''; ?>
-                    onclick="handleRedeem(<?php echo $row['Reward_ID']; ?>, <?php echo $row['Reward_RequiredPoint']; ?>, '<?php echo addslashes($row['Reward_ItemName']); ?>')">
-                    <?php echo $btn_text; ?>
-                </button>
             </div>
-        </div>
-    <?php } ?>
-</div>
+        <?php } ?>
+    </div>
 
     <div id="history-tab" class="history-container">
         <?php if ($current_donor_id): ?>
@@ -261,15 +260,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
                         </td>
                         <td><?php echo date("d M Y", strtotime($hist['Redemption_Updated_At'])); ?></td>
                         <td style="color:var(--primary-red); font-weight:bold;">-<?php echo $hist['Redemption_PointsSpent']; ?> PT</td>
-                        <td><span class="status-badge st-<?php echo strtolower($status); ?>"><?php echo $status; ?></span></td>
+                        <td>
+                            <?php 
+                                // 动态显示状态标签
+                                $status_lower = strtolower($status);
+                                echo "<span class='status-badge st-$status_lower'>$status</span>";
+                            ?>
+                        </td>
                         <td>
                             <?php if ($status == 'Shipped'): ?>
-                                <button class="btn-redeem" style="margin-top:0; padding:5px 10px;" onclick="confirmReceive(<?php echo $hist['Redemption_ID']; ?>)">Confirm Received</button>
+                                <button type="button" class="btn-received" onclick="confirmReceive(<?php echo $hist['Redemption_ID']; ?>)">
+                                    <i class="fas fa-box-open"></i> Confirm Received
+                                </button>
+                            <?php elseif ($status == 'Completed'): ?>
+                                <span style="color:var(--success-green); font-weight:bold;"><i class="fas fa-check-circle"></i> Enjoy!</span>
+                            <?php else: ?>
+                                <span style="color:#999; font-size:0.85rem;">Processing...</span>
                             <?php endif; ?>
                         </td>
                     </tr>
                 <?php endwhile; else: ?>
-                    <tr><td colspan="5" style="text-align:center;">No history found.</td></tr>
+                    <tr><td colspan="5" style="text-align:center; padding:50px; color:#999;">No history found.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -278,13 +289,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
 </div>
 
 <form id="redeemForm" method="POST" style="display:none;"><input type="hidden" name="redeem_item_id" id="hidden_id"></form>
-<form id="receiveForm" method="POST" style="display:none;"><input type="hidden" name="confirm_receive_id" id="hidden_recv_id"></form>
+
+<form id="receiveForm" method="POST" style="display:none;">
+    <input type="hidden" name="confirm_receive_id" id="hidden_recv_id">
+</form>
 
 <script>
     const isLoggedIn = <?php echo $current_donor_id ? 'true' : 'false'; ?>;
     const isAddressComplete = <?php echo $donor_address_complete ? 'true' : 'false'; ?>;
     const currentPoints = <?php echo $donor_points; ?>;
 
+    // Tab 切换逻辑 (保留)
     function switchTab(tabName) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById('redeem-tab').style.display = (tabName === 'redeem' ? 'grid' : 'none');
@@ -292,6 +307,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         event.currentTarget.classList.add('active');
     }
 
+    // 兑换逻辑 (保留)
     function handleRedeem(itemId, reqPoints, name) {
         if (!isLoggedIn) { 
             Swal.fire('Login Required', 'Please login to redeem rewards.', 'warning').then(() => window.location.href='donor_login.php');
@@ -321,13 +337,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         });
     }
 
+    // ⭐ 新增：确认收货逻辑
     function confirmReceive(orderId) {
         Swal.fire({
             title: 'Confirm Received?',
-            text: 'Have you received the item?',
+            text: 'Have you received the reward item? This action will mark the order as Completed.',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Yes'
+            confirmButtonColor: '#10b981',
+            confirmButtonText: 'Yes, I received it!'
         }).then(res => {
             if (res.isConfirmed) {
                 document.getElementById('hidden_recv_id').value = orderId;
