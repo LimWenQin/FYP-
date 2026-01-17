@@ -57,16 +57,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
 
     // 兑换请求处理
     if (isset($_POST['redeem_item_id'])) {
-        $item_id = $_POST['redeem_item_id'];
-        $stmt = $conn->prepare("SELECT * FROM reward_item WHERE Reward_ID = ? AND Reward_Status = 'Active'");
-        $stmt->bind_param("i", $item_id);
-        $stmt->execute();
-        $item = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
+    $item_id = $_POST['redeem_item_id'];
+    
+    // ⭐ 修改这里的 WHERE 子句，允许 Active 或 Low Stock
+    $stmt = $conn->prepare("SELECT * FROM reward_item WHERE Reward_ID = ? AND (Reward_Status = 'Active' OR Reward_Status = 'Low Stock')");
+    $stmt->bind_param("i", $item_id);
+    $stmt->execute();
+    $item = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 
-        if (!$item || $item['Reward_Stock'] <= 0 || $donor_points < $item['Reward_RequiredPoint'] || !$donor_address_complete) {
-            $alert_script = "Swal.fire('Error', 'Unable to redeem. Check your points, address, or stock.', 'error');";
-        } else {
+    // 验证：商品存在、库存大于0、积分足够、地址完整
+    if (!$item || $item['Reward_Stock'] <= 0 || $donor_points < $item['Reward_RequiredPoint'] || !$donor_address_complete) {
+        $alert_script = "Swal.fire('Error', 'Unable to redeem. Please check your points or stock.', 'error');";
+    } else {
             $conn->begin_transaction();
             try {
                 $new_points = $donor_points - $item['Reward_RequiredPoint'];
@@ -164,65 +167,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
     </div>
     
     <div id="redeem-tab" class="rewards-grid">
-        <?php
-        $sql = "SELECT * FROM reward_item ORDER BY FIELD(Reward_Status, 'Active') DESC, Reward_RequiredPoint ASC";
-        $result = $conn->query($sql);
-        while ($row = $result->fetch_assoc()) {
-            $is_active = ($row['Reward_Status'] == 'Active');
-            $stock = $row['Reward_Stock'];
-            
-            // 核心逻辑判断
-            $is_out_of_stock = ($stock <= 0);
-            $is_low_stock = ($is_active && $stock > 0 && $stock <= 10);
-            
-            // 只要是Active且库存>0，就可以兑换
-            $can_redeem = ($is_active && !$is_out_of_stock);
-            
-            // 图片路径处理
-            $raw_path = $row['Reward_PhotoPath'];
-            $clean_path = str_replace('\\', '/', $raw_path);
-            $final_src = (strpos($clean_path, 'reward_') === 0) ? "uploads/rewards/" . $clean_path : $clean_path;
+    <?php
+    // 获取所有商品，按状态排序（Active/Low Stock优先）
+    $sql = "SELECT * FROM reward_item ORDER BY FIELD(Reward_Status, 'Active', 'Low Stock', 'Inactive') ASC, Reward_RequiredPoint ASC";
+    $result = $conn->query($sql);
 
-            $badge_html = "";
-            $btn_text = "Redeem Now";
-            $card_class = "";
+    while ($row = $result->fetch_assoc()) {
+        $status = $row['Reward_Status'];
+        $stock = (int)$row['Reward_Stock'];
 
-            // 标签优先级判定
-            if (!$is_active) {
-                $badge_html = '<div class="stock-badge badge-inactive">Not Available</div>';
-                $btn_text = "Not Available";
-                $card_class = "disabled";
-            } elseif ($is_out_of_stock) {
-                $badge_html = '<div class="stock-badge badge-out">Out of Stock</div>';
-                $btn_text = "Out of Stock";
-                $card_class = "disabled";
-            } elseif ($is_low_stock) {
-                // ⭐ 这里就是你要的效果：库存1-10且Active，显示 Low Stock
-                $badge_html = '<div class="stock-badge badge-low">Low Stock</div>';
-                $btn_text = "Redeem Now";
-                $card_class = ""; // 确保没有变灰
-            }
-            ?>
-            <div class="reward-card <?php echo $card_class; ?>">
-                <?php echo $badge_html; ?>
-                <img src="<?php echo htmlspecialchars($final_src); ?>" class="reward-img" onerror="this.src='images/hero_3.jpg';">
-                <div class="reward-body">
-                    <div style="font-weight:bold; font-size:1.1rem;"><?php echo htmlspecialchars($row['Reward_ItemName']); ?></div>
-                    <div style="color:#666; font-size:0.9rem; margin-top:5px; flex-grow:1;"><?php echo htmlspecialchars($row['Reward_Description']); ?></div>
-                    <div class="reward-meta">
-                        <div style="color:var(--primary-red); font-weight:800;"><?php echo $row['Reward_RequiredPoint']; ?> PTS</div>
-                        <div style="font-size:0.8rem; <?php echo $is_low_stock ? 'color:var(--warning-orange); font-weight:bold;' : 'color:#888;'; ?>">
-                            <?php echo $stock; ?> left
-                        </div>
+        // ⭐ 核心逻辑修改：只要状态不是 Inactive 且库存大于 0，就可以兑换
+        $is_inactive = ($status === 'Inactive');
+        $is_out_of_stock = ($stock <= 0);
+        $is_low_stock = ($status === 'Low Stock' || ($stock > 0 && $stock <= 10));
+
+        // 只要不是 Inactive 且 有货，就是可兑换状态
+        $can_redeem = (!$is_inactive && !$is_out_of_stock);
+
+        // 处理图片路径
+        $img_path = str_replace('\\', '/', $row['Reward_PhotoPath']);
+        $final_src = (strpos($img_path, 'reward_') === 0) ? "uploads/rewards/" . $img_path : $img_path;
+
+        // 样式类：只有真正不能兑换的才加 disabled
+        $card_class = $can_redeem ? "" : "disabled";
+        
+        // 标签显示逻辑
+        $badge_html = "";
+        $btn_text = "Redeem Now";
+
+        if ($is_inactive) {
+            $badge_html = '<div class="stock-badge badge-inactive">Not Available</div>';
+            $btn_text = "Not Available";
+        } elseif ($is_out_of_stock) {
+            $badge_html = '<div class="stock-badge badge-out">Out of Stock</div>';
+            $btn_text = "Out of Stock";
+        } elseif ($is_low_stock) {
+            // ⭐ 针对您的需求：显示橙色 Low Stock 标签，但保持按钮可用
+            $badge_html = '<div class="stock-badge badge-low">Low Stock</div>';
+        }
+    ?>
+        <div class="reward-card <?php echo $card_class; ?>">
+            <?php echo $badge_html; ?>
+            <img src="<?php echo htmlspecialchars($final_src); ?>" class="reward-img" onerror="this.src='images/hero_3.jpg';">
+            <div class="reward-body">
+                <div style="font-weight:bold; font-size:1.1rem;"><?php echo htmlspecialchars($row['Reward_ItemName']); ?></div>
+                <div style="color:#666; font-size:0.9rem; margin-top:5px; flex-grow:1;"><?php echo htmlspecialchars($row['Reward_Description']); ?></div>
+                <div class="reward-meta">
+                    <div style="color:var(--primary-red); font-weight:800;"><?php echo $row['Reward_RequiredPoint']; ?> PTS</div>
+                    <div style="font-size:0.8rem; <?php echo $is_low_stock ? 'color:var(--warning-orange); font-weight:bold;' : 'color:#888;'; ?>">
+                        <?php echo $stock; ?> left
                     </div>
-                    <button class="btn-redeem" <?php echo !$can_redeem ? 'disabled' : ''; ?>
-                        onclick="handleRedeem(<?php echo $row['Reward_ID']; ?>, <?php echo $row['Reward_RequiredPoint']; ?>, '<?php echo addslashes($row['Reward_ItemName']); ?>')">
-                        <?php echo $btn_text; ?>
-                    </button>
                 </div>
+                <button class="btn-redeem" <?php echo !$can_redeem ? 'disabled' : ''; ?>
+                    onclick="handleRedeem(<?php echo $row['Reward_ID']; ?>, <?php echo $row['Reward_RequiredPoint']; ?>, '<?php echo addslashes($row['Reward_ItemName']); ?>')">
+                    <?php echo $btn_text; ?>
+                </button>
             </div>
-        <?php } ?>
-    </div>
+        </div>
+    <?php } ?>
+</div>
 
     <div id="history-tab" class="history-container">
         <?php if ($current_donor_id): ?>

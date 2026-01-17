@@ -37,18 +37,31 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 if ($row = $result->fetch_assoc()) {
-    // Determine Beneficiary and Generate Detail Link
+    // 默认项目名称
     $project_name = "General Fund (HQ)";
     
+    // 核心修改：调整跳转链接逻辑
     if (!empty($row['Case_Title'])) {
+        // Special Case 保持原样或根据需要调整
         $project_name = "Special Case: " . $row['Case_Title'];
         $view_beneficiary_url = "Special_Case_Details.php?id=" . $row['sc_id'];
+        
     } elseif (!empty($row['Activity_Name'])) {
+        // Activity 跳转至 donor_campaign_detail.php
         $project_name = "Activity: " . $row['Activity_Name'];
-        $view_beneficiary_url = "Activity_Details.php?id=" . $row['act_id'];
+        $view_beneficiary_url = "donor_campaign_detail.php?id=" . $row['act_id'];
+        
     } elseif (!empty($row['Branch_Name'])) {
+        // Branch 跳转至 Branch_Details.php
         $project_name = "Branch: " . $row['Branch_Name'];
         $view_beneficiary_url = "Branch_Details.php?id=" . $row['br_id'];
+        
+    } else {
+        // 如果是 HQ (既没有 Case, Activity 也没有特定 Branch ID)
+        // 根据您的要求，HQ 也连接到 Branch_Details.php
+        // 通常 HQ 的 ID 在数据库中可能是固定的（例如 id=1），请确认您的数据结构
+        $project_name = "General Fund (HQ)";
+        $view_beneficiary_url = "Branch_Details.php?id=0"; // 假设 HQ 的 ID 为 1
     }
 
     // Format Donation Type
