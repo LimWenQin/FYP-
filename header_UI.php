@@ -28,18 +28,8 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         }
         $stmt->close();
 
-        // B. [新增] 获取即将到期的 Subscription (未来7天内扣款)
+        // B. [新增] 获取即将到期的 Recurring Donation (未来7天内扣款)
         // 逻辑：状态为 Active，且 Recurring_Deduction_Date 在今天和未来7天之间
-        $notif_sql = "SELECT Recurring_Amount, Recurring_Deduction_Date, Recurring_Type 
-                      FROM recurring_donation 
-                      WHERE Donor_ID = ? 
-                      AND Recurring_Status = 'Active' 
-                      AND Recurring_Deduction_Date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
-                      ORDER BY Recurring_Deduction_Date ASC";
-        
-        // 注意：如果您的表里没有 Recurring_Type，请从 SQL 中去掉它。这里假设用金额和日期展示。
-        // 根据您提供的 SQL dump，表里只有 Recurring_Amount 和 Recurring_Deduction_Date 是关键。
-        
         $stmt_notif = $conn->prepare("SELECT Recurring_ID, Recurring_Amount, Recurring_Deduction_Date FROM recurring_donation WHERE Donor_ID = ? AND Recurring_Status = 'Active' AND Recurring_Deduction_Date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)");
         
         if ($stmt_notif) {
@@ -525,7 +515,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                                 <?php if ($notification_count > 0): ?>
                                     <?php foreach ($notifications as $notif): ?>
                                         <div class="notification-item">
-                                            <div class="notif-title">Subscription Renewal</div>
+                                            <div class="notif-title">Recurring Donation Renewal</div>
                                             <div class="notif-desc">
                                                 Your monthly donation of <b>RM <?php echo number_format($notif['Recurring_Amount'], 2); ?></b> is scheduled for deduction.
                                             </div>
@@ -625,10 +615,16 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             dropdown.classList.toggle('active');
         }
 
-        // [新增] 2. Notification Dropdown Logic
+        // 2. Notification Dropdown Logic
         function toggleNotification() {
             const notifDropdown = document.getElementById('notificationDropdown');
             const accountDropdown = document.getElementById('profileDropdown');
+
+            // [新增] 当用户点击铃铛时，隐藏红色角标
+            const badge = document.querySelector('.notification-badge');
+            if (badge) {
+                badge.style.display = 'none';
+            }
 
             // 关闭 Account，打开通知
             if(accountDropdown) accountDropdown.classList.remove('active');
@@ -648,7 +644,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 profileDropdown.classList.remove('active');
             }
 
-            // [新增] 处理 Notification 点击外部关闭
+            // 处理 Notification 点击外部关闭
             if (notifTrigger && !notifTrigger.contains(event.target) && !notifDropdown.contains(event.target)) {
                 notifDropdown.classList.remove('active');
             }
@@ -692,7 +688,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e16161', 
-                cancelButtonColor: '#6c757d',
+                cancelButtonColor: '#6c757d', 
                 confirmButtonText: 'Yes, Log out',
                 cancelButtonText: 'Cancel'
             }).then((result) => {
