@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- 主机： 127.0.0.1
--- 生成日期： 2026-01-13 16:54:27
+-- 生成日期： 2026-01-17 19:03:50
 -- 服务器版本： 10.4.32-MariaDB
 -- PHP 版本： 8.2.12
 
@@ -72,6 +72,8 @@ CREATE TABLE `activity` (
   `Activity_Max_Participants` int(11) DEFAULT 0,
   `Activity_Images` longtext DEFAULT NULL,
   `Activity_Status` varchar(50) NOT NULL,
+  `Activity_BankName` varchar(100) DEFAULT NULL,
+  `Activity_BankAccount` varchar(50) DEFAULT NULL,
   `Activity_GetAmount` decimal(10,2) NOT NULL,
   `Activity_TargetAmount` decimal(10,2) DEFAULT 0.00,
   `Activity_Address1` varchar(255) NOT NULL,
@@ -89,15 +91,15 @@ CREATE TABLE `activity` (
 -- 转存表中的数据 `activity`
 --
 
-INSERT INTO `activity` (`Activity_ID`, `Activity_Name`, `Activity_Venue`, `Activity_Date`, `Activity_StartDate`, `Activity_EndDate`, `Activity_Description`, `Activity_Organizer`, `Activity_Contact_Name`, `Activity_Contact_Number`, `Activity_Contact_Email`, `Activity_Max_Participants`, `Activity_Images`, `Activity_Status`, `Activity_GetAmount`, `Activity_TargetAmount`, `Activity_Address1`, `Activity_Address2`, `Activity_Address3`, `Activity_City`, `Activity_State`, `Activity_PostalCode`, `Activity_Country`, `Branch_ID`, `Cancel_Reason`) VALUES
-(1, 'Hope in Ashes - Sentul Kampung Fire Reconstruction', 'Sentul Community Hall', NULL, '2026-02-01', '2026-03-01', 'A sudden tragedy struck the squatter area of Sentul early yesterday morning, where a fire engulfed 30 wooden houses in just two hours, leaving over 120 residents homeless. Most victims are from low-income B40 families for whom this loss is devastating. Love Bridge is collaborating with local leaders to launch an emergency relief plan. Donations will provide RM500 emergency rental subsidies per family, essential household items like mattresses and cooking utensils, and school supplies for 40 affected children to ensure their education is not interrupted. We are also accepting donations of new clothing at our KL HQ.', 'Love Bridge Urban Aid', 'Ms. Sarah Lim (Project Coordinator)', '+6016-1234567', 'urban.aid@lovebridge.org.my', 0, '[\"uploads\\/activities\\/act_1768129494_696383d67fe11_0.png\",\"uploads\\/activities\\/act_1768129494_696383d681da0_1.png\"]', 'Active', 11827.75, 50000.00, 'Dewan Komuniti Sentul Pasar', 'Jalan Sentul Manis', 'Kampung Sentul Pasar', 'Kuala Lumpur', 'Kuala Lumpur', '51000', 'Malaysia', 2, NULL),
-(2, '\"Dreams Take Flight\" - Weekend Care Day', 'Four Ace Sanctuary', NULL, '2026-02-14', '2026-02-14', 'The 45 children at our sanctuary each have unique and difficult backgrounds, but they all share a longing for love and attention. This Valentine\'s Day weekend, we invite the public to spread love by joining us for the \"Dreams Take Flight\" party. The event will include ice-breaking games, a \"Home of My Dreams\" drawing contest, story-sharing sessions, and a special KFC lunch treat. We are looking for 20 patient and fully vaccinated volunteers to spend the afternoon bringing joy to these children.', 'Johor Youth Volunteers', 'Mrs. Sarah Wong (Branch Head)', '+6012-3456781', 'fourace@lovebridge.org.my', 20, '[\"uploads\\/activities\\/act_1768129933_6963858d70e61_0.png\",\"uploads\\/activities\\/act_1768129933_6963858d72c0b_1.png\"]', 'Upcoming', 0.00, 5000.00, '22, Jalan Impian Emas 4', 'Taman Impian Emas', 'Skudai', 'Johor Bahru', 'Johor', '81300', 'Malaysia', 1, NULL),
-(3, '2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', 'Flood Relief Center (PPS) SK Kota Bharu', NULL, '2026-01-15', '2026-02-15', 'The relentless Northeast Monsoon rains have caused severe flooding across low-lying areas in Kelantan and Terengganu, marking the worst flood in a decade. Over 5,000 families have been displaced to temporary relief centers, many evacuating with nothing but the clothes on their backs. Love Bridge has urgently launched \"Operation Ark,\" mobilizing our Quick Response Team (QRT) to deploy aid. Funds raised will be strictly used to purchase heavy-duty inflatable boats for rescue missions, clean water tablets, dry food packs, and hygiene kits to prevent post-disaster disease outbreaks. We are also seeking volunteers with 4x4 vehicles to assist in transportation.', 'Love Bridge Crisis Response Team', 'Mr. David Lee (Branch Manager)', '+6012-3456782', 'crisis@lovebridge.org.my', 0, '[\"uploads\\/activities\\/act_1768129368_6963835879e82_0.png\",\"uploads\\/activities\\/act_1768129368_696383587a5c4_1.png\"]', 'Active', 63629.96, 100000.00, 'Sekolah Kebangsaan Kota Bharu', 'Jalan Hospital', 'Pusat Pemindahan Banjir (PPS)', 'Kota Bharu', 'Kelantan', '15000', 'Malaysia', 2, NULL),
-(4, '\"Quiet Years\" - CNY Senior Celebration', 'Silver Years Haven', '2026-02-10', '2026-02-10', '2026-02-10', 'Festive seasons can be the loneliest times for the elderly in care homes. To bring the warmth of family to them this Chinese New Year, we are transforming Silver Years Haven into a 1960s-style \"Nanyang Dance Hall.\" The celebration will feature free festive haircuts, health screenings, a karaoke session featuring classic hits, and the distribution of Ang Paos and mandarin oranges. Funds raised will cover the costs of a traditional Poon Choi feast, decorations, and nutritional supplies like milk powder. Musicians are welcome to volunteer and perform!', 'Penang Care Team', 'Mr. Ronald Tan (Branch Head)', '+6012-3456783', 'penang@lovebridge.org.my', 30, '[\"uploads\\/activities\\/act_1768129984_696385c05f140_0.png\",\"uploads\\/activities\\/act_1768129984_696385c05fc84_1.png\"]', 'Active', 5354.66, 8000.00, '15, Jalan Georgetown', 'Heritage Zone', '', 'George Town', 'Penang', '10200', 'Malaysia', 3, NULL),
-(5, 'Batang Kali Landslide - Psychological & Medical Aid', 'Batang Kali Site (Forward Base)', NULL, '2025-12-15', '2026-01-15', 'Following the tragic landslide at the campsite, the nation is in mourning. While search and rescue operations have concluded, the road to recovery for survivors is just beginning. Many survivors face complex surgeries for fractures, while the families of the victims are enduring immense psychological trauma. This completed fundraising campaign focused on funding medical treatments and mobility aids for the severely injured, as well as providing professional PTSD counseling for affected families to help them navigate through their grief and trauma.', 'Love Bridge QRT (Quick Response Team)', 'Dr. Wong (Medical Volunteer Lead)', '+6019-9988776', 'medical@lovebridge.org.my', 0, '[\"uploads\\/activities\\/act_1768129618_6963845210b3c_0.png\",\"uploads\\/activities\\/act_1768129618_696384521266e_1.png\"]', 'Completed', 30000.00, 30000.00, 'Father\'s Organic Farm Site', 'Jalan Batang Kali - Genting Highlands', 'Hulu Selangor District', 'Batang Kali', 'Selangor', '44300', 'Malaysia', 2, NULL),
-(6, '2026 Back to School - Aid for Underprivileged Students', 'Four Ace Sanctuary Hall (Distribution Center)', NULL, '2026-01-12', '2026-05-01', 'With the rising cost of living, many B40 families struggle significantly during the school reopening season. We are proud to announce the successful conclusion of this year\'s \"Back to School\" initiative, which provided 200 primary students from rural villages around Johor with complete school supplies. Each student received a care package worth RM150 containing uniforms, branded school shoes, a spinal-support backpack, and a year\'s supply of stationery. By providing these essentials, we aim to give these children the confidence to walk into school with their heads held high.', 'Love Bridge Education Fund', 'Cikgu Siti (Community Liaison)', '+6013-5566778', 'edu@lovebridge.org.my', 0, '[\"uploads\\/activities\\/act_1768130006_696385d6bbe11_0.png\",\"uploads\\/activities\\/act_1768130006_696385d6be46b_1.png\"]', 'Completed', 30000.00, 30000.00, '22, Jalan Impian Emas 4', 'Taman Impian Emas', 'Skudai', 'Johor Bahru', 'Johor', '81300', 'Malaysia', 1, NULL),
-(7, 'City Light - KL Soup Kitchen Night Distribution', 'Medan Selera Pudu (Distribution Point)', NULL, '2026-02-01', '2026-12-31', 'Hidden beneath the city\'s neon lights are the homeless and urban poor who go hungry every night. This is a year-long initiative where Love Bridge\'s food truck visits Pudu and Chow Kit every Friday night to distribute aid. We provide 500 sets of hot nutritious meals, mineral water, and fruits, while our volunteers offer basic wound dressing services and distribute second-hand clothing. A donation of just RM10 can sponsor a warm meal for someone in need. We welcome corporate sponsors to adopt a week of distribution.', 'KL Soup Kitchen Crew', 'Mr. Jason Teoh (Operations Lead)', '+6017-7788990', 'soupkitchen@lovebridge.org.my', 50, '[\"uploads\\/activities\\/act_1768130263_696386d77bbef_0.png\",\"uploads\\/activities\\/act_1768130263_696386d77cde2_1.png\"]', 'Active', 64711.83, 120000.00, 'Open Car Park Area', 'Jalan Pudu', 'Near Pudu LRT Station', 'Kuala Lumpur', 'Kuala Lumpur', '55100', 'Malaysia', 2, NULL),
-(8, 'Community Health Day - Free Checkup & Physio', 'Silver Years Haven Hall', '2026-03-15', '2026-03-15', '2026-03-15', 'Many elderly individuals living alone neglect their health due to financial constraints or lack of transport. In collaboration with volunteer doctors from Penang General Hospital, Silver Years Haven is hosting a \"Community Health Day\" open to the public. Services include free screenings for blood sugar, blood pressure, and cholesterol, as well as one-on-one medical consultations. A physiotherapist will also lead a workshop on fall prevention exercises. We are raising funds to purchase test strips, medical consumables, and reading glasses to be given away to low-income seniors.', 'Penang Medical Volunteers', 'Dr. Lim (Volunteer Doctor)', '+6012-2233445', 'health@lovebridge.org.my', 100, '[\"uploads\\/activities\\/act_1768130286_696386ee2c482_0.png\",\"uploads\\/activities\\/act_1768130286_696386ee2e3e2_1.png\"]', 'Upcoming', 0.00, 3000.00, '15, Jalan Georgetown', 'Heritage Zone', 'George Town', 'George Town', 'Penang', '10200', 'Malaysia', 3, NULL);
+INSERT INTO `activity` (`Activity_ID`, `Activity_Name`, `Activity_Venue`, `Activity_Date`, `Activity_StartDate`, `Activity_EndDate`, `Activity_Description`, `Activity_Organizer`, `Activity_Contact_Name`, `Activity_Contact_Number`, `Activity_Contact_Email`, `Activity_Max_Participants`, `Activity_Images`, `Activity_Status`, `Activity_BankName`, `Activity_BankAccount`, `Activity_GetAmount`, `Activity_TargetAmount`, `Activity_Address1`, `Activity_Address2`, `Activity_Address3`, `Activity_City`, `Activity_State`, `Activity_PostalCode`, `Activity_Country`, `Branch_ID`, `Cancel_Reason`) VALUES
+(1, 'Hope in Ashes - Sentul Kampung Fire Reconstruction', 'Sentul Community Hall', NULL, '2026-02-01', '2026-03-01', 'A sudden tragedy struck the squatter area of Sentul early yesterday morning, where a fire engulfed 30 wooden houses in just two hours, leaving over 120 residents homeless. Most victims are from low-income B40 families for whom this loss is devastating. Love Bridge is collaborating with local leaders to launch an emergency relief plan. Donations will provide RM500 emergency rental subsidies per family, essential household items like mattresses and cooking utensils, and school supplies for 40 affected children to ensure their education is not interrupted. We are also accepting donations of new clothing at our KL HQ.', 'Love Bridge Urban Aid', 'Ms. Sarah Lim (Project Coordinator)', '+6016-1234567', 'urban.aid@lovebridge.org.my', 0, '[\"uploads\\/activities\\/act_1768129494_696383d67fe11_0.png\",\"uploads\\/activities\\/act_1768129494_696383d681da0_1.png\"]', 'Active', NULL, NULL, 11827.75, 50000.00, 'Dewan Komuniti Sentul Pasar', 'Jalan Sentul Manis', 'Kampung Sentul Pasar', 'Kuala Lumpur', 'Kuala Lumpur', '51000', 'Malaysia', 2, NULL),
+(2, '\"Dreams Take Flight\" - Weekend Care Day', 'Four Ace Sanctuary', NULL, '2026-02-14', '2026-02-14', 'The 45 children at our sanctuary each have unique and difficult backgrounds, but they all share a longing for love and attention. This Valentine\'s Day weekend, we invite the public to spread love by joining us for the \"Dreams Take Flight\" party. The event will include ice-breaking games, a \"Home of My Dreams\" drawing contest, story-sharing sessions, and a special KFC lunch treat. We are looking for 20 patient and fully vaccinated volunteers to spend the afternoon bringing joy to these children.', 'Johor Youth Volunteers', 'Mrs. Sarah Wong (Branch Head)', '+6012-3456781', 'fourace@lovebridge.org.my', 20, '[\"uploads\\/activities\\/act_1768129933_6963858d70e61_0.png\",\"uploads\\/activities\\/act_1768129933_6963858d72c0b_1.png\"]', 'Upcoming', NULL, NULL, 0.00, 5000.00, '22, Jalan Impian Emas 4', 'Taman Impian Emas', 'Skudai', 'Johor Bahru', 'Johor', '81300', 'Malaysia', 1, NULL),
+(3, '2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', 'Flood Relief Center (PPS) SK Kota Bharu', NULL, '2026-01-15', '2026-02-15', 'The relentless Northeast Monsoon rains have caused severe flooding across low-lying areas in Kelantan and Terengganu, marking the worst flood in a decade. Over 5,000 families have been displaced to temporary relief centers, many evacuating with nothing but the clothes on their backs. Love Bridge has urgently launched \"Operation Ark,\" mobilizing our Quick Response Team (QRT) to deploy aid. Funds raised will be strictly used to purchase heavy-duty inflatable boats for rescue missions, clean water tablets, dry food packs, and hygiene kits to prevent post-disaster disease outbreaks. We are also seeking volunteers with 4x4 vehicles to assist in transportation.', 'Love Bridge Crisis Response Team', 'Mr. David Lee (Branch Manager)', '+6012-3456782', 'crisis@lovebridge.org.my', 0, '[\"uploads\\/activities\\/act_1768129368_6963835879e82_0.png\",\"uploads\\/activities\\/act_1768129368_696383587a5c4_1.png\"]', 'Active', NULL, NULL, 63729.96, 100000.00, 'Sekolah Kebangsaan Kota Bharu', 'Jalan Hospital', 'Pusat Pemindahan Banjir (PPS)', 'Kota Bharu', 'Kelantan', '15000', 'Malaysia', 2, NULL),
+(4, '\"Quiet Years\" - CNY Senior Celebration', 'Silver Years Haven', '2026-02-10', '2026-02-10', '2026-02-10', 'Festive seasons can be the loneliest times for the elderly in care homes. To bring the warmth of family to them this Chinese New Year, we are transforming Silver Years Haven into a 1960s-style \"Nanyang Dance Hall.\" The celebration will feature free festive haircuts, health screenings, a karaoke session featuring classic hits, and the distribution of Ang Paos and mandarin oranges. Funds raised will cover the costs of a traditional Poon Choi feast, decorations, and nutritional supplies like milk powder. Musicians are welcome to volunteer and perform!', 'Penang Care Team', 'Mr. Ronald Tan (Branch Head)', '+6011-11190233', 'penang@lovebridge.org.my', -1, '[\"uploads\\/activities\\/act_1768129984_696385c05f140_0.png\",\"uploads\\/activities\\/act_1768129984_696385c05fc84_1.png\",\"uploads\\/activities\\/act_1768663698_696baa928e7d1_0.jpg\"]', 'Active', 'CIMB', '7070169114', 5354.66, 8000.00, '15, Jalan Georgetown', 'Heritage Zone', '', 'George Town', 'Penang', '10200', 'Malaysia', 3, NULL),
+(5, 'Batang Kali Landslide - Psychological & Medical Aid', 'Batang Kali Site (Forward Base)', NULL, '2025-12-15', '2026-01-15', 'Following the tragic landslide at the campsite, the nation is in mourning. While search and rescue operations have concluded, the road to recovery for survivors is just beginning. Many survivors face complex surgeries for fractures, while the families of the victims are enduring immense psychological trauma. This completed fundraising campaign focused on funding medical treatments and mobility aids for the severely injured, as well as providing professional PTSD counseling for affected families to help them navigate through their grief and trauma.', 'Love Bridge QRT (Quick Response Team)', 'Dr. Wong (Medical Volunteer Lead)', '+6019-9988776', 'medical@lovebridge.org.my', 0, '[\"uploads\\/activities\\/act_1768129618_6963845210b3c_0.png\",\"uploads\\/activities\\/act_1768129618_696384521266e_1.png\"]', 'Completed', NULL, NULL, 30000.00, 30000.00, 'Father\'s Organic Farm Site', 'Jalan Batang Kali - Genting Highlands', 'Hulu Selangor District', 'Batang Kali', 'Selangor', '44300', 'Malaysia', 2, NULL),
+(6, '2026 Back to School - Aid for Underprivileged Students', 'Four Ace Sanctuary Hall (Distribution Center)', NULL, '2026-01-12', '2026-05-01', 'With the rising cost of living, many B40 families struggle significantly during the school reopening season. We are proud to announce the successful conclusion of this year\'s \"Back to School\" initiative, which provided 200 primary students from rural villages around Johor with complete school supplies. Each student received a care package worth RM150 containing uniforms, branded school shoes, a spinal-support backpack, and a year\'s supply of stationery. By providing these essentials, we aim to give these children the confidence to walk into school with their heads held high.', 'Love Bridge Education Fund', 'Cikgu Siti (Community Liaison)', '+6013-5566778', 'edu@lovebridge.org.my', 0, '[\"uploads\\/activities\\/act_1768130006_696385d6bbe11_0.png\",\"uploads\\/activities\\/act_1768130006_696385d6be46b_1.png\"]', 'Completed', NULL, NULL, 30000.00, 30000.00, '22, Jalan Impian Emas 4', 'Taman Impian Emas', 'Skudai', 'Johor Bahru', 'Johor', '81300', 'Malaysia', 1, NULL),
+(7, 'City Light - KL Soup Kitchen Night Distribution', 'Medan Selera Pudu (Distribution Point)', NULL, '2026-02-01', '2026-12-31', 'Hidden beneath the city\'s neon lights are the homeless and urban poor who go hungry every night. This is a year-long initiative where Love Bridge\'s food truck visits Pudu and Chow Kit every Friday night to distribute aid. We provide 500 sets of hot nutritious meals, mineral water, and fruits, while our volunteers offer basic wound dressing services and distribute second-hand clothing. A donation of just RM10 can sponsor a warm meal for someone in need. We welcome corporate sponsors to adopt a week of distribution.', 'KL Soup Kitchen Crew', 'Mr. Jason Teoh (Operations Lead)', '+6017-7788990', 'soupkitchen@lovebridge.org.my', 50, '[\"uploads\\/activities\\/act_1768130263_696386d77bbef_0.png\",\"uploads\\/activities\\/act_1768130263_696386d77cde2_1.png\"]', 'Active', NULL, NULL, 64711.83, 120000.00, 'Open Car Park Area', 'Jalan Pudu', 'Near Pudu LRT Station', 'Kuala Lumpur', 'Kuala Lumpur', '55100', 'Malaysia', 2, NULL),
+(8, 'Community Health Day - Free Checkup & Physio', 'Silver Years Haven Hall', '2026-03-15', '2026-03-15', '2026-03-15', 'Many elderly individuals living alone neglect their health due to financial constraints or lack of transport. In collaboration with volunteer doctors from Penang General Hospital, Silver Years Haven is hosting a \"Community Health Day\" open to the public. Services include free screenings for blood sugar, blood pressure, and cholesterol, as well as one-on-one medical consultations. A physiotherapist will also lead a workshop on fall prevention exercises. We are raising funds to purchase test strips, medical consumables, and reading glasses to be given away to low-income seniors.', 'Penang Medical Volunteers', 'Dr. Lim (Volunteer Doctor)', '+6012-2233445', 'health@lovebridge.org.my', 100, '[\"uploads\\/activities\\/act_1768130286_696386ee2c482_0.png\",\"uploads\\/activities\\/act_1768130286_696386ee2e3e2_1.png\"]', 'Upcoming', '', '', 0.00, 3000.00, '15, Jalan Georgetown', 'Heritage Zone', 'George Town', 'George Town', 'Penang', '10200', 'Malaysia', 3, NULL);
 
 --
 -- 触发器 `activity`
@@ -156,10 +158,10 @@ CREATE TABLE `admin` (
 --
 
 INSERT INTO `admin` (`Admin_ID`, `Admin_Name`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address1`, `Admin_Address2`, `Admin_Address3`, `Admin_City`, `Admin_State`, `Admin_PostalCode`, `Admin_Country`, `Admin_ProfilePicture`, `Admin_Role`, `Admin_Status`, `Admin_LastLogin`, `Admin_CreatedAt`, `Admin_UpdatedAt`, `Admin_Comment`, `Admin_LoginAttempts`, `Admin_LastFailedLogin`, `Is_Deleted`, `Admin_IsFirstLogin`) VALUES
-(1, 'Super Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Level 12', 'Menara Love Bridge', 'Jalan Charity', 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', '2025-12-06 20:35:49', '2025-11-28 12:00:00', '2025-12-10 21:15:44', 'System Super Administrator', 5, '2025-12-10 21:15:44', 0, 1),
-(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$yRnaaAeLqift7YsGSVjF8.70L7.tQMHtDFrLkD7gbeapVr4KLfHR2', '2003-05-17', '11， jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', 'uploads/profiles/admin_2_1767838052.jpg', 'Super Admin', 'Active', '2026-01-13 21:15:41', '2025-12-06 17:31:10', '2026-01-13 21:15:41', 'Added via admin management system', 0, '2026-01-12 20:41:47', 0, 0),
+(1, 'Super Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Level 12', 'Menara Love Bridge', 'Jalan Charity', 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', '2025-12-06 20:35:49', '2025-11-28 12:00:00', '2026-01-15 09:00:45', 'System Super Administrator', 3, '2026-01-15 09:00:45', 0, 1),
+(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$yRnaaAeLqift7YsGSVjF8.70L7.tQMHtDFrLkD7gbeapVr4KLfHR2', '2003-05-17', '11， jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', 'uploads/profiles/admin_2_1767838052.jpg', 'Super Admin', 'Active', '2026-01-17 21:25:01', '2025-12-06 17:31:10', '2026-01-17 21:25:01', 'Added via admin management system', 0, '2026-01-16 21:22:57', 0, 0),
 (5, 'ujin', '+6019-9878299', '050218-05-1234', 'ujintan218@gmail.com', '$2y$10$1BvJVRIgBpkgfPOpeiXBOulnxttZFxJKfHEOtMyImfaLzjSUvkJhO', '2005-02-18', '', '', '', '', '', '', 'Malaysia', NULL, 'Admin', 'Active', '2026-01-08 22:00:05', '2026-01-08 21:55:12', '2026-01-08 23:33:10', '', 0, NULL, 0, 0),
-(6, 'Lim Wen Qin', '+6011-19848732', '060504-03-0201', 'qinwenlin989@gmail.com', '$2y$10$CpJi2tClyKoRBpDt4sR4B.QRW/yTjENkBVnKLReWKaGGts1eAKAUy', '2006-05-04', '', '', '', '', '', '', 'Malaysia', NULL, 'Admin', 'Active', '2026-01-12 22:20:42', '2026-01-09 13:44:39', '2026-01-12 22:20:42', '', 0, NULL, 0, 0);
+(6, 'Lim Wen Qin', '+6011-19848732', '060504-03-0201', 'qinwenlin989@gmail.com', '$2y$10$CpJi2tClyKoRBpDt4sR4B.QRW/yTjENkBVnKLReWKaGGts1eAKAUy', '2006-05-04', '', '', '', '', '', '', 'Malaysia', 'uploads/profiles/admin_1768558087_696a0e076968e.jpeg', 'Admin', 'Active', '2026-01-14 14:05:52', '2026-01-09 13:44:39', '2026-01-16 18:08:07', '', 0, NULL, 0, 0);
 
 -- --------------------------------------------------------
 
@@ -183,52 +185,81 @@ CREATE TABLE `admin_notifications` (
 --
 
 INSERT INTO `admin_notifications` (`AdminNotification_ID`, `Message`, `Contact_ID`, `Type`, `Link`, `Is_Read`, `Is_Deleted`, `Created_At`) VALUES
-(1, 'New Donor Registered: thong', NULL, 'New_Donor', 'admin_donor_page.php', 1, 0, '2026-01-11 01:09:57'),
-(2, 'Activity Updated: 2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 15:06:04'),
-(3, 'Activity Updated: Hope in Ashes - Sentul Kampung Fire Reconstruction', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 15:09:54'),
-(4, 'Activity Updated: Batang Kali Landslide - Psychological & Medical Aid', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 16:00:13'),
-(5, 'Activity Updated: \"Dreams Take Flight\" - Weekend Care Day', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 16:04:55'),
-(6, 'Activity Updated: \"Quiet Years\" - CNY Senior Celebration', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 16:08:08'),
-(7, 'New Activity Created: 2026 Back to School - Aid for Underprivileged Students', NULL, 'Target', 'activity_management.php', 1, 0, '2026-01-11 16:12:06'),
-(8, 'New Activity Created: City Light - KL Soup Kitchen Night Distribution', NULL, 'Target', 'activity_management.php', 1, 0, '2026-01-11 16:14:48'),
-(9, 'New Activity Created: Community Health Day - Free Checkup & Physio', NULL, 'Target', 'activity_management.php', 1, 0, '2026-01-11 16:17:01'),
-(10, 'New Fundraising Case: Shattered Hoop Dreams - Emergency Chemo Fund for Jason', NULL, 'Target', NULL, 1, 0, '2026-01-11 16:44:25'),
-(11, 'New Fundraising Case: Fighting for Love - Single Mom\'s Last Hope', NULL, 'Target', NULL, 1, 0, '2026-01-11 16:46:33'),
-(12, 'New Fundraising Case: Rebirth from Fire - Skin Graft Surgery for Xiao Mei', NULL, 'Target', NULL, 1, 0, '2026-01-11 16:48:45'),
-(13, 'New Fundraising Case: Child of the Moon\" - Aid for Albino Student Aman', NULL, 'Target', NULL, 1, 0, '2026-01-11 16:52:39'),
-(14, 'Activity Updated: 2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 19:02:48'),
-(15, 'Activity Updated: Hope in Ashes - Sentul Kampung Fire Reconstruction', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 19:04:54'),
-(16, 'Activity Updated: Batang Kali Landslide - Psychological & Medical Aid', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 19:06:58'),
-(17, 'Activity Updated: \"Dreams Take Flight\" - Weekend Care Day', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 19:12:13'),
-(18, 'Activity Updated: \"Quiet Years\" - CNY Senior Celebration', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 19:13:04'),
-(19, 'Activity Updated: 2026 Back to School - Aid for Underprivileged Students', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 19:13:26'),
-(20, 'Activity Updated: City Light - KL Soup Kitchen Night Distribution', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 19:17:43'),
-(21, 'Activity Updated: Community Health Day - Free Checkup & Physio', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 19:18:06'),
-(22, 'New Donor Registered: RONALD TAN BIN HONG', NULL, 'New_Donor', 'admin_donor_page.php', 1, 0, '2026-01-11 21:21:48'),
-(23, 'Activity Updated: Batang Kali Landslide - Psychological & Medical Aid', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 21:40:05'),
-(24, 'Activity Updated: 2026 Back to School - Aid for Underprivileged Students', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 21:40:05'),
-(25, 'Activity Updated: \"Dreams Take Flight\" - Weekend Care Day', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 21:40:05'),
-(26, 'Activity Updated: Community Health Day - Free Checkup & Physio', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 21:40:05'),
-(27, 'Activity Updated: Hope in Ashes - Sentul Kampung Fire Reconstruction', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 21:40:06'),
-(28, 'Activity Updated: 2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 21:40:06'),
-(29, 'Activity Updated: \"Quiet Years\" - CNY Senior Celebration', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 21:40:06'),
-(30, 'Activity Updated: City Light - KL Soup Kitchen Night Distribution', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 21:40:06'),
-(31, 'New Donation:  100.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-11 21:41:44'),
-(32, 'New Donation: MYR 20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-11 21:41:57'),
-(33, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-11 21:53:38'),
-(34, 'Case Update: Rebirth from Fire - Skin Graft Surgery for Xiao Mei raised RM50.00', NULL, 'Donation', NULL, 1, 0, '2026-01-11 21:53:38'),
-(35, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-11 21:56:56'),
-(36, 'Activity Updated: 2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-11 21:56:56'),
-(38, 'New Donation: MYR 20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-12 12:21:32'),
-(39, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-12 12:23:11'),
-(40, 'Case Update: Rebirth from Fire - Skin Graft Surgery for Xiao Mei raised RM100.00', NULL, 'Donation', NULL, 1, 0, '2026-01-12 12:23:11'),
-(44, 'New Donation:  20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-12 12:31:19'),
-(45, 'New Donation:  20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-12 12:35:36'),
-(46, 'New Donation:  50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-12 12:43:27'),
-(47, 'New Donation:  50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-12 12:55:21'),
-(48, 'New Donation: MYR 100.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-12 12:55:47'),
-(49, 'Case Update: Fighting for Love - Single Mom\'s Last Hope raised RM100.00', NULL, 'Donation', NULL, 1, 0, '2026-01-12 12:55:47'),
-(50, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-12 12:57:36');
+(1, 'New Donor Registered: thong', NULL, 'New_Donor', 'admin_donor_page.php', 1, 1, '2026-01-11 01:09:57'),
+(2, 'Activity Updated: 2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 15:06:04'),
+(3, 'Activity Updated: Hope in Ashes - Sentul Kampung Fire Reconstruction', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 15:09:54'),
+(4, 'Activity Updated: Batang Kali Landslide - Psychological & Medical Aid', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 16:00:13'),
+(5, 'Activity Updated: \"Dreams Take Flight\" - Weekend Care Day', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 16:04:55'),
+(6, 'Activity Updated: \"Quiet Years\" - CNY Senior Celebration', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 16:08:08'),
+(7, 'New Activity Created: 2026 Back to School - Aid for Underprivileged Students', NULL, 'Target', 'activity_management.php', 1, 1, '2026-01-11 16:12:06'),
+(8, 'New Activity Created: City Light - KL Soup Kitchen Night Distribution', NULL, 'Target', 'activity_management.php', 1, 1, '2026-01-11 16:14:48'),
+(9, 'New Activity Created: Community Health Day - Free Checkup & Physio', NULL, 'Target', 'activity_management.php', 1, 1, '2026-01-11 16:17:01'),
+(10, 'New Fundraising Case: Shattered Hoop Dreams - Emergency Chemo Fund for Jason', NULL, 'Target', NULL, 1, 1, '2026-01-11 16:44:25'),
+(11, 'New Fundraising Case: Fighting for Love - Single Mom\'s Last Hope', NULL, 'Target', NULL, 1, 1, '2026-01-11 16:46:33'),
+(12, 'New Fundraising Case: Rebirth from Fire - Skin Graft Surgery for Xiao Mei', NULL, 'Target', NULL, 1, 1, '2026-01-11 16:48:45'),
+(13, 'New Fundraising Case: Child of the Moon\" - Aid for Albino Student Aman', NULL, 'Target', NULL, 1, 1, '2026-01-11 16:52:39'),
+(14, 'Activity Updated: 2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 19:02:48'),
+(15, 'Activity Updated: Hope in Ashes - Sentul Kampung Fire Reconstruction', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 19:04:54'),
+(16, 'Activity Updated: Batang Kali Landslide - Psychological & Medical Aid', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 19:06:58'),
+(17, 'Activity Updated: \"Dreams Take Flight\" - Weekend Care Day', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 19:12:13'),
+(18, 'Activity Updated: \"Quiet Years\" - CNY Senior Celebration', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 19:13:04'),
+(19, 'Activity Updated: 2026 Back to School - Aid for Underprivileged Students', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 19:13:26'),
+(20, 'Activity Updated: City Light - KL Soup Kitchen Night Distribution', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 19:17:43'),
+(21, 'Activity Updated: Community Health Day - Free Checkup & Physio', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 19:18:06'),
+(22, 'New Donor Registered: RONALD TAN BIN HONG', NULL, 'New_Donor', 'admin_donor_page.php', 1, 1, '2026-01-11 21:21:48'),
+(23, 'Activity Updated: Batang Kali Landslide - Psychological & Medical Aid', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 21:40:05'),
+(24, 'Activity Updated: 2026 Back to School - Aid for Underprivileged Students', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 21:40:05'),
+(25, 'Activity Updated: \"Dreams Take Flight\" - Weekend Care Day', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 21:40:05'),
+(26, 'Activity Updated: Community Health Day - Free Checkup & Physio', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 21:40:05'),
+(27, 'Activity Updated: Hope in Ashes - Sentul Kampung Fire Reconstruction', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 21:40:06'),
+(28, 'Activity Updated: 2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 21:40:06'),
+(29, 'Activity Updated: \"Quiet Years\" - CNY Senior Celebration', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 21:40:06'),
+(30, 'Activity Updated: City Light - KL Soup Kitchen Night Distribution', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 21:40:06'),
+(31, 'New Donation:  100.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-11 21:41:44'),
+(32, 'New Donation: MYR 20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-11 21:41:57'),
+(33, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-11 21:53:38'),
+(34, 'Case Update: Rebirth from Fire - Skin Graft Surgery for Xiao Mei raised RM50.00', NULL, 'Donation', NULL, 1, 1, '2026-01-11 21:53:38'),
+(35, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-11 21:56:56'),
+(36, 'Activity Updated: 2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', NULL, 'Update', 'activity_management.php', 1, 1, '2026-01-11 21:56:56'),
+(38, 'New Donation: MYR 20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-12 12:21:32'),
+(39, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-12 12:23:11'),
+(40, 'Case Update: Rebirth from Fire - Skin Graft Surgery for Xiao Mei raised RM100.00', NULL, 'Donation', NULL, 1, 1, '2026-01-12 12:23:11'),
+(44, 'New Donation:  20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-12 12:31:19'),
+(45, 'New Donation:  20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-12 12:35:36'),
+(46, 'New Donation:  50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-12 12:43:27'),
+(47, 'New Donation:  50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-12 12:55:21'),
+(48, 'New Donation: MYR 100.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-12 12:55:47'),
+(49, 'Case Update: Fighting for Love - Single Mom\'s Last Hope raised RM100.00', NULL, 'Donation', NULL, 1, 1, '2026-01-12 12:55:47'),
+(50, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-12 12:57:36'),
+(51, 'New Donor Registered: thong', NULL, 'New_Donor', 'admin_donor_page.php', 1, 1, '2026-01-15 10:03:57'),
+(52, 'New Donation: MYR 60000.00 from thong', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-15 10:16:20'),
+(53, 'Case Update: Fighting for Love - Single Mom\'s Last Hope raised RM60100.00', NULL, 'Donation', NULL, 1, 1, '2026-01-15 10:16:24'),
+(54, 'New Donation:  50.00 from thong', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-15 10:19:37'),
+(55, 'New Donation: MYR 30.00 from thong', NULL, 'Donation', 'payment_management.php', 1, 1, '2026-01-15 10:30:29'),
+(56, 'New Recurring Donation Setup: RM30.00', NULL, 'Donation', NULL, 1, 1, '2026-01-15 10:30:29'),
+(57, 'New Reward Redemption Order #3', NULL, 'Target', 'redemption_order_management.php', 1, 1, '2026-01-15 10:33:20'),
+(58, 'New Donor Registered: john', NULL, 'New_Donor', 'admin_donor_page.php', 1, 0, '2026-01-15 10:48:37'),
+(59, 'Redemption Order #3 is now Pending', NULL, 'Update', NULL, 1, 0, '2026-01-15 18:01:14'),
+(60, 'New Staff Member Added: thong', NULL, 'New_Staff', 'staff_management_page.php', 1, 0, '2026-01-15 22:01:39'),
+(61, 'New Donor Registered: thong', NULL, 'New_Donor', 'admin_donor_page.php', 1, 0, '2026-01-15 22:03:08'),
+(62, 'New Staff Member Added: jojo', NULL, 'New_Staff', 'staff_management_page.php', 1, 0, '2026-01-16 17:53:19'),
+(63, 'New Donor Registered: thng', NULL, 'New_Donor', 'admin_donor_page.php', 1, 0, '2026-01-17 09:28:27'),
+(64, 'New Donor Registered: thong', NULL, 'New_Donor', 'admin_donor_page.php', 1, 0, '2026-01-17 21:13:55'),
+(65, 'New Donation: MYR 50.00 from thong', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-17 21:17:54'),
+(66, 'New Recurring Donation Setup: RM50.00', NULL, 'Donation', NULL, 1, 0, '2026-01-17 21:17:54'),
+(67, 'New Donation: MYR 50.00 from thong', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-17 21:19:06'),
+(68, 'Case Update: Rebirth from Fire - Skin Graft Surgery for Xiao Mei raised RM150.00', NULL, 'Donation', NULL, 1, 0, '2026-01-17 21:19:06'),
+(69, 'New Donation:  300.00 from thong', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-17 21:21:16'),
+(70, 'New Donation:  300.00 from thong', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-17 21:21:34'),
+(71, 'New Donation: MYR 100.00 from thong', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-17 21:22:01'),
+(72, 'Case Update: Operation \"Fix A Heart\" - Urgent Fund for Baby Ali raised RM1400.00', NULL, 'Donation', NULL, 1, 0, '2026-01-17 21:22:01'),
+(73, 'New Donation: MYR 100.00 from thong', NULL, 'Donation', 'payment_management.php', 1, 0, '2026-01-17 21:23:24'),
+(74, 'Activity Updated: 2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-17 21:23:24'),
+(75, 'Activity Updated: Community Health Day - Free Checkup & Physio', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-17 23:12:00'),
+(76, 'Activity Updated: \"Quiet Years\" - CNY Senior Celebration', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-17 23:28:18'),
+(77, 'Activity Updated: \"Quiet Years\" - CNY Senior Celebration', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-17 23:30:40'),
+(78, 'New Activity Created: 123', NULL, 'Target', 'activity_management.php', 1, 0, '2026-01-17 23:47:31'),
+(79, 'Activity Updated: \"Quiet Years\" - CNY Senior Celebration', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-18 00:20:27');
 
 -- --------------------------------------------------------
 
@@ -258,6 +289,8 @@ CREATE TABLE `branch` (
   `Branch_Images` text DEFAULT NULL,
   `Admin_ID` int(11) NOT NULL,
   `Branch_OperationalStatus` enum('Open','Closed') DEFAULT 'Open',
+  `Branch_BankName` varchar(100) DEFAULT NULL,
+  `Branch_BankAccount` varchar(50) DEFAULT NULL,
   `Branch_CreatedAt` datetime DEFAULT current_timestamp(),
   `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -266,10 +299,10 @@ CREATE TABLE `branch` (
 -- 转存表中的数据 `branch`
 --
 
-INSERT INTO `branch` (`Branch_ID`, `Branch_Name`, `Branch_Head`, `Branch_Head_Contact`, `Branch_Head_Email`, `Branch_Type`, `Branch_Capacity`, `Branch_EstablishedDate`, `Branch_Address1`, `Branch_Address2`, `Branch_Address3`, `Branch_City`, `Branch_State`, `Branch_PostalCode`, `Branch_Country`, `Branch_ContactNumber`, `Branch_Email`, `Branch_Description`, `Branch_Images`, `Admin_ID`, `Branch_OperationalStatus`, `Branch_CreatedAt`, `Is_Deleted`) VALUES
-(1, 'Love Bridge Four Ace Sanctuary', 'Mrs. Sarah Wong', '+6012-3456781', 'sarah.wong@lovebridge.org.my', 'Orphanage', 45, '2015-06-01', '22, Jalan Impian Emas 4, ', 'Taman Impian Emas, ', '', 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-1190233', 'fourace@lovebridge.org.my', 'Founded in 2015 and located in Skudai, Johor, the Four Ace Sanctuary is more than just a shelter; it is a home built on four core promises to our children: Academic excellence, Character building, Emotional health, and Social development. The facility features a comforting living area, a \"Digital Hope Laboratory\" equipped for computer learning, and an organic vegetable garden. We are dedicated to providing holistic education and care, committed to nurturing vulnerable children into the confident future leaders of tomorrow.', '[\"uploads/branches/br_1768128819_696381332f9bc_0.png\",\"uploads/branches/br_1768128849_696381517fb2d_0.jpg\",\"uploads/branches/br_1768137820_6963a45cef105_0.png\"]', 2, 'Open', '2025-12-15 23:02:23', 0),
-(2, 'KL Main Operations Hub', 'Mr. David Lee', '+6012-3456782', 'david.lee@lovebridge.org.my', 'Headquarters', 1000, '2010-01-15', 'Ground Floor, Menara Love Bridge, ', 'Jalan Charity, Pudu, ', '', 'Kuala Lumpur', 'Kuala Lumpur', '55100 ', 'Malaysia', '+6011-12345633', 'admin@donationsystem.com', 'Serving as the operational heartbeat of the organization in the city center, this branch focuses on aiding the urban poor and managing disaster relief efforts. It operates a daily Soup Kitchen to feed the homeless, manages a central Food Bank warehouse for resource distribution, and houses the Quick Response Team (QRT) for emergency deployments. Additionally, the hub features a homeless transformation station that provides vocational training and sanitation facilities to help individuals reintegrate into society.', '[\"uploads/branches/br_1768128793_69638119eed3f_0.png\",\"uploads/branches/br_1768128793_69638119f05fc_1.png\",\"uploads/branches/br_1768128839_696381473f1bd_0.jpg\"]', 1, 'Open', '2025-12-15 23:02:23', 0),
-(3, 'Penang Silver Years Haven', 'Mr. Ronald Tan', '+6012-7212535', 'ronaldtan0404@gmail.com', 'Old Folks Home', 32, '2018-08-30', '15, Jalan Georgetown, ', 'Heritage Zone, George Town, ', '', 'Georgetown', 'Penang', '10200', 'Malaysia', '+6011-11190233', 'penang@lovebridge.org.my', 'Nestled within a heritage building in George Town, Penang, this center specializes in care for the elderly, particularly those with mild dementia or who have been abandoned. We utilize Reminiscence Therapy, featuring an environment designed to mimic the 1960s \"Nanyang\" style to provide comfort and familiarity. With 24-hour nursing care, physical therapy, and our unique \"Life Storybook\" project, we ensure that every resident enjoys a twilight year filled with dignity, respect, and joy.', '[\"uploads/branches/br_1767960081_6960ee113ef84_0.jpg\",\"uploads/branches/br_1768128774_6963810604e14_0.png\",\"uploads/branches/br_1768128774_69638106055dc_1.png\"]', 1, 'Open', '2025-12-15 23:02:23', 0);
+INSERT INTO `branch` (`Branch_ID`, `Branch_Name`, `Branch_Head`, `Branch_Head_Contact`, `Branch_Head_Email`, `Branch_Type`, `Branch_Capacity`, `Branch_EstablishedDate`, `Branch_Address1`, `Branch_Address2`, `Branch_Address3`, `Branch_City`, `Branch_State`, `Branch_PostalCode`, `Branch_Country`, `Branch_ContactNumber`, `Branch_Email`, `Branch_Description`, `Branch_Images`, `Admin_ID`, `Branch_OperationalStatus`, `Branch_BankName`, `Branch_BankAccount`, `Branch_CreatedAt`, `Is_Deleted`) VALUES
+(1, 'Love Bridge Four Ace Sanctuary', 'Mrs. Sarah Wong', '+6012-3456781', 'sarah.wong@lovebridge.org.my', 'Orphanage', 45, '2015-06-01', '22, Jalan Impian Emas 4, ', 'Taman Impian Emas, ', '', 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-1190233', 'fourace@lovebridge.org.my', 'Founded in 2015 and located in Skudai, Johor, the Four Ace Sanctuary is more than just a shelter; it is a home built on four core promises to our children: Academic excellence, Character building, Emotional health, and Social development. The facility features a comforting living area, a \"Digital Hope Laboratory\" equipped for computer learning, and an organic vegetable garden. We are dedicated to providing holistic education and care, committed to nurturing vulnerable children into the confident future leaders of tomorrow.', '[\"uploads/branches/br_1768128819_696381332f9bc_0.png\",\"uploads/branches/br_1768128849_696381517fb2d_0.jpg\",\"uploads/branches/br_1768137820_6963a45cef105_0.png\"]', 2, 'Open', NULL, NULL, '2025-12-15 23:02:23', 0),
+(2, 'KL Main Operations Hub', 'Mr. David Lee', '+6012-3456782', 'david.lee@lovebridge.org.my', 'Headquarters', 8, '2010-01-15', 'Ground Floor, Menara Love Bridge, ', 'Jalan Charity, Pudu, ', '', 'Kuala Lumpur', 'Kuala Lumpur', '55100 ', 'Malaysia', '+6011-12345633', 'admin@donationsystem.com', 'Serving as the operational heartbeat of the organization in the city center, this branch focuses on aiding the urban poor and managing disaster relief efforts. It operates a daily Soup Kitchen to feed the homeless, manages a central Food Bank warehouse for resource distribution, and houses the Quick Response Team (QRT) for emergency deployments. Additionally, the hub features a homeless transformation station that provides vocational training and sanitation facilities to help individuals reintegrate into society.', '[\"uploads/branches/br_1768128793_69638119eed3f_0.png\",\"uploads/branches/br_1768128793_69638119f05fc_1.png\",\"uploads/branches/br_1768128839_696381473f1bd_0.jpg\"]', 1, 'Open', NULL, NULL, '2025-12-15 23:02:23', 0),
+(3, 'Penang Silver Years Haven', 'Mr. Ronald Tan', '+6012-7212535', 'ronaldtan0404@gmail.com', 'Old Folks Home', 32, '2018-08-30', '15, Jalan Georgetown, ', 'Heritage Zone, George Town, ', '', 'Georgetown', 'Penang', '10200', 'Malaysia', '+6011-11190233', 'penang@lovebridge.org.my', 'Nestled within a heritage building in George Town, Penang, this center specializes in care for the elderly, particularly those with mild dementia or who have been abandoned. We utilize Reminiscence Therapy, featuring an environment designed to mimic the 1960s \"Nanyang\" style to provide comfort and familiarity. With 24-hour nursing care, physical therapy, and our unique \"Life Storybook\" project, we ensure that every resident enjoys a twilight year filled with dignity, respect, and joy.', '[\"uploads/branches/br_1767960081_6960ee113ef84_0.jpg\",\"uploads/branches/br_1768128774_6963810604e14_0.png\",\"uploads/branches/br_1768128774_69638106055dc_1.png\"]', 1, 'Open', 'CIMB', '7070169114', '2025-12-15 23:02:23', 0);
 
 -- --------------------------------------------------------
 
@@ -329,7 +362,7 @@ CREATE TABLE `contact_settings` (
 --
 
 INSERT INTO `contact_settings` (`Setting_ID`, `Address`, `Phone`, `Whatsapp_Link`, `Email`, `Working_Hours`, `Map_Embed_Src`, `Updated_At`) VALUES
-(1, 'Level 11, Menara Love Bridge<br>Jalan Charity, 50450<br>Melaka, Malaysia', '+60 11-1119 0233', 'https://wa.me/601111190233', 'lovebridge1201@gmail.com', 'Monday - Friday: 9:00 AM - 6:00 PM<br>Saturday: 9:00 AM - 1:00 PM<br>Sunday: Closed', 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3986.8!2d102.2!3d2.2!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMsKwMTInMDAuMCJOIDEwMsKwMTInMDAuMCJF!5e0!3m2!1sen!2smy!4v1600000000000!5m2!1sen!2smy', '2026-01-13 23:54:12');
+(1, 'Jalan Ayer Keroh Lama,<br>75450 Bukit Beruang, Melaka<br>(MULTIMEDIA UNIVERSITY)', '+60 11-1119 0233', 'https://wa.me/601111190233', 'lovebridge1201@gmail.com', 'Monday - Friday: 9:00 AM - 6:00 PM<br>Saturday: 9:00 AM - 1:00 PM<br>Sunday: Closed', 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3986.7570420789075!2d102.27367637583344!3d2.245656058045656!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31d1e56b9710cf4b%3A0x66b6b12b75469278!2sMultimedia%20University%2C%20Melaka%20Campus!5e0!3m2!1sen!2smy!4v1700000000000!5m2!1sen!2smy', '2026-01-15 20:47:58');
 
 -- --------------------------------------------------------
 
@@ -368,10 +401,15 @@ CREATE TABLE `donor` (
 
 INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_ContactNumber`, `Donor_ICNumber`, `Donor_Email`, `Donor_Password`, `Donor_Wallet`, `Donor_Address1`, `Donor_Address2`, `Donor_Address3`, `Donor_City`, `Donor_State`, `Donor_PostalCode`, `Donor_Country`, `Donor_DOB`, `Donor_Description`, `Donor_RegisteredAt`, `Donor_LastLogin`, `Donor_ProfilePicture`, `Is_Deleted`, `donor_reset_count`, `donor_last_reset_request`) VALUES
 (2, 'RONALD TAN BIN HONG', '012-7212535', '030404011183', 'abc@gmail.com', '$2y$10$3hsuDLLcdM4mr9bqhvJekOZqH80/6aF.7GR2vLxXHbcgWT.RjOe.O', 0.00, 'No19.jalan melawati 19, taman melawati', '', '', 'Johor Bahru', 'Johor', '81300', 'Malaysia', '2003-04-04', '', '2025-12-15 22:27:40', NULL, NULL, 0, 0, NULL),
-(3, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$PNOaF1e8KP0y9i404VCz9OWhn3XVyLHx8roawWiJjvPR0hyRunfeW', 0.00, 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '2003-05-17', '', '2026-01-03 21:43:26', NULL, 'uploads/donors/donor_1767879100_695fb1bc6d8e7.png', 0, 0, NULL),
+(3, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$PNOaF1e8KP0y9i404VCz9OWhn3XVyLHx8roawWiJjvPR0hyRunfeW', 0.00, 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '2003-05-17', '', '2026-01-03 21:43:26', NULL, 'uploads/donors/donor_1767879100_695fb1bc6d8e7.png', 0, 1, NULL),
 (4, 'johndoe', '+6011-11190233', '', 'admin@donationsystem.com', NULL, 0.00, '', '', '', '', '', '', 'Malaysia', '0000-00-00', '', '2026-01-08 10:17:29', NULL, NULL, 0, 0, NULL),
 (5, 'thong', '+6011-11190233', '', 'thong@example.com', '$2y$10$yIcrpElLqaB33nLEva5rB.cfnVFib.XdekEbMYbJROuPcpHi.lshi', 0.00, '', '', '', '', '', '', 'Malaysia', '0000-00-00', '', '2026-01-11 01:09:57', NULL, NULL, 0, 0, NULL),
-(6, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', '$2y$10$xOPon039anG.Ft.X5qZCjuMJ.zwoKZBfFpWlAm61hiBHvnJZaHamK', 0.00, 'No19.jalan melawati 19, taman melawati', 'taman melawati', 'Skudai', 'Johor Bahru', 'Johor', '81300', 'Malaysia', '2005-04-04', '', '2026-01-11 21:21:48', NULL, NULL, 0, 0, NULL);
+(6, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', '$2y$10$xOPon039anG.Ft.X5qZCjuMJ.zwoKZBfFpWlAm61hiBHvnJZaHamK', 0.00, 'No19.jalan melawati 19, taman melawati', 'taman melawati', 'Skudai', 'Johor Bahru', 'Johor', '81300', 'Malaysia', '2005-04-04', '', '2026-01-11 21:21:48', NULL, NULL, 0, 4, NULL),
+(7, 'thong', '012-34567812', '691121011234', 'qinwenlin989@gmail.com', '$2y$10$EM8PfzEjVKw6tO3bgzOg0uX21x2Qhh8geTUFON816oItisuI2GMQK', 20.00, 'Blk 914Jurong West Street 91', 'taman abc', '', 'Skudai', 'Johor', '640914', 'Malaysia', '1969-11-21', '', '2026-01-15 10:03:57', NULL, NULL, 0, 1, NULL),
+(8, 'john', '+6011-11190233', '', 'user@donationsystem.my', '$2y$10$yj0hTeFgb8HPGcVTCUCJ/e8xbghBuFPUq3wHlVLBG2TRU8PcUO7rO', 0.00, '', '', '', '', '', '', 'Malaysia', '0000-00-00', '', '2026-01-15 10:48:37', NULL, NULL, 0, 0, NULL),
+(9, 'thong', '+6011-11190233', '030517', 'qinwen@gmail.org', '$2y$10$wAnF5LHfhwNjlio1fzpDvu/pZLmtNrXFiGKzQaVaSZKyb44cEKyby', 0.00, '', '', '', '', '', '', 'Malaysia', '2003-05-17', '', '2026-01-15 22:03:08', NULL, NULL, 1, 0, NULL),
+(10, 'thng', '+6011-99999988', '', 'thong@gmail.com', '$2y$10$L717kleNhzBgPvIGg97uL.P3xote/p30Bi31augcoWYwhCixI9QNS', 0.00, '', '', '', '', '', '', 'Malaysia', '0000-00-00', '', '2026-01-17 09:28:27', NULL, NULL, 0, 0, NULL),
+(11, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', '$2y$10$KeXcc0clhsomf6U24F.KyOSP0x1F/AsuS951EG84mxF.BAAnCc7mC', 400.00, '11, jalan silat lincah 10', '', '', 'Skudai', 'Johor', '81300', 'Malaysia', '2003-05-17', '', '2026-01-17 21:13:55', NULL, NULL, 0, 0, NULL);
 
 --
 -- 触发器 `donor`
@@ -407,6 +445,17 @@ CREATE TABLE `donor_login_attempts` (
   `status` enum('failed','success') NOT NULL DEFAULT 'failed'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- 转存表中的数据 `donor_login_attempts`
+--
+
+INSERT INTO `donor_login_attempts` (`id`, `email`, `ip_address`, `attempt_time`, `status`) VALUES
+(2, 'qinwe@gmail.com', '::1', '2026-01-15 10:05:40', 'failed'),
+(4, 'qinwenlin989@gmail.com', '::1', '2026-01-15 11:09:26', 'failed'),
+(5, 'qinwenlin989@gmail.com', '::1', '2026-01-15 11:09:37', 'failed'),
+(6, 'qinwenlin989@gmail.com', '::1', '2026-01-17 21:12:06', 'failed'),
+(7, 'qinwenlin989@gmail.com', '::1', '2026-01-17 21:12:30', 'failed');
+
 -- --------------------------------------------------------
 
 --
@@ -427,6 +476,15 @@ CREATE TABLE `donor_password_reset` (
   `reset_used` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- 转存表中的数据 `donor_password_reset`
+--
+
+INSERT INTO `donor_password_reset` (`reset_id`, `donor_id`, `reset_token`, `reset_email`, `reset_expires`, `reset_created`, `reset_updated`, `ip_address`, `user_agent`, `reset_status`, `reset_used`) VALUES
+(1, 7, 'ab359c5f40bb6b27a7b67435d222c6e1d489f232f7c57928a1d7ece665e4f984', 'qinwenlin989@gmail.com', '2026-01-15 10:21:20', '2026-01-15 10:06:20', NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'pending', 0),
+(2, 3, '53c43aabfc75a861b0b06d285820509c6c8ce7773e129f3c591fc5d8a886a3b5', 'thongyuenzhen@gmail.com', '2026-01-15 10:21:41', '2026-01-15 10:06:41', NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'pending', 0),
+(6, 6, '981a0b8d07287f48088e4415c7ac698c821f852dd5685098b91b42bcbec92ec7', 'ronaldtan0404@gmail.com', '2026-01-15 10:25:47', '2026-01-15 10:10:47', NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'pending', 0);
+
 -- --------------------------------------------------------
 
 --
@@ -443,6 +501,18 @@ CREATE TABLE `donor_security_logs` (
   `log_details` text DEFAULT NULL,
   `log_date` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- 转存表中的数据 `donor_security_logs`
+--
+
+INSERT INTO `donor_security_logs` (`log_id`, `donor_id`, `log_type`, `log_action`, `ip_address`, `user_agent`, `log_details`, `log_date`) VALUES
+(1, 7, 'password_reset', 'reset_email_sent', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Success', '2026-01-15 10:06:24'),
+(2, 3, 'password_reset', 'reset_email_sent', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Success', '2026-01-15 10:06:45'),
+(3, 6, 'password_reset', 'reset_email_sent', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Success', '2026-01-15 10:09:20'),
+(4, 6, 'password_reset', 'reset_email_sent', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Success', '2026-01-15 10:10:05'),
+(5, 6, 'password_reset', 'reset_email_sent', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Success', '2026-01-15 10:10:29'),
+(6, 6, 'password_reset', 'reset_email_sent', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36', 'Success', '2026-01-15 10:10:51');
 
 -- --------------------------------------------------------
 
@@ -485,15 +555,17 @@ CREATE TABLE `headquarters` (
   `HQ_FoundingDate` date DEFAULT NULL,
   `HQ_Image` varchar(255) DEFAULT NULL,
   `Updated_At` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `Headquarters_State` varchar(50) DEFAULT 'Kuala Lumpur'
+  `Headquarters_State` varchar(50) DEFAULT 'Kuala Lumpur',
+  `HQ_BankName` varchar(100) DEFAULT NULL,
+  `HQ_BankAccount` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- 转存表中的数据 `headquarters`
 --
 
-INSERT INTO `headquarters` (`HQ_ID`, `HQ_Name`, `HQ_ContactNumber`, `HQ_Email`, `HQ_Address`, `HQ_Description`, `HQ_Story`, `HQ_FoundingDate`, `HQ_Image`, `Updated_At`, `Headquarters_State`) VALUES
-(1, 'Love Bridge International Headquarters', '+603-2145 7788', 'hq@lovebridge.org.my', 'Level 12, Menara Love Bridge, Jalan Charity, 50450 Kuala Lumpur, Malaysia', 'The strategic command center for Love Bridge. Responsible for formulating long-term charitable strategies, managing fund flows, executing transparent financial audits, and coordinating cross-border aid. It is also the R&D base for our blockchain charity system, dedicated to using technology to improve charitable efficiency.', '[Origins & Mission] Founded in 2010, evolving from a 5-person team into a data-driven modern charitable organization.\n\n[Core Functions] The HQ houses a \"Global Command Center\" that monitors relief supplies and beneficiary status nationwide in real-time. We aim not just to do good, but to establish industry standards: ensuring transparency through independent audits, empowering branches through standardized training, and promoting sustainable charity through corporate partnerships.', '2010-01-01', NULL, '2026-01-11 13:51:41', 'Kuala Lumpur');
+INSERT INTO `headquarters` (`HQ_ID`, `HQ_Name`, `HQ_ContactNumber`, `HQ_Email`, `HQ_Address`, `HQ_Description`, `HQ_Story`, `HQ_FoundingDate`, `HQ_Image`, `Updated_At`, `Headquarters_State`, `HQ_BankName`, `HQ_BankAccount`) VALUES
+(1, 'Love Bridge International Headquarters', '+603-2145 7788', 'hq@lovebridge.org.my', 'Level 12, Menara Love Bridge, Jalan Charity, 50450 Kuala Lumpur, Malaysia', 'The strategic command center for Love Bridge. Responsible for formulating long-term charitable strategies, managing fund flows, executing transparent financial audits, and coordinating cross-border aid. It is also the R&D base for our blockchain charity system, dedicated to using technology to improve charitable efficiency.', '[Origins & Mission] Founded in 2010, evolving from a 5-person team into a data-driven modern charitable organization.\n\n[Core Functions] The HQ houses a \"Global Command Center\" that monitors relief supplies and beneficiary status nationwide in real-time. We aim not just to do good, but to establish industry standards: ensuring transparency through independent audits, empowering branches through standardized training, and promoting sustainable charity through corporate partnerships.', '2010-01-01', NULL, '2026-01-11 13:51:41', 'Kuala Lumpur', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -573,7 +645,16 @@ INSERT INTO `orders` (`Order_ID`, `Order_Name`, `Order_ContactNumber`, `Order_IC
 (15, 'RONALD TAN BIN HONG', '012-7212535', '050404011183', 'ronaldtan0404@gmail.com', 50.00, 0, '', 'TNG eWallet', '', 'Completed', 'TXN-TOPUP-20260112124327-573', 'Top-up', 'Completed', 'Not_Requested', 0, '2026-01-12 12:43:27', '2026-01-12 12:43:27', 6, 16, NULL, NULL, NULL),
 (16, 'RONALD TAN BIN HONG', '012-7212535', '050404011183', 'ronaldtan0404@gmail.com', 50.00, 0, '', 'System E-Wallet', '', 'Completed', 'TXN-TOPUP-20260112125521-816', 'Top-up', 'Completed', 'Not_Requested', 0, '2026-01-12 12:55:21', '2026-01-12 12:55:21', 6, 17, NULL, NULL, NULL),
 (17, 'RONALD TAN BIN HONG', '012-7212535', '050404011183', 'ronaldtan0404@gmail.com', 100.00, 0, 'MYR', 'System E-Wallet', 'Success', 'Completed', 'TXN-EW-20260112125547-106', 'One-time', 'Completed', 'Generated', 0, '2026-01-12 12:55:47', '2026-01-12 12:55:47', 6, 18, NULL, NULL, 7),
-(18, 'RONALD TAN BIN HONG', '012-7212535', '050404011183', 'ronaldtan0404@gmail.com', 50.00, 0, 'MYR', 'System E-Wallet', 'Success', 'Completed', 'TXN-EW-20260112125736-492', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-12 12:57:36', '2026-01-12 12:57:36', 6, 19, 2, NULL, NULL);
+(18, 'RONALD TAN BIN HONG', '012-7212535', '050404011183', 'ronaldtan0404@gmail.com', 50.00, 0, 'MYR', 'System E-Wallet', 'Success', 'Completed', 'TXN-EW-20260112125736-492', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-12 12:57:36', '2026-01-12 12:57:36', 6, 19, 2, NULL, NULL),
+(19, 'thong', '012-34567812', '', 'qinwenlin989@gmail.com', 60000.00, 0, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-20260115101620-996', 'One-time', 'Completed', 'Generated', 0, '2026-01-15 10:16:20', '2026-01-15 10:16:20', 7, 20, NULL, NULL, 7),
+(20, 'thong', '012-34567812', '', 'qinwenlin989@gmail.com', 50.00, 0, '', '', '', 'Completed', 'TXN-TOPUP-20260115101937-547', 'Top-up', 'Completed', 'Not_Requested', 0, '2026-01-15 10:19:37', '2026-01-15 10:19:37', 7, 21, NULL, NULL, NULL),
+(21, 'thong', '012-34567812', '691121011234', 'qinwenlin989@gmail.com', 30.00, 0, 'MYR', '', 'Success', 'Completed', 'TXN-EW-20260115103029-579', 'Recurring', 'Completed', 'Rejected', 0, '2026-01-15 10:30:29', '2026-01-15 10:30:29', 7, 22, 2, NULL, NULL),
+(22, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 50.00, 0, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260117211754-890', 'Recurring', 'Completed', 'Not_Requested', 0, '2026-01-17 21:17:54', '2026-01-17 21:17:54', 11, 23, 2, NULL, NULL),
+(23, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 50.00, 0, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260117211906-993', 'One-time', 'Completed', 'Requested', 0, '2026-01-17 21:19:06', '2026-01-17 21:19:06', 11, 24, NULL, NULL, 8),
+(24, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 300.00, 0, '', 'TNG eWallet', '', 'Completed', 'TXN-TOPUP-20260117212116-248', 'Top-up', 'Completed', 'Not_Requested', 0, '2026-01-17 21:21:16', '2026-01-17 21:21:16', 11, 25, NULL, NULL, NULL),
+(25, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 300.00, 0, '', 'TNG eWallet', '', 'Completed', 'TXN-TOPUP-20260117212134-309', 'Top-up', 'Completed', 'Not_Requested', 0, '2026-01-17 21:21:34', '2026-01-17 21:21:34', 11, 26, NULL, NULL, NULL),
+(26, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 100.00, 0, 'MYR', 'System E-Wallet', 'Success', 'Completed', 'TXN-EW-20260117212201-255', 'One-time', 'Completed', 'Requested', 0, '2026-01-17 21:22:01', '2026-01-17 21:22:01', 11, 27, NULL, NULL, 3),
+(27, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 100.00, 0, 'MYR', 'System E-Wallet', 'Success', 'Completed', 'TXN-EW-20260117212324-565', 'One-time', 'Completed', 'Requested', 0, '2026-01-17 21:23:24', '2026-01-17 21:23:24', 11, 28, NULL, 3, NULL);
 
 --
 -- 触发器 `orders`
@@ -662,7 +743,7 @@ CREATE TABLE `password_resets` (
 
 INSERT INTO `password_resets` (`id`, `email`, `token`, `expires_at`, `created_at`) VALUES
 (2, 'ujintan218@gmail.com', 'ae15e0b65780f84ad3a13eaeba8fab791c35617bcea01e57447b0c14a27fee7d', '2025-12-07 21:38:58', '2025-12-07 12:38:58'),
-(3, 'thongyuenzhen@gmail.com', '7979343727a2f4f69ba4a295fb44a590e83b00cf138c47c036048f41f34e3ed1', '2025-12-18 22:32:33', '2025-12-18 13:32:33');
+(11, 'thongyuenzhen@gmail.com', '705ee8e26f820b75db7f0cb2cc46f6b866d4e36fe245b7d1d97fdd4a5ba8ebe0', '2026-01-16 10:51:55', '2026-01-16 01:51:55');
 
 -- --------------------------------------------------------
 
@@ -701,7 +782,16 @@ INSERT INTO `payment` (`Payment_ID`, `Payment_Method`, `Payment_Status`, `Paymen
 (16, 'TNG eWallet', 'Success', 'TXN-TOPUP-20260112124327-573', 50.00, '0000-00-00 00:00:00', 'TNG eWallet', 'Top-up Account', NULL, '2026-01-12 12:43:27'),
 (17, '', 'Success', 'TXN-TOPUP-20260112125521-816', 50.00, '0000-00-00 00:00:00', 'MasterCard', '5124 **** **** 8232', NULL, '2026-01-12 12:55:21'),
 (18, '', 'Success', 'TXN-EW-20260112125547-106', 100.00, '2026-01-12 12:55:47', 'My E-Wallet Balance', 'Wallet-Spending', NULL, '2026-01-12 12:55:47'),
-(19, '', 'Success', 'TXN-EW-20260112125736-492', 50.00, '2026-01-12 12:57:36', 'My E-Wallet Balance', 'Wallet-Spending', NULL, '2026-01-12 12:57:36');
+(19, '', 'Success', 'TXN-EW-20260112125736-492', 50.00, '2026-01-12 12:57:36', 'My E-Wallet Balance', 'Wallet-Spending', NULL, '2026-01-12 12:57:36'),
+(20, 'TNG eWallet', 'Success', 'TXN-20260115101620-996', 60000.00, '2026-01-15 10:16:20', 'TNG eWallet', 'QR Payment', NULL, '2026-01-15 10:16:20'),
+(21, '', 'Success', 'TXN-TOPUP-20260115101937-547', 50.00, '0000-00-00 00:00:00', 'MasterCard', '5165 **** **** 7077', NULL, '2026-01-15 10:19:37'),
+(22, '', 'Success', 'TXN-EW-20260115103029-579', 30.00, '2026-01-15 10:30:29', 'My E-Wallet Balance', 'Wallet-Spending', NULL, '2026-01-15 10:30:29'),
+(23, 'TNG eWallet', 'Success', 'TXN-TNG-20260117211754-890', 50.00, '2026-01-17 21:17:54', 'TNG eWallet', 'QR Payment', NULL, '2026-01-17 21:17:54'),
+(24, 'TNG eWallet', 'Success', 'TXN-TNG-20260117211906-993', 50.00, '2026-01-17 21:19:06', 'TNG eWallet', 'QR Payment', NULL, '2026-01-17 21:19:06'),
+(25, 'TNG eWallet', 'Success', 'TXN-TOPUP-20260117212116-248', 300.00, '0000-00-00 00:00:00', 'TNG eWallet', 'Top-up Account', NULL, '2026-01-17 21:21:16'),
+(26, 'TNG eWallet', 'Success', 'TXN-TOPUP-20260117212134-309', 300.00, '0000-00-00 00:00:00', 'TNG eWallet', 'Top-up Account', NULL, '2026-01-17 21:21:34'),
+(27, 'System E-Wallet', 'Success', 'TXN-EW-20260117212201-255', 100.00, '2026-01-17 21:22:01', 'Internal Wallet', 'Wallet-Spending', NULL, '2026-01-17 21:22:01'),
+(28, 'System E-Wallet', 'Success', 'TXN-EW-20260117212324-565', 100.00, '2026-01-17 21:23:24', 'Internal Wallet', 'Wallet-Spending', NULL, '2026-01-17 21:23:24');
 
 -- --------------------------------------------------------
 
@@ -730,7 +820,15 @@ INSERT INTO `point` (`Points_ID`, `Points_Earned`, `Points_Total`, `Points_Updat
 (6, 35, 35, '2026-01-12 12:57:41', 6),
 (7, 17, 17, '2026-01-12 12:57:41', 6),
 (8, 20, 20, '2026-01-12 12:57:41', 6),
-(9, 20, 20, '2026-01-12 12:57:41', 6);
+(9, 20, 20, '2026-01-12 12:57:41', 6),
+(10, 6006, 5956, '2026-01-15 10:33:20', 7),
+(11, 11, 5956, '2026-01-15 10:33:20', 7),
+(12, 0, 0, '2026-01-15 10:48:37', 8),
+(13, 0, 0, '2026-01-15 22:03:08', 9),
+(14, 0, 0, '2026-01-17 09:28:27', 10),
+(15, 55, 55, '2026-01-17 21:23:27', 11),
+(16, 70, 70, '2026-01-17 21:23:27', 11),
+(17, 70, 70, '2026-01-17 21:23:27', 11);
 
 -- --------------------------------------------------------
 
@@ -793,7 +891,8 @@ INSERT INTO `receipt` (`Receipt_ID`, `Receipt_Receipt_Number`, `Receipt_Generate
 (1, 'REC-2026-000005', '2026-01-12 12:58:46', 'receipt_5.pdf', 6, 5),
 (2, 'REC-2026-000006', '2026-01-12 19:59:49', 'receipt_6.pdf', 6, 6),
 (3, 'REC-2026-000009', '2026-01-12 19:59:56', 'receipt_9.pdf', 6, 9),
-(4, 'REC-2026-000017', '2026-01-12 20:00:03', 'receipt_17.pdf', 6, 17);
+(4, 'REC-2026-000017', '2026-01-12 20:00:03', 'receipt_17.pdf', 6, 17),
+(5, 'REC-2026-000019', '2026-01-15 11:07:25', 'receipt_19.pdf', 7, 19);
 
 -- --------------------------------------------------------
 
@@ -823,7 +922,9 @@ CREATE TABLE `recurring_donation` (
 --
 
 INSERT INTO `recurring_donation` (`Recurring_ID`, `Recurring_Amount`, `Recurring_Payment_Method`, `Recurring_StartDate`, `Recurring_EndDate`, `Recurring_Deduction_Date`, `Last_Payment_Date`, `Recurring_Status`, `Recurring_Created_At`, `Recurring_Updated_At`, `Donor_ID`, `Branch_ID`, `Activity_ID`, `Case_ID`) VALUES
-(2, 100.00, 'TNG eWallet', '2025-12-15', NULL, '2026-01-01', NULL, 'Cancelled', '2025-12-15 22:28:06', '2025-12-15 22:28:51', 2, NULL, NULL, 3);
+(2, 100.00, 'TNG eWallet', '2025-12-15', NULL, '2026-01-01', NULL, 'Cancelled', '2025-12-15 22:28:06', '2025-12-15 22:28:51', 2, NULL, NULL, 3),
+(3, 30.00, '', '2026-01-15', NULL, '2026-02-15', NULL, 'Paused', '2026-01-15 10:30:29', '2026-01-15 10:34:52', 7, 2, NULL, NULL),
+(4, 50.00, 'TNG eWallet', '2026-01-17', NULL, '2026-02-17', NULL, 'Active', '2026-01-17 21:17:54', '2026-01-17 21:17:54', 11, 2, NULL, NULL);
 
 --
 -- 触发器 `recurring_donation`
@@ -871,7 +972,8 @@ CREATE TABLE `redemption_order` (
 
 INSERT INTO `redemption_order` (`Redemption_ID`, `Redemption_Address1`, `Redemption_Address2`, `Redemption_Address3`, `Redemption_City`, `Redemption_State`, `Redemption_PostalCode`, `Redemption_Country`, `Redemption_ContactNumber`, `Redemption_PointsSpent`, `Redemption_Status`, `Redemption_CancelReason`, `Redemption_TrackingNumber`, `Redemption_Updated_At`, `Donor_ID`, `Reward_ID`, `Redemption_Quantity`, `Redemption_Shipped_At`, `Redemption_Est_Delivery_Date`, `Redemption_FollowUp_Sent`) VALUES
 (1, '11， jalan  silat lincah 10', NULL, NULL, 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-11190233', 35, 'Cancelled', NULL, NULL, '2026-01-04 23:03:56', 3, 2, 1, NULL, NULL, 0),
-(2, 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '11-11190233', 35, 'Shipped', NULL, 'JNT-123654798', '2026-01-13 20:08:54', 3, 2, 1, NULL, NULL, 0);
+(2, 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '11-11190233', 35, 'Shipped', NULL, 'JNT-123654798', '2026-01-13 20:08:54', 3, 2, 1, NULL, NULL, 0),
+(3, 'Blk 914Jurong West Street 91', 'taman abc', '', 'Skudai', 'Johor', '640914', 'Malaysia', '012-34567812', 50, 'Pending', NULL, NULL, '2026-01-15 10:33:20', 7, 15, 1, NULL, NULL, 0);
 
 --
 -- 触发器 `redemption_order`
@@ -918,26 +1020,26 @@ CREATE TABLE `reward_item` (
 --
 
 INSERT INTO `reward_item` (`Reward_ID`, `Reward_Code`, `Reward_ItemName`, `Reward_Category`, `Reward_Description`, `Reward_RequiredPoint`, `Reward_Supplier`, `Reward_Stock`, `Reward_ExpiryDate`, `Reward_Status`, `Reward_PhotoPath`) VALUES
-(1, 'HO-001', 'Handmade Organic Soap', 'Household', 'Natural lavender scented soap bars made with essential oils. Gentle on skin.', 12, 'Mama Earth Crafts', 50, '2026-12-31', 'Active', 'soap_lavender.jpg'),
-(2, 'AP-002', 'Batik Cotton Scarf', 'Apparel', 'Traditional Malaysian Batik hand-painted scarf. 100% Cotton, vibrant colors.', 35, 'East Coast Batik', 23, NULL, 'Active', 'batik_scarf.jpg'),
-(3, 'HO-003', 'Rattan Coaster Set', 'Household', 'Set of 4 hand-woven rattan coasters. Durable and eco-friendly.', 15, 'Village Weavers', 40, NULL, 'Active', 'rattan_coasters.jpg'),
-(4, 'HA-004', 'Beaded Key Chain', 'Handicraft', 'Colorful hand-beaded keychain with traditional motifs. Random designs.', 5, 'Love Bridge Volunteers', 100, NULL, 'Active', 'keychain_beaded.jpg'),
-(5, 'HO-005', 'Scented Soy Candle', 'Household', 'Eco-friendly soy wax candle in a glass jar. Lemongrass scent.', 20, 'Candle Studio', 30, NULL, 'Active', 'candle_soy.jpg'),
-(6, 'HO-006', 'Mengkuang Woven Mat', 'Household', 'Small woven mat suitable for table centerpiece or wall decoration.', 25, 'Kampung Heritage', 15, NULL, 'Active', 'mengkuang_mat.jpg'),
-(7, 'HO-007', 'Clay Flower Pot', 'Household', 'Mini terracotta pot hand-painted with floral designs.', 10, 'Earth Pottery', 8, NULL, 'Low Stock', 'clay_pot.jpg'),
-(8, 'AP-008', 'Tie-Dye Tote Bag', 'Apparel', 'Canvas tote bag featuring unique tie-dye patterns. Reusable and stylish.', 18, 'Youth Art Center', 60, NULL, 'Active', 'tote_tiedye.jpg'),
-(9, 'HO-009', 'Coconut Shell Bowl', 'Household', 'Polished natural coconut shell bowl, perfect for smoothie bowls or decor.', 12, 'Island Crafts', 45, NULL, 'Active', 'coconut_bowl.jpg'),
-(10, 'OT-010', 'Hand-Stitched Notebook', 'Others', 'A5 notebook with recycled paper and hand-stitched binding.', 15, 'Green Stationers', 35, NULL, 'Active', 'notebook_stitched.jpg'),
-(11, 'HA-011', 'Macrame Wall Hanging', 'Handicraft', 'Bohemian style wall decoration made from cotton rope.', 45, 'Knotty Arts', 12, NULL, 'Active', 'macrame_wall.jpg'),
-(12, 'AP-012', 'Embroidered Pouch', 'Apparel', 'Zipper pouch with detailed floral embroidery. Great for cosmetics.', 22, 'Needlework Aunties', 28, NULL, 'Active', 'pouch_embroidery.jpg'),
-(13, 'HO-013', 'Bamboo Cutlery Set', 'Household', 'Reusable bamboo spoon, fork, and straw in a cloth pouch.', 10, 'EcoLife', 5, NULL, 'Low Stock', 'bamboo_set.jpg'),
-(14, 'OT-014', 'Resin Flower Bookmark', 'Others', 'Clear resin bookmark with pressed real dried flowers inside.', 8, 'Floral Press', 0, NULL, 'Inactive', 'resin_bookmark.jpg'),
-(15, 'HO-015', 'Hand-Painted Tiffin', 'Household', 'Classic metal tiffin carrier painted with retro floral patterns.', 50, 'Retro Vibes', 10, NULL, 'Active', 'tiffin_painted.jpg'),
-(16, 'HA-016', 'Crochet Plushie (Bear)', 'Handicraft', 'Cute handmade crochet bear doll. Safe for kids.', 30, 'Grandma Stitches', 20, NULL, 'Active', 'crochet_bear.jpg'),
-(17, 'AP-017', 'Upcycled Denim Purse', 'Apparel', 'Coin purse made from recycled denim jeans.', 10, 'Recycle Works', 40, NULL, 'Active', 'denim_purse.jpg'),
-(18, 'EL-018', 'Wood Carved Phone Stand', 'Electronics', 'Simple wooden stand carved from leftover timber. Fits most phones.', 15, 'Woody Crafts', 3, NULL, 'Low Stock', 'wood_stand.jpg'),
-(19, 'HO-019', 'Ceramic Mug (Handmade)', 'Household', 'Imperfection is beauty. Hand-thrown ceramic mug with unique glaze.', 25, 'Earth Pottery', 18, NULL, 'Active', 'ceramic_mug.jpg'),
-(20, 'HA-020', 'Traditional Kite ', 'Handicraft', 'Miniature decorative Wau Bulan. Not for flying, for display only.', 40, 'Heritage Fly', 75, NULL, 'Active', 'reward_1768282318_6965d8ceafaae.jpeg');
+(1, 'HO-001', 'Handmade Organic Soap', 'Household', 'Natural lavender scented soap bars made with essential oils. Gentle on skin.', 12, 'Mama Earth Crafts', 50, NULL, 'Active', 'reward_1768482550_6968e6f6a0b03.jpg'),
+(2, 'AP-002', 'Batik Cotton Scarf', 'Apparel', 'Traditional Malaysian Batik hand-painted scarf. 100% Cotton, vibrant colors.', 35, 'East Coast Batik', 23, NULL, 'Active', 'reward_1768482787_6968e7e3eb582.jpg'),
+(3, 'HO-003', 'Rattan Coaster Set', 'Household', 'Set of 4 hand-woven rattan coasters. Durable and eco-friendly.', 15, 'Village Weavers', 40, NULL, 'Active', 'reward_1768482779_6968e7dbe170c.jpg'),
+(4, 'HA-004', 'Beaded Key Chain', 'Handicraft', 'Colorful hand-beaded keychain with traditional motifs. Random designs.', 5, 'Love Bridge Volunteers', 100, NULL, 'Active', 'reward_1768482771_6968e7d307f31.jpg'),
+(5, 'HO-005', 'Scented Soy Candle', 'Household', 'Eco-friendly soy wax candle in a glass jar. Lemongrass scent.', 20, 'Candle Studio', 30, NULL, 'Active', 'reward_1768482757_6968e7c5caa68.jpg'),
+(6, 'HO-006', 'Mengkuang Woven Mat', 'Household', 'Small woven mat suitable for table centerpiece or wall decoration.', 25, 'Kampung Heritage', 15, NULL, 'Active', 'reward_1768482747_6968e7bb402a2.jpg'),
+(7, 'HO-007', 'Clay Flower Pot', 'Household', 'Mini terracotta pot hand-painted with floral designs.', 10, 'Earth Pottery', 8, NULL, 'Low Stock', 'reward_1768482736_6968e7b0a895c.jpg'),
+(8, 'AP-008', 'Tie-Dye Tote Bag', 'Apparel', 'Canvas tote bag featuring unique tie-dye patterns. Reusable and stylish.', 18, 'Youth Art Center', 60, NULL, 'Active', 'reward_1768482725_6968e7a5517f8.jpg'),
+(9, 'HO-009', 'Coconut Shell Bowl', 'Household', 'Polished natural coconut shell bowl, perfect for smoothie bowls or decor.', 12, 'Island Crafts', 45, NULL, 'Active', 'reward_1768482715_6968e79b4b5cb.jpg'),
+(10, 'OT-010', 'Hand-Stitched Notebook', 'Others', 'A5 notebook with recycled paper and hand-stitched binding.', 15, 'Green Stationers', 35, NULL, 'Active', 'reward_1768482703_6968e78f84c20.jpg'),
+(11, 'HA-011', 'Macrame Wall Hanging', 'Handicraft', 'Bohemian style wall decoration made from cotton rope.', 45, 'Knotty Arts', 12, NULL, 'Low Stock', 'reward_1768482689_6968e7819a019.jpg'),
+(12, 'AP-012', 'Embroidered Pouch', 'Apparel', 'Zipper pouch with detailed floral embroidery. Great for cosmetics.', 22, 'Needlework Aunties', 28, NULL, 'Active', 'reward_1768482676_6968e774c0dc3.jpg'),
+(13, 'HO-013', 'Bamboo Cutlery Set', 'Household', 'Reusable bamboo spoon, fork, and straw in a cloth pouch.', 10, 'EcoLife', 5, NULL, 'Low Stock', 'reward_1768482658_6968e76232363.jpg'),
+(14, 'OT-014', 'Resin Flower Bookmark', 'Others', 'Clear resin bookmark with pressed real dried flowers inside.', 8, 'Floral Press', 0, NULL, 'Inactive', 'reward_1768482645_6968e755f30d3.jpg'),
+(15, 'HO-015', 'Hand-Painted Tiffin', 'Household', 'Classic metal tiffin carrier painted with retro floral patterns.', 50, 'Retro Vibes', 9, NULL, 'Low Stock', 'reward_1768482635_6968e74b2b33f.jpg'),
+(16, 'HA-016', 'Crochet Plushie Bear', 'Handicraft', 'Cute handmade crochet bear doll. Safe for kids.', 30, 'Grandma Stitches', 20, NULL, 'Active', 'reward_1768482624_6968e7407d579.jpg'),
+(17, 'AP-017', 'Upcycled Denim Purse', 'Apparel', 'Coin purse made from recycled denim jeans.', 10, 'Recycle Works', 40, NULL, 'Active', 'reward_1768482609_6968e731d20f6.jpg'),
+(18, 'EL-018', 'Wood Carved Phone Stand', 'Electronics', 'Simple wooden stand carved from leftover timber. Fits most phones.', 15, 'Woody Crafts', 15, NULL, 'Active', 'reward_1768482600_6968e72873ec4.jpg'),
+(19, 'HO-019', 'Ceramic Mug ', 'Household', 'Imperfection is beauty. Hand-thrown ceramic mug with unique glaze.', 25, 'Earth Pottery', 18, NULL, 'Active', 'reward_1768482579_6968e7133db7e.jpg'),
+(20, 'HA-020', 'Traditional Kite ', 'Handicraft', 'Miniature decorative Wau Bulan. Not for flying, for display only.', 40, 'Heritage Fly', 50, NULL, 'Active', 'reward_1768482561_6968e70115ced.jpg');
 
 -- --------------------------------------------------------
 
@@ -960,7 +1062,31 @@ CREATE TABLE `reward_logs` (
 
 INSERT INTO `reward_logs` (`Log_ID`, `Reward_ID`, `Admin_ID`, `Action_Type`, `Action_Details`, `Log_Created_At`) VALUES
 (1, 20, 2, 'Stock Update', 'Added 50 qty. New Total: 75', '2026-01-13 12:47:34'),
-(2, 20, 2, 'Update', 'Updated details for Traditional Kite . Stock set to 75', '2026-01-13 13:31:58');
+(2, 20, 2, 'Update', 'Updated details for Traditional Kite . Stock set to 75', '2026-01-13 13:31:58'),
+(3, 20, 2, 'Update', 'Updated details for Traditional Kite . Stock set to 0', '2026-01-15 11:09:04'),
+(4, 20, 2, 'Update', 'Updated details for Traditional Kite . Stock set to 50', '2026-01-15 11:10:26'),
+(5, 18, 2, 'Update', 'Updated details for Wood Carved Phone Stand. Stock set to 0', '2026-01-15 11:11:01'),
+(6, 1, 2, 'Update', 'Updated details for Handmade Organic Soap. Stock set to 50', '2026-01-15 21:09:10'),
+(7, 20, 2, 'Update', 'Updated details for Traditional Kite . Stock set to 50', '2026-01-15 21:09:21'),
+(8, 19, 2, 'Update', 'Updated details for Ceramic Mug . Stock set to 18', '2026-01-15 21:09:39'),
+(9, 18, 2, 'Stock Update', 'Added 15 qty. New Total: 15', '2026-01-15 21:09:48'),
+(10, 18, 2, 'Update', 'Updated details for Wood Carved Phone Stand. Stock set to 15', '2026-01-15 21:10:00'),
+(11, 17, 2, 'Update', 'Updated details for Upcycled Denim Purse. Stock set to 40', '2026-01-15 21:10:09'),
+(12, 16, 2, 'Update', 'Updated details for Crochet Plushie Bear. Stock set to 20', '2026-01-15 21:10:24'),
+(13, 15, 2, 'Update', 'Updated details for Hand-Painted Tiffin. Stock set to 9', '2026-01-15 21:10:35'),
+(14, 14, 2, 'Update', 'Updated details for Resin Flower Bookmark. Stock set to 0', '2026-01-15 21:10:45'),
+(15, 13, 2, 'Update', 'Updated details for Bamboo Cutlery Set. Stock set to 5', '2026-01-15 21:10:58'),
+(16, 12, 2, 'Update', 'Updated details for Embroidered Pouch. Stock set to 28', '2026-01-15 21:11:16'),
+(17, 11, 2, 'Update', 'Updated details for Macrame Wall Hanging. Stock set to 12', '2026-01-15 21:11:29'),
+(18, 10, 2, 'Update', 'Updated details for Hand-Stitched Notebook. Stock set to 35', '2026-01-15 21:11:43'),
+(19, 9, 2, 'Update', 'Updated details for Coconut Shell Bowl. Stock set to 45', '2026-01-15 21:11:55'),
+(20, 8, 2, 'Update', 'Updated details for Tie-Dye Tote Bag. Stock set to 60', '2026-01-15 21:12:05'),
+(21, 7, 2, 'Update', 'Updated details for Clay Flower Pot. Stock set to 8', '2026-01-15 21:12:16'),
+(22, 6, 2, 'Update', 'Updated details for Mengkuang Woven Mat. Stock set to 15', '2026-01-15 21:12:27'),
+(23, 5, 2, 'Update', 'Updated details for Scented Soy Candle. Stock set to 30', '2026-01-15 21:12:37'),
+(24, 4, 2, 'Update', 'Updated details for Beaded Key Chain. Stock set to 100', '2026-01-15 21:12:51'),
+(25, 3, 2, 'Update', 'Updated details for Rattan Coaster Set. Stock set to 40', '2026-01-15 21:12:59'),
+(26, 2, 2, 'Update', 'Updated details for Batik Cotton Scarf. Stock set to 23', '2026-01-15 21:13:07');
 
 -- --------------------------------------------------------
 
@@ -977,6 +1103,8 @@ CREATE TABLE `special_case` (
   `Target_Amount` decimal(10,2) NOT NULL,
   `Raised_Amount` decimal(10,2) DEFAULT 0.00,
   `Case_Status` varchar(50) DEFAULT 'Active',
+  `Case_BankName` varchar(100) DEFAULT NULL,
+  `Case_BankAccount` varchar(50) DEFAULT NULL,
   `Cancel_Reason` text DEFAULT NULL,
   `Completed_At` datetime DEFAULT NULL,
   `Created_At` datetime DEFAULT current_timestamp(),
@@ -1004,15 +1132,15 @@ CREATE TABLE `special_case` (
 -- 转存表中的数据 `special_case`
 --
 
-INSERT INTO `special_case` (`Case_ID`, `Case_Title`, `Case_Venue`, `Case_Description`, `Case_Images`, `Target_Amount`, `Raised_Amount`, `Case_Status`, `Cancel_Reason`, `Completed_At`, `Created_At`, `Start_Date`, `End_Date`, `Case_Category`, `Case_Other_Category`, `Urgency`, `Donor_Count`, `Case_Deadline`, `Case_Organizer`, `Contact_Name`, `Contact_Number`, `Contact_Email`, `Case_Address1`, `Case_Address2`, `Case_Address3`, `Case_City`, `Case_State`, `Case_PostalCode`, `Case_Country`) VALUES
-(1, 'Rising from the Ashes - Help Siti Realize Her University Dream', 'Universiti Malaya (UM)', '19-year-old Siti comes from a hardcore poor family in Kedah. With her father paralyzed from a workplace accident and the family relying solely on her mother’s meager income from rubber tapping, life has been incredibly hard. Despite these challenges, Siti scored a perfect 4.0 CGPA in her STPM exams and received an offer to study Accounting at Universiti Malaya. However, the registration fees, the cost of a laptop, and living expenses in KL are insurmountable hurdles. We aim to raise RM 15,000 to cover her first-year expenses so that poverty does not clip the wings of this bright young student. ', '[\"uploads\\/cases\\/case_1768137355_6963a28b7d1ae_0.png\",\"uploads\\/cases\\/case_1768137355_6963a28b7ef65_1.png\"]', 15000.00, 15000.00, 'Completed', '', NULL, '2025-12-01 10:00:00', '2026-01-15', '2026-03-15', 'Other Cases', NULL, 'medium', 0, NULL, 'Love Bridge Education Fund', 'Cikgu Rahman', '+6013-5556666', 'edu.siti@lovebridge.org.my', 'Lot 123, Kampung Paya Rumput', 'Mukim Sungai Petani', '', 'Sungai Petani', 'Kedah', '08000', 'Malaysia'),
-(2, '\"Child of the Moon\" - Aid for Albino Student Aman', 'Pahang Specialist Hospital', '8-year-old Aman was born with Albinism. His lack of melanin makes his skin dangerously susceptible to burns and skin cancer from sunlight, but his biggest hurdle is his vision. Due to nystagmus and photophobia, he cannot see the whiteboard at school, hindering his dream of becoming a teacher. His parents, who work as rubber tappers, cannot afford the specialized visual aids he needs. We are fundraising to purchase custom low-vision glasses, medical-grade sunscreen, and an electronic reading aid to help Aman pursue his education confidently and safely. ', '[\"uploads\\/cases\\/case_1768137303_6963a25708403_0.png\",\"uploads\\/cases\\/case_1768137303_6963a2570a617_1.png\"]', 12000.00, 25000.00, 'Completed', '', NULL, '2025-11-15 09:30:00', '2026-03-01', '2026-04-30', 'Children Support', NULL, 'medium', 0, NULL, 'Love Bridge Pahang', 'Encik Rosli (Father)', '+6019-9988776', 'aman.help@lovebridge.org.my', 'Lot 45, Kampung Bahagia', 'Jalan Gambang', '', 'Kuantan', 'Pahang', '25000', 'Malaysia'),
-(3, 'Operation \"Fix A Heart\" - Urgent Fund for Baby Ali', 'Institut Jantung Negara (IJN)', 'At just 8 months old, Baby Ali is fighting a race against time. Born with Tetralogy of Fallot, a complex condition involving four heart defects, his blood cannot effectively carry oxygen, causing his lips and fingertips to turn a distressing shade of blue. Every breath is a struggle, and simple actions like feeding can cause him to faint from hypoxia. Doctors have warned that his heart is at its limit and requires immediate open-heart surgery to prevent fatal failure. His father, a delivery rider, and his mother, who left her job to care for him, cannot afford the RM 60,000 surgery fee. Your donation is Ali\'s only hope for a healthy childhood. ', '[\"uploads\\/cases\\/case_1768137371_6963a29b57a75_0.png\",\"uploads\\/cases\\/case_1768137371_6963a29b58377_1.png\"]', 60000.00, 1300.00, 'Active', '', NULL, '2025-12-05 14:20:00', '2026-01-13', '2026-05-01', 'Medical', NULL, 'medium', 0, NULL, 'Love Bridge Medical Fund', 'Puan Aminah (Mother)', '+6012-3456789', 'support.ali@lovebridge.org.my', 'No. 45, Blok B, PPR Kerinchi', 'Jalan Pantai Dalam', '', 'Kuala Lumpur', 'Kuala Lumpur', '59200', 'Malaysia'),
-(4, 'Sustaining Life - Emergency Dialysis Aid for Uncle Wong', 'Pusat Dialisis NKF', '68-year-old Uncle Wong, a retired construction worker, has battled End-Stage Renal Failure for three years. Requiring dialysis three times a week, he has completely depleted his life savings and EPF funds. Living alone in a low-cost flat with no income other than small welfare aid, he recently tried to skip treatments to save money, resulting in a near-fatal coma due to toxin buildup. This campaign aims to fund his dialysis treatments, blood booster injections, and transportation for the next 12 months, allowing him to live his remaining years with dignity. ', '[\"uploads\\/cases\\/case_1768137336_6963a278e2799_0.png\",\"uploads\\/cases\\/case_1768137336_6963a278e3e2d_1.png\"]', 25000.00, 8000.00, 'Active', '', NULL, '2025-11-20 11:00:00', '2026-01-11', '2026-12-31', 'Medical', NULL, 'medium', 0, NULL, 'Community Care Team', 'Mr. Ronald Tan', '+6012-7212535', 'care@lovebridge.org.my', 'Unit 4-12, Flat Sri Sabah', 'Jalan Cheras', '', 'Cheras', 'Kuala Lumpur', '56100', 'Malaysia'),
-(5, 'Standing Strong Again - Amputee Care for Grandma Halimah', 'Hospital Kuala Lumpur (HKL)', '72-year-old Puan Halimah, a diabetic for over 20 years, recently underwent a life-saving amputation of her left leg due to severe gangrene infection. Previously independent, she is now bedridden and unable to care for herself. Her healing process is slow and requires expensive silver ion dressings to prevent reinfection. We are seeking funds to provide her with a custom prosthetic leg, a lightweight wheelchair, wound care supplies, and diabetic nutritional milk. Your support will serve as her crutch, helping her regain her mobility and independence. ', '[\"uploads\\/cases\\/case_1768137269_6963a23522a13_0.png\",\"uploads\\/cases\\/case_1768137269_6963a23523daf_1.png\"]', 20000.00, 3000.00, 'Active', '', NULL, '2025-10-10 16:45:00', '2026-01-13', '2026-05-10', 'Elderly Care', NULL, 'medium', 0, NULL, 'Sentul Welfare Team', 'Puan Sarah (Volunteer)', '+6016-2233445', 'welfare@lovebridge.org.my', 'Unit 2-4, Flat Sri Perak', 'Bandar Baru Sentul', 'Sentul', 'Kuala Lumpur', 'Kuala Lumpur', '51000', 'Malaysia'),
-(6, 'Shattered Hoop Dreams - Emergency Chemo Fund for Jason', 'Sunway Medical Centre', 'Jason, a 15-year-old basketball captain, thought he had a sports injury until a checkup revealed Osteosarcoma, an aggressive bone cancer eating away at his leg bone. To avoid amputation and save his life, he requires high-dose chemotherapy and complex limb-salvage surgery. The cost of RM 80,000 is impossible for his parents, who are market vendors. Jason asked his mother in tears, \"Will I ever play again?\" We are raising funds to pay for his surgery and chemotherapy, hoping to save not just his leg, but his life and his dreams. ', '[\"uploads\\/cases\\/case_1768137201_6963a1f1c0460_0.png\",\"uploads\\/cases\\/case_1768137279_6963a23f269b3_0.png\"]', 80000.00, 0.00, 'Active', '', NULL, '2026-01-11 16:44:25', '2026-01-11', '2026-07-11', 'Children Support', NULL, 'medium', 0, NULL, 'Youth Cancer Support', 'Mr. Lim (Father)', '+6012-1122334', 'hopeforjason@lovebridge.org.my', '12, Jalan Wawasan 2', 'Pusat Bandar Puchong', '', 'Puchong', 'Selangor', '47100', 'Malaysia'),
-(7, 'Fighting for Love - Single Mom\'s Last Hope', 'Hospital Sultanah Aminah', '38-year-old Sarah has faced tragedy after tragedy. After losing her husband in a car accident two years ago, she became the sole provider for her two toddlers. Recently, she was diagnosed with Stage 3 Triple-Negative Breast Cancer, an aggressive form of the disease. The severe side effects of chemotherapy have forced her to stop working, cutting off the family\'s income. She fights with the mantra, \"I cannot die; my children are too young.\" This fund will cover her immunotherapy costs and living expenses for her children for one year. ', '[\"uploads\\/cases\\/case_1768137129_6963a1a9534de_0.png\",\"uploads\\/cases\\/case_1768137129_6963a1a9559b7_1.png\"]', 55000.00, 100.00, 'Active', '', NULL, '2026-01-11 16:46:33', '2026-01-11', '2026-08-11', 'Medical', NULL, 'medium', 0, NULL, 'Johor Women Aid', 'Sarah Binti Ali', '+6017-8899000', 'help.sarah@lovebridge.org.my', 'No 88, Jalan Kebudayaan', 'Taman Universiti', '', 'Skudai', 'Johor', '81300', 'Malaysia'),
-(8, 'Rebirth from Fire - Skin Graft Surgery for Xiao Mei', 'Hospital Raja Permaisuri Bainun', 'A kitchen accident changed 5-year-old Xiao Mei’s life in an instant when boiling soup spilled over her, causing deep second-degree burns over 40% of her body. While she survived the initial trauma, severe scar contractures are now tightening around her skin, preventing her arm from straightening and affecting her growth. She endures nightly pain and itching. We are raising funds for multiple skin graft surgeries, laser scar treatments, and custom pressure garments to help restore her mobility and reduce the scarring. ', '[\"uploads\\/cases\\/case_1768137109_6963a195d04cc_0.png\",\"uploads\\/cases\\/case_1768137109_6963a195d2193_1.png\"]', 45000.00, 100.00, 'Active', '', NULL, '2026-01-11 16:48:45', '2026-01-13', '2026-10-13', 'Children Support', NULL, 'medium', 0, NULL, 'Perak Children Fund', 'Mrs. Wong (Mother)', '+6011-22334455', 'help.xiaomei@lovebridge.org.my', '77, Laluan Tasek Timur', 'Taman Tasek Indra', '', 'Ipoh', 'Perak', '31400', 'Malaysia');
+INSERT INTO `special_case` (`Case_ID`, `Case_Title`, `Case_Venue`, `Case_Description`, `Case_Images`, `Target_Amount`, `Raised_Amount`, `Case_Status`, `Case_BankName`, `Case_BankAccount`, `Cancel_Reason`, `Completed_At`, `Created_At`, `Start_Date`, `End_Date`, `Case_Category`, `Case_Other_Category`, `Urgency`, `Donor_Count`, `Case_Deadline`, `Case_Organizer`, `Contact_Name`, `Contact_Number`, `Contact_Email`, `Case_Address1`, `Case_Address2`, `Case_Address3`, `Case_City`, `Case_State`, `Case_PostalCode`, `Case_Country`) VALUES
+(1, 'Rising from the Ashes - Help Siti Realize Her University Dream', 'Universiti Malaya (UM)', '19-year-old Siti comes from a hardcore poor family in Kedah. With her father paralyzed from a workplace accident and the family relying solely on her mother’s meager income from rubber tapping, life has been incredibly hard. Despite these challenges, Siti scored a perfect 4.0 CGPA in her STPM exams and received an offer to study Accounting at Universiti Malaya. However, the registration fees, the cost of a laptop, and living expenses in KL are insurmountable hurdles. We aim to raise RM 15,000 to cover her first-year expenses so that poverty does not clip the wings of this bright young student. ', '[\"uploads\\/cases\\/case_1768137355_6963a28b7d1ae_0.png\",\"uploads\\/cases\\/case_1768137355_6963a28b7ef65_1.png\"]', 15000.00, 15000.00, 'Completed', NULL, NULL, '', NULL, '2025-12-01 10:00:00', '2026-01-15', '2026-03-15', 'Other Cases', NULL, 'medium', 0, NULL, 'Love Bridge Education Fund', 'Cikgu Rahman', '+6013-5556666', 'edu.siti@lovebridge.org.my', 'Lot 123, Kampung Paya Rumput', 'Mukim Sungai Petani', '', 'Sungai Petani', 'Kedah', '08000', 'Malaysia'),
+(2, '\"Child of the Moon\" - Aid for Albino Student Aman', 'Pahang Specialist Hospital', '8-year-old Aman was born with Albinism. His lack of melanin makes his skin dangerously susceptible to burns and skin cancer from sunlight, but his biggest hurdle is his vision. Due to nystagmus and photophobia, he cannot see the whiteboard at school, hindering his dream of becoming a teacher. His parents, who work as rubber tappers, cannot afford the specialized visual aids he needs. We are fundraising to purchase custom low-vision glasses, medical-grade sunscreen, and an electronic reading aid to help Aman pursue his education confidently and safely. ', '[\"uploads\\/cases\\/case_1768137303_6963a25708403_0.png\",\"uploads\\/cases\\/case_1768137303_6963a2570a617_1.png\"]', 12000.00, 25000.00, 'Completed', NULL, NULL, '', NULL, '2025-11-15 09:30:00', '2026-03-01', '2026-04-30', 'Children Support', NULL, 'medium', 0, NULL, 'Love Bridge Pahang', 'Encik Rosli (Father)', '+6019-9988776', 'aman.help@lovebridge.org.my', 'Lot 45, Kampung Bahagia', 'Jalan Gambang', '', 'Kuantan', 'Pahang', '25000', 'Malaysia'),
+(3, 'Operation \"Fix A Heart\" - Urgent Fund for Baby Ali', 'Institut Jantung Negara (IJN)', 'At just 8 months old, Baby Ali is fighting a race against time. Born with Tetralogy of Fallot, a complex condition involving four heart defects, his blood cannot effectively carry oxygen, causing his lips and fingertips to turn a distressing shade of blue. Every breath is a struggle, and simple actions like feeding can cause him to faint from hypoxia. Doctors have warned that his heart is at its limit and requires immediate open-heart surgery to prevent fatal failure. His father, a delivery rider, and his mother, who left her job to care for him, cannot afford the RM 60,000 surgery fee. Your donation is Ali\'s only hope for a healthy childhood. ', '[\"uploads\\/cases\\/case_1768137371_6963a29b57a75_0.png\",\"uploads\\/cases\\/case_1768137371_6963a29b58377_1.png\"]', 60000.00, 1400.00, 'Active', NULL, NULL, '', NULL, '2025-12-05 14:20:00', '2026-01-13', '2026-05-01', 'Emergency Relief', NULL, 'medium', 1, NULL, 'Love Bridge Medical Fund', 'Puan Aminah (Mother)', '+6012-3456789', 'support.ali@lovebridge.org.my', 'No. 45, Blok B, PPR Kerinchi', 'Jalan Pantai Dalam', '', 'Kuala Lumpur', 'Kuala Lumpur', '59200', 'Malaysia'),
+(4, 'Sustaining Life - Emergency Dialysis Aid for Uncle Wong', 'Pusat Dialisis NKF', '68-year-old Uncle Wong, a retired construction worker, has battled End-Stage Renal Failure for three years. Requiring dialysis three times a week, he has completely depleted his life savings and EPF funds. Living alone in a low-cost flat with no income other than small welfare aid, he recently tried to skip treatments to save money, resulting in a near-fatal coma due to toxin buildup. This campaign aims to fund his dialysis treatments, blood booster injections, and transportation for the next 12 months, allowing him to live his remaining years with dignity. ', '[\"uploads\\/cases\\/case_1768137336_6963a278e2799_0.png\",\"uploads\\/cases\\/case_1768137336_6963a278e3e2d_1.png\"]', 25000.00, 8000.00, 'Active', NULL, NULL, '', NULL, '2025-11-20 11:00:00', '2026-01-11', '2026-12-31', 'Medical', NULL, 'medium', 0, NULL, 'Community Care Team', 'Mr. Ronald Tan', '+6012-7212535', 'care@lovebridge.org.my', 'Unit 4-12, Flat Sri Sabah', 'Jalan Cheras', '', 'Cheras', 'Kuala Lumpur', '56100', 'Malaysia'),
+(5, 'Standing Strong Again - Amputee Care for Grandma Halimah', 'Hospital Kuala Lumpur (HKL)', '72-year-old Puan Halimah, a diabetic for over 20 years, recently underwent a life-saving amputation of her left leg due to severe gangrene infection. Previously independent, she is now bedridden and unable to care for herself. Her healing process is slow and requires expensive silver ion dressings to prevent reinfection. We are seeking funds to provide her with a custom prosthetic leg, a lightweight wheelchair, wound care supplies, and diabetic nutritional milk. Your support will serve as her crutch, helping her regain her mobility and independence. ', '[\"uploads\\/cases\\/case_1768137269_6963a23522a13_0.png\",\"uploads\\/cases\\/case_1768137269_6963a23523daf_1.png\"]', 20000.00, 3000.00, 'Active', NULL, NULL, '', NULL, '2025-10-10 16:45:00', '2026-01-13', '2026-05-10', 'Elderly Care', NULL, 'medium', 0, NULL, 'Sentul Welfare Team', 'Puan Sarah (Volunteer)', '+6016-2233445', 'welfare@lovebridge.org.my', 'Unit 2-4, Flat Sri Perak', 'Bandar Baru Sentul', 'Sentul', 'Kuala Lumpur', 'Kuala Lumpur', '51000', 'Malaysia'),
+(6, 'Shattered Hoop Dreams - Emergency Chemo Fund for Jason', 'Sunway Medical Centre', 'Jason, a 15-year-old basketball captain, thought he had a sports injury until a checkup revealed Osteosarcoma, an aggressive bone cancer eating away at his leg bone. To avoid amputation and save his life, he requires high-dose chemotherapy and complex limb-salvage surgery. The cost of RM 80,000 is impossible for his parents, who are market vendors. Jason asked his mother in tears, \"Will I ever play again?\" We are raising funds to pay for his surgery and chemotherapy, hoping to save not just his leg, but his life and his dreams. ', '[\"uploads\\/cases\\/case_1768137201_6963a1f1c0460_0.png\",\"uploads\\/cases\\/case_1768137279_6963a23f269b3_0.png\"]', 80000.00, 0.00, 'Active', NULL, NULL, '', NULL, '2026-01-11 16:44:25', '2026-01-11', '2026-07-11', 'Children Support', NULL, 'medium', 0, NULL, 'Youth Cancer Support', 'Mr. Lim (Father)', '+6012-1122334', 'hopeforjason@lovebridge.org.my', '12, Jalan Wawasan 2', 'Pusat Bandar Puchong', '', 'Puchong', 'Selangor', '47100', 'Malaysia'),
+(7, 'Fighting for Love - Single Mom\'s Last Hope', 'Hospital Sultanah Aminah', '38-year-old Sarah has faced tragedy after tragedy. After losing her husband in a car accident two years ago, she became the sole provider for her two toddlers. Recently, she was diagnosed with Stage 3 Triple-Negative Breast Cancer, an aggressive form of the disease. The severe side effects of chemotherapy have forced her to stop working, cutting off the family\'s income. She fights with the mantra, \"I cannot die; my children are too young.\" This fund will cover her immunotherapy costs and living expenses for her children for one year. ', '[\"uploads\\/cases\\/case_1768137129_6963a1a9534de_0.png\",\"uploads\\/cases\\/case_1768137129_6963a1a9559b7_1.png\"]', 55000.00, 60100.00, 'Completed', NULL, NULL, '', '2026-01-15 10:16:27', '2026-01-11 16:46:33', '2026-01-11', '2026-08-11', 'Emergency Relief', NULL, 'medium', 1, NULL, 'Johor Women Aid', 'Sarah Binti Ali', '+6017-8899000', 'help.sarah@lovebridge.org.my', 'No 88, Jalan Kebudayaan', 'Taman Universiti', '', 'Skudai', 'Johor', '81300', 'Malaysia'),
+(8, 'Rebirth from Fire - Skin Graft Surgery for Xiao Mei', 'Hospital Raja Permaisuri Bainun', 'A kitchen accident changed 5-year-old Xiao Mei’s life in an instant when boiling soup spilled over her, causing deep second-degree burns over 40% of her body. While she survived the initial trauma, severe scar contractures are now tightening around her skin, preventing her arm from straightening and affecting her growth. She endures nightly pain and itching. We are raising funds for multiple skin graft surgeries, laser scar treatments, and custom pressure garments to help restore her mobility and reduce the scarring. ', '[\"uploads\\/cases\\/case_1768137109_6963a195d04cc_0.png\",\"uploads\\/cases\\/case_1768137109_6963a195d2193_1.png\"]', 45000.00, 150.00, 'Active', NULL, NULL, '', NULL, '2026-01-11 16:48:45', '2026-01-13', '2026-10-13', 'Children Support', NULL, 'medium', 1, NULL, 'Perak Children Fund', 'Mrs. Wong (Mother)', '+6011-22334455', 'help.xiaomei@lovebridge.org.my', '77, Laluan Tasek Timur', 'Taman Tasek Indra', '', 'Ipoh', 'Perak', '31400', 'Malaysia');
 
 --
 -- 触发器 `special_case`
@@ -1074,7 +1202,9 @@ INSERT INTO `staff` (`Staff_ID`, `Staff_FullName`, `Staff_ContactNumber`, `Staff
 (1, 'Lim Wen Qin', '+6011-11190233', '030303-01-0303', 'lim.wen.qin@student.mmu.edu.my', '$2y$10$wI3ynrr3', '2003-03-03', '19, jalan bukit beruang utama 6', 'taman buklit beruang utama', '', 'melaka', 'Melaka', '75450', 'Malaysia', '', 'Staff', 'Active', NULL, '2025-12-07', 'uploads/staff_profiles/staff_1765123541_6935a5d520873.png', 2, 0, 1),
 (4, 'steve', '+6012-34567898', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$s4PtchL9.Lhy9dcKmrf0.eCM1qrxynsrSq4cLqR.c2XypF7q7F7w2', '2003-05-17', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-08', NULL, 2, 0, 1),
 (6, 'john', '+6012-3456789', '010203-04-0506', 'johndoe123@gmail.com', '$2y$10$FAwwBFD1hIOcrWPKJlvJbOLod5Za.bTjk1l5YsaTUbaRAAWs74tDy', '2001-02-03', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-08', NULL, 2, 0, 1),
-(8, 'ronald tan bin hong', '+6012-7212535', '010203-04-0506', 'ronaldtan0404@gmail.com', '$2y$10$n.Y6jwngCWE/KxeYcAX6ouE6vwq63ZhL1bHHfbtXhxY5ihQa7O8WK', '2001-02-06', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-09', NULL, 2, 0, 0);
+(8, 'ronald tan bin hong', '+6012-7212535', '010203-04-0506', 'ronaldtan0404@gmail.com', '$2y$10$n.Y6jwngCWE/KxeYcAX6ouE6vwq63ZhL1bHHfbtXhxY5ihQa7O8WK', '2001-02-06', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-09', NULL, 2, 0, 0),
+(9, 'thong', '+6011-11190233', '030517', 'thong@gmail.org', '$2y$10$b7ruWGX5udro8Hs0jXtAm.LRsO97eDzswp/YGRSNifATt7497zZJK', '2003-05-17', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-15', NULL, 2, 0, 1),
+(10, 'jojo', '+6011-11190233', '030517-01-0373', 'jojo@example.com', '$2y$10$Ry.gVthd/LQITzeT/fyth.Hv6Y0LGwVxRQLqnoaXXp1EaX46hCYfa', '2003-05-17', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-16', NULL, 2, 0, 1);
 
 --
 -- 触发器 `staff`
@@ -1130,6 +1260,19 @@ INSERT INTO `story` (`Story_ID`, `Story_Date`, `Story_Title`, `Story_Author`, `S
 -- --------------------------------------------------------
 
 --
+-- 表的结构 `system_pages`
+--
+
+CREATE TABLE `system_pages` (
+  `Page_ID` int(11) NOT NULL,
+  `Page_Key` varchar(50) NOT NULL,
+  `Page_Content` longtext NOT NULL,
+  `Last_Updated` date NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- 表的结构 `team_members`
 --
 
@@ -1147,9 +1290,9 @@ CREATE TABLE `team_members` (
 --
 
 INSERT INTO `team_members` (`Team_ID`, `Name`, `Position`, `Description`, `Images`, `Created_At`) VALUES
-(1, 'Mr. Lim Wen Qin', 'Founder & Chairperson', 'Medical doctor with 20+ years of humanitarian experience', '[\"images/team_lim.jpg\"]', '2026-01-12 06:21:16'),
-(2, 'Mr. Thong Yuen Zhen', 'Executive Director', 'Former corporate leader turned full-time humanitarian', '[\"images/team_thong.jpg\"]', '2026-01-12 06:21:16'),
-(3, 'Mr. Ronald Tan Bin Hong', 'Program Director', 'Specialized in community development and disaster response', '[\"images/team_ronald.jpg\"]', '2026-01-12 06:21:16');
+(1, 'Mr. Lim Wen Qin', 'Founder & Chairperson', 'Medical doctor with 20+ years of humanitarian experience', '[\"images/team_1768482933_Lim Wen Qin.jpeg\"]', '2026-01-12 06:21:16'),
+(2, 'Mr. Thong Yuen Zhen', 'Executive Director', 'Former corporate leader turned full-time humanitarian', '[\"images/team_1768482948_Thong Yuen Zhen.jpeg\"]', '2026-01-12 06:21:16'),
+(3, 'Mr. Ronald Tan Bin Hong', 'Program Director', 'Specialized in community development and disaster response', '[\"images\\/team_1768483579_Ronald Tan Bin Hong.jpeg\"]', '2026-01-12 06:21:16');
 
 -- --------------------------------------------------------
 
@@ -1201,7 +1344,44 @@ INSERT INTO `wallet_transaction` (`Wallet_Trans_ID`, `Donor_ID`, `Order_ID`, `Tr
 (5, 6, 15, 'Credit', 50.00, 'Top-up via TNG eWallet', '2026-01-12 12:43:27'),
 (6, 6, 16, 'Credit', 50.00, 'Top-up via Credit/Debit Card', '2026-01-12 12:55:21'),
 (7, 6, 17, 'Debit', 100.00, 'Donate to Case: Fighting for Love - Single Mom\'s Last Hope', '2026-01-12 12:55:47'),
-(8, 6, 18, '', 50.00, 'Donation by E-Wallet', '2026-01-12 12:57:36');
+(8, 6, 18, '', 50.00, 'Donation by E-Wallet', '2026-01-12 12:57:36'),
+(9, 7, 20, 'Credit', 50.00, 'Top-up via Credit/Debit Card', '2026-01-15 10:19:37'),
+(10, 7, 21, '', 30.00, 'Donation by E-Wallet', '2026-01-15 10:30:29'),
+(11, 11, 24, 'Credit', 300.00, 'Top-up via TNG eWallet', '2026-01-17 21:21:16'),
+(12, 11, 25, 'Credit', 300.00, 'Top-up via TNG eWallet', '2026-01-17 21:21:34'),
+(13, 11, 26, '', 100.00, 'Donate to Case: Operation \"Fix A Heart\" - Urgent Fund for Baby Ali', '2026-01-17 21:22:01'),
+(14, 11, 27, '', 100.00, 'Donate to Activity: 2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', '2026-01-17 21:23:24');
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `withdrawals`
+--
+
+CREATE TABLE `withdrawals` (
+  `Withdrawal_ID` int(11) NOT NULL,
+  `Branch_ID` int(11) NOT NULL,
+  `Case_ID` int(11) DEFAULT NULL,
+  `Activity_ID` int(11) DEFAULT NULL COMMENT '如果是针对某个活动的提款',
+  `Amount` decimal(10,2) NOT NULL,
+  `Status` enum('Pending','Approved','Rejected','Completed') DEFAULT 'Pending',
+  `Request_Date` datetime DEFAULT current_timestamp(),
+  `Processed_Date` datetime DEFAULT NULL,
+  `Bank_Name` varchar(100) DEFAULT NULL,
+  `Bank_Account` varchar(50) DEFAULT NULL,
+  `Reference_Proof` text DEFAULT NULL,
+  `Admin_ID` int(11) DEFAULT NULL COMMENT '处理提款的管理员',
+  `Approved_By` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- 转存表中的数据 `withdrawals`
+--
+
+INSERT INTO `withdrawals` (`Withdrawal_ID`, `Branch_ID`, `Case_ID`, `Activity_ID`, `Amount`, `Status`, `Request_Date`, `Processed_Date`, `Bank_Name`, `Bank_Account`, `Reference_Proof`, `Admin_ID`, `Approved_By`) VALUES
+(1, 2, NULL, NULL, 50.00, 'Completed', '2026-01-15 08:22:20', NULL, 'N/A', 'N/A', '[\"uploads\\/withdrawals\\/wd_1768436540_6968333c252f8_0.jpg\"]', 2, NULL),
+(2, 1, NULL, NULL, 20.00, 'Pending', '2026-01-15 08:49:24', NULL, 'N/A', 'N/A', '[\"uploads\\/withdrawals\\/wd_1768438164_69683994b364a_0.jpg\"]', 2, NULL),
+(3, 2, NULL, 3, 150.00, 'Pending', '2026-01-18 00:58:51', NULL, 'N/A', 'N/A', '[\"uploads\\/withdrawals\\/wd_1768669131_696bbfcb7e5da_0.jpg\"]', 2, NULL);
 
 --
 -- 转储表的索引
@@ -1427,6 +1607,13 @@ ALTER TABLE `story`
   ADD PRIMARY KEY (`Story_ID`);
 
 --
+-- 表的索引 `system_pages`
+--
+ALTER TABLE `system_pages`
+  ADD PRIMARY KEY (`Page_ID`),
+  ADD UNIQUE KEY `Page_Key` (`Page_Key`);
+
+--
 -- 表的索引 `team_members`
 --
 ALTER TABLE `team_members`
@@ -1449,6 +1636,14 @@ ALTER TABLE `wallet_transaction`
   ADD KEY `Order_ID` (`Order_ID`);
 
 --
+-- 表的索引 `withdrawals`
+--
+ALTER TABLE `withdrawals`
+  ADD PRIMARY KEY (`Withdrawal_ID`),
+  ADD KEY `Branch_ID` (`Branch_ID`),
+  ADD KEY `Activity_ID` (`Activity_ID`);
+
+--
 -- 在导出的表使用AUTO_INCREMENT
 --
 
@@ -1462,7 +1657,7 @@ ALTER TABLE `about_us_info`
 -- 使用表AUTO_INCREMENT `activity`
 --
 ALTER TABLE `activity`
-  MODIFY `Activity_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `Activity_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- 使用表AUTO_INCREMENT `admin`
@@ -1474,7 +1669,7 @@ ALTER TABLE `admin`
 -- 使用表AUTO_INCREMENT `admin_notifications`
 --
 ALTER TABLE `admin_notifications`
-  MODIFY `AdminNotification_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=51;
+  MODIFY `AdminNotification_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
 
 --
 -- 使用表AUTO_INCREMENT `branch`
@@ -1498,25 +1693,25 @@ ALTER TABLE `contact_settings`
 -- 使用表AUTO_INCREMENT `donor`
 --
 ALTER TABLE `donor`
-  MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- 使用表AUTO_INCREMENT `donor_login_attempts`
 --
 ALTER TABLE `donor_login_attempts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- 使用表AUTO_INCREMENT `donor_password_reset`
 --
 ALTER TABLE `donor_password_reset`
-  MODIFY `reset_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `reset_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- 使用表AUTO_INCREMENT `donor_security_logs`
 --
 ALTER TABLE `donor_security_logs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- 使用表AUTO_INCREMENT `email_logs`
@@ -1546,25 +1741,25 @@ ALTER TABLE `notifications`
 -- 使用表AUTO_INCREMENT `orders`
 --
 ALTER TABLE `orders`
-  MODIFY `Order_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `Order_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
 
 --
 -- 使用表AUTO_INCREMENT `password_resets`
 --
 ALTER TABLE `password_resets`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- 使用表AUTO_INCREMENT `payment`
 --
 ALTER TABLE `payment`
-  MODIFY `Payment_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `Payment_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
 
 --
 -- 使用表AUTO_INCREMENT `point`
 --
 ALTER TABLE `point`
-  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
 -- 使用表AUTO_INCREMENT `policy_acceptances`
@@ -1582,19 +1777,19 @@ ALTER TABLE `privacy_policy`
 -- 使用表AUTO_INCREMENT `receipt`
 --
 ALTER TABLE `receipt`
-  MODIFY `Receipt_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `Receipt_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- 使用表AUTO_INCREMENT `recurring_donation`
 --
 ALTER TABLE `recurring_donation`
-  MODIFY `Recurring_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `Recurring_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- 使用表AUTO_INCREMENT `redemption_order`
 --
 ALTER TABLE `redemption_order`
-  MODIFY `Redemption_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `Redemption_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- 使用表AUTO_INCREMENT `reward_item`
@@ -1606,7 +1801,7 @@ ALTER TABLE `reward_item`
 -- 使用表AUTO_INCREMENT `reward_logs`
 --
 ALTER TABLE `reward_logs`
-  MODIFY `Log_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `Log_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
 
 --
 -- 使用表AUTO_INCREMENT `special_case`
@@ -1618,7 +1813,7 @@ ALTER TABLE `special_case`
 -- 使用表AUTO_INCREMENT `staff`
 --
 ALTER TABLE `staff`
-  MODIFY `Staff_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `Staff_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- 使用表AUTO_INCREMENT `staff_activity`
@@ -1631,6 +1826,12 @@ ALTER TABLE `staff_activity`
 --
 ALTER TABLE `story`
   MODIFY `Story_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- 使用表AUTO_INCREMENT `system_pages`
+--
+ALTER TABLE `system_pages`
+  MODIFY `Page_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- 使用表AUTO_INCREMENT `team_members`
@@ -1648,7 +1849,13 @@ ALTER TABLE `terms_conditions`
 -- 使用表AUTO_INCREMENT `wallet_transaction`
 --
 ALTER TABLE `wallet_transaction`
-  MODIFY `Wallet_Trans_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `Wallet_Trans_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+
+--
+-- 使用表AUTO_INCREMENT `withdrawals`
+--
+ALTER TABLE `withdrawals`
+  MODIFY `Withdrawal_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- 限制导出的表
@@ -1745,6 +1952,13 @@ ALTER TABLE `staff_activity`
 ALTER TABLE `wallet_transaction`
   ADD CONSTRAINT `wallet_transaction_ibfk_1` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`) ON DELETE CASCADE,
   ADD CONSTRAINT `wallet_transaction_ibfk_2` FOREIGN KEY (`Order_ID`) REFERENCES `orders` (`Order_ID`) ON DELETE SET NULL;
+
+--
+-- 限制表 `withdrawals`
+--
+ALTER TABLE `withdrawals`
+  ADD CONSTRAINT `withdrawals_ibfk_1` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`),
+  ADD CONSTRAINT `withdrawals_ibfk_2` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
