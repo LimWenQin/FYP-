@@ -44,6 +44,7 @@ $alert_script = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
     
+    // 地址更新处理
     if (isset($_POST['update_address'])) {
         $addr1 = $_POST['addr1']; $addr2 = $_POST['addr2']; $city = $_POST['city']; $state = $_POST['state']; $zip = $_POST['zip'];
         $sql = "UPDATE donor SET Donor_Address1=?, Donor_Address2=?, Donor_City=?, Donor_State=?, Donor_PostalCode=? WHERE Donor_ID=?";
@@ -54,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         }
     }
 
+    // 兑换请求处理
     if (isset($_POST['redeem_item_id'])) {
         $item_id = $_POST['redeem_item_id'];
         $stmt = $conn->prepare("SELECT * FROM reward_item WHERE Reward_ID = ? AND Reward_Status = 'Active'");
@@ -63,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         $stmt->close();
 
         if (!$item || $item['Reward_Stock'] <= 0 || $donor_points < $item['Reward_RequiredPoint'] || !$donor_address_complete) {
-            $alert_script = "Swal.fire('Error', 'Unable to redeem.', 'error');";
+            $alert_script = "Swal.fire('Error', 'Unable to redeem. Check your points, address, or stock.', 'error');";
         } else {
             $conn->begin_transaction();
             try {
@@ -84,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         }
     }
 
+    // 确认收货处理
     if (isset($_POST['confirm_receive_id'])) {
         $order_id = $_POST['confirm_receive_id'];
         $stmt = $conn->prepare("UPDATE redemption_order SET Redemption_Status = 'Completed', Redemption_Updated_At = NOW() WHERE Redemption_ID = ? AND Donor_ID = ? AND Redemption_Status = 'Shipped'");
@@ -103,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        :root { --primary-red: #dc2626; --dark-red: #b91c1c; --light-gray: #f5f5f5; --text-dark: #171717; --white: #ffffff; --success-green: #10b981; }
+        :root { --primary-red: #dc2626; --dark-red: #b91c1c; --light-gray: #f5f5f5; --text-dark: #171717; --white: #ffffff; --success-green: #10b981; --warning-orange: #f59e0b; }
         body { font-family: 'Segoe UI', sans-serif; background-color: var(--light-gray); margin: 0; padding: 0; }
         .container { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
         .points-banner { background: linear-gradient(135deg, var(--primary-red), var(--dark-red)); color: white; padding: 30px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
@@ -112,20 +115,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         .tab-btn { padding: 10px 20px; cursor: pointer; font-weight: 600; font-size: 1.1rem; border: none; background: none; color: #777; position: relative; }
         .tab-btn.active { color: var(--primary-red); }
         .tab-btn.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 3px; background: var(--primary-red); }
+        
+        /* Grid and Cards */
         .rewards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 30px; }
         .reward-card { background: var(--white); border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.3s ease; display: flex; flex-direction: column; position: relative; }
         .reward-card:not(.disabled):hover { transform: translateY(-5px); }
+        
+        /* 关键修复：只有状态非Active或库存为0才显示disabled效果 */
         .reward-card.disabled { opacity: 0.7; filter: grayscale(0.8); cursor: not-allowed; }
-        .reward-card.disabled .btn-redeem { background-color: #999 !important; }
-        .stock-badge { position: absolute; top: 10px; right: 10px; padding: 5px 10px; border-radius: 5px; font-size: 0.75rem; font-weight: bold; color: white; z-index: 2; }
-        .badge-out { background: #444; }
-        .badge-inactive { background: #991b1b; }
+        .reward-card.disabled .btn-redeem { background-color: #999 !important; pointer-events: none; }
+        
+        /* Badge Styles */
+        .stock-badge { position: absolute; top: 10px; left: 10px; padding: 5px 12px; border-radius: 5px; font-size: 0.75rem; font-weight: bold; color: white; z-index: 2; text-transform: uppercase; }
+        .badge-out { background: #444; } /* Out of Stock - 灰色/黑色 */
+        .badge-inactive { background: #dc2626; } /* Not Available - 红色 */
+        .badge-low { background: var(--warning-orange); box-shadow: 0 2px 4px rgba(0,0,0,0.2); } /* Low Stock - 橙色 */
+
         .reward-img { width: 100%; height: 200px; object-fit: cover; background: #eee; }
         .reward-body { padding: 20px; flex-grow: 1; display: flex; flex-direction: column; }
         .reward-meta { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 15px; border-top: 1px solid #eee; }
-        .btn-redeem { background-color: var(--primary-red); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; margin-top: 15px; }
+        .btn-redeem { background-color: var(--primary-red); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; margin-top: 15px; transition: background 0.2s; }
+        .btn-redeem:hover:not(:disabled) { background-color: var(--dark-red); }
 
-        /* History Table Styles */
+        /* History UI */
         .history-container { display: none; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .history-table { width: 100%; border-collapse: collapse; }
         .history-table th { text-align: left; padding: 15px; background: #eee; color: #555; }
@@ -134,11 +146,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         .st-processing { background: #fef3c7; color: #92400e; }
         .st-shipped { background: #dbeafe; color: #1e40af; }
         .st-completed { background: #dcfce7; color: #166534; }
-        .btn-receive { background-color: var(--success-green); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px; }
-        
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-box { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 500px; position: relative; }
-        .form-control { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -162,24 +169,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         $result = $conn->query($sql);
         while ($row = $result->fetch_assoc()) {
             $is_active = ($row['Reward_Status'] == 'Active');
-            $is_out_of_stock = ($row['Reward_Stock'] <= 0);
+            $stock = $row['Reward_Stock'];
+            
+            // 核心逻辑判断
+            $is_out_of_stock = ($stock <= 0);
+            $is_low_stock = ($is_active && $stock > 0 && $stock <= 10);
+            
+            // 只要是Active且库存>0，就可以兑换
             $can_redeem = ($is_active && !$is_out_of_stock);
             
-            // ⭐ 路径处理：将数据库的文件名补全为文件夹路径 ⭐
+            // 图片路径处理
             $raw_path = $row['Reward_PhotoPath'];
             $clean_path = str_replace('\\', '/', $raw_path);
             $final_src = (strpos($clean_path, 'reward_') === 0) ? "uploads/rewards/" . $clean_path : $clean_path;
 
-            $card_class = $can_redeem ? "" : "disabled";
             $badge_html = "";
             $btn_text = "Redeem Now";
+            $card_class = "";
 
+            // 标签优先级判定
             if (!$is_active) {
-                $badge_html = '<div class="stock-badge badge-inactive">NOT AVAILABLE</div>';
+                $badge_html = '<div class="stock-badge badge-inactive">Not Available</div>';
                 $btn_text = "Not Available";
+                $card_class = "disabled";
             } elseif ($is_out_of_stock) {
-                $badge_html = '<div class="stock-badge badge-out">OUT OF STOCK</div>';
+                $badge_html = '<div class="stock-badge badge-out">Out of Stock</div>';
                 $btn_text = "Out of Stock";
+                $card_class = "disabled";
+            } elseif ($is_low_stock) {
+                // ⭐ 这里就是你要的效果：库存1-10且Active，显示 Low Stock
+                $badge_html = '<div class="stock-badge badge-low">Low Stock</div>';
+                $btn_text = "Redeem Now";
+                $card_class = ""; // 确保没有变灰
             }
             ?>
             <div class="reward-card <?php echo $card_class; ?>">
@@ -190,7 +211,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
                     <div style="color:#666; font-size:0.9rem; margin-top:5px; flex-grow:1;"><?php echo htmlspecialchars($row['Reward_Description']); ?></div>
                     <div class="reward-meta">
                         <div style="color:var(--primary-red); font-weight:800;"><?php echo $row['Reward_RequiredPoint']; ?> PTS</div>
-                        <div style="font-size:0.8rem; color:#888;"><?php echo $row['Reward_Stock']; ?> left</div>
+                        <div style="font-size:0.8rem; <?php echo $is_low_stock ? 'color:var(--warning-orange); font-weight:bold;' : 'color:#888;'; ?>">
+                            <?php echo $stock; ?> left
+                        </div>
                     </div>
                     <button class="btn-redeem" <?php echo !$can_redeem ? 'disabled' : ''; ?>
                         onclick="handleRedeem(<?php echo $row['Reward_ID']; ?>, <?php echo $row['Reward_RequiredPoint']; ?>, '<?php echo addslashes($row['Reward_ItemName']); ?>')">
@@ -201,94 +224,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         <?php } ?>
     </div>
 
-<div id="history-tab" class="history-container">
-    <?php if ($current_donor_id): ?>
+    <div id="history-tab" class="history-container">
+        <?php if ($current_donor_id): ?>
         <table class="history-table">
             <thead>
                 <tr>
                     <th>Item</th>
                     <th>Date Redeemed</th>
                     <th>Points spent</th>
-                    <th>Status</th> <th>Action</th>
+                    <th>Status</th> 
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
                 <?php
-                $h_sql = "SELECT ro.*, ri.Reward_ItemName, ri.Reward_PhotoPath 
-                          FROM redemption_order ro 
-                          JOIN reward_item ri ON ro.Reward_ID = ri.Reward_ID 
-                          WHERE ro.Donor_ID = ? 
-                          ORDER BY ro.Redemption_Updated_At DESC";
-                $h_stmt = $conn->prepare($h_sql);
+                $h_stmt = $conn->prepare("SELECT ro.*, ri.Reward_ItemName, ri.Reward_PhotoPath FROM redemption_order ro JOIN reward_item ri ON ro.Reward_ID = ri.Reward_ID WHERE ro.Donor_ID = ? ORDER BY ro.Redemption_Updated_At DESC");
                 $h_stmt->bind_param("i", $current_donor_id);
                 $h_stmt->execute();
                 $h_res = $h_stmt->get_result();
 
                 if ($h_res->num_rows > 0):
                     while ($hist = $h_res->fetch_assoc()):
-                        $status = $hist['Redemption_Status']; 
-                        // 图片路径处理
-                        $hist_path = str_replace('\\', '/', $hist['Reward_PhotoPath']);
-                        $hist_src = (strpos($hist_path, 'reward_') === 0) ? "uploads/rewards/" . $hist_path : $hist_path;
-                        ?>
-                        <tr>
-                            <td>
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <img src="<?php echo $hist_src; ?>" style="width:50px; height:50px; object-fit:cover; border-radius:8px; border:1px solid #eee;" onerror="this.src='images/hero_3.jpg';">
-                                    <div>
-                                        <strong><?php echo htmlspecialchars($hist['Reward_ItemName']); ?></strong>
-                                        <div style="font-size: 0.75rem; color: #888;">Order ID: #<?php echo $hist['Redemption_ID']; ?></div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td><?php echo date("d M Y, h:i A", strtotime($hist['Redemption_Updated_At'])); ?></td>
-                            <td style="font-weight:bold; color:var(--primary-red);">-<?php echo number_format($hist['Redemption_PointsSpent']); ?> PT</td>
-                            <td>
-                                <?php 
-                                    // 根据不同状态显示不同的标签样式
-                                    if($status == 'Pending') {
-                                        echo '<span class="status-badge" style="background:#f3f4f6; color:#6b7280;"><i class="fas fa-hourglass-half"></i> Pending</span>';
-                                    } elseif($status == 'Processing') {
-                                        echo '<span class="status-badge st-processing"><i class="fas fa-box"></i> Processing</span>';
-                                    } elseif($status == 'Shipped') {
-                                        echo '<span class="status-badge st-shipped"><i class="fas fa-truck"></i> Shipped</span>';
-                                    } elseif($status == 'Completed') {
-                                        echo '<span class="status-badge st-completed"><i class="fas fa-check-circle"></i> Received</span>';
-                                    } elseif($status == 'Cancelled') {
-                                        echo '<span class="status-badge" style="background:#fee2e2; color:#991b1b;"><i class="fas fa-times-circle"></i> Cancelled</span>';
-                                    }
-                                ?>
-                            </td>
-                            <td>
-                                <?php if ($status == 'Shipped'): ?>
-                                    <button type="button" class="btn-receive" onclick="confirmReceive(<?php echo $hist['Redemption_ID']; ?>)">
-                                        <i class="fas fa-hand-holding-heart"></i> Confirm Received
-                                    </button>
-                                <?php elseif ($status == 'Completed'): ?>
-                                    <span style="color:var(--success-green); font-weight:600;"><i class="fas fa-heart"></i> Enjoy your gift!</span>
-                                <?php elseif ($status == 'Processing'): ?>
-                                    <span style="color:#f59e0b; font-size:0.85rem;"><b>Preparing for shipping...</b></span>
-                                <?php elseif ($status == 'Cancelled'): ?>
-                                    <span style="color:#999; font-size:0.85rem;">Order Void</span>
-                                <?php else: ?>
-                                    <span style="color:#999; font-size:0.85rem;">Waiting for Admin</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endwhile; 
-                else: ?>
-                    <tr><td colspan="5" style="text-align:center; padding:50px; color:#999;">You haven't redeemed any rewards yet.</td></tr>
+                        $status = $hist['Redemption_Status'];
+                        $h_path = str_replace('\\', '/', $hist['Reward_PhotoPath']);
+                        $h_src = (strpos($h_path, 'reward_') === 0) ? "uploads/rewards/" . $h_path : $h_path;
+                ?>
+                    <tr>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <img src="<?php echo $h_src; ?>" style="width:50px; height:50px; object-fit:cover; border-radius:5px;" onerror="this.src='images/hero_3.jpg';">
+                                <strong><?php echo htmlspecialchars($hist['Reward_ItemName']); ?></strong>
+                            </div>
+                        </td>
+                        <td><?php echo date("d M Y", strtotime($hist['Redemption_Updated_At'])); ?></td>
+                        <td style="color:var(--primary-red); font-weight:bold;">-<?php echo $hist['Redemption_PointsSpent']; ?> PT</td>
+                        <td><span class="status-badge st-<?php echo strtolower($status); ?>"><?php echo $status; ?></span></td>
+                        <td>
+                            <?php if ($status == 'Shipped'): ?>
+                                <button class="btn-redeem" style="margin-top:0; padding:5px 10px;" onclick="confirmReceive(<?php echo $hist['Redemption_ID']; ?>)">Confirm Received</button>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endwhile; else: ?>
+                    <tr><td colspan="5" style="text-align:center;">No history found.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
-    <?php else: ?>
-        <div style="text-align:center; padding:50px;">
-            <i class="fas fa-user-lock" style="font-size:3rem; color:#ccc; margin-bottom:15px;"></i>
-            <p>Please login to view your redemption history.</p>
-            <a href="donor_login.php" class="btn-redeem" style="display:inline-block; width:auto; padding:10px 30px;">Login Now</a>
-        </div>
-    <?php endif; ?>
-</div>
+        <?php endif; ?>
+    </div>
 </div>
 
 <form id="redeemForm" method="POST" style="display:none;"><input type="hidden" name="redeem_item_id" id="hidden_id"></form>
@@ -303,22 +286,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById('redeem-tab').style.display = (tabName === 'redeem' ? 'grid' : 'none');
         document.getElementById('history-tab').style.display = (tabName === 'history' ? 'block' : 'none');
-        const btns = document.querySelectorAll('.tab-btn');
-        if(tabName === 'redeem') btns[0].classList.add('active'); else btns[1].classList.add('active');
+        event.currentTarget.classList.add('active');
     }
 
     function handleRedeem(itemId, reqPoints, name) {
-        if (!isLoggedIn) { Swal.fire('Warning', 'Please login.', 'warning').then(() => { window.location.href='donor_login.php'; }); return; }
-        if (currentPoints < reqPoints) { Swal.fire('Error', 'Insufficient points.', 'error'); return; }
-        // ... (此处省略部分冗余逻辑，保持原本弹窗流程即可)
-        Swal.fire({ title: 'Confirm', text: `Redeem ${name}?`, showCancelButton: true }).then(res => {
-            if(res.isConfirmed) { document.getElementById('hidden_id').value = itemId; document.getElementById('redeemForm').submit(); }
+        if (!isLoggedIn) { 
+            Swal.fire('Login Required', 'Please login to redeem rewards.', 'warning').then(() => window.location.href='donor_login.php');
+            return; 
+        }
+        if (!isAddressComplete) {
+            Swal.fire('Address Required', 'Please complete your address in profile.', 'info').then(() => window.location.href='donor_profile.php');
+            return;
+        }
+        if (currentPoints < reqPoints) {
+            Swal.fire('Insufficient Points', 'You do not have enough points.', 'error');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Confirm Redemption',
+            text: `Redeem "${name}" for ${reqPoints} points?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#dc2626',
+            confirmButtonText: 'Yes, Redeem!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('hidden_id').value = itemId;
+                document.getElementById('redeemForm').submit();
+            }
         });
     }
 
     function confirmReceive(orderId) {
-        Swal.fire({ title: 'Received?', text: 'Mark as received?', showCancelButton: true }).then(res => {
-            if (res.isConfirmed) { document.getElementById('hidden_recv_id').value = orderId; document.getElementById('receiveForm').submit(); }
+        Swal.fire({
+            title: 'Confirm Received?',
+            text: 'Have you received the item?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes'
+        }).then(res => {
+            if (res.isConfirmed) {
+                document.getElementById('hidden_recv_id').value = orderId;
+                document.getElementById('receiveForm').submit();
+            }
         });
     }
 
