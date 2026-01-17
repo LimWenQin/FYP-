@@ -189,7 +189,7 @@ if ($case['Case_Status'] == 'Upcoming') $statusClass = 'status-upcoming';
                     <div class="info-card">
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-map-marked-alt"></i></div>
-                            <div class="ir-data"><h5>Venue / Location Name</h5><p><?php echo htmlspecialchars($case['Case_Venue'] ?? 'N/A'); ?></p></div>
+                            <div class="ir-data"><h5>Venue / Location Name</h5><p><?php echo htmlspecialchars($case['Case_LocationName'] ?? 'N/A'); ?></p></div>
                         </div>
                         <div class="info-row">
                             <div class="ir-icon"><i class="fas fa-clock"></i></div>
