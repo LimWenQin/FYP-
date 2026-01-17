@@ -169,6 +169,25 @@ include 'header_UI.php';
     .qr-box img { width: 180px; border-radius: 10px; }
     /* 新增错误高亮样式 */
     .is-invalid { border: 2px solid #dc3545 !important; background-color: #fff8f8 !important; }
+    /* 当容器被选中时，圆圈边框变绿，背景变绿 */
+.method-container.selected .check-circle {
+    border-color: #28a745 !important;
+    background-color: #28a745;
+    position: relative;
+}
+
+/* 在选中的圆圈中心添加一个白色小点 */
+.method-container.selected .check-circle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background-color: white;
+    border-radius: 50%;
+}
 </style>
 
 <div class="topup-wrapper">

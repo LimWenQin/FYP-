@@ -44,6 +44,8 @@ if (isset($_POST['update_profile'])) {
 }
 
 // B. 处理：申请报税收据
+$request_result = ""; // 用于标记结果类型
+
 if (isset($_POST['request_receipt'])) {
     $order_id = $_POST['order_id'];
     
@@ -60,10 +62,12 @@ if (isset($_POST['request_receipt'])) {
         $stmt = $conn->prepare("UPDATE orders SET Tax_Receipt_Status = 'Requested' WHERE Order_ID = ?");
         $stmt->bind_param("i", $order_id);
         if ($stmt->execute()) {
-            echo "<script>alert('Request submitted! Admin will verify shortly.'); window.location.href='Track_Records.php';</script>";
+            // ⭐ 标记成功
+            $request_result = "success";
         }
     } else {
-        echo "<script>alert('Error: Profile incomplete or amount less than RM30.');</script>";
+        // ⭐ 标记失败
+        $request_result = "error_incomplete";
     }
 }
 
@@ -425,23 +429,60 @@ usort($records, function($a, $b) {
 <script>
     const isProfileComplete = <?php echo $is_profile_complete; ?>;
 
+    // --- 1. 处理原本 handleRequest 的确认逻辑 ---
+    function handleRequest(orderId) {
+        if (isProfileComplete) {
+            Swal.fire({
+                title: 'Request Tax Receipt?',
+                text: "Admin will verify your profile and donation details to issue a tax exemption receipt.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#e53935',
+                cancelButtonColor: '#8a8686',
+                confirmButtonText: 'Yes, Request it!',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('hidden_order_id').value = orderId;
+                    document.getElementById('directRequestForm').submit();
+                }
+            });
+        } else {
+            document.getElementById('profileModal').style.display = 'flex';
+        }
+    }
+
+    // --- 2. ⭐ 新增：处理页面刷新后，显示后端提交的结果弹窗 ---
+    document.addEventListener('DOMContentLoaded', function() {
+        const result = "<?php echo $request_result; ?>";
+        
+        if (result === "success") {
+            Swal.fire({
+                title: 'Request Submitted!',
+                text: 'Your request has been sent successfully. Admin will verify it shortly.',
+                icon: 'success',
+                confirmButtonColor: '#e53935'
+            });
+        } else if (result === "error_incomplete") {
+            Swal.fire({
+                title: 'Submission Failed',
+                text: 'Profile incomplete or amount less than RM30.',
+                icon: 'error',
+                confirmButtonColor: '#e53935'
+            });
+        }
+    });
+
+    // --- 3. 其他原本的函数 (保持不变) ---
     function filterTable(type, element) {
-        // 1. 更新卡片按钮状态
         const items = document.querySelectorAll('.category-item');
         items.forEach(item => item.classList.remove('active'));
         element.classList.add('active');
-
-        // 2. 筛选行
         const rows = document.querySelectorAll('.record-row');
         let visibleCount = 0;
-
-        // 将目标类型转为小写
         const targetType = type.toLowerCase();
-
         rows.forEach(row => {
-            // 获取当前行 data-type 属性并转为小写
             const rowType = row.getAttribute('data-type').toLowerCase();
-        
             if (targetType === 'all' || rowType === targetType) {
                 row.style.display = '';
                 visibleCount++;
@@ -452,17 +493,6 @@ usort($records, function($a, $b) {
         const noRecordsRow = document.getElementById('noRecordsRow');
         if (noRecordsRow) {
             noRecordsRow.style.display = (visibleCount === 0) ? '' : 'none';
-        }
-    }
-
-    function handleRequest(orderId) {
-        if (isProfileComplete) {
-            if(confirm("Request Tax Receipt for this donation?")) {
-                document.getElementById('hidden_order_id').value = orderId;
-                document.getElementById('directRequestForm').submit();
-            }
-        } else {
-            document.getElementById('profileModal').style.display = 'flex';
         }
     }
 
