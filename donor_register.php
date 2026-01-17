@@ -436,11 +436,12 @@ include 'header_UI.php';
                         <input type="date" class="form-control" id="dob" name="dob" 
                                value="<?php echo htmlspecialchars($dob); ?>" 
                                required>
+                               <span class="form-help">Must be 18 years old and above</span>
                         <div class="field-error-msg" id="dobError">Date of Birth is required.</div>
                     </div>
                     
                     <div class="form-group">
-                        <label for="contact" class="required">Contact Number</label>
+                        <label for="contact" class="required">Phone Number</label>
                         <div class="phone-group" id="phoneGroup">
                             <div class="phone-prefix">+60</div>
                             <input type="tel" class="form-control" id="contact" name="contact" 
@@ -495,7 +496,7 @@ include 'header_UI.php';
                     <div style="display: flex; align-items: flex-start; gap: 10px;">
                         <input type="checkbox" id="terms" name="terms" required style="margin-top: 5px;">
                         <label for="terms" style="margin: 0; font-size: 0.9rem;">
-                            I agree to the <a href="term&conditon.php" target="_blank" style="color: var(--primary-red);">Terms and Conditions</a> 
+                            I agree to the <a href="terms&condition.php" target="_blank" style="color: var(--primary-red);">Terms and Conditions</a> 
                             and <a href="privacy.php" target="_blank" style="color: var(--primary-red);">Privacy Policy</a> of Love Bridge Donation System.
                         </label>
                     </div>

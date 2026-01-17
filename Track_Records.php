@@ -44,10 +44,11 @@ if (isset($_POST['update_profile'])) {
 }
 
 // B. 处理：申请报税收据
+$request_result = ""; // 用于标记结果类型
+
 if (isset($_POST['request_receipt'])) {
     $order_id = $_POST['order_id'];
     
-    // 安全验证
     $check_sql = "SELECT d.Donor_ICNumber, d.Donor_Address1, o.Order_Amount 
                   FROM orders o JOIN donor d ON o.Donor_ID = d.Donor_ID 
                   WHERE o.Order_ID = ? AND o.Donor_ID = ?";
@@ -61,10 +62,12 @@ if (isset($_POST['request_receipt'])) {
         $stmt = $conn->prepare("UPDATE orders SET Tax_Receipt_Status = 'Requested' WHERE Order_ID = ?");
         $stmt->bind_param("i", $order_id);
         if ($stmt->execute()) {
-            echo "<script>alert('Request submitted! Admin will verify shortly.'); window.location.href='Track_Records.php';</script>";
+            // ⭐ 标记成功
+            $request_result = "success";
         }
     } else {
-        echo "<script>alert('Error: Profile incomplete or amount less than RM30.');</script>";
+        // ⭐ 标记失败
+        $request_result = "error_incomplete";
     }
 }
 
@@ -72,7 +75,6 @@ if (isset($_POST['request_receipt'])) {
 // 3. 获取数据
 // ==========================================
 
-// 获取用户资料
 $user_sql = "SELECT * FROM donor WHERE Donor_ID = ?";
 $stmt_user = $conn->prepare($user_sql);
 $stmt_user->bind_param("i", $current_donor_id);
@@ -87,33 +89,45 @@ $is_profile_complete = (
     !empty($user_data['Donor_PostalCode'])
 ) ? 'true' : 'false';
 
-// 获取筛选参数
 $filter_type = isset($_GET['type']) ? $_GET['type'] : 'All';
 $filter_status = isset($_GET['status']) ? $_GET['status'] : 'All';
 
+// --- 修改后的数据获取逻辑 ---
 $records = [];
-
-// 获取捐款记录 (移除了对 item_donation 表的查询)
-$sql_orders = "SELECT Order_ID, Order_TXN_Ref, Order_Amount, Order_Status, Order_Created_At, Order_PaymentMethod, Tax_Receipt_Status, 'Cash' as Record_Type 
+// 基础查询语句
+$sql_orders = "SELECT Order_ID, Order_TXN_Ref, Order_Amount, Order_Status, Order_Created_At, Order_PaymentMethod, Tax_Receipt_Status, Order_Type 
                FROM orders 
-               WHERE Donor_ID = ? AND Order_Status != 'Failed'";
+               WHERE Donor_ID = ? AND Order_Status != 'Failed' AND (Order_Type = 'Recurring' OR Order_Type = 'One-Time')";
 
-if ($filter_type != 'All' && $filter_type != 'Item') {
-    $sql_orders .= " AND Order_PaymentMethod LIKE '%$filter_type%'";
+// 1. 处理 Payment Method 筛选
+if ($filter_type != 'All') {
+    $sql_orders .= " AND Order_PaymentMethod = ?"; 
 }
+
+// 2. 修改点：处理 Tax Receipt Status 筛选
 if ($filter_status != 'All') {
-    $sql_orders .= " AND Order_Status LIKE '%$filter_status%'";
+    $sql_orders .= " AND Tax_Receipt_Status = ?";
 }
 
 $stmt = $conn->prepare($sql_orders);
-$stmt->bind_param("i", $current_donor_id);
+
+// 3. 动态绑定参数
+if ($filter_type != 'All' && $filter_status != 'All') {
+    $stmt->bind_param("iss", $current_donor_id, $filter_type, $filter_status);
+} elseif ($filter_type != 'All') {
+    $stmt->bind_param("is", $current_donor_id, $filter_type);
+} elseif ($filter_status != 'All') {
+    $stmt->bind_param("is", $current_donor_id, $filter_status);
+} else {
+    $stmt->bind_param("i", $current_donor_id);
+}
 $stmt->execute();
 $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
     $records[] = [
         'id' => $row['Order_ID'],
         'ref' => $row['Order_TXN_Ref'],
-        'type' => 'Cash',
+        'type' => $row['Order_Type'], 
         'method' => $row['Order_PaymentMethod'],
         'details' => 'RM ' . number_format($row['Order_Amount'], 2),
         'date' => $row['Order_Created_At'],
@@ -124,7 +138,6 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 
-// 排序
 usort($records, function($a, $b) {
     return strtotime($b['date']) - strtotime($a['date']);
 });
@@ -138,45 +151,86 @@ usort($records, function($a, $b) {
     <title>Track Records - Love Bridge</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --primary-red: #dc2626; --dark-red: #b91c1c; --light-red: #fee2e2; --white: #ffffff; --light-gray: #f5f5f5; --medium-gray: #737373; --dark-gray: #262626; --text-dark: #171717; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--light-gray); color: var(--text-dark); margin: 0; padding: 0; }
-        .main-container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; min-height: 80vh; }
+        :root { 
+            --primary-red: #e53935; 
+            --dark-red: #c62828; 
+            --light-bg: #fef7f7; 
+            --white: #ffffff; 
+            --medium-gray: #8a8686; 
+            --text-dark: #212121; 
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--light-bg); color: var(--text-dark); margin: 0; padding: 0; }
+        .main-container { max-width: 1300px; margin: 0 auto; padding: 40px 20px; min-height: 80vh; }
+        
         .page-header { text-align: center; margin-bottom: 40px; }
         .page-title { font-size: 2.5rem; color: var(--primary-red); font-weight: 800; margin-bottom: 15px; position: relative; display: inline-block; }
         .page-title::after { content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 80px; height: 4px; background: var(--primary-red); border-radius: 2px; }
-        .page-subtitle { font-size: 1.1rem; color: var(--medium-gray); }
+        
         .filter-card { background: var(--white); padding: 25px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05); margin-bottom: 30px; border-left: 5px solid var(--primary-red); display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; }
         .filter-group { display: flex; gap: 15px; align-items: center; }
-        .filter-label { font-weight: 700; color: var(--text-dark); }
-        .custom-select { padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; font-family: inherit; outline: none; min-width: 150px; }
-        .btn-filter { background-color: var(--primary-red); color: white; padding: 10px 25px; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
-        .btn-filter:hover { background-color: var(--dark-red); }
-        .table-card { background: var(--white); border-radius: 10px; overflow: hidden; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05); overflow-x: auto; }
-        .styled-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        .filter-label { font-weight: 700; }
+        .custom-select { padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; min-width: 150px; }
+        .btn-filter { background-color: var(--primary-red); color: white; padding: 10px 25px; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; transition: 0.3s; }
+
+        .tab-container { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+            gap: 15px; 
+            margin-bottom: 30px; 
+        }
+        .category-item { 
+            background: var(--white); 
+            border: 2px solid #eee; 
+            border-radius: 10px; 
+            padding: 20px 15px; 
+            text-align: center; 
+            cursor: pointer; 
+            transition: all 0.3s ease; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .category-item i { font-size: 28px; transition: color 0.3s; }
+        .category-item span { font-size: 14px; font-weight: 600; }
+        .category-item:hover:not(.active) { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .category-item.active { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15); color: white; }
+        
+        .cat-all { border-color: var(--primary-red); color: var(--primary-red); }
+        .cat-all.active { background: var(--primary-red); border-color: var(--primary-red); }
+        .cat-one { border-color: #0288d1; color: #0288d1; }
+        .cat-one.active { background: #0288d1; border-color: #0288d1; }
+        .cat-monthly { border-color: #f57c00; color: #f57c00; }
+        .cat-monthly.active { background: #f57c00; border-color: #f57c00; }
+        
+        /* 表格小标签 */
+        .type-badge { font-size: 0.7rem; padding: 4px 10px; border-radius: 20px; font-weight: bold; text-transform: uppercase; }
+        .badge-onetime { background: #e0f2fe; color: #0369a1; }
+        .badge-monthly { background: #fef3c7; color: #92400e; }
+
+        .table-card { background: var(--white); border-radius: 15px; overflow: hidden; box-shadow: 0 8px 25px rgba(0,0,0,0.05); overflow-x: auto; }
+        .styled-table { width: 100%; border-collapse: collapse; min-width: 900px; }
         .styled-table thead tr { background-color: var(--primary-red); color: var(--white); }
         .styled-table th, .styled-table td { padding: 18px 15px; border-bottom: 1px solid #eee; text-align: center; vertical-align: middle; }
-        .styled-table th { font-weight: 600; font-size: 0.9rem; text-transform: uppercase; }
-        .styled-table tbody tr:hover { background-color: var(--light-gray); }
+        .styled-table th { font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
+        
         .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; display: inline-block; }
-        .status-completed, .status-success, .status-generated { background-color: #dcfce7; color: #166534; }
+        .status-success, .status-generated { background-color: #dcfce7; color: #166534; }
         .status-pending, .status-requested { background-color: #fef3c7; color: #92400e; }
-        .status-failed, .status-rejected { background-color: #fee2e2; color: #991b1b; }
+        .status-failed { background-color: #fee2e2; color: #991b1b; }
         .status-not_requested { background-color: #f3f4f6; color: #9ca3af; } 
         
-        .btn-action { padding: 6px 12px; border-radius: 5px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border: none; transition: 0.2s; text-decoration: none; display: inline-block; }
+        .btn-action { padding: 8px 14px; border-radius: 5px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border: none; transition: 0.2s; text-decoration: none; display: inline-block; }
         .btn-view { background: white; border: 1px solid var(--primary-red); color: var(--primary-red); }
-        .btn-view:hover { background: var(--primary-red); color: white; text-decoration: none; }
-        .btn-tax { background: var(--primary-red); color: white; border: 1px solid var(--primary-red); }
-        .btn-tax:hover { background: var(--dark-red); }
+        .btn-view:hover { background: var(--primary-red); color: white; }
+        .btn-tax { background: var(--primary-red); color: white; }
         .btn-processing { background: #fbbf24; color: white; cursor: default; }
 
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
         .modal-box { background: white; padding: 30px; border-radius: 10px; width: 90%; max-width: 500px; border-top: 6px solid var(--primary-red); position: relative; }
         .modal-title { font-size: 1.5rem; font-weight: 800; color: var(--primary-red); margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         .close-btn { position: absolute; right: 20px; top: 15px; border: none; background: none; font-size: 1.8rem; cursor: pointer; color: #999; }
-        .close-btn:hover { color: #333; }
         .form-group { margin-bottom: 15px; text-align: left; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; color: #333; }
         .form-control { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
 
         @media (max-width: 768px) {
@@ -201,31 +255,49 @@ usort($records, function($a, $b) {
     <form method="GET" action="" class="filter-card">
         <div class="filter-group">
             <div>
-                <span class="filter-label">Filter Method:</span>
+                <span class="filter-label">Filter by Payment Method:</span>
                 <select name="type" class="custom-select">
                     <option value="All" <?php echo $filter_type=='All'?'selected':''; ?>>All Methods</option>
                     <option value="TNG eWallet" <?php echo $filter_type=='TNG eWallet'?'selected':''; ?>>TNG eWallet</option>
-                    <option value="Credit/Debit Card" <?php echo $filter_type=='Credit/Debit Card'?'selected':''; ?>>Credit/Debit Card</option>
-                    <option value="Cash" <?php echo $filter_type=='Cash'?'selected':''; ?>>Cash / Manual</option>
+                    <option value="Credit Card" <?php echo $filter_type=='Credit Card'?'selected':''; ?>>Credit Card</option>
+                    <option value="System E-Wallet" <?php echo $filter_type=='System E-Wallet'?'selected':''; ?>>System E-Wallet</option>
                 </select>
             </div>
             <div>
-                <span class="filter-label">Status:</span>
+                <span class="filter-label">Filter by Tax Receipt Status:</span>
                 <select name="status" class="custom-select">
                     <option value="All" <?php echo $filter_status=='All'?'selected':''; ?>>All Status</option>
-                    <option value="Completed" <?php echo $filter_status=='Completed'?'selected':''; ?>>Completed</option>
-                    <option value="Pending" <?php echo $filter_status=='Pending'?'selected':''; ?>>Pending</option>
+                    <option value="Not_Requested" <?php echo $filter_status=='Not_Requested'?'selected':''; ?>>Not Requested</option>
+                    <option value="Requested" <?php echo $filter_status=='Requested'?'selected':''; ?>>Processing (Requested)</option>
+                    <option value="Generated" <?php echo $filter_status=='Generated'?'selected':''; ?>>Sent (Generated)</option>
+                    <option value="Rejected" <?php echo $filter_status=='Rejected'?'selected':''; ?>>Rejected</option>
                 </select>
             </div>
         </div>
         <button type="submit" class="btn-filter">Apply Filters</button>
     </form>
 
+    <div class="tab-container">
+        <div class="category-item cat-all active" onclick="filterTable('All', this)">
+            <i class="fas fa-layer-group"></i>
+            <span>All Donations</span>
+        </div>
+        <div class="category-item cat-one" onclick="filterTable('One-time', this)">
+            <i class="fas fa-hand-holding-heart"></i>
+            <span>One-Time</span>
+        </div>
+        <div class="category-item cat-monthly" onclick="filterTable('Recurring', this)">
+            <i class="fas fa-calendar-check"></i>
+            <span>Monthly Giving</span>
+        </div>
+    </div>
+
     <div class="table-card">
-        <table class="styled-table">
+        <table class="styled-table" id="donationsTable">
             <thead>
                 <tr>
                     <th>Ref ID</th>
+                    <th>Category</th>
                     <th>Payment Method</th>
                     <th>Amount</th>
                     <th>Date</th>
@@ -237,8 +309,33 @@ usort($records, function($a, $b) {
             <tbody>
                 <?php if (count($records) > 0): ?>
                     <?php foreach ($records as $rec): ?>
-                        <tr>
-                            <td data-label="Ref ID"><strong><?php echo htmlspecialchars($rec['ref']); ?></strong></td>
+                        <tr class="record-row" data-type="<?php echo $rec['type']; ?>">
+                            <td data-label="Ref ID">
+                                <strong><?php echo htmlspecialchars($rec['ref']); ?></strong>
+                            </td>
+                            
+                            <td data-label="Category">
+                                <?php 
+                                    // 1. 获取数据库中的原始值
+                                    $rawType = $rec['type']; 
+        
+                                    // 2. 统一转为小写进行判断，解决 One-time 和 One-Time 的差异
+                                    $compareType = strtolower(trim($rawType));
+
+                                    if ($compareType === 'one-time'): 
+                                ?>
+                                    <span class="type-badge badge-onetime">One-Time</span>
+                                <?php 
+                                    // 3. 明确判断是否为 Recurring，映射为 Monthly
+                                    elseif ($compareType === 'recurring'): 
+                                ?>
+                                    <span class="type-badge badge-monthly">Monthly</span>
+                                <?php else: ?>
+                                    <span class="type-badge" style="background:#eee; color:#666;">
+                                <?php echo htmlspecialchars($rawType); ?>
+                                    </span>
+                                <?php endif; ?>
+                            </td>
                             
                             <td data-label="Method">
                                 <?php 
@@ -247,27 +344,25 @@ usort($records, function($a, $b) {
                                     if (stripos($m, 'TNG') !== false) { $icon = 'fa-wallet'; }
                                     elseif (stripos($m, 'Card') !== false) { $icon = 'fa-credit-card'; }
                                     elseif (stripos($m, 'E-Wallet') !== false) { $icon = 'fa-wallet'; }
-
-                                    if (empty($m)) { $m = "Top-up / Unknown"; }
+                                    if (empty($m)) { $m = "Manual"; }
                                 ?>
-                                <i class="fas <?php echo $icon; ?>" style="margin-right:5px; color:#777;"></i>
+                                <i class="fas <?php echo $icon; ?>" style="margin-right:5px; opacity:0.6;"></i>
                                 <?php echo htmlspecialchars($m); ?>
                             </td>
 
-                            <td data-label="Details"><?php echo htmlspecialchars($rec['details']); ?></td>
+                            <td data-label="Amount" style="font-weight: 700;"><?php echo htmlspecialchars($rec['details']); ?></td>
                             <td data-label="Date"><?php echo date('d M Y', strtotime($rec['date'])); ?></td>
                             
                             <td data-label="Status">
                                 <?php 
                                     $s_class = (stripos($rec['status'], 'Success') !== false || stripos($rec['status'], 'Completed') !== false) ? 'status-success' : 'status-pending';
-                                    if(stripos($rec['status'], 'Failed') !== false) $s_class = 'status-failed';
                                 ?>
                                 <span class="status-badge <?php echo $s_class; ?>"><?php echo htmlspecialchars($rec['status']); ?></span>
                             </td>
 
                             <td data-label="Tax Receipt">
                                 <?php if ($rec['raw_amount'] < 30): ?>
-                                    <span class="status-badge status-not_requested">Min RM30</span>
+                                    <span class="status-badge status-not_requested">N/A</span>
                                 <?php elseif ($rec['tax_status'] == 'Requested'): ?>
                                     <button class="btn-action btn-processing" disabled><i class="fas fa-clock"></i> Processing</button>
                                 <?php elseif ($rec['tax_status'] == 'Generated'): ?>
@@ -289,7 +384,7 @@ usort($records, function($a, $b) {
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <tr><td colspan="7" style="text-align:center; padding: 40px; color: #999;">No records found.</td></tr>
+                    <tr id="noRecordsRow"><td colspan="8" style="text-align:center; padding: 40px; color: #999;">No records found.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -333,16 +428,74 @@ usort($records, function($a, $b) {
 
 <script>
     const isProfileComplete = <?php echo $is_profile_complete; ?>;
+
+    // --- 1. 处理原本 handleRequest 的确认逻辑 ---
     function handleRequest(orderId) {
         if (isProfileComplete) {
-            if(confirm("Request Tax Receipt for this donation?")) {
-                document.getElementById('hidden_order_id').value = orderId;
-                document.getElementById('directRequestForm').submit();
-            }
+            Swal.fire({
+                title: 'Request Tax Receipt?',
+                text: "Admin will verify your profile and donation details to issue a tax exemption receipt.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#e53935',
+                cancelButtonColor: '#8a8686',
+                confirmButtonText: 'Yes, Request it!',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('hidden_order_id').value = orderId;
+                    document.getElementById('directRequestForm').submit();
+                }
+            });
         } else {
             document.getElementById('profileModal').style.display = 'flex';
         }
     }
+
+    // --- 2. ⭐ 新增：处理页面刷新后，显示后端提交的结果弹窗 ---
+    document.addEventListener('DOMContentLoaded', function() {
+        const result = "<?php echo $request_result; ?>";
+        
+        if (result === "success") {
+            Swal.fire({
+                title: 'Request Submitted!',
+                text: 'Your request has been sent successfully. Admin will verify it shortly.',
+                icon: 'success',
+                confirmButtonColor: '#e53935'
+            });
+        } else if (result === "error_incomplete") {
+            Swal.fire({
+                title: 'Submission Failed',
+                text: 'Profile incomplete or amount less than RM30.',
+                icon: 'error',
+                confirmButtonColor: '#e53935'
+            });
+        }
+    });
+
+    // --- 3. 其他原本的函数 (保持不变) ---
+    function filterTable(type, element) {
+        const items = document.querySelectorAll('.category-item');
+        items.forEach(item => item.classList.remove('active'));
+        element.classList.add('active');
+        const rows = document.querySelectorAll('.record-row');
+        let visibleCount = 0;
+        const targetType = type.toLowerCase();
+        rows.forEach(row => {
+            const rowType = row.getAttribute('data-type').toLowerCase();
+            if (targetType === 'all' || rowType === targetType) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        const noRecordsRow = document.getElementById('noRecordsRow');
+        if (noRecordsRow) {
+            noRecordsRow.style.display = (visibleCount === 0) ? '' : 'none';
+        }
+    }
+
     function closeProfileModal() { document.getElementById('profileModal').style.display = 'none'; }
     window.onclick = function(e) { if(e.target == document.getElementById('profileModal')) closeProfileModal(); }
 </script>

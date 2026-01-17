@@ -2,11 +2,11 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-// --- 1. 计算日期限制 ---
+
 $current_date = date('Y-m-d');
 $min_date = date('Y-m-d', strtotime('-100 years')); 
 
-// --- 2. Login Check ---
+
 $show_login_modal = false;
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     $show_login_modal = true;
@@ -14,7 +14,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
 
 $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
 
-// 默认用户数据
+
 $donor = [
     "Donor_Name" => "",
     "Donor_ContactNumber" => "",
@@ -28,11 +28,10 @@ $donor = [
     "Donor_PostalCode" => "",
     "Donor_Country" => "Malaysia",
     "Donor_DOB" => "",
-    "Donor_Description" => "",
     "Donor_ProfilePicture" => ""
 ];
 
-// 获取真实数据
+
 if ($logged_in && isset($_SESSION['donor_id'])) {
     $query = "SELECT * FROM donor WHERE Donor_ID = ?";
     $stmt = $conn->prepare($query);
@@ -51,7 +50,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
     $stmt->close();
 }
 
-// --- 处理逻辑：删除账号 ---
+
 $delete_success = false; 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_account'])) {
     $delete_query = "UPDATE donor SET Is_Deleted = 1 WHERE Donor_ID = ?";
@@ -66,14 +65,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_account'])) {
     $stmt->close();
 }
 
-// --- 处理逻辑：更新个人资料 ---
 $update_success = false;
 $update_message = "";
 $upload_error = "";
 
 if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && isset($_POST['update_profile'])) {
     
-    // 处理头像上传
+    $name = trim($_POST['name']);
+    $email = trim($_POST['email']);
+    
+    // 【修改点 1】PHP 验证：只允许字母和空格 (移除了 /)
+    if (!preg_match("/^[a-zA-Z\s]+$/", $name)) {
+        echo "<script>alert('Error: Name must contain only letters and spaces.'); window.history.back();</script>";
+        exit();
+    }
+
+   
     $profile_picture = $donor['Donor_ProfilePicture']; 
     
     if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] === UPLOAD_ERR_OK) {
@@ -109,14 +116,8 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
         }
     }
     
-    $name = $_POST['name'];
-    $email = $_POST['email'];
     
-    // [UPDATED] Contact: 用户输入不带0，这里我们手动补上 '0' 存入数据库
-    // 例如用户填 "12-3456789"，我们存 "012-3456789"
     $raw_contact = $_POST['contact'];
-    // 防止用户某些手段填了0，我们先去0再加0，或者直接加0
-    // 最简单：直接加0，因为JS会控制格式
     $contact = '0' . $raw_contact; 
 
     $ic_number = str_replace('-', '', $_POST['icnumber']); 
@@ -128,7 +129,7 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
     $state = $_POST['state']; 
     $postalcode = $_POST['postalcode'];
     $country = "Malaysia"; 
-    $description = $_POST['description'];
+    
     
     $update_query = "UPDATE donor SET 
         Donor_Name = ?, 
@@ -143,15 +144,15 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
         Donor_State = ?,
         Donor_PostalCode = ?,
         Donor_Country = ?,
-        Donor_Description = ?,
         Donor_ProfilePicture = ?
         WHERE Donor_ID = ?";
     
     $stmt = $conn->prepare($update_query);
-    $stmt->bind_param("ssssssssssssssi", 
+    
+    $stmt->bind_param("sssssssssssssi", 
         $name, $email, $contact, $ic_number, $dob, 
         $address1, $address2, $address3,
-        $city, $state, $postalcode, $country, $description,
+        $city, $state, $postalcode, $country,
         $profile_picture, $_SESSION['donor_id']
     );
     
@@ -160,7 +161,7 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
         $update_message = "Profile updated successfully!";
         $_SESSION['donor_name'] = $name;
         
-        // Update local array
+      
         $donor['Donor_Name'] = $name;
         $donor['Donor_Email'] = $email;
         $donor['Donor_ContactNumber'] = $contact;
@@ -173,7 +174,6 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
         $donor['Donor_State'] = $state;
         $donor['Donor_PostalCode'] = $postalcode;
         $donor['Donor_Country'] = $country;
-        $donor['Donor_Description'] = $description;
         $donor['Donor_ProfilePicture'] = $profile_picture;
     } else {
         $update_message = "Error updating profile: " . $conn->error;
@@ -182,9 +182,14 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
 }
 
 function calculateProfileCompletion($donor) {
-    $total_fields = 11; 
+    
+    $total_fields = 10; 
     $completed_fields = 0;
+   
     $fields_to_check = ['Donor_Name', 'Donor_Email', 'Donor_ContactNumber', 'Donor_ICNumber', 'Donor_DOB', 'Donor_Address1', 'Donor_City', 'Donor_State', 'Donor_PostalCode', 'Donor_Country', 'Donor_ProfilePicture'];
+   
+    $fields_to_check = array_slice($fields_to_check, 0, 10);
+
     foreach ($fields_to_check as $field) {
         if (!empty($donor[$field]) && trim($donor[$field]) !== '') { $completed_fields++; }
     }
@@ -413,14 +418,16 @@ include 'header_UI.php';
                 
                 <div class="form-section">
                     <h3>Personal Information</h3>
-                    <div class="form-group">
+                    <div class="form-group" id="nameGroup">
                         <label for="name">Full Name</label>
                         <input type="text" id="name" name="name" class="track-field" value="<?php echo htmlspecialchars($donor['Donor_Name']); ?>" required>
+                        <div class="field-error-msg" id="nameError"></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group">
+                        <div class="form-group" id="emailGroup">
                             <label for="email">Email Address</label>
                             <input type="email" id="email" name="email" class="track-field" value="<?php echo htmlspecialchars($donor['Donor_Email']); ?>" required>
+                            <div class="field-error-msg" id="emailError"></div>
                         </div>
                         <div class="form-group" id="contactGroup">
                             <label for="contact">Contact Number</label>
@@ -450,6 +457,7 @@ include 'header_UI.php';
                                    value="<?php echo $donor['Donor_DOB']; ?>"
                                    max="<?php echo $current_date; ?>" 
                                    min="<?php echo $min_date; ?>">
+                                   <span class="tax-note">Must be 18 years old and above</span>
                             <div class="field-error-msg" id="dobError"></div>
                         </div>
                     </div>
@@ -495,14 +503,6 @@ include 'header_UI.php';
                     </div>
                 </div>
                 
-                <div class="form-section">
-                    <h3>About Me</h3>
-                    <div class="form-group">
-                        <label for="description">Description</label>
-                        <textarea id="description" name="description" class="track-field"><?php echo htmlspecialchars($donor['Donor_Description']); ?></textarea>
-                    </div>
-                </div>
-                
                 <div class="action-buttons">
                     <button type="submit" class="submit-btn" id="updateBtn">Update Profile</button>
                     <button type="button" class="delete-btn" onclick="openDeleteModal()">Delete Account</button>
@@ -544,7 +544,7 @@ include 'header_UI.php';
     <?php include 'footer.php'; ?>
 
     <script>
-        // --- 0. Login Check with SweetAlert2 ---
+ 
         <?php if ($show_login_modal): ?>
             document.addEventListener('DOMContentLoaded', function() {
                 document.querySelector('.page-container').style.display = 'none';
@@ -567,7 +567,7 @@ include 'header_UI.php';
             });
         <?php endif; ?>
 
-        // --- Modal Logic (Delete) ---
+ 
         function openDeleteModal() {
             document.getElementById('deleteModal').style.display = 'flex';
         }
@@ -603,7 +603,78 @@ include 'header_UI.php';
             }
         }
 
-        // --- 1. IC Input & Validation Logic (UNCHANGED) ---
+    
+        const nameInput = document.getElementById('name');
+        const nameError = document.getElementById('nameError');
+        const nameGroup = document.getElementById('nameGroup');
+
+        const emailInput = document.getElementById('email');
+        const emailError = document.getElementById('emailError');
+        const emailGroup = document.getElementById('emailGroup');
+
+        const contactInput = document.getElementById('contact');
+        const contactError = document.getElementById('contactError');
+        const contactGroup = document.querySelector('.phone-group');
+
+      
+        nameInput.addEventListener('input', function(e) {
+            const val = e.target.value;
+            // 【修改点 2】JS 验证：只允许字母和空格 (移除了 /)
+            const regex = /^[A-Za-z\s]*$/;
+            
+            if (!regex.test(val)) {
+                nameError.innerText = "Name cannot contain numbers or symbols.";
+                nameError.style.display = 'block';
+                nameGroup.classList.add('error');
+            } else if (val.trim() === '') {
+              
+                nameError.style.display = 'none';
+                nameGroup.classList.remove('error');
+            } else {
+                nameError.style.display = 'none';
+                nameGroup.classList.remove('error');
+            }
+            updateProgress();
+        });
+
+      
+        emailInput.addEventListener('input', function(e) {
+            updateProgress();
+         
+            if (emailInput.value.trim() !== '') {
+                emailError.style.display = 'none';
+                emailGroup.classList.remove('error');
+            }
+        });
+
+     
+        contactInput.addEventListener('input', function(e) {
+            let val = e.target.value.replace(/\D/g, ''); 
+            
+           
+            if (val.startsWith('0')) {
+                val = val.substring(1);
+            }
+
+           
+            if (val.length > 2) val = val.substring(0, 2) + '-' + val.substring(2);
+            if (val.length > 11) val = val.substring(0, 11);
+            
+            e.target.value = val;
+            updateProgress();
+            
+          
+            if (val.length > 0 && val.charAt(0) !== '1') {
+                contactError.innerText = "Phone number must start with 1 (e.g. 12-3456789).";
+                contactError.style.display = 'block';
+                contactGroup.classList.add('error');
+            } else {
+                contactError.style.display = 'none';
+                contactGroup.classList.remove('error');
+            }
+        });
+
+        
         const icInput = document.getElementById('icnumber');
         const dobInput = document.getElementById('dob');
         const icError = document.getElementById('icError');
@@ -679,48 +750,63 @@ include 'header_UI.php';
             }
         }
 
-        // --- 2. Contact Input Logic (UPDATED: No leading 0) ---
-        const contactInput = document.getElementById('contact');
-        const contactError = document.getElementById('contactError');
-        const contactGroup = document.querySelector('.phone-group');
-
-        contactInput.addEventListener('input', function(e) {
-            let val = e.target.value.replace(/\D/g, ''); 
-            
-            // 如果用户尝试输入0开头，立即移除
-            if (val.startsWith('0')) {
-                val = val.substring(1);
-            }
-
-            // 格式化: 12-3456789 (xx-xxxxxxx)
-            if (val.length > 2) val = val.substring(0, 2) + '-' + val.substring(2);
-            if (val.length > 11) val = val.substring(0, 11);
-            
-            e.target.value = val;
-            updateProgress();
-            
-            // 实时清除错误
-            if(val.length >= 2) {
-                contactError.style.display = 'none';
-                contactGroup.classList.remove('error');
-            }
-        });
-
-        // --- 3. Form Submission Validation (UPDATED) ---
+      
         document.getElementById('profileForm').addEventListener('submit', function(e) {
             let isValid = true;
             
-            // --- A. Validate Contact Number (Must not start with 0, length 9-10) ---
-            const contactVal = contactInput.value.replace(/\D/g, ''); 
-            if (contactVal.length > 0 && contactVal.charAt(0) === '0') {
+        
+            const nameVal = nameInput.value.trim();
+            // 【修改点 3】提交验证：只允许字母和空格 (移除了 /)
+            const nameRegex = /^[A-Za-z\s]+$/;
+            if (nameVal === '') {
                 isValid = false;
-                contactError.innerText = "Do not include the leading '0'.";
+                nameError.innerText = "Name is required.";
+                nameError.style.display = 'block';
+                nameGroup.classList.add('error');
+            } else if (!nameRegex.test(nameVal)) {
+                isValid = false;
+                nameError.innerText = "Name cannot contain numbers or symbols.";
+                nameError.style.display = 'block';
+                nameGroup.classList.add('error');
+            } else {
+                nameError.style.display = 'none';
+                nameGroup.classList.remove('error');
+            }
+
+            const emailVal = emailInput.value.trim();
+           
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (emailVal === '') {
+                isValid = false;
+                emailError.innerText = "Email is required.";
+                emailError.style.display = 'block';
+                emailGroup.classList.add('error');
+            } else if (!emailRegex.test(emailVal)) {
+                isValid = false;
+                emailError.innerText = "Please enter a valid email address.";
+                emailError.style.display = 'block';
+                emailGroup.classList.add('error');
+            } else {
+                emailError.style.display = 'none';
+                emailGroup.classList.remove('error');
+            }
+
+            
+            const contactVal = contactInput.value.replace(/\D/g, ''); 
+            if (contactVal.length === 0) {
+                 isValid = false;
+                 contactError.innerText = "Phone number is required.";
+                 contactError.style.display = 'block';
+                 contactGroup.classList.add('error');
+            } else if (contactVal.charAt(0) !== '1') {
+                isValid = false;
+                contactError.innerText = "Phone number must start with 1 (e.g. 12-3456789).";
                 contactError.style.display = 'block';
                 contactGroup.classList.add('error');
             } else if (contactVal.length < 9 || contactVal.length > 10) {
-                // 原本是 10-11 位 (含0)，现在去掉0变成 9-10 位
+              
                 isValid = false;
-                contactError.innerText = "Please enter a valid contact number (e.g. 12-3456789).";
+                contactError.innerText = "Invalid length. Please check your number.";
                 contactError.style.display = 'block';
                 contactGroup.classList.add('error');
             } else {
@@ -728,7 +814,7 @@ include 'header_UI.php';
                 contactGroup.classList.remove('error');
             }
 
-            // --- B. Validate Date of Birth ---
+           
             const dobError = document.getElementById('dobError'); 
             const dobVal = dobInput.value;
             
@@ -753,44 +839,30 @@ include 'header_UI.php';
                 }
             }
 
-            // --- C. Validate IC (UNCHANGED) ---
+           
             if (icInput.value.trim() !== '') {
                 const cleanIC = icInput.value.replace(/[^0-9]/g, '');
-                
                 if (cleanIC.length !== 12) {
                     isValid = false;
                     icError.innerText = "IC Number must be exactly 12 digits.";
                     icError.style.display = 'block'; icGroup.classList.add('error');
                 } else {
-                    const month = parseInt(cleanIC.substring(2, 4), 10);
-                    const day = parseInt(cleanIC.substring(4, 6), 10);
-                    const stateCode = cleanIC.substring(6, 8);
-                    const validStateCodes = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16'];
                     
-                    let isDateValid = true;
-                    if (month < 1 || month > 12) {
-                        isDateValid = false;
-                    } else {
-                        const daysInMonth = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-                        if (day < 1 || day > daysInMonth[month]) {
-                            isDateValid = false;
-                        }
-                    }
-
-                    if (!isDateValid) {
-                        isValid = false;
-                        icError.innerText = "Invalid IC Number: Invalid Date of Birth (YYMMDD).";
-                        icError.style.display = 'block';
-                        icGroup.classList.add('error');
-                    } else if (!validStateCodes.includes(stateCode)) {
-                        isValid = false;
-                        icError.innerText = "Invalid IC Number: Invalid state code.";
-                        icError.style.display = 'block';
-                        icGroup.classList.add('error');
-                    } else {
-                         icError.style.display = 'none';
-                         icGroup.classList.remove('error');
-                    }
+                     const month = parseInt(cleanIC.substring(2, 4), 10);
+                     const day = parseInt(cleanIC.substring(4, 6), 10);
+                     const stateCode = cleanIC.substring(6, 8);
+                     const validStateCodes = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16'];
+                     
+                     if (month < 1 || month > 12 || day < 1 || day > 31) {
+                         isValid = false;
+                         icError.innerText = "Invalid IC Number: Invalid Date.";
+                         icError.style.display = 'block'; icGroup.classList.add('error');
+                     } else if (!validStateCodes.includes(stateCode) && parseInt(stateCode) > 59) {
+                        
+                         isValid = false;
+                         icError.innerText = "Invalid IC Number: Invalid State Code.";
+                         icError.style.display = 'block'; icGroup.classList.add('error');
+                     }
                 }
             }
 
@@ -801,7 +873,7 @@ include 'header_UI.php';
             }
         });
 
-        // --- 4. Auto Detect State ---
+        
         function handlePostcodeInput(postcode) {
             const stateInput = document.getElementById('state');
             const pc = parseInt(postcode, 10);
@@ -834,7 +906,7 @@ include 'header_UI.php';
             updateProgress();
         }
 
-        // --- 5. Image Preview ---
+        
         function previewImage(event) {
             const input = event.target;
             const avatarDisplay = document.getElementById('avatar-display');
@@ -848,11 +920,12 @@ include 'header_UI.php';
             }
         }
 
-        // --- 6. Real-time Progress Bar ---
+        
         function updateProgress() {
+            
             const fields = ['name', 'email', 'contact', 'icnumber', 'dob', 'address1', 'city', 'state', 'postalcode', 'country'];
             let filledCount = 0;
-            const totalFields = fields.length + 1; 
+            const totalFields = fields.length + 1; // +1 for picture
             fields.forEach(id => {
                 const el = document.getElementById(id);
                 if (el && el.value.trim() !== '') { filledCount++; }

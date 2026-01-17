@@ -12,9 +12,10 @@ $logged_in = (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true);
 $donor_name = isset($_SESSION['donor_name']) ? htmlspecialchars($_SESSION['donor_name']) : "Guest";
 $wallet_balance = 0.00;
 
-// [新增] 通知的变量初始化
+// 通知的变量初始化
 $notifications = [];
 $notification_count = 0;
+$show_badge = false; // 控制红点显示的变量
 
 if ($logged_in && isset($_SESSION['donor_id'])) {
     if (isset($conn)) {
@@ -28,18 +29,8 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         }
         $stmt->close();
 
-        // B. [新增] 获取即将到期的 Subscription (未来7天内扣款)
+        // B. [新增] 获取即将到期的 Recurring Donation (未来7天内扣款)
         // 逻辑：状态为 Active，且 Recurring_Deduction_Date 在今天和未来7天之间
-        $notif_sql = "SELECT Recurring_Amount, Recurring_Deduction_Date, Recurring_Type 
-                      FROM recurring_donation 
-                      WHERE Donor_ID = ? 
-                      AND Recurring_Status = 'Active' 
-                      AND Recurring_Deduction_Date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
-                      ORDER BY Recurring_Deduction_Date ASC";
-        
-        // 注意：如果您的表里没有 Recurring_Type，请从 SQL 中去掉它。这里假设用金额和日期展示。
-        // 根据您提供的 SQL dump，表里只有 Recurring_Amount 和 Recurring_Deduction_Date 是关键。
-        
         $stmt_notif = $conn->prepare("SELECT Recurring_ID, Recurring_Amount, Recurring_Deduction_Date FROM recurring_donation WHERE Donor_ID = ? AND Recurring_Status = 'Active' AND Recurring_Deduction_Date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)");
         
         if ($stmt_notif) {
@@ -50,6 +41,14 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 $notifications[] = $row_notif;
             }
             $notification_count = count($notifications);
+            
+            // [逻辑修改] 只有当有通知，且用户没有点击过(没有Cookie)时，才显示红点
+            if ($notification_count > 0) {
+                if (!isset($_COOKIE['notif_read']) || $_COOKIE['notif_read'] !== 'true') {
+                    $show_badge = true;
+                }
+            }
+            
             $stmt_notif->close();
         }
     }
@@ -514,7 +513,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                                 <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                             </svg>
-                            <?php if ($notification_count > 0): ?>
+                            <?php if ($show_badge): ?>
                                 <span class="notification-badge"><?php echo $notification_count; ?></span>
                             <?php endif; ?>
                         </div>
@@ -525,7 +524,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                                 <?php if ($notification_count > 0): ?>
                                     <?php foreach ($notifications as $notif): ?>
                                         <div class="notification-item">
-                                            <div class="notif-title">Subscription Renewal</div>
+                                            <div class="notif-title">Recurring Donation Renewal</div>
                                             <div class="notif-desc">
                                                 Your monthly donation of <b>RM <?php echo number_format($notif['Recurring_Amount'], 2); ?></b> is scheduled for deduction.
                                             </div>
@@ -606,7 +605,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 </form>
 
                 <?php if ($logged_in): ?>
-                    <a href="Payment_page.php" class="header-donate-btn">Donate</a>
+                    <a href="Branch_Selection.php" class="header-donate-btn">Donate</a>
                 <?php else: ?>
                     <a href="#" class="header-donate-btn" onclick="showLoginAlert(event)">Donate</a>
                 <?php endif; ?>
@@ -625,10 +624,20 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             dropdown.classList.toggle('active');
         }
 
-        // [新增] 2. Notification Dropdown Logic
+        // 2. Notification Dropdown Logic
         function toggleNotification() {
             const notifDropdown = document.getElementById('notificationDropdown');
             const accountDropdown = document.getElementById('profileDropdown');
+
+            // 当用户点击铃铛时，隐藏红色角标
+            const badge = document.querySelector('.notification-badge');
+            if (badge) {
+                badge.style.display = 'none';
+            }
+
+            // [新增] 设置一个 Cookie，告诉服务器“我已经看过通知了”
+            // path=/ 确保整个网站都生效
+            document.cookie = "notif_read=true; path=/";
 
             // 关闭 Account，打开通知
             if(accountDropdown) accountDropdown.classList.remove('active');
@@ -648,7 +657,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 profileDropdown.classList.remove('active');
             }
 
-            // [新增] 处理 Notification 点击外部关闭
+            // 处理 Notification 点击外部关闭
             if (notifTrigger && !notifTrigger.contains(event.target) && !notifDropdown.contains(event.target)) {
                 notifDropdown.classList.remove('active');
             }
@@ -692,7 +701,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e16161', 
-                cancelButtonColor: '#6c757d',
+                cancelButtonColor: '#6c757d', 
                 confirmButtonText: 'Yes, Log out',
                 cancelButtonText: 'Cancel'
             }).then((result) => {

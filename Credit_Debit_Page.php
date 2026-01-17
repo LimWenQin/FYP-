@@ -282,26 +282,38 @@ document.addEventListener('DOMContentLoaded', function() {
         const yy = parseInt(yyStr, 10);
         
         const now = new Date();
-        const currentYear = parseInt(now.getFullYear().toString().substr(-2)); 
+        const fullCurrentYear = now.getFullYear();
+        const currentYearShort = parseInt(fullCurrentYear.toString().substr(-2)); 
         const currentMonth = now.getMonth() + 1; 
 
+        // 1. 验证月份是否合法 (01-12)
         if (mm < 1 || mm > 12) {
             e.preventDefault();
             expInput.classList.add('is-invalid');
-            Swal.fire({ title: 'Invalid Month', text: 'Please enter a month between 01 and 12.', icon: 'error', confirmButtonColor: '#00a651' }).then(() => {
-                expInput.value = ''; 
-                expInput.focus(); 
-            });
+            Swal.fire({ title: 'Invalid Month', text: 'Please enter a month between 01 and 12.', icon: 'error', confirmButtonColor: '#00a651' });
             return;
         }
 
-        if (yy < currentYear || (yy === currentYear && mm < currentMonth)) {
+        // 2. 验证是否已过期 (不能早于当前月)
+        if (yy < currentYearShort || (yy === currentYearShort && mm < currentMonth)) {
             e.preventDefault(); 
             expInput.classList.add('is-invalid');
-            Swal.fire({ title: 'Card Expired', text: 'The expiration date entered has already passed.', icon: 'error', confirmButtonColor: '#00a651' }).then(() => {
-                expInput.value = ''; 
-                expInput.focus(); 
+            Swal.fire({ title: 'Card Expired', text: 'The expiration date entered has already passed.', icon: 'error', confirmButtonColor: '#00a651' });
+            return;
+        }
+
+        // ⭐ 3. [新增逻辑] 验证是否超过 5 年 (逻辑检查)
+        const maxYearAllowed = currentYearShort + 5;
+        if (yy > maxYearAllowed) {
+            e.preventDefault();
+            expInput.classList.add('is-invalid');
+            Swal.fire({ 
+                title: 'Invalid Year', 
+                text: 'Expiration year cannot be more than 5 years from now (' + (fullCurrentYear + 5) + ').', 
+                icon: 'error', 
+                confirmButtonColor: '#00a651' 
             });
+            return;
         }
     });
 

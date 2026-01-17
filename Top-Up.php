@@ -169,6 +169,25 @@ include 'header_UI.php';
     .qr-box img { width: 180px; border-radius: 10px; }
     /* 新增错误高亮样式 */
     .is-invalid { border: 2px solid #dc3545 !important; background-color: #fff8f8 !important; }
+    /* 当容器被选中时，圆圈边框变绿，背景变绿 */
+.method-container.selected .check-circle {
+    border-color: #28a745 !important;
+    background-color: #28a745;
+    position: relative;
+}
+
+/* 在选中的圆圈中心添加一个白色小点 */
+.method-container.selected .check-circle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background-color: white;
+    border-radius: 50%;
+}
 </style>
 
 <div class="topup-wrapper">
@@ -337,10 +356,11 @@ include 'header_UI.php';
             checkForm();
         });
 
-        topupForm.addEventListener('submit', function(e) {
+topupForm.addEventListener('submit', function(e) {
             if (document.getElementById('payment_method').value === 'Credit/Debit Card') {
                 const expValue = expInput.value; 
                 
+                // 1. 基础格式检查
                 if (expValue.length !== 5) {
                     e.preventDefault();
                     expInput.classList.add('is-invalid');
@@ -353,10 +373,11 @@ include 'header_UI.php';
                 const yy = parseInt(yyStr, 10);
                 
                 const now = new Date();
-                const currentYear = parseInt(now.getFullYear().toString().substr(-2)); 
+                const fullCurrentYear = now.getFullYear();
+                const currentYearShort = parseInt(fullCurrentYear.toString().substr(-2)); 
                 const currentMonth = now.getMonth() + 1; 
 
-                // 错误处理逻辑：变红、通知、清除内容
+                // 2. 验证月份是否合法 (01-12)
                 if (mm < 1 || mm > 12) {
                     e.preventDefault();
                     expInput.classList.add('is-invalid');
@@ -366,14 +387,15 @@ include 'header_UI.php';
                         icon: 'error', 
                         confirmButtonColor: '#0057B7' 
                     }).then(() => {
-                        expInput.value = ''; // 清除内容
+                        expInput.value = ''; 
                         expInput.focus();
                         checkForm();
                     });
                     return;
                 }
 
-                if (yy < currentYear || (yy === currentYear && mm < currentMonth)) {
+                // 3. 验证是否已过期
+                if (yy < currentYearShort || (yy === currentYearShort && mm < currentMonth)) {
                     e.preventDefault(); 
                     expInput.classList.add('is-invalid');
                     Swal.fire({ 
@@ -382,7 +404,25 @@ include 'header_UI.php';
                         icon: 'error', 
                         confirmButtonColor: '#0057B7' 
                     }).then(() => {
-                        expInput.value = ''; // 清除内容
+                        expInput.value = ''; 
+                        expInput.focus();
+                        checkForm();
+                    });
+                    return;
+                }
+
+                // ⭐ 4. [新增核心逻辑] 验证是否超过 5 年
+                const maxYearAllowed = currentYearShort + 5;
+                if (yy > maxYearAllowed) {
+                    e.preventDefault();
+                    expInput.classList.add('is-invalid');
+                    Swal.fire({ 
+                        title: 'Invalid Year', 
+                        text: 'Expiration year cannot be more than 5 years from now (' + (fullCurrentYear + 5) + ').', 
+                        icon: 'error', 
+                        confirmButtonColor: '#0057B7' 
+                    }).then(() => {
+                        expInput.value = ''; 
                         expInput.focus();
                         checkForm();
                     });
