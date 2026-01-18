@@ -2,13 +2,13 @@
 session_start();
 include 'dataconnection.php';
 
-// 1. Check Login Status
+// 1. 检查登录状态
 if (!isset($_SESSION['donor_id'])) {
     echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
     exit();
 }
 
-// 2. Check Required Parameters
+// 2. 检查必要参数
 if (!isset($_GET['id'])) {
     echo "<script>alert('Invalid request.'); window.location.href='Track_Records.php';</script>";
     exit();
@@ -17,14 +17,14 @@ if (!isset($_GET['id'])) {
 $record_id = $_GET['id'];
 $current_donor_id = $_SESSION['donor_id'];
 $details = [];
-$view_beneficiary_url = ""; // To store the dynamic link
+$view_beneficiary_url = ""; 
 
-// 3. Query Donation Details
-// Added Case_ID, Activity_ID, and Branch_ID to determine the link
+// 3. 查询捐款详情
+// 逻辑说明：直接从 orders (o) 表中判断关联 ID，确保即使关联表数据缺失也能生成基本逻辑
 $sql = "SELECT o.*, 
-               sc.Case_Title, sc.Case_ID as sc_id,
-               act.Activity_Name, act.Activity_ID as act_id,
-               b.Branch_Name, b.Branch_ID as br_id
+               sc.Case_Title, 
+               act.Activity_Name, 
+               b.Branch_Name
         FROM orders o
         LEFT JOIN special_case sc ON o.Case_ID = sc.Case_ID
         LEFT JOIN activity act ON o.Activity_ID = act.Activity_ID
@@ -37,37 +37,33 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 if ($row = $result->fetch_assoc()) {
-    // 默认项目名称
-    $project_name = "General Fund (HQ)";
-    
-    // 核心修改：调整跳转链接逻辑
-    if (!empty($row['Case_Title'])) {
-        // Special Case 保持原样或根据需要调整
-        $project_name = "Special Case: " . $row['Case_Title'];
-        $view_beneficiary_url = "Special_Case_Details.php?id=" . $row['sc_id'];
+    // 确定项目名称与跳转链接
+    if (!empty($row['Case_ID'])) {
+        // 如果关联了 Special Case
+        $project_name = "Special Case: " . ($row['Case_Title'] ?: 'Individual Case');
+        $view_beneficiary_url = "Special_Case_Detail.php?case_id=" . $row['Case_ID'];
         
-    } elseif (!empty($row['Activity_Name'])) {
-        // Activity 跳转至 donor_campaign_detail.php
-        $project_name = "Activity: " . $row['Activity_Name'];
-        $view_beneficiary_url = "donor_campaign_detail.php?id=" . $row['act_id'];
+    } elseif (!empty($row['Activity_ID'])) {
+        // 如果关联了 Activity
+        $project_name = "Activity: " . ($row['Activity_Name'] ?: 'Community Campaign');
+        $view_beneficiary_url = "donor_campaign_detail.php?id=" . $row['Activity_ID'];
         
-    } elseif (!empty($row['Branch_Name'])) {
-        // Branch 跳转至 Branch_Details.php
-        $project_name = "Branch: " . $row['Branch_Name'];
-        $view_beneficiary_url = "Branch_Details.php?id=" . $row['br_id'];
+    } elseif (!empty($row['Branch_ID'])) {
+        // 如果关联了 Branch
+        $project_name = "Branch: " . ($row['Branch_Name'] ?: 'Branch Fund');
+        $view_beneficiary_url = "Branch_Details.php?id=" . $row['Branch_ID'];
         
     } else {
-        // 如果是 HQ (既没有 Case, Activity 也没有特定 Branch ID)
-        // 根据您的要求，HQ 也连接到 Branch_Details.php
-        // 通常 HQ 的 ID 在数据库中可能是固定的（例如 id=1），请确认您的数据结构
+        // 默认 General Fund / HQ
         $project_name = "General Fund (HQ)";
-        $view_beneficiary_url = "Branch_Details.php?id=0"; // 假设 HQ 的 ID 为 1
+        $view_beneficiary_url = "Branch_Details.php?id=2"; // 根据你的数据库，HQ ID 是 2
     }
 
-    // Format Donation Type
+    // 格式化捐款类型
     $db_type = strtolower(trim($row['Order_Type']));
     $display_type = ($db_type === 'recurring') ? 'Monthly Giving' : 'One-Time Donation';
 
+    // 组装显示详情
     $details = [
         'Beneficiary' => $project_name,
         'Amount' => "RM " . number_format($row['Order_Amount'], 2),
@@ -82,7 +78,7 @@ if ($row = $result->fetch_assoc()) {
     ];
 }
 
-// 4. Handle Record Not Found
+// 4. 处理找不到记录的情况
 if (empty($details)) {
     echo "<script>alert('Record not found.'); window.location.href='Track_Records.php';</script>";
     exit();
@@ -111,7 +107,6 @@ include 'header_UI.php';
     .info-label { width: 180px; font-weight: 600; color: #666; flex-shrink: 0; font-size: 0.95rem; }
     .info-value { flex: 1; color: #222; font-weight: 500; font-size: 1rem; line-height: 1.5; }
     
-    /* Beneficiary Detail Button */
     .btn-beneficiary {
         display: inline-flex;
         align-items: center;

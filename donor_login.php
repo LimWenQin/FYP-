@@ -48,14 +48,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($remember && !empty($email)) { $email_value = htmlspecialchars($email); }
     } else {
         // -----------------------------------------------------------------
-        // 2. 执行登录验证 (核心修改部分)
+        // 2. 执行登录验证
         // -----------------------------------------------------------------
         
         if (!isset($conn)) {
              $error_message = "Database connection error.";
              if ($remember) { $email_value = htmlspecialchars($email); }
         } else {
-            // --- 关键逻辑：只查找 Is_Deleted = 0 (未删除) 的用户 ---
+            // 只查找 Is_Deleted = 0 (未删除) 的用户
             $query = "SELECT Donor_ID, Donor_Name, Donor_Password FROM donor WHERE Donor_Email = ? AND Is_Deleted = 0";
             $stmt = $conn->prepare($query);
             $stmt->bind_param("s", $email);
@@ -89,8 +89,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $password_error = "Incorrect password."; 
                 }
             } else {
-                // 如果 Is_Deleted = 1，这里也会查不到，也会显示 Email not found
-                // 这会引导用户去重新注册（从而触发复活逻辑）
                 $email_error = "Email address not found.";
             }
             $stmt->close();
@@ -138,6 +136,8 @@ include 'header_UI.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Donor Login - Love Bridge</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
         :root {
             --primary-red: #dc2626;
@@ -232,6 +232,32 @@ include 'header_UI.php';
             border-color: var(--error-red);
             box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
         }
+
+        /* --- 新增：密码框容器和图标样式 --- */
+        .password-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .password-wrapper .form-control {
+            padding-right: 45px; /* 给图标留出位置 */
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: var(--medium-gray);
+            z-index: 10;
+            transition: color 0.3s;
+        }
+
+        .toggle-password:hover {
+            color: var(--primary-red);
+        }
+        /* ---------------------------------- */
 
         .error-message {
             background-color: var(--light-red);
@@ -420,10 +446,13 @@ include 'header_UI.php';
             
             <div class="form-group" id="password-group">
                 <label for="password">Password</label>
-                <input type="password" class="form-control <?php echo !empty($password_error) ? 'error' : ''; ?>" 
-                       id="password" name="password" 
-                       required placeholder="Enter your password"
-                       <?php echo !empty($lockout_error) ? 'disabled' : ''; ?>>
+                <div class="password-wrapper">
+                    <input type="password" class="form-control <?php echo !empty($password_error) ? 'error' : ''; ?>" 
+                           id="password" name="password" 
+                           required placeholder="Enter your password"
+                           <?php echo !empty($lockout_error) ? 'disabled' : ''; ?>>
+                    <i class="fas fa-eye toggle-password" id="togglePassword"></i>
+                </div>
                 
                 <?php if (!empty($password_error)): ?>
                     <span class="field-error"><?php echo $password_error; ?></span>
@@ -460,11 +489,40 @@ include 'header_UI.php';
         const emailInput = document.getElementById('email');
         const passwordInput = document.getElementById('password');
         
+        // --- 新增：查看密码功能 ---
+        const togglePassword = document.getElementById('togglePassword');
+        
+        if (togglePassword && passwordInput) {
+            togglePassword.addEventListener('click', function () {
+                // 切换 type 属性
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                
+                // 切换图标样式 (睁眼/闭眼)
+                this.classList.toggle('fa-eye');
+                this.classList.toggle('fa-eye-slash');
+            });
+        }
+        // -------------------------
+
         function clearErrorOnInput() {
             this.classList.remove('error');
-            const errorSpan = this.nextElementSibling;
+            // 如果输入框后面直接跟着错误信息，隐藏它
+            // 注意：因为加了wrapper，password的结构变了，我们需要找父级的nextSibling或者wrapper内的
+            // 简单的处理方式是找到 .field-error 并隐藏
+            
+            // 尝试找紧随其后的 error span (适用于 email)
+            let errorSpan = this.nextElementSibling;
             if (errorSpan && errorSpan.classList.contains('field-error')) {
                 errorSpan.style.display = 'none';
+            }
+            
+            // 尝试找父元素后面的 error span (适用于 password, 因为有 wrapper)
+            if (this.parentElement.classList.contains('password-wrapper')) {
+                let wrapperErrorSpan = this.parentElement.nextElementSibling;
+                if (wrapperErrorSpan && wrapperErrorSpan.classList.contains('field-error')) {
+                    wrapperErrorSpan.style.display = 'none';
+                }
             }
         }
 

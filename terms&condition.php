@@ -485,7 +485,7 @@ include 'header_UI.php';
         
         <div class="navigation">
             <a href="privacy.php" class="btn">View Privacy Policy</a>
-            <a href="index.php" class="btn btn-outline">Return to Homepage</a>
+            <a href="Homepage.php" class="btn btn-outline">Return to Homepage</a>
         </div>
     </div>
     

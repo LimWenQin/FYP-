@@ -13,9 +13,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Get form data
     $name = trim($_POST['name']);
     
-    // --- 关键修改：处理电话号码 ---
-    // 用户输入的是 "123456789"，我们在存入数据库前手动补上前面的 "0"
-    // 这样数据库里依然是标准的 0123456789 格式
+    // --- 处理电话号码 ---
     $raw_contact = trim($_POST['contact']);
     $contact = '0' . $raw_contact; 
 
@@ -33,8 +31,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $missing_fields[] = $field;
         }
     }
-    
-    // 注意：这里的 contact 检查的是 $_POST['contact'] (即不带0的)，只要不为空就行
     
     if (!empty($missing_fields)) {
         $error_message = "Please fill in all required fields.";
@@ -97,10 +93,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             
             if ($stmt_action->execute()) {
-                // --- 关键修改：注册成功，设置标记，清空数据 ---
+                // --- 注册成功 ---
                 $registration_success = true;
-                $name = $contact = $email = $dob = ""; // 清空表单以便下次显示
-                // $_POST = array(); // 不强制清空POST，避免刷新问题，让JS跳转处理
+                $name = $contact = $email = $dob = ""; 
             } else {
                 $error_message = "Error: " . $stmt_action->error;
             }
@@ -259,6 +254,31 @@ include 'header_UI.php';
         .phone-group .form-control:focus {
             box-shadow: none;
         }
+
+        /* --- New: Password Toggle Styles --- */
+        .password-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .password-wrapper .form-control {
+            padding-right: 45px; /* Space for the eye icon */
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: var(--medium-gray);
+            z-index: 10;
+            transition: color 0.3s;
+        }
+
+        .toggle-password:hover {
+            color: var(--primary-red);
+        }
         /* ------------------------------------- */
 
         .field-error-msg {
@@ -335,8 +355,6 @@ include 'header_UI.php';
             margin-bottom: 25px;
             font-weight: 500;
         }
-
-        /* 移除了原有的 .success-message CSS，因为用 SweetAlert2 替代了 */
 
         .button-container {
             display: flex;
@@ -468,8 +486,11 @@ include 'header_UI.php';
                 <div class="form-row">
                     <div class="form-group">
                         <label for="password" class="required">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" 
-                               required placeholder="At least 8 characters">
+                        <div class="password-wrapper">
+                            <input type="password" class="form-control" id="password" name="password" 
+                                   required placeholder="At least 8 characters">
+                            <i class="fas fa-eye toggle-password" id="togglePassword"></i>
+                        </div>
                         <div class="password-strength">
                             <div class="password-strength-bar" id="passwordStrengthBar"></div>
                         </div>
@@ -485,8 +506,11 @@ include 'header_UI.php';
                     
                     <div class="form-group">
                         <label for="confirm_password" class="required">Confirm Password</label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" 
-                               required placeholder="Re-enter your password">
+                        <div class="password-wrapper">
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" 
+                                   required placeholder="Re-enter your password">
+                            <i class="fas fa-eye toggle-password" id="toggleConfirmPassword"></i>
+                        </div>
                         <div class="field-info-msg" id="matchMsg"></div>
                         <div class="field-error-msg" id="confirmPasswordError">Please confirm your password.</div>
                     </div>
@@ -526,7 +550,7 @@ include 'header_UI.php';
             text: 'Your account has been created successfully.',
             icon: 'success',
             confirmButtonText: 'Login Now',
-            confirmButtonColor: '#dc2626', // 使用你的主题红色
+            confirmButtonColor: '#dc2626', 
             allowOutsideClick: false
         }).then((result) => {
             if (result.isConfirmed) {
@@ -547,6 +571,27 @@ include 'header_UI.php';
             const phoneGroup = document.getElementById('phoneGroup'); 
             const termsInput = document.getElementById('terms');
             
+            // --- 1. Password Visibility Toggle Logic (New Added) ---
+            function setupPasswordToggle(toggleId, inputId) {
+                const toggleIcon = document.getElementById(toggleId);
+                const inputField = document.getElementById(inputId);
+
+                if (toggleIcon && inputField) {
+                    toggleIcon.addEventListener('click', function() {
+                        // Toggle input type
+                        const type = inputField.getAttribute('type') === 'password' ? 'text' : 'password';
+                        inputField.setAttribute('type', type);
+                        
+                        // Toggle icon class
+                        this.classList.toggle('fa-eye');
+                        this.classList.toggle('fa-eye-slash');
+                    });
+                }
+            }
+            setupPasswordToggle('togglePassword', 'password');
+            setupPasswordToggle('toggleConfirmPassword', 'confirm_password');
+            // --------------------------------------------------------
+
             function setFieldState(elementId, isError, message = "") {
                 const el = document.getElementById(elementId);
                 // Handle Contact Input special styling (apply error to the group div)
@@ -570,7 +615,7 @@ include 'header_UI.php';
                 }
             }
 
-            // --- 1. Password Logic (不变) ---
+            // --- 2. Password Match Logic ---
             function checkPasswordMatch() {
                 const matchMsg = document.getElementById('matchMsg');
                 const confirmError = document.getElementById('confirmPasswordError');
@@ -604,7 +649,7 @@ include 'header_UI.php';
             confirmPassword.addEventListener('input', checkPasswordMatch);
             password.addEventListener('input', checkPasswordMatch);
 
-            // --- 2. Validation Functions ---
+            // --- 3. Validation Functions ---
             function validateAge() {
                 const dobValue = dobInput.value;
                 if (!dobValue) return true; 
@@ -659,7 +704,7 @@ include 'header_UI.php';
             }
             nameInput.addEventListener('input', validateName);
             
-            // --- 关键修改：Contact Validation (Update logic for No-Zero) ---
+            // --- Contact Validation ---
             function validateContact() {
                  if(!contactInput.value) return true;
                  
@@ -672,7 +717,7 @@ include 'header_UI.php';
                       return false;
                  }
                  
-                 // 2. Check Length (1x-xxxxxxx usually 9-10 digits without the leading 0)
+                 // 2. Check Length
                  if(rawValue.length < 9) {
                       phoneGroup.classList.add('error');
                       setFieldState('contactError', true, "Please enter a valid contact number.");
@@ -685,7 +730,7 @@ include 'header_UI.php';
             }
             contactInput.addEventListener('blur', validateContact);
 
-            // --- Password Strength UI (不变) ---
+            // --- Password Strength UI ---
             const passwordStrengthBar = document.getElementById('passwordStrengthBar');
             const reqs = {
                 length: document.getElementById('lengthReq'),
@@ -743,22 +788,19 @@ include 'header_UI.php';
                 }
             }
             
-            // --- 关键修改：Contact Input Handler (Prevent typing 0) ---
+            // --- Contact Input Handler (Prevent typing 0) ---
             contactInput.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+                let value = e.target.value.replace(/\D/g, ''); 
                 
-                // If user tries to type 0 at the start, remove it immediately
                 if (value.startsWith('0')) {
                     value = value.substring(1);
                 }
 
-                // Enforce formatting 1xx-xxxxxxx
                 if (value.length > 2) value = value.substring(0, 2) + '-' + value.substring(2);
-                if (value.length > 11) value = value.substring(0, 11); // Limit length
+                if (value.length > 11) value = value.substring(0, 11); 
                 
                 e.target.value = value;
                 
-                // Real-time error clear if length is okay
                 if(value.length >= 2) {
                     const currentError = document.getElementById('contactError').innerText;
                     if(currentError === "Do not include the leading '0'.") {
@@ -767,7 +809,7 @@ include 'header_UI.php';
                 }
             });
 
-            // --- 3. FINAL SUBMISSION HANDLER ---
+            // --- 4. FINAL SUBMISSION HANDLER ---
             form.addEventListener('submit', function(e) {
                 let isValid = true;
                 

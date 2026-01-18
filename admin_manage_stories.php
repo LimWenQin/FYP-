@@ -103,12 +103,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // 1. 添加新 Story
     if (isset($_POST['add_story'])) {
         $title = $_POST['title'];
+        $author = $_POST['author']; // [新增] 获取作者
         $desc = $_POST['description'];
         
         $jsonImages = "[]";
         if (isset($_FILES["images"])) {
             $uploadedPaths = handleMultiUpload($_FILES["images"]);
-            // 限制最多10张 (虽然前端限制了，后端再防一道)
+            // 限制最多10张
             if(count($uploadedPaths) > 10) $uploadedPaths = array_slice($uploadedPaths, 0, 10);
             $jsonImages = json_encode($uploadedPaths);
         }
@@ -117,13 +118,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // 检查是否有 Created_At 列
             $checkCol = $conn->query("SHOW COLUMNS FROM story LIKE 'Created_At'");
             if($checkCol && $checkCol->num_rows > 0) {
-                $sql = "INSERT INTO story (Story_Title, Story_Description, Story_Image, Created_At) VALUES (?, ?, ?, NOW())";
+                // [修改] SQL 插入 Author
+                $sql = "INSERT INTO story (Story_Title, Story_Author, Story_Description, Story_Image, Created_At) VALUES (?, ?, ?, ?, NOW())";
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("sss", $title, $desc, $jsonImages);
+                // [修改] bind_param "ssss"
+                $stmt->bind_param("ssss", $title, $author, $desc, $jsonImages);
             } else {
-                $sql = "INSERT INTO story (Story_Title, Story_Description, Story_Image) VALUES (?, ?, ?)";
+                $sql = "INSERT INTO story (Story_Title, Story_Author, Story_Description, Story_Image) VALUES (?, ?, ?, ?)";
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("sss", $title, $desc, $jsonImages);
+                $stmt->bind_param("ssss", $title, $author, $desc, $jsonImages);
             }
             
             if ($stmt->execute()) {
@@ -139,9 +142,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['update_story'])) {
         $storyId = intval($_POST['story_id']);
         $title = $_POST['edit_title'];
+        $author = $_POST['edit_author']; // [新增] 获取编辑的作者
         $desc = $_POST['edit_description'];
 
-        // 获取剩余的旧图片 (从前端 Hidden Input 传回的 JSON)
+        // 获取剩余的旧图片
         $remainingExistingImagesJson = $_POST['existing_images_json'];
         $remainingExistingImages = json_decode($remainingExistingImagesJson, true) ?? [];
 
@@ -153,15 +157,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         // 合并：旧图 + 新图
         $finalImages = array_merge($remainingExistingImages, $newUploadedPaths);
-        
-        // 限制最多10张
         if(count($finalImages) > 10) $finalImages = array_slice($finalImages, 0, 10);
         
         $jsonImages = json_encode($finalImages);
 
-        $updateSql = "UPDATE story SET Story_Title = ?, Story_Description = ?, Story_Image = ? WHERE Story_ID = ?";
+        // [修改] SQL 更新 Author
+        $updateSql = "UPDATE story SET Story_Title = ?, Story_Author = ?, Story_Description = ?, Story_Image = ? WHERE Story_ID = ?";
         $stmt = $conn->prepare($updateSql);
-        $stmt->bind_param("sssi", $title, $desc, $jsonImages, $storyId);
+        // [修改] bind_param "ssssi"
+        $stmt->bind_param("ssssi", $title, $author, $desc, $jsonImages, $storyId);
 
         if ($stmt->execute()) {
             header("Location: admin_manage_stories.php?success=Story updated successfully!");
@@ -209,7 +213,7 @@ $galleryData = [];
         .form-control:focus { border-color: var(--primary); background: white; box-shadow: 0 5px 15px rgba(242, 133, 133, 0.1); }
         textarea.form-control { resize: vertical; min-height: 130px; line-height: 1.6; }
         
-        /* --- NEW FILE UPLOAD STYLES (MATCHING BRANCH MANAGEMENT) --- */
+        /* Upload Styles */
         .upload-container { width: 100%; }
         .upload-box {
             border: 2px dashed #ccc;
@@ -232,7 +236,7 @@ $galleryData = [];
         
         .preview-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr); /* 3列 */
+            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
             margin-top: 15px;
         }
@@ -256,7 +260,6 @@ $galleryData = [];
             z-index: 10; transition: 0.2s;
         }
         .remove-img-btn:hover { background: #cc0000; transform: scale(1.1); }
-        /* -------------------------------------------------------- */
 
         /* Submit Button */
         .btn-submit {
@@ -287,23 +290,14 @@ $galleryData = [];
             color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px;
         }
         
-        /* --- 核心修改：Story Description 样式 --- */
-        .story-title { font-weight: 700; font-size: 15px; color: var(--dark); margin-bottom: 6px; }
+        /* Story Styles */
+        .story-title { font-weight: 700; font-size: 15px; color: var(--dark); margin-bottom: 4px; }
+        .story-author { font-size: 12px; color: var(--primary); margin-bottom: 6px; font-weight: 600; display: block; }
         .story-desc { 
-            font-size: 13px; 
-            color: var(--gray); 
-            line-height: 1.5; 
-            max-width: 450px; /* 限制最大宽度 */
-            
-            /* CSS 限制显示行数 (Webkit 浏览器) */
-            display: -webkit-box;
-            -webkit-line-clamp: 2; /* 这里设置只显示 2 行 */
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: normal; /* 必须允许换行 */
+            font-size: 13px; color: var(--gray); line-height: 1.5; max-width: 450px; 
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden; text-overflow: ellipsis; white-space: normal;
         }
-        /* -------------------------------------- */
 
         .story-date { font-size: 13px; color: #888; font-weight: 500; white-space: nowrap;}
         
@@ -373,6 +367,11 @@ $galleryData = [];
                             <div class="form-group">
                                 <label class="form-label">Story Title</label>
                                 <input type="text" name="title" class="form-control" required placeholder="e.g., A New Home for Shelly">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Story Author</label>
+                                <input type="text" name="author" class="form-control" required placeholder="e.g., John Doe">
                             </div>
                             
                             <div class="form-group">
@@ -444,11 +443,10 @@ $galleryData = [];
                                                 $imgCount = count($decoded);
                                             }
                                         } else {
-                                            $displayImg = $imgData; // 兼容旧单图
+                                            $displayImg = $imgData; 
                                             if (!empty($imgData)) $imgCount = 1;
                                         }
 
-                                        // 存入 Gallery 数组
                                         $galleryData[] = (!empty($displayImg) && file_exists($displayImg)) ? $displayImg : 'https://placehold.co/400?text=No+Image';
                                         $currentIndex = count($galleryData) - 1; 
                                 ?>
@@ -467,6 +465,7 @@ $galleryData = [];
                                     </td>
                                     <td>
                                         <div class="story-title"><?php echo htmlspecialchars($row['Story_Title']); ?></div>
+                                        <div class="story-author">By: <?php echo htmlspecialchars($row['Story_Author'] ?? 'Unknown'); ?></div>
                                         <div class="story-desc"><?php echo htmlspecialchars($row['Story_Description']); ?></div>
                                     </td>
                                     <td class="story-date">
@@ -481,7 +480,7 @@ $galleryData = [];
                                                 <div onclick="window.open('admin_story_details.php?id=<?php echo $row['Story_ID']; ?>','_blank')">
                                                     <i class="fas fa-eye"></i> View Details
                                                 </div>
-                                                <div onclick='openEditStoryModal(<?php echo json_encode($row); ?>)'>
+                                                <div onclick='openEditStoryModal(<?php echo htmlspecialchars(json_encode($row), ENT_QUOTES, "UTF-8"); ?>)'>
                                                     <i class="fas fa-edit"></i> Edit Story
                                                 </div>
                                                 <div onclick="confirmDelete(<?php echo $row['Story_ID']; ?>)" class="text-delete">
@@ -518,6 +517,11 @@ $galleryData = [];
                     <div class="form-group">
                         <label class="form-label">Story Title</label>
                         <input type="text" id="edit_title" name="edit_title" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Story Author</label>
+                        <input type="text" id="edit_author" name="edit_author" class="form-control" required>
                     </div>
                     
                     <div class="form-group">
@@ -578,7 +582,7 @@ $galleryData = [];
             })
         }
 
-        // --- NEW MULTI-UPLOAD LOGIC (COPIED & ADAPTED FROM BRANCH PAGE) ---
+        // --- MULTI-UPLOAD LOGIC ---
         let addFiles = []; 
         let editNewFiles = []; 
         let editExistingImages = []; 
@@ -587,7 +591,6 @@ $galleryData = [];
             const input = event.target;
             const newFiles = Array.from(input.files);
             
-            // Limit check (Total 10) - Optional but good for UX
             if (mode === 'add') {
                 if (addFiles.length + newFiles.length > 10) {
                     alert("You can only upload a maximum of 10 images.");
@@ -607,7 +610,6 @@ $galleryData = [];
             }
         }
 
-        // 删除新选择的文件
         function removeFile(index, mode) {
             if (mode === 'add') {
                 addFiles.splice(index, 1);
@@ -620,22 +622,18 @@ $galleryData = [];
             }
         }
 
-        // 删除已存在的图片 (Edit Mode)
         function removeExistingImage(index) {
             editExistingImages.splice(index, 1);
-            // 更新 hidden input，告诉后端剩下哪些旧图
             document.getElementById('edit_existing_images_input').value = JSON.stringify(editExistingImages);
             renderEditPreviews();
         }
 
-        // 使用 DataTransfer 同步 Input File 的内容
         function updateFileInput(inputId, fileArray) {
             const dataTransfer = new DataTransfer();
             fileArray.forEach(file => dataTransfer.items.add(file));
             document.getElementById(inputId).files = dataTransfer.files;
         }
 
-        // 渲染新文件预览 (Add Mode)
         function renderPreview(containerId, fileArray, mode) {
             const container = document.getElementById(containerId);
             container.innerHTML = '';
@@ -655,12 +653,10 @@ $galleryData = [];
             });
         }
 
-        // 渲染编辑模式预览 (Existing + New)
         function renderEditPreviews() {
             const container = document.getElementById('edit_preview_container');
             container.innerHTML = '';
 
-            // 1. 先显示旧图
             editExistingImages.forEach((src, index) => {
                 const item = document.createElement('div');
                 item.className = 'preview-item';
@@ -671,7 +667,6 @@ $galleryData = [];
                 container.appendChild(item);
             });
 
-            // 2. 再显示新图
             editNewFiles.forEach((file, index) => {
                 const reader = new FileReader();
                 reader.onload = function(e) {
@@ -699,26 +694,26 @@ $galleryData = [];
         function openEditStoryModal(story) {
             document.getElementById('edit_story_id').value = story.Story_ID;
             document.getElementById('edit_title').value = story.Story_Title;
+            
+            // 填充 Author, 防止 null 报错
+            document.getElementById('edit_author').value = story.Story_Author || '';
+            
             document.getElementById('edit_description').value = story.Story_Description;
             
-            // 重置新文件数组
+            // 重置新文件
             editNewFiles = [];
             updateFileInput('edit_images', []);
 
             // 解析旧图片
             try {
-                // 如果是 JSON 数组
                 editExistingImages = JSON.parse(story.Story_Image);
                 if (!Array.isArray(editExistingImages)) {
-                    // 如果不是数组但有值（旧数据单图），转为数组
                     editExistingImages = story.Story_Image ? [story.Story_Image] : [];
                 }
             } catch(e) {
-                // 如果 JSON 解析失败（旧数据单图 string）
                 editExistingImages = story.Story_Image ? [story.Story_Image] : [];
             }
 
-            // 初始化 Hidden Input
             document.getElementById('edit_existing_images_input').value = JSON.stringify(editExistingImages);
             
             renderEditPreviews();

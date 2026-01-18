@@ -6,7 +6,7 @@ include 'header_function.php';
 // 定义常量
 define('SITE_RED', '#d32f2f');
 
-// 1. 获取当前 PHP 时间（核心修复：统一使用 PHP 时间，避免数据库时区不一致）
+// 1. 获取当前 PHP 时间
 $current_time = date("Y-m-d H:i:s");
 
 $token = $_GET['token'] ?? '';
@@ -17,11 +17,6 @@ $donor_id = null;
 
 // 2. 验证 Token
 if (!empty($token)) {
-    /* 修复说明：
-       原代码使用 AND reset_expires > NOW()，这依赖 MySQL 的时区。
-       如果 MySQL 是 UTC(+0) 而你是 UTC(+8)，时间会相差8小时，导致看起来“马上过期”。
-       现在改为传入 PHP 的 $current_time。
-    */
     $stmt = $conn->prepare("
         SELECT reset_id, donor_id, reset_expires 
         FROM donor_password_reset 
@@ -29,7 +24,6 @@ if (!empty($token)) {
         AND reset_status = 'pending' 
         AND reset_expires > ?
     ");
-    // 注意这里变成了 "ss"，传入了 token 和 current_time
     $stmt->bind_param("ss", $token, $current_time);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -87,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $token_valid) {
                 $update_stmt->execute();
 
                 $token_stmt = $conn->prepare("UPDATE donor_password_reset SET reset_status = 'used', reset_used = 1, reset_updated = ? WHERE reset_token = ?");
-                $token_stmt->bind_param("ss", $current_time, $token); // 这里也统一用 PHP 时间
+                $token_stmt->bind_param("ss", $current_time, $token); 
                 $token_stmt->execute();
 
                 $ip = $_SERVER['REMOTE_ADDR'];
@@ -161,9 +155,11 @@ include 'header_UI.php';
             transform: translateY(-50%);
             color: #757575;
         }
+        
+        /* 关键 CSS 修改：Padding Right 增加 */
         .input-with-icon input {
             width: 100%;
-            padding: 12px 15px 12px 45px;
+            padding: 12px 45px 12px 45px; /* 右侧留空给眼睛图标 */
             border: 1px solid #ddd;
             border-radius: 6px;
             font-size: 16px;
@@ -172,6 +168,20 @@ include 'header_UI.php';
         .input-with-icon input:focus { outline: none; border-color: #d32f2f; }
         .input-with-icon input.error { border-color: #d32f2f; background-color: #fff0f0; }
         .input-with-icon input.success { border-color: #4caf50; background-color: #f0fff4; }
+
+        /* 关键 CSS 修改：眼睛图标样式 */
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #757575;
+            z-index: 10;
+        }
+        .toggle-password:hover {
+            color: #d32f2f;
+        }
 
         /* Password Strength Bar */
         .password-strength { height: 4px; background: #eee; margin-top: 8px; border-radius: 2px; overflow: hidden; display: flex; margin-bottom: 15px; }
@@ -266,6 +276,7 @@ include 'header_UI.php';
                         <div class="input-with-icon">
                             <i class="fas fa-key input-icon"></i>
                             <input type="password" id="new_password" name="new_password" placeholder="Enter new password" required>
+                            <i class="fas fa-eye toggle-password" id="toggleNewPassword"></i>
                         </div>
                         
                         <div class="password-strength">
@@ -296,6 +307,7 @@ include 'header_UI.php';
                         <div class="input-with-icon">
                             <i class="fas fa-lock input-icon"></i>
                             <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm new password" required>
+                            <i class="fas fa-eye toggle-password" id="toggleConfirmPassword"></i>
                         </div>
                         <div id="match-msg" style="font-size: 12px; margin-top: 5px;"></div>
                     </div>
@@ -316,6 +328,25 @@ include 'header_UI.php';
             const submitBtn = document.getElementById('submitBtn');
             const strengthBar = document.getElementById('strengthBar');
             const matchMsg = document.getElementById('match-msg');
+
+            // --- 关键修改：JS 添加点击事件 ---
+            function setupPasswordToggle(toggleId, inputId) {
+                const toggleIcon = document.getElementById(toggleId);
+                const inputField = document.getElementById(inputId);
+
+                if (toggleIcon && inputField) {
+                    toggleIcon.addEventListener('click', function() {
+                        const type = inputField.getAttribute('type') === 'password' ? 'text' : 'password';
+                        inputField.setAttribute('type', type);
+                        
+                        this.classList.toggle('fa-eye');
+                        this.classList.toggle('fa-eye-slash');
+                    });
+                }
+            }
+            setupPasswordToggle('toggleNewPassword', 'new_password');
+            setupPasswordToggle('toggleConfirmPassword', 'confirm_password');
+            // --------------------------------
 
             const rules = {
                 lengthReq: /^.{8,15}$/,

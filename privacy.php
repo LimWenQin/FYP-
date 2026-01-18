@@ -383,7 +383,7 @@ body {
         
         <div class="navigation">
             <a href="terms&condition.php" class="btn">View Terms & Conditions</a>
-            <a href="index.php" class="btn btn-outline">Return to Homepage</a>
+            <a href="Homepage.php" class="btn btn-outline">Return to Homepage</a>
         </div>
     </div>
     
