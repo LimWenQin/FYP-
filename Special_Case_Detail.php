@@ -29,7 +29,7 @@ function showErrorAndRedirect($title, $text, $redirectUrl) {
 
 // 1. 获取 ID
 if (!isset($_GET['case_id']) || !is_numeric($_GET['case_id'])) {
-    showErrorAndRedirect('Invalid Request', 'Invalid Case ID provided.', 'Special_Case_Page.php');
+    showErrorAndRedirect('Invalid Request', 'Invalid Case ID provided.', 'Special_Case Page.php');
 }
 
 $case_id = intval($_GET['case_id']);
@@ -67,7 +67,7 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 if ($result->num_rows == 0) {
-    showErrorAndRedirect('Not Found', 'The requested case could not be found.', 'Special_Case_Page.php');
+    showErrorAndRedirect('Not Found', 'The requested case could not be found.', 'Special_Case Page.php');
 }
 
 $case = $result->fetch_assoc();
@@ -245,7 +245,7 @@ include 'header_UI.php';
 <div class="detail-container">
     
     <div class="left-col">
-        <a href="Special_Case_Page.php" style="display:inline-block; margin-bottom:20px; color:#666; text-decoration:none;">
+        <a href="Special_Case Page.php" style="display:inline-block; margin-bottom:20px; color:#666; text-decoration:none;">
             <i class="fas fa-arrow-left"></i> Back to Special Cases
         </a>
 
