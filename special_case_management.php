@@ -21,7 +21,6 @@ $conn->query("UPDATE special_case SET Case_Status = 'Upcoming' WHERE Start_Date 
 // --- DELETE ---
 if (isset($_GET['delete_case_id'])) {
     $delId = intval($_GET['delete_case_id']);
-    // Optional: Delete related images from folder if needed
     $conn->query("DELETE FROM special_case WHERE Case_ID = $delId");
     header("Location: special_case_management.php?success=" . urlencode("Deleted successfully!"));
     exit();
@@ -39,6 +38,17 @@ $phonePrefixes = ['010', '011', '012', '013', '014', '015', '016', '017', '018',
 $searchTerm = "";
 $filterType = "";
 $filterValue = "";
+
+// Date specific variables (Creation Date)
+$filterDateDay = "";
+$filterDateMonth = "";
+$filterDateYear = "";
+
+// End Date specific variables
+$filterEndDateDay = "";
+$filterEndDateMonth = "";
+$filterEndDateYear = "";
+
 $whereConditions = [];
 $orderClause = "ORDER BY CASE 
                 WHEN Case_Status = 'Upcoming' THEN 1 
@@ -52,6 +62,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
 
 if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
     $filterType = $_GET['filter_type'];
+    
     if ($filterType == 'status' && !empty($_GET['filter_val_status'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_status']);
         $whereConditions[] = "Case_Status = '$filterValue'";
@@ -64,6 +75,34 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
     } elseif ($filterType == 'city' && !empty($_GET['filter_val_city'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_city']);
         $whereConditions[] = "Case_City = '$filterValue'";
+    } elseif ($filterType == 'date') {
+        // Creation Date Logic
+        if (isset($_GET['filter_val_date_day']) && $_GET['filter_val_date_day'] !== '') {
+            $filterDateDay = $conn->real_escape_string($_GET['filter_val_date_day']);
+            $whereConditions[] = "DAY(Created_At) = '$filterDateDay'";
+        }
+        if (isset($_GET['filter_val_date_month']) && $_GET['filter_val_date_month'] !== '') {
+            $filterDateMonth = $conn->real_escape_string($_GET['filter_val_date_month']);
+            $whereConditions[] = "MONTH(Created_At) = '$filterDateMonth'";
+        }
+        if (isset($_GET['filter_val_date_year']) && $_GET['filter_val_date_year'] !== '') {
+            $filterDateYear = $conn->real_escape_string($_GET['filter_val_date_year']);
+            $whereConditions[] = "YEAR(Created_At) = '$filterDateYear'";
+        }
+    } elseif ($filterType == 'end_date') {
+        // End Date Logic
+        if (isset($_GET['filter_val_end_date_day']) && $_GET['filter_val_end_date_day'] !== '') {
+            $filterEndDateDay = $conn->real_escape_string($_GET['filter_val_end_date_day']);
+            $whereConditions[] = "DAY(End_Date) = '$filterEndDateDay'";
+        }
+        if (isset($_GET['filter_val_end_date_month']) && $_GET['filter_val_end_date_month'] !== '') {
+            $filterEndDateMonth = $conn->real_escape_string($_GET['filter_val_end_date_month']);
+            $whereConditions[] = "MONTH(End_Date) = '$filterEndDateMonth'";
+        }
+        if (isset($_GET['filter_val_end_date_year']) && $_GET['filter_val_end_date_year'] !== '') {
+            $filterEndDateYear = $conn->real_escape_string($_GET['filter_val_end_date_year']);
+            $whereConditions[] = "YEAR(End_Date) = '$filterEndDateYear'";
+        }
     }
 }
 
@@ -84,7 +123,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
     header("Expires: 0");
 
     echo '<table border="1">';
-    echo '<tr><th>Case ID</th><th>Title</th><th>Category</th><th>Description</th><th>Start Date</th><th>End Date</th><th>Target (RM)</th><th>Raised (RM)</th><th>Status</th><th>Bank Name</th><th>Bank Account</th></tr>';
+    echo '<tr><th>Case ID</th><th>Title</th><th>Category</th><th>Description</th><th>Start Date</th><th>End Date</th><th>Target (RM)</th><th>Raised (RM)</th><th>Status</th><th>Bank Name</th><th>Bank Account</th><th>Created At</th></tr>';
     if ($exportResult && $exportResult->num_rows > 0) {
         while($row = $exportResult->fetch_assoc()) {
             echo '<tr>';
@@ -99,6 +138,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
             echo '<td>'.$row['Case_Status'].'</td>';
             echo '<td>'.$row['Case_BankName'].'</td>';
             echo '<td>\''.$row['Case_BankAccount'].'</td>';
+            echo '<td>'.$row['Created_At'].'</td>';
             echo '</tr>';
         }
     }
@@ -152,6 +192,7 @@ $allCaseImagesMap = [];
     <link rel="stylesheet" href="admin_common.css">
     
     <style>
+        /* Existing Styles Retained */
         .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; animation: slideIn 0.3s; display: none; }
         .floating-alert div { line-height: 1.6; }
         .floating-alert i { margin-top: 4px; }
@@ -159,7 +200,6 @@ $allCaseImagesMap = [];
         .floating-alert-danger { background: white; color: var(--danger); border-left: 4px solid var(--danger); }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-        /* Stats & UI */
         .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-5px); }
@@ -180,16 +220,14 @@ $allCaseImagesMap = [];
         .btn { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: 500; transition: all 0.3s; display: flex; align-items: center; gap: 5px; text-decoration: none; font-size: 13px; color: white; }
         .btn-primary { background: var(--primary); } .btn-success { background: var(--success); } .btn-danger { background: var(--danger); }
         
-        /* Filters */
         .filter-search-bar { margin-bottom: 25px; display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee; flex-wrap: wrap; }
         .filter-group { display: flex; align-items: center; gap: 8px; }
         .filter-select, .search-input { padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; background: white; }
         .search-input { flex: 1; min-width: 200px; }
         .secondary-filter { display: none; animation: fadeIn 0.3s; }
-        .secondary-filter.active { display: block; }
+        .secondary-filter.active { display: flex; gap: 5px; } /* Changed to flex for date inputs */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Grid & Cards */
         .case-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; margin-top: 10px; margin-bottom: 30px; }
         .case-card { background: white; border-radius: 12px; position: relative; display: flex; flex-direction: column; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border: 1px solid #f0f0f0; transition: transform 0.3s; }
         .case-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-color: #eee; }
@@ -300,6 +338,8 @@ $allCaseImagesMap = [];
                             <option value="category" <?php echo ($filterType == 'category') ? 'selected' : ''; ?>>Category</option>
                             <option value="phone" <?php echo ($filterType == 'phone') ? 'selected' : ''; ?>>Phone Prefix</option>
                             <option value="city" <?php echo ($filterType == 'city') ? 'selected' : ''; ?>>City</option>
+                            <option value="date" <?php echo ($filterType == 'date') ? 'selected' : ''; ?>>Creation Date</option>
+                            <option value="end_date" <?php echo ($filterType == 'end_date') ? 'selected' : ''; ?>>End Date</option>
                         </select>
                     </div>
 
@@ -340,6 +380,46 @@ $allCaseImagesMap = [];
                         </select>
                     </div>
 
+                    <div id="filter_date_container" class="secondary-filter">
+                        <select name="filter_val_date_day" class="filter-select" style="min-width: 80px;">
+                            <option value="">Day</option>
+                            <?php for($i=1; $i<=31; $i++) echo "<option value='$i' ".($filterDateDay==$i?'selected':'').">$i</option>"; ?>
+                        </select>
+                        <select name="filter_val_date_month" class="filter-select" style="min-width: 100px;">
+                            <option value="">Month</option>
+                            <?php 
+                            $months = [1=>'Jan', 2=>'Feb', 3=>'Mar', 4=>'Apr', 5=>'May', 6=>'Jun', 7=>'Jul', 8=>'Aug', 9=>'Sep', 10=>'Oct', 11=>'Nov', 12=>'Dec'];
+                            foreach($months as $k=>$v) echo "<option value='$k' ".($filterDateMonth==$k?'selected':'').">$v</option>"; 
+                            ?>
+                        </select>
+                        <select name="filter_val_date_year" class="filter-select" style="min-width: 90px;">
+                            <option value="">Year</option>
+                            <?php 
+                            $currYear = date('Y');
+                            for($i=$currYear; $i>=2023; $i--) echo "<option value='$i' ".($filterDateYear==$i?'selected':'').">$i</option>"; 
+                            ?>
+                        </select>
+                    </div>
+
+                    <div id="filter_end_date_container" class="secondary-filter">
+                        <select name="filter_val_end_date_day" class="filter-select" style="min-width: 80px;">
+                            <option value="">Day</option>
+                            <?php for($i=1; $i<=31; $i++) echo "<option value='$i' ".($filterEndDateDay==$i?'selected':'').">$i</option>"; ?>
+                        </select>
+                        <select name="filter_val_end_date_month" class="filter-select" style="min-width: 100px;">
+                            <option value="">Month</option>
+                            <?php 
+                            foreach($months as $k=>$v) echo "<option value='$k' ".($filterEndDateMonth==$k?'selected':'').">$v</option>"; 
+                            ?>
+                        </select>
+                        <select name="filter_val_end_date_year" class="filter-select" style="min-width: 90px;">
+                            <option value="">Year</option>
+                            <?php 
+                            for($i=$currYear; $i>=2023; $i--) echo "<option value='$i' ".($filterEndDateYear==$i?'selected':'').">$i</option>"; 
+                            ?>
+                        </select>
+                    </div>
+
                     <input type="text" name="search" class="search-input" placeholder="Search by title..." value="<?php echo htmlspecialchars($searchTerm); ?>">
                     <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
                     <?php if (!empty($searchTerm) || !empty($filterType)): ?>
@@ -373,13 +453,20 @@ $allCaseImagesMap = [];
                                     <button class="menu-btn" onclick="toggleMenu(event, <?php echo $case['Case_ID']; ?>)"><i class="fas fa-ellipsis-v"></i></button>
                                     <div id="menu-<?php echo $case['Case_ID']; ?>" class="dropdown-content">
                                         
+                                        <div onclick="goToDetailsPage(<?php echo $case['Case_ID']; ?>)"><i class="fas fa-eye"></i> View Full Details</div>
+                                        
+                                        <div onclick="window.location.href='special_case_edit.php?id=<?php echo $case['Case_ID']; ?>'"><i class="fas fa-edit"></i> Edit Details</div>
+
                                         <?php if (!$isStaff): ?>
                                             <a href="special_case_donation_history.php?case_id=<?php echo $case['Case_ID']; ?>" target="_blank"><i class="fas fa-file-invoice-dollar"></i> View Donor Payment History</a>
+                                        <?php endif; ?>
+
+                                        <?php if (!$isStaff): ?>
                                             <a href="special_case_withdrawal_history.php?case_id=<?php echo $case['Case_ID']; ?>" target="_blank"><i class="fas fa-money-bill-wave"></i> Withdrawal History</a>
                                         <?php endif; ?>
-                                        
-                                        <div onclick="goToDetailsPage(<?php echo $case['Case_ID']; ?>)"><i class="fas fa-eye"></i> View Full Details</div>
-                                        <div onclick="window.location.href='special_case_edit.php?id=<?php echo $case['Case_ID']; ?>'"><i class="fas fa-edit"></i> Edit Details</div>
+
+                                        <a href="special_case_comments.php?case_id=<?php echo $case['Case_ID']; ?>" target="_blank"><i class="fas fa-comments"></i> View Comments</a>
+
                                         <a href="javascript:confirmDeleteSpecialCase(<?php echo $case['Case_ID']; ?>)" class="text-delete"><i class="fas fa-trash"></i> Delete</a>
                                     </div>
                                 </div>
@@ -445,6 +532,19 @@ $allCaseImagesMap = [];
                             if ($filterType == 'phone' && !empty($filterValue)) $queryParams['filter_val_phone'] = $filterValue;
                             if ($filterType == 'city' && !empty($filterValue)) $queryParams['filter_val_city'] = $filterValue;
                             if ($filterType == 'category' && !empty($filterValue)) $queryParams['filter_val_category'] = $filterValue;
+                            
+                            // Date params
+                            if ($filterType == 'date') {
+                                if(!empty($filterDateDay)) $queryParams['filter_val_date_day'] = $filterDateDay;
+                                if(!empty($filterDateMonth)) $queryParams['filter_val_date_month'] = $filterDateMonth;
+                                if(!empty($filterDateYear)) $queryParams['filter_val_date_year'] = $filterDateYear;
+                            }
+                            // End Date params
+                            if ($filterType == 'end_date') {
+                                if(!empty($filterEndDateDay)) $queryParams['filter_val_end_date_day'] = $filterEndDateDay;
+                                if(!empty($filterEndDateMonth)) $queryParams['filter_val_end_date_month'] = $filterEndDateMonth;
+                                if(!empty($filterEndDateYear)) $queryParams['filter_val_end_date_year'] = $filterEndDateYear;
+                            }
                         }
                         $search_query = !empty($queryParams) ? '&' . http_build_query($queryParams) : '';
                         
@@ -482,17 +582,27 @@ $allCaseImagesMap = [];
             window.open('admin_special_case_details.php?id=' + id, '_blank');
         }
 
-        // --- FILTER LOGIC (Restored) ---
         function toggleFilterInputs() {
             const type = document.getElementById('filterType').value;
-            document.querySelectorAll('.secondary-filter').forEach(el => el.classList.remove('active'));
-            if (type === 'status') document.getElementById('filter_status_container').classList.add('active');
-            else if (type === 'phone') document.getElementById('filter_phone_container').classList.add('active');
-            else if (type === 'city') document.getElementById('filter_city_container').classList.add('active');
-            else if (type === 'category') document.getElementById('filter_category_container').classList.add('active');
+            document.querySelectorAll('.secondary-filter').forEach(el => { el.classList.remove('active'); if(el.tagName === 'DIV' && el.querySelector('select')) el.querySelector('select').disabled = true; });
+            
+            if (type === 'status') { document.getElementById('filter_status_container').classList.add('active'); document.getElementById('filter_status_container').querySelector('select').disabled = false; }
+            else if (type === 'phone') { document.getElementById('filter_phone_container').classList.add('active'); document.getElementById('filter_phone_container').querySelector('select').disabled = false; }
+            else if (type === 'city') { document.getElementById('filter_city_container').classList.add('active'); document.getElementById('filter_city_container').querySelector('select').disabled = false; }
+            else if (type === 'category') { document.getElementById('filter_category_container').classList.add('active'); document.getElementById('filter_category_container').querySelector('select').disabled = false; }
+            else if (type === 'date') { 
+                document.getElementById('filter_date_container').classList.add('active'); 
+                const dateSelects = document.getElementById('filter_date_container').querySelectorAll('select');
+                dateSelects.forEach(s => s.disabled = false);
+            }
+            else if (type === 'end_date') { 
+                document.getElementById('filter_end_date_container').classList.add('active'); 
+                const endDateSelects = document.getElementById('filter_end_date_container').querySelectorAll('select');
+                endDateSelects.forEach(s => s.disabled = false);
+            }
         }
 
-        // --- CAROUSEL LOGIC (Restored) ---
+        // --- CAROUSEL LOGIC ---
         function moveCarousel(cardId, direction) {
             const card = document.getElementById('card-' + cardId);
             const images = card.querySelectorAll('.card-img');
@@ -513,7 +623,6 @@ $allCaseImagesMap = [];
                 s.style.display='flex'; setTimeout(() => s.style.display='none', 5000); 
             }
             
-            // Lightbox keys
             document.addEventListener('keydown', function(event) {
                 if (document.getElementById('imageLightbox').style.display === "flex") {
                     if (event.key === "Escape") closeLightbox();
@@ -541,7 +650,7 @@ $allCaseImagesMap = [];
             if(confirm("Are you sure you want to delete this case?")) window.location.href = `special_case_management.php?delete_case_id=${id}`;
         }
 
-        // --- LIGHTBOX JS LOGIC (Restored) ---
+        // --- LIGHTBOX JS LOGIC ---
         const allCaseImages = <?php echo json_encode($allCaseImagesMap); ?>;
         let currentLightboxCaseId = null;
         let currentLightboxIndex = 0;
