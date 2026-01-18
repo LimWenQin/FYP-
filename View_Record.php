@@ -44,7 +44,7 @@ if ($row = $result->fetch_assoc()) {
     if (!empty($row['Case_Title'])) {
         // Special Case 保持原样或根据需要调整
         $project_name = "Special Case: " . $row['Case_Title'];
-        $view_beneficiary_url = "Special_Case_Details.php?id=" . $row['sc_id'];
+        $view_beneficiary_url = "Special_Case_Detail.php?id=" . $row['sc_id'];
         
     } elseif (!empty($row['Activity_Name'])) {
         // Activity 跳转至 donor_campaign_detail.php
