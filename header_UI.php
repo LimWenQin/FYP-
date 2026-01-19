@@ -30,7 +30,6 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         $stmt->close();
 
         // B. [新增] 获取即将到期的 Recurring Donation (未来7天内扣款)
-        // 逻辑：状态为 Active，且 Recurring_Deduction_Date 在今天和未来7天之间
         $stmt_notif = $conn->prepare("SELECT Recurring_ID, Recurring_Amount, Recurring_Deduction_Date FROM recurring_donation WHERE Donor_ID = ? AND Recurring_Status = 'Active' AND Recurring_Deduction_Date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)");
         
         if ($stmt_notif) {
@@ -153,7 +152,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             font-family: 'Segoe UI', sans-serif; 
         }
 
-        /* --- [新增] Notification 样式 --- */
+        /* --- Notification 样式 --- */
         .notification-container {
             position: relative;
             display: flex;
@@ -452,19 +451,57 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             color: #777;
         }
 
+       
         .header-donate-btn {
             background-color: #ffbb6dff;
             color: #fff !important;
-            padding: 10px 25px;
+            
+            /* 设置固定宽高，确保切换时不跳动 */
+            width: 120px; 
+            height: 44px;
+            
+            /* Flex 布局居中 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            
             border-radius: 30px;
             font-weight: bold;
             margin-left: 15px;
             box-shadow: 0 4px 10px rgba(209, 47, 2, 0.3);
             cursor: pointer;
+            transition: all 0.3s ease;
         }
+
         .header-donate-btn:hover {
-            background-color: #f79c34ff ;
+            background-color: #f79c34ff;
             transform: translateY(-2px);
+        }
+
+        /* 文字样式：默认显示 */
+        .btn-text {
+            display: block;
+        }
+
+        /* 图标样式：默认隐藏 */
+        .btn-icon {
+            display: none;
+        }
+
+        /* Hover 触发：文字隐藏，图标显示 */
+        .header-donate-btn:hover .btn-text {
+            display: none;
+        }
+        
+        .header-donate-btn:hover .btn-icon {
+            display: block;
+            /* 简单的弹出动画 */
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.5); }
+            100% { opacity: 1; transform: scale(1); }
         }
 
         @media (max-width: 900px) {
@@ -592,8 +629,9 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             <nav>
                 <ul class="header-menu">
                     <li><a href="Homepage.php">Home</a></li>
-                    <li><a href="Campaign_Page.php">Campaign</a></li>
                     <li><a href="New&Story.php">News & Story</a></li>
+                    <li><a href="Branch_Page.php">Branch</a></li>
+                    <li><a href="Campaign_Page.php">Campaign</a></li>
                     <li><a href="Special_case Page.php">Special Case</a></li>
                 </ul>
             </nav>
@@ -605,10 +643,25 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 </form>
 
                 <?php if ($logged_in): ?>
-                    <a href="Branch_Selection.php" class="header-donate-btn">Donate</a>
+                    <a href="Branch_Selection.php" class="header-donate-btn">
+                        <span class="btn-text">Donate</span>
+                        <span class="btn-icon">
+                            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="white" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                            </svg>
+                        </span>
+                    </a>
                 <?php else: ?>
-                    <a href="#" class="header-donate-btn" onclick="showLoginAlert(event)">Donate</a>
+                    <a href="#" class="header-donate-btn" onclick="showLoginAlert(event)">
+                        <span class="btn-text">Donate</span>
+                        <span class="btn-icon">
+                            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="white" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                            </svg>
+                        </span>
+                    </a>
                 <?php endif; ?>
+
             </div>
         </div>
     </header>
