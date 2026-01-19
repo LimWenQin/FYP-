@@ -91,10 +91,6 @@ include 'header_UI.php';
         --shadow: rgba(229, 57, 53, 0.1);
     }
 
-    /* 注意：这里不再隐藏 .header-donate-btn 
-       因为你需要保留 Header 上的 Donate Button
-    */
-
     body {
         background-color: var(--light-bg);
         color: var(--text);
@@ -183,6 +179,9 @@ include 'header_UI.php';
         height: 100%;
         display: flex;
         flex-direction: column;
+        /* 确保默认是可见的，不依赖JS控制 */
+        opacity: 1;
+        transform: translateY(0);
     }
 
     /* Hover Effect */
@@ -374,31 +373,5 @@ include 'header_UI.php';
         </div>
     </form>
 </div>
-
-<script>
-    function animateStoryCards() {
-        const storyCards = document.querySelectorAll('.story-card');
-        storyCards.forEach((card, index) => {
-            const rect = card.getBoundingClientRect();
-            if (rect.top < window.innerHeight - 50) {
-                setTimeout(() => {
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 100);
-            }
-        });
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        const storyCards = document.querySelectorAll('.story-card');
-        storyCards.forEach(card => {
-            card.style.opacity = '0';
-            card.style.transform = 'translateY(20px)';
-        });
-        
-        setTimeout(animateStoryCards, 100);
-        window.addEventListener('scroll', animateStoryCards);
-    });
-</script>
 
 <?php include 'footer.php'; ?>
