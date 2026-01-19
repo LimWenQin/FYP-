@@ -20,7 +20,7 @@ $malaysiaBanks = [
     "Citibank" => "Citibank", "Bank Muamalat" => "Bank Muamalat", "Agrobank" => "Agrobank", "BSN" => "Bank Simpanan Nasional"
 ];
 
-// --- FILE UPLOAD HELPER ---
+// --- FILE UPLOAD HELPER (IMAGES ONLY - FOR CASE IMAGES) ---
 function handleMultipleImageUpload($files) {
     $uploadedPaths = [];
     $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
@@ -28,12 +28,7 @@ function handleMultipleImageUpload($files) {
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
 
     if (!is_array($files['name'])) {
-        $files = [
-            'name' => [$files['name']],
-            'type' => [$files['type']],
-            'tmp_name' => [$files['tmp_name']],
-            'error' => [$files['error']]
-        ];
+        $files = ['name' => [$files['name']], 'type' => [$files['type']], 'tmp_name' => [$files['tmp_name']], 'error' => [$files['error']]];
     }
 
     $count = count($files['name']);
@@ -49,8 +44,33 @@ function handleMultipleImageUpload($files) {
     return $uploadedPaths;
 }
 
+// --- FILE UPLOAD HELPER (REPORTS: PDF + IMAGES) ---
+function handleReportUpload($files) {
+    $uploadedPaths = [];
+    // Allow Images AND PDF
+    $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    $uploadDir = 'uploads/reports/';
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+
+    if (!is_array($files['name'])) {
+        $files = ['name' => [$files['name']], 'type' => [$files['type']], 'tmp_name' => [$files['tmp_name']], 'error' => [$files['error']]];
+    }
+
+    $count = count($files['name']);
+    for ($i = 0; $i < $count; $i++) {
+        if ($files['error'][$i] == 0 && in_array($files['type'][$i], $allowedTypes)) {
+            $ext = pathinfo($files['name'][$i], PATHINFO_EXTENSION);
+            $name = 'report_' . time() . '_' . uniqid() . '_' . $i . '.' . $ext;
+            if (move_uploaded_file($files['tmp_name'][$i], $uploadDir . $name)) {
+                $uploadedPaths[] = $uploadDir . $name;
+            }
+        }
+    }
+    return $uploadedPaths;
+}
+
 $errorMessage = "";
-$saveSuccess = false; // Flag for success modal
+$saveSuccess = false;
 
 // --- HANDLE SUBMISSION ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
@@ -66,13 +86,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
     $bankName = mysqli_real_escape_string($conn, $_POST['bank_name']);
     $bankAccount = mysqli_real_escape_string($conn, $_POST['bank_account']);
 
-    // Using Case_LocationName
     $caseLocationName = mysqli_real_escape_string($conn, $_POST['case_location_name']);
-    
     $caseOrganizer = mysqli_real_escape_string($conn, $_POST['case_organizer']);
     $contactName = mysqli_real_escape_string($conn, $_POST['contact_name']);
     
-    // Handle Phone Prefix
     $rawPhone = $_POST['contact_number'];
     $contactNumber = (strpos($rawPhone, '+60') === 0) ? $rawPhone : "+60" . $rawPhone;
     $contactNumber = mysqli_real_escape_string($conn, $contactNumber);
@@ -89,8 +106,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
     if (empty($caseTitle) || empty($targetAmount) || empty($bankAccount)) {
         $errorMessage = "Please fill in all required fields.";
     } elseif (!isset($_FILES['case_images']) || empty($_FILES['case_images']['name'][0])) {
-         $errorMessage = "At least one image is required.";
+         $errorMessage = "At least one main image is required.";
     } else {
+        // 1. Handle Case Images
         $caseImagesJson = "[]";
         if (isset($_FILES['case_images'])) {
             $uploaded = handleMultipleImageUpload($_FILES['case_images']);
@@ -98,11 +116,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
             if(!empty($uploaded)) $caseImagesJson = json_encode($uploaded);
         }
 
-        $sql = "INSERT INTO special_case (Case_Title, Case_Category, Case_Description, Target_Amount, Case_Status, Start_Date, End_Date, Case_LocationName, Case_Organizer, Contact_Name, Contact_Number, Contact_Email, Case_Address1, Case_Address2, Case_Address3, Case_City, Case_State, Case_PostalCode, Case_Images, Case_BankName, Case_BankAccount, Created_At) 
-                VALUES ('$caseTitle', '$caseCategory', '$caseDescription', '$targetAmount', '$caseStatus', $startDate, $endDate, '$caseLocationName', '$caseOrganizer', '$contactName', '$contactNumber', '$contactEmail', '$addr1', '$addr2', '$addr3', '$city', '$state', '$zip', '$caseImagesJson', '$bankName', '$bankAccount', NOW())";
+        // 2. Handle Medical Reports (New Requirement)
+        $medicalReportsJson = "[]";
+        if (isset($_FILES['medical_reports']) && !empty($_FILES['medical_reports']['name'][0])) {
+            $uploadedReports = handleReportUpload($_FILES['medical_reports']);
+            if(count($uploadedReports) > 5) $uploadedReports = array_slice($uploadedReports, 0, 5); // Max 5
+            if(!empty($uploadedReports)) $medicalReportsJson = json_encode($uploadedReports);
+        }
+
+        $sql = "INSERT INTO special_case (
+            Case_Title, Case_Category, Case_Description, Target_Amount, Case_Status, 
+            Start_Date, End_Date, Case_LocationName, Case_Organizer, Contact_Name, 
+            Contact_Number, Contact_Email, Case_Address1, Case_Address2, Case_Address3, 
+            Case_City, Case_State, Case_PostalCode, Case_Images, Case_BankName, 
+            Case_BankAccount, Case_Medical_Report, Created_At
+        ) VALUES (
+            '$caseTitle', '$caseCategory', '$caseDescription', '$targetAmount', '$caseStatus', 
+            $startDate, $endDate, '$caseLocationName', '$caseOrganizer', '$contactName', 
+            '$contactNumber', '$contactEmail', '$addr1', '$addr2', '$addr3', 
+            '$city', '$state', '$zip', '$caseImagesJson', '$bankName', 
+            '$bankAccount', '$medicalReportsJson', NOW()
+        )";
 
         if ($conn->query($sql)) {
-            $saveSuccess = true; // Trigger Success Modal
+            $saveSuccess = true;
         } else {
             $errorMessage = "Database Error: " . $conn->error;
         }
@@ -118,6 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin_common.css">
     <style>
+        /* Shared Styles from branch_add.php */
         .page-header-compact { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-top: 10px; }
         .back-btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: #666; font-weight: 600; font-size: 14px; padding: 8px 12px; border-radius: 5px; background: #f8f9fa; border: 1px solid #eee; transition: all 0.2s; }
         .back-btn:hover { background: #e9ecef; color: #333; }
@@ -153,8 +191,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
         .upload-box i { font-size: 30px; color: #aaa; margin-bottom: 10px; display: block; }
         .upload-box input[type="file"] { position: absolute; width: 100%; height: 100%; top: 0; left: 0; opacity: 0; cursor: pointer; }
         .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; margin-top: 15px; }
-        .preview-item { position: relative; height: 80px; border-radius: 6px; overflow: hidden; border: 1px solid #eee; }
+        .preview-item { position: relative; height: 80px; border-radius: 6px; overflow: hidden; border: 1px solid #eee; display: flex; align-items: center; justify-content: center; background: #fff; }
         .preview-item img { width: 100%; height: 100%; object-fit: cover; }
+        .preview-file-icon { font-size: 30px; color: #dc3545; } /* PDF Icon Style */
         .remove-img-btn { position: absolute; top: 2px; right: 2px; background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
         .button-group { display: flex; justify-content: flex-end; gap: 15px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
@@ -229,10 +268,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
                         <div class="upload-box" id="case_images_box">
                             <i class="fas fa-cloud-upload-alt"></i>
                             <p>Click or Drag images here (JPG, PNG)</p>
-                            <input type="file" id="case_images" name="case_images[]" multiple accept="image/*" onchange="handleFileSelect(event)">
+                            <input type="file" id="case_images" name="case_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'image')">
                         </div>
                         <div class="preview-grid" id="preview_container"></div>
                         <small class="form-guide">Upload high-quality images to represent the case. Accepted formats: JPG, PNG.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Medical Reports (Max 5, Optional)</label>
+                        <div class="upload-box" id="reports_box" style="border-color:#17a2b8; background:#f0fbff;">
+                            <i class="fas fa-file-medical-alt" style="color:#17a2b8;"></i>
+                            <p style="color:#0056b3;">Click to upload Medical Reports (PDF, JPG, PNG)</p>
+                            <input type="file" id="medical_reports" name="medical_reports[]" multiple accept=".pdf, .jpg, .jpeg, .png" onchange="handleFileSelect(event, 'report')">
+                        </div>
+                        <div class="preview-grid" id="report_preview_container"></div>
+                        <small class="form-guide">Upload supporting medical documents or doctor's letters.</small>
                     </div>
 
                     <div class="form-section-title">Basic Information</div>
@@ -392,14 +442,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
     <script>
         function showSystemAlert(message, type = 'error') {
             const alertBox = document.getElementById('customAlert');
-            const alertIcon = document.getElementById('alertIcon');
-            const alertTitle = document.getElementById('alertTitle');
-            const alertMsg = document.getElementById('alertMessage');
-            alertBox.className = 'custom-alert ' + type;
-            if (type === 'error') { alertIcon.className = 'fas fa-exclamation-circle'; alertTitle.innerText = 'Error'; } 
-            else { alertIcon.className = 'fas fa-check-circle'; alertTitle.innerText = 'Success'; }
-            alertMsg.innerText = message;
-            alertBox.classList.add('show');
+            document.getElementById('alertIcon').className = type==='error'?'fas fa-exclamation-circle':'fas fa-check-circle';
+            document.getElementById('alertTitle').innerText = type==='error'?'Error':'Success';
+            document.getElementById('alertMessage').innerText = message;
+            alertBox.className = 'custom-alert ' + type + ' show';
             setTimeout(() => { alertBox.classList.remove('show'); }, 4000);
         }
 
@@ -407,74 +453,89 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
             showSystemAlert("<?php echo addslashes($errorMessage); ?>", 'error');
         <?php endif; ?>
 
-        // --- UPLOAD LOGIC ---
-        let selectedFiles = [];
-        function handleFileSelect(event) {
+        // --- UPLOAD LOGIC (DUAL HANDLER) ---
+        let selectedImages = [];
+        let selectedReports = [];
+
+        function handleFileSelect(event, type) {
             const newFiles = Array.from(event.target.files);
-            selectedFiles = selectedFiles.concat(newFiles);
-            updateFileInput();
-            renderPreview();
+            if (type === 'image') {
+                selectedImages = selectedImages.concat(newFiles);
+                updateFileInput('case_images', selectedImages);
+                renderPreview('preview_container', selectedImages, 'image');
+            } else {
+                selectedReports = selectedReports.concat(newFiles);
+                updateFileInput('medical_reports', selectedReports);
+                renderPreview('report_preview_container', selectedReports, 'report');
+            }
         }
-        function updateFileInput() {
+
+        function updateFileInput(id, files) {
             const dt = new DataTransfer();
-            selectedFiles.forEach(file => dt.items.add(file));
-            document.getElementById('case_images').files = dt.files;
+            files.forEach(f => dt.items.add(f));
+            document.getElementById(id).files = dt.files;
         }
-        function renderPreview() {
-            const container = document.getElementById('preview_container');
+
+        function renderPreview(containerId, files, type) {
+            const container = document.getElementById(containerId);
             container.innerHTML = '';
-            selectedFiles.forEach((file, index) => {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const item = document.createElement('div');
-                    item.className = 'preview-item';
-                    item.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-img-btn" onclick="removeFile(${index})"><i class="fas fa-times"></i></button>`;
-                    container.appendChild(item);
+            files.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.className = 'preview-item';
+                
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        item.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-img-btn" onclick="removeFile(${index}, '${type}')"><i class="fas fa-times"></i></button>`;
+                    };
+                    reader.readAsDataURL(file);
+                } else if (file.type === 'application/pdf') {
+                    // PDF Icon
+                    item.innerHTML = `<i class="fas fa-file-pdf preview-file-icon"></i><div style="font-size:10px; position:absolute; bottom:2px; left:2px; right:2px; white-space:nowrap; overflow:hidden;">${file.name}</div><button type="button" class="remove-img-btn" onclick="removeFile(${index}, '${type}')"><i class="fas fa-times"></i></button>`;
                 }
-                reader.readAsDataURL(file);
+                container.appendChild(item);
             });
         }
-        function removeFile(index) {
-            selectedFiles.splice(index, 1);
-            updateFileInput();
-            renderPreview();
+
+        function removeFile(index, type) {
+            if (type === 'image') {
+                selectedImages.splice(index, 1);
+                updateFileInput('case_images', selectedImages);
+                renderPreview('preview_container', selectedImages, 'image');
+            } else {
+                selectedReports.splice(index, 1);
+                updateFileInput('medical_reports', selectedReports);
+                renderPreview('report_preview_container', selectedReports, 'report');
+            }
         }
+
         function clearFormCustom() {
             document.getElementById('addSpecialCaseForm').reset();
-            selectedFiles = [];
-            updateFileInput();
-            renderPreview();
+            selectedImages = []; selectedReports = [];
+            updateFileInput('case_images', []); updateFileInput('medical_reports', []);
+            document.getElementById('preview_container').innerHTML = '';
+            document.getElementById('report_preview_container').innerHTML = '';
             clearFormErrors();
             document.getElementById('bank_counter').innerText = '';
         }
 
         // --- VALIDATION HELPERS ---
-        function showFieldError(inputId, message) {
-            const input = document.getElementById(inputId);
-            if (!input) return;
+        function showFieldError(id, msg) {
+            const el = document.getElementById(id);
+            if(!el) return;
+            if(id === 'case_images') document.getElementById('case_images_box').classList.add('input-error');
+            else el.classList.add('input-error');
             
-            if (inputId === 'case_images') {
-                const uploadBox = document.getElementById('case_images_box');
-                if (uploadBox) {
-                    uploadBox.classList.add('input-error');
-                    let parent = uploadBox.parentNode;
-                    let errorDiv = parent.querySelector('.inline-error');
-                    if (!errorDiv) { errorDiv = document.createElement('div'); errorDiv.className = 'inline-error'; parent.appendChild(errorDiv); }
-                    errorDiv.textContent = message;
-                }
-                return;
-            }
-
-            input.classList.add('input-error');
-            let parent = input.parentNode;
-            if (parent.classList.contains('phone-format')) parent = parent.parentNode;
-            let errorDiv = parent.querySelector('.inline-error');
-            if (!errorDiv) { errorDiv = document.createElement('div'); errorDiv.className = 'inline-error'; parent.appendChild(errorDiv); }
-            errorDiv.textContent = message;
+            let p = (id === 'case_images' || id === 'medical_reports') ? el.parentNode.parentNode : el.parentNode;
+            if(el.parentNode.classList.contains('phone-format')) p = el.parentNode.parentNode;
+            
+            let err = p.querySelector('.inline-error');
+            if(!err) { err = document.createElement('div'); err.className='inline-error'; p.appendChild(err); }
+            err.textContent = msg;
         }
         function clearFormErrors() {
-            document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
-            document.querySelectorAll('.inline-error').forEach(el => el.remove());
+            document.querySelectorAll('.input-error').forEach(e => e.classList.remove('input-error'));
+            document.querySelectorAll('.inline-error').forEach(e => e.remove());
         }
 
         const bankRules = {
@@ -519,7 +580,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
             return "";
         }
 
-        // UPDATED: Exact logic from branch_add.php
         function validatePhoneDetailed(val) {
             if (!val.includes('-')) return "Missing hyphen symbol ( - ). Please use the dash key.";
             const parts = val.split('-'); 
@@ -550,8 +610,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
                 if(!el.value.trim()) { showFieldError(id, "This field is required."); hasError=true; }
             });
 
-            if(selectedFiles.length === 0) {
-                showFieldError('case_images', "At least one image is required.");
+            if(selectedImages.length === 0) {
+                showFieldError('case_images', "At least one main image is required.");
                 hasError=true;
             }
 
@@ -569,7 +629,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
                 if (err) { showFieldError('contact_email', err); hasError = true; }
             }
 
-            // Phone Validation (Updated)
+            // Phone Validation
             const phone = document.getElementById('contact_number');
             if(phone.value.trim()) {
                 const err = validatePhoneDetailed(phone.value.trim());
@@ -607,15 +667,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_special_case'])) {
             }
         });
 
-        // Phone Input
         document.getElementById('contact_number').addEventListener('input', function() {
             let val = this.value.replace(/\D/g, '');
             if (val.length > 11) val = val.substring(0, 11);
             if (val.length > 2) val = val.substring(0, 2) + '-' + val.substring(2);
             this.value = val;
         });
-
-        // Start Date Logic
+        
         document.getElementById('start_date').addEventListener('change', function() {
             const today = new Date().setHours(0,0,0,0);
             const sel = new Date(this.value).setHours(0,0,0,0);

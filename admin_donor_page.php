@@ -60,11 +60,11 @@ $whereConditions[] = "d.Is_Deleted = 0";
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $searchTerm = $conn->real_escape_string($_GET['search']);
     $whereConditions[] = "(d.Donor_Name LIKE '%$searchTerm%' 
-                           OR d.Donor_Email LIKE '%$searchTerm%' 
-                           OR d.Donor_ID LIKE '%$searchTerm%')";
+                            OR d.Donor_Email LIKE '%$searchTerm%' 
+                            OR d.Donor_ID LIKE '%$searchTerm%')";
 }
 
-// 2. Check Dynamic Filters
+// 2. Check Dynamic Filters (Sidebar/Dropdown)
 if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
     $filterType = $_GET['filter_type'];
     
@@ -98,6 +98,36 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
         elseif ($amountRange == 'high') $havingConditions[] = "TotalPayment > 500";
     }
 }
+
+// 3. HEADER SPECIFIC FILTERS (The requested changes)
+
+// Phone Prefix Filter from Header
+if (isset($_GET['header_filter_phone']) && !empty($_GET['header_filter_phone'])) {
+    $phonePrefix = $conn->real_escape_string($_GET['header_filter_phone']);
+    // Support searching for +601x or just 01x
+    $whereConditions[] = "(d.Donor_ContactNumber LIKE '%$phonePrefix%' OR d.Donor_ContactNumber LIKE '+6$phonePrefix%')";
+}
+
+// Total Payment Range Filter
+if (isset($_GET['header_filter_payment_min']) && $_GET['header_filter_payment_min'] !== '') {
+    $payMin = (float)$_GET['header_filter_payment_min'];
+    $havingConditions[] = "TotalPayment >= $payMin";
+}
+if (isset($_GET['header_filter_payment_max']) && $_GET['header_filter_payment_max'] !== '') {
+    $payMax = (float)$_GET['header_filter_payment_max'];
+    $havingConditions[] = "TotalPayment <= $payMax";
+}
+
+// Total Points Range Filter
+if (isset($_GET['header_filter_points_min']) && $_GET['header_filter_points_min'] !== '') {
+    $ptsMin = (int)$_GET['header_filter_points_min'];
+    $havingConditions[] = "CurrentPoints >= $ptsMin";
+}
+if (isset($_GET['header_filter_points_max']) && $_GET['header_filter_points_max'] !== '') {
+    $ptsMax = (int)$_GET['header_filter_points_max'];
+    $havingConditions[] = "CurrentPoints <= $ptsMax";
+}
+
 
 $sortMap = [
     'date' => 'd.Donor_RegisteredAt',
@@ -165,16 +195,21 @@ $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] :
 if ($page < 1) $page = 1;
 $start_from = ($page - 1) * $results_per_page;
 
+// Count Total Records (Updated to handle HAVING clause for Points and Payment)
 if (!empty($havingClause)) {
+    // We must select the calculated columns in the subquery for HAVING to work
     $count_sql = "SELECT COUNT(*) as total FROM (
-                    SELECT d.Donor_ID, (SELECT SUM(o.Order_Amount) FROM orders o WHERE o.Donor_ID = d.Donor_ID) as TotalPayment 
+                    SELECT d.Donor_ID, 
+                    COALESCE((SELECT SUM(o.Order_Amount) FROM orders o WHERE o.Donor_ID = d.Donor_ID), 0) as TotalPayment,
+                    COALESCE((SELECT Points_Total FROM point p WHERE p.Donor_ID = d.Donor_ID ORDER BY p.Points_Updated_At DESC LIMIT 1), 0) as CurrentPoints
                     FROM donor d $whereClause $havingClause
                   ) as sub";
 } else {
     $count_sql = "SELECT COUNT(*) as total FROM donor d $whereClause";
 }
 
-$total_records = $conn->query($count_sql)->fetch_assoc()['total'];
+$count_result = $conn->query($count_sql);
+$total_records = ($count_result) ? $count_result->fetch_assoc()['total'] : 0;
 $total_pages = ceil($total_records / $results_per_page);
 if ($page > $total_pages && $total_pages > 0) { $page = $total_pages; $start_from = ($page - 1) * $results_per_page; }
 
@@ -244,8 +279,27 @@ function formatAddress($donor) {
 // 辅助函数：构建URL
 function buildUrl($params = []) {
     $current = $_GET;
+    // Reset page to 1 when changing filters
+    unset($current['page']);
     $merged = array_merge($current, $params);
     return '?' . http_build_query($merged);
+}
+
+// Helper to generate hidden inputs for existing params (to use inside forms)
+function getHiddenInputs($exclude = []) {
+    $html = '';
+    $params = $_GET;
+    // Remove params that will be replaced by the form
+    foreach ($exclude as $key) {
+        unset($params[$key]);
+    }
+    // Also reset page
+    unset($params['page']);
+    
+    foreach ($params as $key => $value) {
+        $html .= '<input type="hidden" name="'.htmlspecialchars($key).'" value="'.htmlspecialchars($value).'">';
+    }
+    return $html;
 }
 
 $malaysiaStates = [ 'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu' ];
@@ -355,6 +409,17 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
         .sort-btn { display: block; width: 100%; padding: 10px; margin-bottom: 5px; border: 1px solid #eee; background: #fff; text-align: left; border-radius: 5px; cursor: pointer; transition: 0.2s; font-size: 14px; color: #555; text-decoration: none; }
         .sort-btn:hover { background: #f8f9fa; border-color: #ddd; color: var(--primary); }
         .sort-btn i { width: 20px; text-align: center; margin-right: 8px; }
+
+        /* New Styles for Range Inputs & Grid */
+        .filter-section-title { font-size: 14px; font-weight: 600; color: #555; margin: 15px 0 10px 0; border-top: 1px solid #eee; padding-top: 15px; }
+        .prefix-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .prefix-btn { padding: 8px 0; text-align: center; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; color: #333; text-decoration: none; transition: 0.2s; }
+        .prefix-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
+        .range-form { display: flex; flex-direction: column; gap: 10px; }
+        .range-inputs { display: flex; gap: 10px; }
+        .range-input { width: 50%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+        .range-submit { width: 100%; padding: 8px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .range-submit:hover { background: #e06c6c; }
     </style>
 </head>
 <body>
@@ -420,7 +485,9 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
 
                     <input type="text" name="search" class="search-input" placeholder="Search donors by name, ID or email..." value="<?php echo htmlspecialchars($searchTerm); ?>">
                     <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
-                    <?php if(!empty($filterType) || !empty($searchTerm)): ?><a href="admin_donor_page.php" class="btn btn-danger" style="background-color: #dc3545; padding: 10px 15px;" title="Clear Filters"><i class="fas fa-times"></i></a><?php endif; ?>
+                    <?php if(!empty($filterType) || !empty($searchTerm) || !empty($_GET['header_filter_phone']) || !empty($_GET['header_filter_payment_min']) || !empty($_GET['header_filter_points_min'])): ?>
+                        <a href="admin_donor_page.php" class="btn btn-danger" style="background-color: #dc3545; padding: 10px 15px;" title="Clear Filters"><i class="fas fa-times"></i></a>
+                    <?php endif; ?>
                 </form>
 
                 <table class="donor-table">
@@ -442,7 +509,7 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                                 TOTAL PAYMENT
                                 <?php if($sort=='payment') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?>
                             </th>
-                            <th style="text-align: center;" onclick="openModal('pointsSortModal')">
+                            <th style="text-align: right;" onclick="openModal('pointsSortModal')">
                                 TOTAL POINTS
                                 <?php if($sort=='points') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?>
                             </th>
@@ -469,7 +536,7 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                                 <td><div class="donor-details"><p><?php echo htmlspecialchars($donor['Donor_Email']); ?></p><p><?php echo htmlspecialchars($donor['Donor_ContactNumber']); ?></p></div></td>
                                 <td><div class="address-display"><?php echo formatAddress($donor); ?></div></td>
                                 <td>RM <?php echo number_format($donor['TotalPayment'], 2); ?></td>
-                                <td class="text-center"><?php echo number_format($donor['CurrentPoints']); ?> pts</td>
+                                <td style="text-align: right;"><?php echo number_format($donor['CurrentPoints']); ?> pts</td>
                                 <td>
                                     <div class="action-cell">
                                         <div class="action-menu">
@@ -516,6 +583,12 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                             $queryParams['sort'] = $sort;
                             $queryParams['order'] = $order;
                         }
+                        // Add the new header filters to pagination
+                        if(isset($_GET['header_filter_phone'])) $queryParams['header_filter_phone'] = $_GET['header_filter_phone'];
+                        if(isset($_GET['header_filter_payment_min'])) $queryParams['header_filter_payment_min'] = $_GET['header_filter_payment_min'];
+                        if(isset($_GET['header_filter_payment_max'])) $queryParams['header_filter_payment_max'] = $_GET['header_filter_payment_max'];
+                        if(isset($_GET['header_filter_points_min'])) $queryParams['header_filter_points_min'] = $_GET['header_filter_points_min'];
+                        if(isset($_GET['header_filter_points_max'])) $queryParams['header_filter_points_max'] = $_GET['header_filter_points_max'];
                         
                         $queryString = !empty($queryParams) ? '&' . http_build_query($queryParams) : '';
 
@@ -554,6 +627,20 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
             <div class="sort-header"><h3>Sort by Contact</h3><span class="sort-close" onclick="document.getElementById('contactSortModal').style.display='none'">&times;</span></div>
             <a href="<?php echo buildUrl(['sort'=>'contact', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-down"></i> Phone (Ascending)</a>
             <a href="<?php echo buildUrl(['sort'=>'contact', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-up"></i> Phone (Descending)</a>
+            
+            <div class="filter-section-title">Filter by Prefix</div>
+            <div class="prefix-grid">
+                <?php 
+                // Define prefixes 010 to 019
+                for($p=10; $p<=19; $p++) {
+                    $prefix = "0$p";
+                    // Build URL keeping existing params
+                    $url = buildUrl(['header_filter_phone' => $prefix]);
+                    $activeClass = (isset($_GET['header_filter_phone']) && $_GET['header_filter_phone'] == $prefix) ? 'background-color:var(--primary);color:white;' : '';
+                    echo "<a href='$url' class='prefix-btn' style='$activeClass'>+6$prefix</a>";
+                }
+                ?>
+            </div>
         </div>
     </div>
 
@@ -571,6 +658,16 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
             <div class="sort-header"><h3>Sort by Total Payment</h3><span class="sort-close" onclick="document.getElementById('paymentSortModal').style.display='none'">&times;</span></div>
             <a href="<?php echo buildUrl(['sort'=>'payment', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-amount-up"></i> Low to High</a>
             <a href="<?php echo buildUrl(['sort'=>'payment', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-amount-down"></i> High to Low</a>
+            
+            <div class="filter-section-title">Filter by Amount (RM)</div>
+            <form action="admin_donor_page.php" method="GET" class="range-form">
+                <?php echo getHiddenInputs(['header_filter_payment_min', 'header_filter_payment_max']); ?>
+                <div class="range-inputs">
+                    <input type="number" name="header_filter_payment_min" class="range-input" placeholder="Min" min="0" step="0.01" value="<?php echo isset($_GET['header_filter_payment_min']) ? htmlspecialchars($_GET['header_filter_payment_min']) : ''; ?>">
+                    <input type="number" name="header_filter_payment_max" class="range-input" placeholder="Max" min="0" step="0.01" value="<?php echo isset($_GET['header_filter_payment_max']) ? htmlspecialchars($_GET['header_filter_payment_max']) : ''; ?>">
+                </div>
+                <button type="submit" class="range-submit">Apply Filter</button>
+            </form>
         </div>
     </div>
 
@@ -579,6 +676,16 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
             <div class="sort-header"><h3>Sort by Points</h3><span class="sort-close" onclick="document.getElementById('pointsSortModal').style.display='none'">&times;</span></div>
             <a href="<?php echo buildUrl(['sort'=>'points', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-down"></i> Low to High</a>
             <a href="<?php echo buildUrl(['sort'=>'points', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-up"></i> High to Low</a>
+            
+            <div class="filter-section-title">Filter by Points</div>
+            <form action="admin_donor_page.php" method="GET" class="range-form">
+                <?php echo getHiddenInputs(['header_filter_points_min', 'header_filter_points_max']); ?>
+                <div class="range-inputs">
+                    <input type="number" name="header_filter_points_min" class="range-input" placeholder="Min" min="0" value="<?php echo isset($_GET['header_filter_points_min']) ? htmlspecialchars($_GET['header_filter_points_min']) : ''; ?>">
+                    <input type="number" name="header_filter_points_max" class="range-input" placeholder="Max" min="0" value="<?php echo isset($_GET['header_filter_points_max']) ? htmlspecialchars($_GET['header_filter_points_max']) : ''; ?>">
+                </div>
+                <button type="submit" class="range-submit">Apply Filter</button>
+            </form>
         </div>
     </div>
 

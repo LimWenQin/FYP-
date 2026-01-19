@@ -134,8 +134,31 @@ if (isset($_SESSION['admin_id'])) {
 // --- SEARCH & FILTER ---
 $searchTerm = "";
 $whereConditions = ["1=1"]; 
-// 修改：让 Processing 和 Pending 一样排在最前面
-$orderClause = "ORDER BY CASE WHEN r.Redemption_Status IN ('Pending', 'Processing') THEN 1 ELSE 2 END, r.Redemption_ID DESC"; 
+
+// --- Sorting Logic ---
+$sort = isset($_GET['sort']) ? $_GET['sort'] : 'default';
+$order = isset($_GET['order']) ? $_GET['order'] : 'asc';
+
+// Mapping sort keys to DB columns
+$sortMap = [
+    'id' => 'r.Redemption_ID',
+    'item' => 'rw.Reward_ItemName',
+    'donor' => 'd.Donor_Name',
+    'qty' => 'r.Redemption_Quantity',
+    'points' => 'r.Redemption_PointsSpent',
+    'status' => 'r.Redemption_Status'
+];
+
+$orderByCol = isset($sortMap[$sort]) ? $sortMap[$sort] : '';
+$orderDir = ($order === 'desc') ? 'DESC' : 'ASC';
+
+if ($orderByCol) {
+    $orderClause = "ORDER BY $orderByCol $orderDir";
+} else {
+    // Default Sorting: Pending first, then newest ID
+    $orderClause = "ORDER BY CASE WHEN r.Redemption_Status = 'Pending' THEN 1 ELSE 2 END, r.Redemption_ID DESC"; 
+}
+
 
 // 1. Keyword Search
 if (isset($_GET['search']) && !empty($_GET['search'])) {
@@ -145,12 +168,11 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                            OR rw.Reward_ItemName LIKE '%$searchTerm%')";
 }
 
-// 2. Specific Status Button
+// 2. Specific Status Button (Main Filter)
 if (isset($_GET['status']) && !empty($_GET['status'])) {
     $val = $conn->real_escape_string($_GET['status']);
     if ($val == 'Pending') {
-        // 如果选 Pending，也显示 Processing
-        $whereConditions[] = "r.Redemption_Status IN ('Pending', 'Processing')";
+        $whereConditions[] = "r.Redemption_Status = 'Pending'";
     } else {
         $whereConditions[] = "r.Redemption_Status = '$val'";
     }
@@ -171,24 +193,6 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
         if($val == 'newest') $orderClause = "ORDER BY r.Redemption_Created_At DESC";
         if($val == 'oldest') $orderClause = "ORDER BY r.Redemption_Created_At ASC";
     }
-    // ID Sorting
-    elseif ($filterType == 'id' && !empty($_GET['filter_val_id'])) {
-        $val = $_GET['filter_val_id'];
-        if($val == 'asc') $orderClause = "ORDER BY r.Redemption_ID ASC";
-        if($val == 'desc') $orderClause = "ORDER BY r.Redemption_ID DESC";
-    }
-    // Donor Name Sorting
-    elseif ($filterType == 'donor_name' && !empty($_GET['filter_val_donor'])) {
-        $val = $_GET['filter_val_donor'];
-        if($val == 'asc') $orderClause = "ORDER BY d.Donor_Name ASC";
-        if($val == 'desc') $orderClause = "ORDER BY d.Donor_Name DESC";
-    }
-    // Reward Item Sorting
-    elseif ($filterType == 'reward_item' && !empty($_GET['filter_val_reward'])) {
-        $val = $_GET['filter_val_reward'];
-        if($val == 'asc') $orderClause = "ORDER BY rw.Reward_ItemName ASC";
-        if($val == 'desc') $orderClause = "ORDER BY rw.Reward_ItemName DESC";
-    }
     // Phone Prefix
     elseif ($filterType == 'phone' && !empty($_GET['filter_val_phone'])) {
         $val = $conn->real_escape_string($_GET['filter_val_phone']);
@@ -201,7 +205,75 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
     }
 }
 
+// 4. HEADER SPECIFIC FILTERS (New Requirements)
+
+// 4.1 Date Filtering (Order Info)
+if (!empty($_GET['header_filter_date'])) {
+    $date = $conn->real_escape_string($_GET['header_filter_date']);
+    // Check against Created_At date
+    $whereConditions[] = "DATE(r.Redemption_Created_At) = '$date'";
+}
+if (!empty($_GET['header_filter_year'])) {
+    $y = $conn->real_escape_string($_GET['header_filter_year']);
+    $whereConditions[] = "YEAR(r.Redemption_Created_At) = '$y'";
+}
+if (!empty($_GET['header_filter_month']) && !empty($_GET['header_filter_year'])) {
+    $m = $conn->real_escape_string($_GET['header_filter_month']);
+    $whereConditions[] = "MONTH(r.Redemption_Created_At) = '$m'";
+}
+
+// 4.2 Quantity Range
+if (isset($_GET['header_filter_qty_min']) && $_GET['header_filter_qty_min'] !== '') {
+    $min = (int)$_GET['header_filter_qty_min'];
+    $whereConditions[] = "r.Redemption_Quantity >= $min";
+}
+if (isset($_GET['header_filter_qty_max']) && $_GET['header_filter_qty_max'] !== '') {
+    $max = (int)$_GET['header_filter_qty_max'];
+    $whereConditions[] = "r.Redemption_Quantity <= $max";
+}
+
+// 4.3 Points Range
+if (isset($_GET['header_filter_points_min']) && $_GET['header_filter_points_min'] !== '') {
+    $min = (int)$_GET['header_filter_points_min'];
+    $whereConditions[] = "r.Redemption_PointsSpent >= $min";
+}
+if (isset($_GET['header_filter_points_max']) && $_GET['header_filter_points_max'] !== '') {
+    $max = (int)$_GET['header_filter_points_max'];
+    $whereConditions[] = "r.Redemption_PointsSpent <= $max";
+}
+
+// 4.4 Header Status Filter (Direct Selection)
+if (isset($_GET['header_filter_status']) && !empty($_GET['header_filter_status'])) {
+    $statusVal = $conn->real_escape_string($_GET['header_filter_status']);
+    $whereConditions[] = "r.Redemption_Status = '$statusVal'";
+}
+
+
 $whereClause = "WHERE " . implode(" AND ", $whereConditions);
+
+// ==========================================
+// HELPER: Build URL for Sorting
+// ==========================================
+function buildUrl($params = []) {
+    $current = $_GET;
+    unset($current['page']); // Reset page when sorting
+    $merged = array_merge($current, $params);
+    return '?' . http_build_query($merged);
+}
+
+// Helper to generate hidden inputs for filtering forms (preserves other filters)
+function getHiddenInputs($exclude = []) {
+    $html = '';
+    $params = $_GET;
+    // Remove params replaced by form
+    foreach ($exclude as $key) { unset($params[$key]); }
+    unset($params['page']);
+    
+    foreach ($params as $key => $value) {
+        $html .= '<input type="hidden" name="'.htmlspecialchars($key).'" value="'.htmlspecialchars($value).'">';
+    }
+    return $html;
+}
 
 // ==========================================
 // EMAIL FUNCTIONS
@@ -288,73 +360,6 @@ function sendEmailViaSMTP($to, $subject, $body) {
 // --- HANDLE POST ACTIONS ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
-    // 1. HANDLE ADD ORDER
-    if (isset($_POST['add_order'])) {
-        $donorId = intval($_POST['donor_id']);
-        $rewardId = intval($_POST['reward_id']);
-        $quantity = intval($_POST['quantity']); // New Quantity
-        if ($quantity < 1) $quantity = 1; 
-        
-        $address1 = $conn->real_escape_string($_POST['address1']);
-        $address2 = $conn->real_escape_string($_POST['address2']); 
-        $address3 = $conn->real_escape_string($_POST['address3']); 
-        
-        $city = $conn->real_escape_string($_POST['city']);
-        $state = $conn->real_escape_string($_POST['state']);
-        $postal = $conn->real_escape_string($_POST['postal_code']);
-        
-        $contactRaw = $conn->real_escape_string($_POST['contact']);
-        $contact = "+60" . $contactRaw; 
-
-        // Get Reward Info
-        $rwQ = $conn->query("SELECT Reward_RequiredPoint, Reward_Stock FROM reward_item WHERE Reward_ID = $rewardId");
-        $rwRow = $rwQ->fetch_assoc();
-        $unitPoints = $rwRow['Reward_RequiredPoint'];
-        $currentStock = $rwRow['Reward_Stock'];
-
-        // Calculate Total Points Needed
-        $totalPointsNeeded = $unitPoints * $quantity;
-
-        // Get Donor Points
-        $ptQ = $conn->query("SELECT Points_Total, Points_ID FROM point WHERE Donor_ID = $donorId");
-        $ptRow = $ptQ->fetch_assoc();
-        $donorHasPoints = $ptRow ? $ptRow['Points_Total'] : 0;
-        
-        if ($currentStock < $quantity) {
-            $errorMessage = "Error: Item does not have enough stock (Requested: $quantity, Available: $currentStock).";
-        } elseif ($donorHasPoints < $totalPointsNeeded) {
-            $errorMessage = "Error: Donor does not have enough points (Has: $donorHasPoints, Need: $totalPointsNeeded).";
-        } else {
-            // Deduct Points
-            $newPoints = $donorHasPoints - $totalPointsNeeded;
-            $conn->query("UPDATE point SET Points_Total = $newPoints, Points_Updated_At = NOW() WHERE Donor_ID = $donorId");
-            // Deduct Stock
-            $conn->query("UPDATE reward_item SET Reward_Stock = Reward_Stock - $quantity WHERE Reward_ID = $rewardId");
-
-            // Insert (Added Redemption_Quantity)
-            $sql = "INSERT INTO redemption_order (
-                Donor_ID, Reward_ID, Redemption_Quantity, Redemption_PointsSpent, Redemption_Status, 
-                Redemption_Address1, Redemption_Address2, Redemption_Address3, 
-                Redemption_City, Redemption_State, Redemption_PostalCode, 
-                Redemption_ContactNumber, Redemption_Created_At, Redemption_Updated_At
-            ) VALUES (
-                $donorId, $rewardId, $quantity, $totalPointsNeeded, 'Pending',
-                '$address1', '$address2', '$address3', 
-                '$city', '$state', '$postal',
-                '$contact', NOW(), NOW()
-            )";
-            
-            if ($conn->query($sql)) {
-                $successMessage = "Order added successfully! Points deducted.";
-            } else {
-                $errorMessage = "Database Error: " . $conn->error;
-            }
-        }
-        
-        if (isset($successMessage)) { header("Location: redemption_order_management.php?success=" . urlencode($successMessage)); exit(); }
-        if (isset($errorMessage)) { header("Location: redemption_order_management.php?error=" . urlencode($errorMessage)); exit(); }
-    }
-
     // 2. HANDLE UPDATE ORDER (Manage)
     if (isset($_POST['action']) && $_POST['action'] == 'update_order') {
         $redemptionId = intval($_POST['redemption_id']);
@@ -363,7 +368,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         // Tracking & Est Days
         $tracking = isset($_POST['tracking_number']) ? $conn->real_escape_string($_POST['tracking_number']) : null;
-        $estDays = isset($_POST['estimated_days']) ? intval($_POST['estimated_days']) : 5; 
+        $estDays = isset($_POST['estimated_days']) ? intval($_POST['estimated_days']) : 3; 
         
         // Editable Info
         $eContact = $conn->real_escape_string($_POST['contact']);
@@ -477,10 +482,10 @@ if ($result->num_rows > 0) {
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
 $end_record = min($start_from + $results_per_page, $total_records);
 
-// --- STATS CALCULATION (Modified to include Processing in Pending) ---
+// --- STATS CALCULATION (Removed Processing) ---
 $statsSql = "SELECT 
                 COUNT(*) as TotalOrders,
-                SUM(CASE WHEN Redemption_Status IN ('Pending', 'Processing') THEN 1 ELSE 0 END) as PendingOrders,
+                SUM(CASE WHEN Redemption_Status = 'Pending' THEN 1 ELSE 0 END) as PendingOrders,
                 SUM(CASE WHEN Redemption_Status = 'Shipped' THEN 1 ELSE 0 END) as ShippedOrders,
                 SUM(CASE WHEN Redemption_Status = 'Completed' THEN 1 ELSE 0 END) as CompletedOrders,
                 SUM(Redemption_PointsSpent) as TotalPoints
@@ -488,45 +493,15 @@ $statsSql = "SELECT
 $statsResult = $conn->query($statsSql);
 $stats = $statsResult->fetch_assoc();
 
-// --- FETCH DATA FOR ADD MODAL ---
-$donorList = [];
-$dq = $conn->query("SELECT d.*, IFNULL(p.Points_Total, 0) as Points_Total 
-                    FROM donor d 
-                    LEFT JOIN point p ON d.Donor_ID = p.Donor_ID 
-                    WHERE d.Is_Deleted = 0 
-                    ORDER BY d.Donor_Name ASC");
-while($d = $dq->fetch_assoc()) { $donorList[] = $d; }
-
-$rewardList = [];
-$rq = $conn->query("SELECT Reward_ID, Reward_ItemName, Reward_RequiredPoint, Reward_Stock FROM reward_item WHERE Reward_Status = 'Active' AND Reward_Stock > 0 ORDER BY Reward_ItemName ASC");
-while($r = $rq->fetch_assoc()) { $rewardList[] = $r; }
-
 // --- DATA FOR FILTERS ---
 $phonePrefixes = ['011', '012', '013', '014', '015', '016', '017', '018', '019'];
 $cities = [];
 $cityQ = $conn->query("SELECT DISTINCT Redemption_City FROM redemption_order ORDER BY Redemption_City");
 while($c = $cityQ->fetch_assoc()) $cities[] = $c['Redemption_City'];
 
-// --- AI LOCATION HELPER ---
-$stateCoords = [
-    'Johor' => [1.9344, 103.3587], 'Kedah' => [6.1184, 100.3685], 'Kelantan' => [5.1500, 101.9742],
-    'Kuala Lumpur' => [3.1390, 101.6869], 'Melaka' => [2.1896, 102.2501], 'Negeri Sembilan' => [2.7258, 101.9424],
-    'Pahang' => [3.8126, 103.3256], 'Penang' => [5.4141, 100.3288], 'Perak' => [4.5921, 101.0901],
-    'Perlis' => [6.4449, 100.2048], 'Sabah' => [5.9788, 116.0753], 'Sarawak' => [1.5533, 110.3592],
-    'Selangor' => [3.0738, 101.5183], 'Terengganu' => [5.3117, 103.1324], 'Putrajaya' => [2.9264, 101.6964],
-    'Labuan' => [5.2831, 115.2308]
-];
-$malaysiaStates = array_keys($stateCoords);
-$hqState = "Kuala Lumpur"; 
-try {
-    $hqSql = "SELECT Headquarters_State FROM headquarters LIMIT 1";
-    $hqResult = $conn->query($hqSql);
-    if ($hqResult && $hqResult->num_rows > 0) {
-        $row = $hqResult->fetch_assoc();
-        if (!empty($row['Headquarters_State'])) $hqState = $row['Headquarters_State'];
-    }
-} catch (Exception $e) {}
-
+// --- Helper Data for Date Filters ---
+$currentYear = date('Y');
+$years = range($currentYear, 2020);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -579,11 +554,18 @@ try {
 
         /* Table */
         table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 15px; color: #888; font-size: 13px; border-bottom: 2px solid #f0f0f0; }
+        th { text-align: left; padding: 15px; color: #888; font-size: 13px; border-bottom: 2px solid #f0f0f0; user-select: none; cursor: pointer; }
+        th:hover { color: #F28585; }
         td { padding: 15px; border-bottom: 1px solid #f9f9f9; vertical-align: middle; }
         /* Center Alignment */
-        th:nth-child(3), td:nth-child(3),
-        th:nth-child(6), td:nth-child(6), th:nth-child(7), td:nth-child(7) { text-align: center; }
+        th:nth-child(3), td:nth-child(3) { text-align: center; } /* Donor */
+        th:nth-child(4), td:nth-child(4) { text-align: center; } /* Quantity */
+        th:nth-child(6), td:nth-child(6) { text-align: center; } /* Status */
+        th:nth-child(7), td:nth-child(7) { text-align: center; } /* Action */
+
+        /* Sort Header Styles */
+        .sort-header-content { display: flex; align-items: center; gap: 5px; }
+        th.center-header .sort-header-content { justify-content: center; }
 
         .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
         .status-pending { background: #fff3cd; color: #856404; }
@@ -625,7 +607,6 @@ try {
         .form-row { display: flex; gap: 15px; } 
 
         .ai-panel { background: #f0f8ff; border: 1px solid #cce5ff; border-radius: 8px; padding: 15px; margin-top: 15px; position: relative; overflow: hidden; }
-        .ai-title { color: #004085; font-weight: bold; font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
         .ai-data { display: flex; gap: 20px; }
         .ai-metric { flex: 1; }
         .ai-metric span { font-size: 11px; color: #666; display: block; }
@@ -656,6 +637,28 @@ try {
         .close-lightbox:hover { color: #bbb; }
         
         .item-preview-row { display: flex; gap: 15px; align-items: center; margin-bottom: 20px; background: #fafafa; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
+
+        /* --- Sort Modal Styles (New) --- */
+        .sort-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 2000; justify-content: center; align-items: center; }
+        .sort-modal-content { background: white; width: 300px; border-radius: 10px; padding: 20px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); animation: fadeIn 0.2s; }
+        .sort-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .sort-header h3 { margin: 0; font-size: 16px; color: #333; }
+        .sort-close { cursor: pointer; font-size: 20px; color: #999; }
+        .sort-btn { display: block; width: 100%; padding: 10px; margin-bottom: 5px; border: 1px solid #eee; background: #fff; text-align: left; border-radius: 5px; cursor: pointer; transition: 0.2s; font-size: 14px; color: #555; text-decoration: none; }
+        .sort-btn:hover { background: #f8f9fa; border-color: #ddd; color: #F28585; }
+        .sort-btn i { width: 20px; text-align: center; margin-right: 8px; }
+
+        /* New Range/Filter Styles */
+        .filter-section-title { font-size: 14px; font-weight: 600; color: #555; margin: 15px 0 10px 0; border-top: 1px solid #eee; padding-top: 15px; }
+        .range-form { display: flex; flex-direction: column; gap: 10px; }
+        .range-inputs { display: flex; gap: 10px; }
+        .range-input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+        .range-submit { width: 100%; padding: 8px; background: #F28585; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .range-submit:hover { background: #e06c6c; }
+        .go-btn { padding: 8px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
+        .status-btn { display: block; width: 100%; padding: 10px; margin-bottom: 5px; border: 1px solid #eee; background: #fff; border-radius: 5px; text-decoration: none; color: #333; text-align: left; font-size: 13px; transition: 0.2s; }
+        .status-btn:hover { background: #f8f9fa; border-color: #ddd; }
+        .status-btn span { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 10px; }
     </style>
 </head>
 <body>
@@ -695,7 +698,7 @@ try {
                         <a href="redemption_order_management.php?status=Pending" class="btn btn-light-pending">
                             <i class="fas fa-filter"></i> Show Pending Only
                         </a>
-                        <button class="btn btn-primary" onclick="openAddOrderModal()"><i class="fas fa-plus"></i> Add Redemption</button>
+                        <a href="redemption_order_add.php" class="btn btn-primary"><i class="fas fa-plus"></i> Add Redemption</a>
                         <a href="redemption_order_management.php?export=excel" class="btn btn-success"><i class="fas fa-download"></i> Export Data</a>
                     </div>
                 </div>
@@ -707,9 +710,6 @@ try {
                             <option value="">Filter By...</option>
                             <option value="status" <?php if(isset($_GET['filter_type']) && $_GET['filter_type'] == 'status') echo 'selected'; ?>>Status</option>
                             <option value="date" <?php if(isset($_GET['filter_type']) && $_GET['filter_type'] == 'date') echo 'selected'; ?>>Date</option>
-                            <option value="id" <?php if(isset($_GET['filter_type']) && $_GET['filter_type'] == 'id') echo 'selected'; ?>>Order ID</option>
-                            <option value="donor_name" <?php if(isset($_GET['filter_type']) && $_GET['filter_type'] == 'donor_name') echo 'selected'; ?>>Donor Name</option>
-                            <option value="reward_item" <?php if(isset($_GET['filter_type']) && $_GET['filter_type'] == 'reward_item') echo 'selected'; ?>>Reward Item</option>
                             <option value="phone" <?php if(isset($_GET['filter_type']) && $_GET['filter_type'] == 'phone') echo 'selected'; ?>>Phone Prefix</option>
                             <option value="city" <?php if(isset($_GET['filter_type']) && $_GET['filter_type'] == 'city') echo 'selected'; ?>>City</option>
                         </select>
@@ -717,29 +717,50 @@ try {
 
                     <div id="filter_status" class="secondary-filter"><select name="filter_val_status" class="filter-select"><option value="">Select Status...</option><option value="Pending">Pending</option><option value="Shipped">Shipped</option><option value="Completed">Completed</option><option value="Cancelled">Cancelled</option></select></div>
                     <div id="filter_date" class="secondary-filter"><select name="filter_val_date" class="filter-select"><option value="newest">Newest First</option><option value="oldest">Oldest First</option></select></div>
-                    <div id="filter_id" class="secondary-filter"><select name="filter_val_id" class="filter-select"><option value="asc">ID (Ascending)</option><option value="desc">ID (Descending)</option></select></div>
-                    <div id="filter_donor_name" class="secondary-filter"><select name="filter_val_donor" class="filter-select"><option value="asc">Name (A-Z)</option><option value="desc">Name (Z-A)</option></select></div>
-                    <div id="filter_reward_item" class="secondary-filter"><select name="filter_val_reward" class="filter-select"><option value="asc">Item (A-Z)</option><option value="desc">Item (Z-A)</option></select></div>
                     <div id="filter_phone" class="secondary-filter"><select name="filter_val_phone" class="filter-select"><option value="">Select Prefix...</option><?php foreach($phonePrefixes as $p) echo "<option value='$p'>+6$p</option>"; ?></select></div>
                     <div id="filter_city" class="secondary-filter"><select name="filter_val_city" class="filter-select"><option value="">Select City...</option><?php foreach($cities as $c) echo "<option value='$c'>$c</option>"; ?></select></div>
 
                     <input type="text" name="search" class="search-input" placeholder="Search Order ID, Donor or Item..." value="<?php echo htmlspecialchars($searchTerm); ?>">
                     <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
-                    <?php if(!empty($searchTerm) || isset($_GET['filter_type']) || isset($_GET['status'])): ?>
+                    <?php if(!empty($searchTerm) || isset($_GET['filter_type']) || isset($_GET['status']) || isset($_GET['sort']) || isset($_GET['header_filter_date']) || isset($_GET['header_filter_year'])): ?>
                         <a href="redemption_order_management.php" class="btn btn-danger" style="padding:10px 15px;"><i class="fas fa-times"></i></a>
                     <?php endif; ?>
                 </form>
-
+                
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
                         <tr style="border-bottom: 2px solid #f0f0f0;">
-                            <th style="padding: 15px; color: #888; font-size: 13px;">ORDER INFO</th>
-                            <th style="padding: 15px; color: #888; font-size: 13px;">ITEM REDEEMED</th>
-                            <th style="padding: 15px; color: #888; font-size: 13px; text-align:center;">DONOR</th> 
-                            <th style="padding: 15px; color: #888; font-size: 13px;">QTY</th>
-                            <th style="padding: 15px; color: #888; font-size: 13px;">POINTS</th>
-                            <th style="padding: 15px; color: #888; font-size: 13px; text-align:center;">STATUS</th> 
-                            <th style="padding: 15px; color: #888; font-size: 13px; text-align:center;">ACTION</th>
+                            <th style="padding: 15px;" onclick="openModal('idSortModal')">
+                                <div class="sort-header-content">
+                                    ORDER INFO / DATE <?php if($sort=='id') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort" style="color:#ccc; font-size:11px;"></i>'; ?>
+                                </div>
+                            </th>
+                            <th style="padding: 15px;" onclick="openModal('itemSortModal')">
+                                <div class="sort-header-content">
+                                    ITEM REDEEMED <?php if($sort=='item') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort" style="color:#ccc; font-size:11px;"></i>'; ?>
+                                </div>
+                            </th>
+                            <th style="padding: 15px;" class="center-header" onclick="openModal('donorSortModal')">
+                                <div class="sort-header-content">
+                                    DONOR <?php if($sort=='donor') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort" style="color:#ccc; font-size:11px;"></i>'; ?>
+                                </div>
+                            </th> 
+                            <th style="padding: 15px;" class="center-header" onclick="openModal('qtySortModal')">
+                                <div class="sort-header-content">
+                                    QUANTITY <?php if($sort=='qty') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort" style="color:#ccc; font-size:11px;"></i>'; ?>
+                                </div>
+                            </th>
+                            <th style="padding: 15px;" onclick="openModal('pointsSortModal')">
+                                <div class="sort-header-content">
+                                    POINTS <?php if($sort=='points') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort" style="color:#ccc; font-size:11px;"></i>'; ?>
+                                </div>
+                            </th>
+                            <th style="padding: 15px;" class="center-header" onclick="openModal('statusSortModal')">
+                                <div class="sort-header-content">
+                                    STATUS <?php if($sort=='status') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort" style="color:#ccc; font-size:11px;"></i>'; ?>
+                                </div>
+                            </th> 
+                            <th style="padding: 15px; text-align:center;">ACTION</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -774,7 +795,7 @@ try {
                                         <div style="font-weight: 500;"><?php echo htmlspecialchars($order['Donor_Name']); ?></div>
                                         <div style="font-size: 12px; color: #888;"><?php echo htmlspecialchars($order['Donor_Email']); ?></div>
                                     </td>
-                                    <td style="padding: 15px; vertical-align: top;">
+                                    <td style="padding: 15px; vertical-align: top; text-align:center;">
                                         <?php echo $order['Redemption_Quantity']; ?>
                                     </td>
                                     <td style="padding: 15px; vertical-align: top; color: #dc3545; font-weight: bold;">
@@ -801,9 +822,9 @@ try {
                                                     // Fix for JS syntax errors with quotes in data
                                                     $orderJson = htmlspecialchars(json_encode($order), ENT_QUOTES, 'UTF-8'); 
                                                     
-                                                    // 修复：确保 Pending 和 Processing 状态下都显示 Process 按钮
+                                                    // Only show Process/Manage for 'Pending'
                                                     $statusCheck = trim($order['Redemption_Status']);
-                                                    $isPending = (strcasecmp($statusCheck, 'Pending') === 0 || strcasecmp($statusCheck, 'Processing') === 0);
+                                                    $isPending = (strcasecmp($statusCheck, 'Pending') === 0);
                                                     
                                                     if ($isPending) {
                                                         echo "<div onclick='openManageModal($orderJson)'><i class='fas fa-tasks'></i> Process / Manage Order</div>";
@@ -856,85 +877,108 @@ try {
         </div>
     </div>
 
-    <div class="modal" id="addOrderModal">
-        <div class="modal-content">
-            <div class="modal-header"><h2>Add Redemption Order</h2><button onclick="closeModal('addOrderModal')" style="border:none; background:none; font-size:24px; cursor:pointer;">&times;</button></div>
-            <div class="modal-body">
-                <form method="POST" action="redemption_order_management.php" id="addOrderForm" onsubmit="return validateAddOrder(event)" novalidate>
-                    <input type="hidden" name="add_order" value="1">
-                    
-                    <div class="form-group">
-                        <label class="form-label">Select Donor <span style="color:red">*</span></label>
-                        <select name="donor_id" class="form-select" required id="add_donor_select" style="width: 100%;">
-                            <option value="">-- Choose Donor --</option>
-                            <?php foreach($donorList as $d): ?>
-                                <option value="<?php echo $d['Donor_ID']; ?>" 
-                                        data-points="<?php echo $d['Points_Total']; ?>"
-                                        data-contact="<?php echo htmlspecialchars($d['Donor_ContactNumber']); ?>"
-                                        data-address1="<?php echo htmlspecialchars($d['Donor_Address1']); ?>"
-                                        data-address2="<?php echo htmlspecialchars($d['Donor_Address2']); ?>"
-                                        data-address3="<?php echo htmlspecialchars($d['Donor_Address3']); ?>"
-                                        data-city="<?php echo htmlspecialchars($d['Donor_City']); ?>"
-                                        data-state="<?php echo htmlspecialchars($d['Donor_State']); ?>"
-                                        data-postal="<?php echo htmlspecialchars($d['Donor_PostalCode']); ?>">
-                                    <?php echo htmlspecialchars($d['Donor_Name']) . " (" . $d['Donor_ICNumber'] . ") - " . $d['Points_Total'] . " pts"; ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <div class="register-hint">
-                            <i class="fas fa-info-circle"></i> Donor doesn't have an account? <a href="admin_donor_page.php">Register Donor Here</a>
-                        </div>
-                    </div>
+    <div id="idSortModal" class="sort-modal" onclick="closeModal(event, 'idSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Sort by Date</h3><span class="sort-close" onclick="document.getElementById('idSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'id', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-down"></i> Oldest First</a>
+            <a href="<?php echo buildUrl(['sort'=>'id', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-up"></i> Newest First</a>
+            
+            <div class="filter-section-title">Filter by Specific Date</div>
+            <form action="redemption_order_management.php" method="GET" class="range-form">
+                <?php echo getHiddenInputs(['header_filter_date', 'header_filter_year', 'header_filter_month']); ?>
+                <div class="range-inputs">
+                    <input type="date" name="header_filter_date" class="range-input" value="<?php echo isset($_GET['header_filter_date']) ? $_GET['header_filter_date'] : ''; ?>">
+                    <button type="submit" class="go-btn">Go</button>
+                </div>
+            </form>
 
-                    <div class="form-row">
-                        <div class="form-group" style="flex:2;">
-                            <label class="form-label">Select Reward Item <span style="color:red">*</span></label>
-                            <select name="reward_id" id="add_reward_id" class="form-select" required onchange="calcPoints()">
-                                <option value="" data-points="0">-- Choose Reward --</option>
-                                <?php foreach($rewardList as $r): ?>
-                                    <option value="<?php echo $r['Reward_ID']; ?>" data-points="<?php echo $r['Reward_RequiredPoint']; ?>">
-                                        <?php echo htmlspecialchars($r['Reward_ItemName']) . " - " . $r['Reward_RequiredPoint'] . " pts (Stock: " . $r['Reward_Stock'] . ")"; ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="form-group" style="flex:1;">
-                            <label class="form-label">Quantity <span style="color:red">*</span></label>
-                            <input type="number" name="quantity" id="add_quantity" class="form-input" value="1" min="1" required onchange="calcPoints()">
-                        </div>
-                    </div>
-                    <div style="margin-bottom:15px;" class="form-guide" id="pointsSummary">Total Points Required: 0</div>
+            <div class="filter-section-title">Filter by Month & Year</div>
+            <form action="redemption_order_management.php" method="GET" class="range-form">
+                <?php echo getHiddenInputs(['header_filter_date', 'header_filter_year', 'header_filter_month']); ?>
+                <div class="range-inputs" style="flex-direction:column; gap:5px;">
+                    <select name="header_filter_year" class="range-input">
+                        <option value="">All Years</option>
+                        <?php foreach($years as $yr) echo "<option value='$yr'".(isset($_GET['header_filter_year']) && $_GET['header_filter_year']==$yr ? ' selected' : '').">$yr</option>"; ?>
+                    </select>
+                    <select name="header_filter_month" class="range-input">
+                        <option value="">All Months</option>
+                        <?php 
+                        for($m=1; $m<=12; $m++) {
+                            $mVal = str_pad($m, 2, "0", STR_PAD_LEFT);
+                            $mName = date("F", mktime(0, 0, 0, $m, 10));
+                            echo "<option value='$mVal'".(isset($_GET['header_filter_month']) && $_GET['header_filter_month']==$mVal ? ' selected' : '').">$mName</option>";
+                        }
+                        ?>
+                    </select>
+                </div>
+                <button type="submit" class="range-submit">Apply Date Filter</button>
+            </form>
+        </div>
+    </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Contact Number <span style="color:red">*</span></label>
-                        <div class="phone-format">
-                            <span class="phone-prefix">+60</span>
-                            <input type="text" name="contact" id="add_contact" class="form-input phone-input" required placeholder="12-3456789" maxlength="11">
-                        </div>
-                    </div>
+    <div id="itemSortModal" class="sort-modal" onclick="closeModal(event, 'itemSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Sort by Item Name</h3><span class="sort-close" onclick="document.getElementById('itemSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'item', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-alpha-down"></i> Name (A - Z)</a>
+            <a href="<?php echo buildUrl(['sort'=>'item', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-alpha-up"></i> Name (Z - A)</a>
+        </div>
+    </div>
 
-                    <div style="border-top:1px solid #eee; margin:15px 0; padding-top:10px;">
-                        <h4 style="margin-top:0; margin-bottom:10px; font-size:14px;">Shipping Address</h4>
-                        <div class="form-group"><label class="form-label">Address Line 1 <span style="color:red">*</span></label><input type="text" name="address1" id="add_address1" class="form-input" required></div>
-                        <div class="form-group"><label class="form-label">Address Line 2 <span style="color:red">*</span></label><input type="text" name="address2" id="add_address2" class="form-input" required></div>
-                        <div class="form-group"><label class="form-label">Address Line 3</label><input type="text" name="address3" id="add_address3" class="form-input"></div>
+    <div id="donorSortModal" class="sort-modal" onclick="closeModal(event, 'donorSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Sort by Donor Name</h3><span class="sort-close" onclick="document.getElementById('donorSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'donor', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-alpha-down"></i> Name (A - Z)</a>
+            <a href="<?php echo buildUrl(['sort'=>'donor', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-alpha-up"></i> Name (Z - A)</a>
+        </div>
+    </div>
 
-                        <div style="display:flex; gap:10px;">
-                            <div class="form-group" style="flex:1"><label class="form-label">Postal Code <span style="color:red">*</span></label><input type="text" name="postal_code" id="add_postal_code" class="form-input" required></div>
-                            <div class="form-group" style="flex:1"><label class="form-label">City <span style="color:red">*</span></label><input type="text" name="city" id="add_city" class="form-input" required></div>
-                        </div>
+    <div id="qtySortModal" class="sort-modal" onclick="closeModal(event, 'qtySortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Sort by Quantity</h3><span class="sort-close" onclick="document.getElementById('qtySortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'qty', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-amount-up"></i> Low to High</a>
+            <a href="<?php echo buildUrl(['sort'=>'qty', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-amount-down"></i> High to Low</a>
+            
+            <div class="filter-section-title">Filter by Range</div>
+            <form action="redemption_order_management.php" method="GET" class="range-form">
+                <?php echo getHiddenInputs(['header_filter_qty_min', 'header_filter_qty_max']); ?>
+                <div class="range-inputs">
+                    <input type="number" name="header_filter_qty_min" class="range-input" placeholder="Min" min="1" value="<?php echo isset($_GET['header_filter_qty_min']) ? htmlspecialchars($_GET['header_filter_qty_min']) : ''; ?>">
+                    <input type="number" name="header_filter_qty_max" class="range-input" placeholder="Max" min="1" value="<?php echo isset($_GET['header_filter_qty_max']) ? htmlspecialchars($_GET['header_filter_qty_max']) : ''; ?>">
+                </div>
+                <button type="submit" class="range-submit">Apply Filter</button>
+            </form>
+        </div>
+    </div>
 
-                        <div class="form-group">
-                            <label class="form-label">State <span style="color:red">*</span></label>
-                            <select name="state" id="add_state_select" class="form-select" required>
-                                <option value="">Select State</option>
-                                <?php foreach($malaysiaStates as $s) echo "<option value='$s'>$s</option>"; ?>
-                            </select>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Create Order</button>
-                </form>
-            </div>
+    <div id="pointsSortModal" class="sort-modal" onclick="closeModal(event, 'pointsSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Sort by Points</h3><span class="sort-close" onclick="document.getElementById('pointsSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'points', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-down"></i> Low to High</a>
+            <a href="<?php echo buildUrl(['sort'=>'points', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-up"></i> High to Low</a>
+            
+            <div class="filter-section-title">Filter by Points Range</div>
+            <form action="redemption_order_management.php" method="GET" class="range-form">
+                <?php echo getHiddenInputs(['header_filter_points_min', 'header_filter_points_max']); ?>
+                <div class="range-inputs">
+                    <input type="number" name="header_filter_points_min" class="range-input" placeholder="Min" min="0" value="<?php echo isset($_GET['header_filter_points_min']) ? htmlspecialchars($_GET['header_filter_points_min']) : ''; ?>">
+                    <input type="number" name="header_filter_points_max" class="range-input" placeholder="Max" min="0" value="<?php echo isset($_GET['header_filter_points_max']) ? htmlspecialchars($_GET['header_filter_points_max']) : ''; ?>">
+                </div>
+                <button type="submit" class="range-submit">Apply Filter</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="statusSortModal" class="sort-modal" onclick="closeModal(event, 'statusSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Sort by Status</h3><span class="sort-close" onclick="document.getElementById('statusSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'status', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-alpha-down"></i> Status (A - Z)</a>
+            <a href="<?php echo buildUrl(['sort'=>'status', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-alpha-up"></i> Status (Z - A)</a>
+            
+            <div class="filter-section-title">Filter by Status</div>
+            <a href="<?php echo buildUrl(['header_filter_status'=>'Pending']); ?>" class="status-btn"><span style="background:#ffc107;"></span> Pending</a>
+            <a href="<?php echo buildUrl(['header_filter_status'=>'Shipped']); ?>" class="status-btn"><span style="background:#17a2b8;"></span> Shipped</a>
+            <a href="<?php echo buildUrl(['header_filter_status'=>'Cancelled']); ?>" class="status-btn"><span style="background:#dc3545;"></span> Cancelled</a>
+            <a href="<?php echo buildUrl(['header_filter_status'=>'Completed']); ?>" class="status-btn"><span style="background:#28a745;"></span> Completed</a>
         </div>
     </div>
 
@@ -942,14 +986,14 @@ try {
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Manage Order #<span id="manageOrderId"></span></h2>
-                <button onclick="closeModal('manageModal')" style="border:none; background:none; font-size:24px; cursor:pointer;">&times;</button>
+                <button onclick="document.getElementById('manageModal').style.display='none'" style="border:none; background:none; font-size:24px; cursor:pointer;">&times;</button>
             </div>
             
             <div class="modal-body">
                 <form method="POST" action="redemption_order_management.php" id="manageForm">
                     <input type="hidden" name="action" value="update_order">
                     <input type="hidden" name="redemption_id" id="mFormId">
-                    <input type="hidden" name="estimated_days" id="hiddenEstDays" value="5">
+                    <input type="hidden" name="estimated_days" id="hiddenEstDays" value="3">
 
                     <div class="item-preview-row">
                         <div style="position:relative;">
@@ -981,10 +1025,8 @@ try {
                     <div class="form-group"><label class="form-label">State</label><input type="text" name="state" id="mState" class="form-input" readonly></div>
 
                     <div class="ai-panel">
-                        <div class="ai-title"><i class="fas fa-robot"></i> AI Logistics Intelligence</div>
                         <div class="ai-data">
-                            <div class="ai-metric"><span>Estimated Distance</span><strong id="aiDistance">Calculating...</strong></div>
-                            <div class="ai-metric"><span>Recommended Courier</span><strong id="aiCourier">Analyzing...</strong></div>
+                            <div class="ai-metric"><span>Courier</span><strong id="aiCourier">J&T Express</strong></div>
                             <div class="ai-metric"><span>Est. Delivery</span><strong id="aiTime">...</strong></div>
                         </div>
                     </div>
@@ -995,7 +1037,6 @@ try {
                         <select name="new_status" id="mStatusSelect" class="form-select" onchange="toggleTracking()">
                             <option value="Pending">Pending</option>
                             <option value="Shipped">Shipped (Approve)</option>
-                            <option value="Completed">Completed</option>
                             <option value="Cancelled">Cancelled (Reject)</option>
                         </select>
                     </div>
@@ -1028,38 +1069,17 @@ try {
     </div>
 
     <script>
-        // Global variables to store original address for comparison
-        let originalDonorAddress = "";
-
         // Init Select2
         $(document).ready(function() {
-            $('#add_donor_select').select2({ placeholder: "-- Choose Donor --", allowClear: true, dropdownParent: $('#addOrderModal') });
-            
-            // Auto-fill Address logic
-            $('#add_donor_select').on('change', function() {
-                var selected = $(this).find(':selected');
-                
-                // Store original for comparison
-                const addrString = (selected.data('address1') + "" + selected.data('address2') + "" + selected.data('address3') + "" + selected.data('city') + "" + selected.data('postal')).replace(/\s/g, '').toLowerCase();
-                originalDonorAddress = addrString;
-
-                $('input[name="address1"]').val(selected.data('address1'));
-                $('input[name="address2"]').val(selected.data('address2'));
-                $('input[name="address3"]').val(selected.data('address3'));
-                $('input[name="city"]').val(selected.data('city'));
-                $('input[name="postal_code"]').val(selected.data('postal'));
-                let c = selected.data('contact') + '';
-                if(c && c.startsWith('+60')) c = c.substring(3);
-                $('#add_contact').val(c);
-                if(selected.data('state')) $('select[name="state"]').val(selected.data('state')).change();
-                
-                calcPoints(); 
-            });
-            setupPhoneInput('add_contact');
-            setupPostcodeState('add_postal_code', 'add_state_select');
-            
             toggleFilterInputs();
             checkAlerts();
+            
+            // Close sort popups when clicking elsewhere
+            $(document).on('click', function(e) {
+                if (!$(e.target).closest('.sort-header').length) {
+                    // This is handled by openModal logic now
+                }
+            });
         });
 
         // Filter Logic
@@ -1075,94 +1095,16 @@ try {
                 }
             }
         }
-
-        // Calculate Points Logic
-        function calcPoints() {
-            const donorOpt = $('#add_donor_select').find(':selected');
-            const rewardOpt = document.getElementById('add_reward_id').selectedOptions[0];
-            const qtyInput = document.getElementById('add_quantity');
-            
-            let qty = parseInt(qtyInput.value);
-            if(isNaN(qty) || qty < 1) { qty = 1; qtyInput.value = 1; }
-
-            const unitPts = parseInt(rewardOpt.getAttribute('data-points') || 0);
-            const donorPts = parseInt(donorOpt.attr('data-points') || 0);
-            
-            const totalNeeded = unitPts * qty;
-            const summary = document.getElementById('pointsSummary');
-            
-            summary.innerText = "Total Points Required: " + totalNeeded + " (Donor Has: " + donorPts + ")";
-            
-            if(donorPts < totalNeeded) {
-                summary.style.color = 'red';
-                summary.style.fontWeight = 'bold';
-            } else {
-                summary.style.color = '#6c757d';
-                summary.style.fontWeight = 'normal';
-            }
+        
+        // Sorting Modal Toggle
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
         }
 
-        // Validate Add Order
-        function validateAddOrder(e) {
-            e.preventDefault();
-            let errors = [];
-            
-            const donorOpt = $('#add_donor_select').find(':selected');
-            const rewardOpt = document.getElementById('add_reward_id').selectedOptions[0];
-            const qty = parseInt(document.getElementById('add_quantity').value);
-            
-            const contact = document.getElementById('add_contact').value.trim();
-            const addr1 = document.getElementById('add_address1').value.trim();
-            const addr2 = document.getElementById('add_address2').value.trim(); 
-            const postal = document.getElementById('add_postal_code').value.trim();
-            const city = document.getElementById('add_city').value.trim();
-            const state = document.getElementById('add_state_select').value;
-
-            // Checks
-            if (!donorOpt.val()) errors.push("Donor is required.");
-            if (!rewardOpt.value) errors.push("Reward Item is required.");
-            if (!contact) errors.push("Contact Number is required.");
-            
-            if (!addr1) errors.push("Address Line 1 is required.");
-            if (!addr2) errors.push("Address Line 2 is required.");
-            if (!postal) errors.push("Postal Code is required.");
-            if (!city) errors.push("City is required.");
-            if (!state) errors.push("State is required.");
-
-            // Points Check
-            const unitPts = parseInt(rewardOpt.getAttribute('data-points') || 0);
-            const donorPts = parseInt(donorOpt.attr('data-points') || 0);
-            if (donorPts < (unitPts * qty)) {
-                errors.push("Donor does not have enough points.");
+        function closeModal(event, id) {
+            if (event.target.id === id) {
+                document.getElementById(id).style.display = 'none';
             }
-
-            if (errors.length > 0) {
-                showSystemError("Validation Error:<br>" + errors.join("<br>"));
-                return false;
-            }
-
-            // Address Change Check
-            const currAddrString = (addr1 + "" + addr2 + "" + document.getElementById('add_address3').value.trim() + "" + city + "" + postal).replace(/\s/g, '').toLowerCase();
-
-            if (originalDonorAddress !== "" && originalDonorAddress !== currAddrString) {
-                Swal.fire({
-                    title: 'Address Changed',
-                    text: "The delivery address is different from the donor's registered address. Do you want to proceed?",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#F28585',
-                    cancelButtonColor: '#d33',
-                    confirmButtonText: 'Yes',
-                    cancelButtonText: 'No'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        document.getElementById('addOrderForm').submit();
-                    }
-                });
-            } else {
-                document.getElementById('addOrderForm').submit();
-            }
-            return false;
         }
 
         // Lightbox
@@ -1177,8 +1119,6 @@ try {
             const src = document.getElementById('mItemImg').src;
             openLightbox(src);
         }
-
-        function openAddOrderModal() { document.getElementById('addOrderModal').style.display = 'flex'; }
         
         function openManageModal(order) {
             document.getElementById('manageOrderId').innerText = order.Redemption_ID;
@@ -1198,7 +1138,10 @@ try {
             document.getElementById('mPoints').innerText = order.Redemption_PointsSpent;
             document.getElementById('mItemImg').src = order.Reward_PhotoPath ? 'uploads/rewards/' + order.Reward_PhotoPath : 'uploads/rewards/default.jpg';
             
-            // --- 修复：如果状态是 Processing，在下拉菜单中自动选 Pending ---
+            // --- Update Logistics Info (No AI Distance) ---
+            updateLogisticsInfo(order.Redemption_State);
+
+            // --- Status Handling (Processing -> Pending) ---
             let currentStatus = order.Redemption_Status.trim();
             if (currentStatus === 'Processing') {
                 currentStatus = 'Pending';
@@ -1209,18 +1152,17 @@ try {
             document.getElementById('mCancelReason').value = order.Redemption_CancelReason || '';
             
             toggleTracking(); 
-            calculateAI(order.Redemption_State); 
             toggleEditInfo(false); // Reset edit state
 
-            // LOGIC: Disable management if not Pending OR Processing
+            // LOGIC: Disable management if not Pending
             const statusSelect = document.getElementById('mStatusSelect');
             const actionBtns = document.getElementById('actionButtonsGroup');
             const editBtn = document.getElementById('btnEditInfo');
             const trackingInput = document.getElementById('mTracking');
             const reasonInput = document.getElementById('mCancelReason');
 
-            // 检查逻辑：是否为待处理状态 (Pending 或 Processing)
-            const isPending = (order.Redemption_Status.trim() === 'Pending' || order.Redemption_Status.trim() === 'Processing');
+            // Only 'Pending' is editable. (Processing treated as Pending)
+            const isPending = (currentStatus === 'Pending');
 
             if (!isPending) {
                 // View Only Mode
@@ -1231,13 +1173,13 @@ try {
                 reasonInput.readOnly = true;
                 
                 // Show cancel reason field if cancelled
-                if (order.Redemption_Status === 'Cancelled') {
+                if (currentStatus === 'Cancelled') {
                     document.getElementById('cancelReasonGroup').style.display = 'block';
                 } else {
                     document.getElementById('cancelReasonGroup').style.display = 'none';
                 }
             } else {
-                // Edit Mode (Pending/Processing)
+                // Edit Mode (Pending)
                 statusSelect.disabled = false;
                 actionBtns.style.display = 'flex';
                 editBtn.style.display = 'block';
@@ -1272,34 +1214,6 @@ try {
             } else {
                 btnSave.style.display = 'none';
             }
-        }
-
-        function setupPhoneInput(inputId) {
-            const input = document.getElementById(inputId); if(!input) return;
-            input.addEventListener('input', function(e) { 
-                let val = this.value.replace(/\D/g, ''); if (val.length > 11) val = val.substring(0, 11); 
-                let newVal = val; if (val.length > 2) newVal = val.substring(0, 2) + '-' + val.substring(2); 
-                this.value = newVal; 
-            });
-        }
-
-        function setupPostcodeState(postcodeId, stateSelectId) {
-            const pcInput = document.getElementById(postcodeId); const stateSelect = document.getElementById(stateSelectId);
-            if (!pcInput || !stateSelect) return;
-            pcInput.addEventListener('input', function() {
-                const val = this.value.replace(/\D/g, '');
-                if (val.length >= 2) {
-                    const prefix = parseInt(val.substring(0, 2));
-                    let state = "";
-                    if (prefix >= 1 && prefix <= 2) state = "Perlis"; else if (prefix >= 5 && prefix <= 9) state = "Kedah"; else if (prefix >= 10 && prefix <= 14) state = "Penang";
-                    else if (prefix >= 15 && prefix <= 18) state = "Kelantan"; else if (prefix >= 20 && prefix <= 24) state = "Terengganu"; else if (prefix >= 25 && prefix <= 28) state = "Pahang";
-                    else if (prefix >= 30 && prefix <= 36) state = "Perak"; else if (prefix >= 40 && prefix <= 48) state = "Selangor"; else if (prefix >= 50 && prefix <= 60) state = "Kuala Lumpur";
-                    else if (prefix >= 62 && prefix <= 62) state = "Putrajaya"; else if (prefix >= 63 && prefix <= 68) state = "Selangor"; else if (prefix >= 70 && prefix <= 73) state = "Negeri Sembilan";
-                    else if (prefix >= 75 && prefix <= 78) state = "Melaka"; else if (prefix >= 79 && prefix <= 86) state = "Johor"; else if (prefix == 87) state = "Labuan";
-                    else if (prefix >= 88 && prefix <= 91) state = "Sabah"; else if (prefix >= 93 && prefix <= 98) state = "Sarawak";
-                    if (state) $(stateSelect).val(state).trigger('change');
-                }
-            });
         }
 
         function setStatus(status) {
@@ -1341,8 +1255,8 @@ try {
             const trackGrp = document.getElementById('trackingGroup');
             const reasonGrp = document.getElementById('cancelReasonGroup');
             
-            // Logic for fields visibility based on selected status
-            if(val === 'Shipped' || val === 'Completed') {
+            // Logic for fields visibility
+            if(val === 'Shipped') {
                 trackGrp.style.display = 'block';
                 reasonGrp.style.display = 'none';
             } else if (val === 'Cancelled') {
@@ -1365,36 +1279,26 @@ try {
             if (!e.target.matches('.menu-btn') && !e.target.matches('.menu-btn *')) { 
                 document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); 
             }
-            if(e.target == document.getElementById('addOrderModal')) closeModal('addOrderModal');
-            if(e.target == document.getElementById('manageModal')) closeModal('manageModal');
+            if(e.target == document.getElementById('manageModal')) document.getElementById('manageModal').style.display = 'none';
             if(e.target.id == 'imageLightbox') closeLightbox();
         }
-
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         
-        function calculateAI(donorState) {
-            let hqLat = 3.1390; let hqLng = 101.6869;
-            if (stateCoords[currentHqState]) { hqLat = stateCoords[currentHqState][0]; hqLng = stateCoords[currentHqState][1]; }
-            
-            let distText = "Unknown"; let courier = "Standard Post"; let time = "3-5 Days"; let daysInt = 5;
+        // --- Updated Logistics Logic ---
+        function updateLogisticsInfo(donorState) {
+            let courier = "J&T Express"; 
+            let time = "2-3 Days"; 
+            let daysInt = 3;
 
-            if (stateCoords[donorState]) {
-                const lat2 = stateCoords[donorState][0]; const lon2 = stateCoords[donorState][1];
-                const R = 6371; 
-                const dLat = (lat2 - hqLat) * (Math.PI/180);
-                const dLon = (lon2 - hqLng) * (Math.PI/180);
-                const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(hqLat*(Math.PI/180)) * Math.cos(lat2*(Math.PI/180)) * Math.sin(dLon/2) * Math.sin(dLon/2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                const d = Math.round(R * c);
-                
-                distText = "~" + d + " km";
-                
-                if (d < 50) { courier = "Lalamove / Grab"; time = "Same Day (1 Day)"; daysInt = 1; } 
-                else if (donorState === 'Sabah' || donorState === 'Sarawak' || donorState === 'Labuan') { courier = "Pos Laju (Air)"; time = "5-7 Days"; daysInt = 7; } 
-                else { courier = "J&T Express"; time = "2-3 Days"; daysInt = 3; }
+            // Simple check for East Malaysia states
+            const eastMalaysia = ['Sabah', 'Sarawak', 'Labuan'];
+            if (eastMalaysia.includes(donorState)) {
+                time = "5-6 Days";
+                daysInt = 6;
+            } else {
+                time = "2-3 Days";
+                daysInt = 3;
             }
             
-            document.getElementById('aiDistance').innerText = distText;
             document.getElementById('aiCourier').innerText = courier;
             document.getElementById('aiTime').innerText = time;
             document.getElementById('hiddenEstDays').value = daysInt; 
@@ -1416,9 +1320,6 @@ try {
             if(s && s.style.display === 'flex') setTimeout(() => { s.style.display='none'; }, 5000);
             if(e && e.style.display === 'flex') setTimeout(() => { e.style.display='none'; }, 5000);
         }
-        
-        const stateCoords = <?php echo json_encode($stateCoords); ?>;
-        const currentHqState = "<?php echo htmlspecialchars($hqState); ?>";
     </script>
 </body>
 </html>
