@@ -10,6 +10,14 @@ if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
 
 include 'dataconnection.php';
 
+// --- PHPMailer ---
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
+require 'PHPMailer/Exception.php';
+require 'PHPMailer/PHPMailer.php';
+require 'PHPMailer/SMTP.php';
+
 // --- DATA FOR DROPDOWNS ---
 $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'];
 
@@ -112,6 +120,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_donor'])) {
             if($conn->query("INSERT INTO donor ($cols) VALUES ($vals)")) {
                 $newId = $conn->insert_id;
                 $conn->query("INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES (0, 0, NOW(), $newId)");
+                
+                // --- SEND EMAIL LOGIC START ---
+                $mail = new PHPMailer(true);
+                try {
+                    $mail->isSMTP();
+                    $mail->Host = 'smtp.gmail.com';
+                    $mail->SMTPAuth = true;
+                    $mail->Username = 'lovebridge1201@gmail.com'; // Same as staff_add
+                    $mail->Password = 'odaj iwrz gfrt vven';      // Same as staff_add
+                    $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                    $mail->Port = 465;
+                    
+                    $mail->setFrom('lovebridge1201@gmail.com', 'Love Bridge Admin');
+                    $mail->addAddress($email, $donorName);
+                    
+                    $mail->isHTML(true);
+                    $mail->Subject = 'Welcome to Love Bridge';
+                    $mail->Body = "<h2>Welcome $donorName!</h2><p>Your temp password: <b>$rawPassword</b></p>";
+                    
+                    $mail->send();
+                } catch (Exception $e) {
+                    // Email failed but donor created, proceed as success
+                }
+                // --- SEND EMAIL LOGIC END ---
+
                 $saveSuccess = true;
             } else {
                 $errorMessage = "DB Error: " . $conn->error;

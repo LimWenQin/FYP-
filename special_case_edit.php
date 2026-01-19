@@ -23,7 +23,7 @@ if ($result->num_rows == 0) {
 }
 $case = $result->fetch_assoc();
 
-// --- DATA LISTS ---
+// Data Lists
 $categories = ['Medical','Disability Support','Emergency Relief','Elderly Care','Children Support','Other Cases'];
 $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis', 'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu'];
 $malaysiaBanks = [
@@ -34,29 +34,44 @@ $malaysiaBanks = [
     "Citibank" => "Citibank", "Bank Muamalat" => "Bank Muamalat", "Agrobank" => "Agrobank", "BSN" => "Bank Simpanan Nasional"
 ];
 
+// Reusing generic upload function for images
 function handleMultipleImageUpload($files) {
     $uploadedPaths = [];
     $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
     $uploadDir = 'uploads/cases/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
-    if (!is_array($files['name'])) {
-        $files = ['name'=>[$files['name']], 'type'=>[$files['type']], 'tmp_name'=>[$files['tmp_name']], 'error'=>[$files['error']]];
-    }
+    if (!is_array($files['name'])) { $files = ['name'=>[$files['name']], 'type'=>[$files['type']], 'tmp_name'=>[$files['tmp_name']], 'error'=>[$files['error']]]; }
     $count = count($files['name']);
     for ($i = 0; $i < $count; $i++) {
         if ($files['error'][$i] == 0 && in_array($files['type'][$i], $allowedTypes)) {
             $ext = pathinfo($files['name'][$i], PATHINFO_EXTENSION);
             $name = 'case_' . time() . '_' . uniqid() . '_' . $i . '.' . $ext;
-            if (move_uploaded_file($files['tmp_name'][$i], $uploadDir . $name)) {
-                $uploadedPaths[] = $uploadDir . $name;
-            }
+            if (move_uploaded_file($files['tmp_name'][$i], $uploadDir . $name)) $uploadedPaths[] = $uploadDir . $name;
+        }
+    }
+    return $uploadedPaths;
+}
+
+// Handler for Medical Reports
+function handleReportUpload($files) {
+    $uploadedPaths = [];
+    $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    $uploadDir = 'uploads/reports/';
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+    if (!is_array($files['name'])) { $files = ['name'=>[$files['name']], 'type'=>[$files['type']], 'tmp_name'=>[$files['tmp_name']], 'error'=>[$files['error']]]; }
+    $count = count($files['name']);
+    for ($i = 0; $i < $count; $i++) {
+        if ($files['error'][$i] == 0 && in_array($files['type'][$i], $allowedTypes)) {
+            $ext = pathinfo($files['name'][$i], PATHINFO_EXTENSION);
+            $name = 'report_' . time() . '_' . uniqid() . '_' . $i . '.' . $ext;
+            if (move_uploaded_file($files['tmp_name'][$i], $uploadDir . $name)) $uploadedPaths[] = $uploadDir . $name;
         }
     }
     return $uploadedPaths;
 }
 
 $errorMessage = "";
-$saveSuccess = false; // Flag
+$saveSuccess = false;
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_special_case'])) {
     
@@ -71,9 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_special_case'])
     
     $bankName = mysqli_real_escape_string($conn, $_POST['bank_name']);
     $bankAccount = mysqli_real_escape_string($conn, $_POST['bank_account']);
-
     $caseLocationName = mysqli_real_escape_string($conn, $_POST['case_location_name']);
-    
     $caseOrganizer = mysqli_real_escape_string($conn, $_POST['case_organizer']);
     $contactName = mysqli_real_escape_string($conn, $_POST['contact_name']);
     
@@ -82,7 +95,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_special_case'])
     $contactNumber = mysqli_real_escape_string($conn, $contactNumber);
 
     $contactEmail = mysqli_real_escape_string($conn, $_POST['contact_email']);
-    
     $addr1 = mysqli_real_escape_string($conn, $_POST['address1']);
     $addr2 = mysqli_real_escape_string($conn, $_POST['address2']);
     $addr3 = mysqli_real_escape_string($conn, $_POST['address3']);
@@ -92,20 +104,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_special_case'])
 
     $extraSql = isset($_POST['cancel_reason']) ? ", Cancel_Reason = '" . mysqli_real_escape_string($conn, $_POST['cancel_reason']) . "'" : "";
     
-    // Image Handling
+    // Images Logic
     $existingImages = json_decode($_POST['existing_images_json'] ?? "[]", true) ?: [];
     $newImages = isset($_FILES['case_images']) ? handleMultipleImageUpload($_FILES['case_images']) : [];
     $finalImages = array_merge($existingImages, $newImages);
     $finalJson = mysqli_real_escape_string($conn, json_encode(array_slice($finalImages, 0, 10)));
 
+    // Medical Reports Logic (Merge existing + new)
+    $existingReports = json_decode($_POST['existing_reports_json'] ?? "[]", true) ?: [];
+    $newReports = isset($_FILES['medical_reports']) ? handleReportUpload($_FILES['medical_reports']) : [];
+    $finalReports = array_merge($existingReports, $newReports);
+    $finalReportJson = mysqli_real_escape_string($conn, json_encode(array_slice($finalReports, 0, 5))); // Max 5
+
     if (empty($caseTitle) || empty($targetAmount) || empty($bankAccount)) {
         $errorMessage = "Required fields are missing.";
     } else {
-        $sql = "UPDATE special_case SET Case_Title='$caseTitle', Case_Category='$caseCategory', Case_Description='$caseDescription', Target_Amount='$targetAmount', Case_Status='$caseStatus', Start_Date=$startDate, End_Date=$endDate, Case_LocationName='$caseLocationName', Case_Organizer='$caseOrganizer', Contact_Name='$contactName', Contact_Number='$contactNumber', Contact_Email='$contactEmail', Case_Address1='$addr1', Case_Address2='$addr2', Case_Address3='$addr3', Case_City='$city', Case_State='$state', Case_PostalCode='$zip', Case_Images='$finalJson', Case_BankName='$bankName', Case_BankAccount='$bankAccount' $extraSql WHERE Case_ID=$caseId";
+        $sql = "UPDATE special_case SET Case_Title='$caseTitle', Case_Category='$caseCategory', Case_Description='$caseDescription', Target_Amount='$targetAmount', Case_Status='$caseStatus', Start_Date=$startDate, End_Date=$endDate, Case_LocationName='$caseLocationName', Case_Organizer='$caseOrganizer', Contact_Name='$contactName', Contact_Number='$contactNumber', Contact_Email='$contactEmail', Case_Address1='$addr1', Case_Address2='$addr2', Case_Address3='$addr3', Case_City='$city', Case_State='$state', Case_PostalCode='$zip', Case_Images='$finalJson', Case_Medical_Report='$finalReportJson', Case_BankName='$bankName', Case_BankAccount='$bankAccount' $extraSql WHERE Case_ID=$caseId";
 
         if ($conn->query($sql)) {
             $saveSuccess = true;
-            // Reload Data
             $result = $conn->query("SELECT * FROM special_case WHERE Case_ID = $caseId");
             $case = $result->fetch_assoc();
         } else {
@@ -114,9 +131,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_special_case'])
     }
 }
 
-// Pre-process data
 $phoneDisplay = str_replace('+60', '', $case['Contact_Number']);
-$existingImages = $case['Case_Images']; // JSON String
+$existingImages = $case['Case_Images'];
+// Handle if DB value is null or empty string for report
+$existingReports = !empty($case['Case_Medical_Report']) ? $case['Case_Medical_Report'] : "[]";
 ?>
 
 <!DOCTYPE html>
@@ -127,66 +145,55 @@ $existingImages = $case['Case_Images']; // JSON String
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin_common.css">
     <style>
-        /* Shared Styles */
+        /* (Styles same as Add Page) */
         .page-header-compact { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-top: 10px; }
         .back-btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: #666; font-weight: 600; font-size: 14px; padding: 8px 12px; border-radius: 5px; background: #f8f9fa; border: 1px solid #eee; transition: all 0.2s; }
         .back-btn:hover { background: #e9ecef; color: #333; }
         .header-title { flex: 1; text-align: center; padding-right: 120px; }
         .header-title h1 { margin: 0; font-size: 24px; color: #333; font-weight: 700; }
         .header-title p { margin: 5px 0 0; color: #666; font-size: 14px; }
-        
         .form-container { background: white; border-radius: 10px; padding: 30px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); max-width: 900px; margin: 0 auto 30px; }
         .form-header { margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 15px; text-align: center; } 
         .form-header h2 { font-size: 20px; color: #333; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }
-        
         .form-section-title { font-size: 14px; font-weight: 700; color: #555; border-bottom: 1px solid #eee; padding-bottom: 5px; margin: 30px 0 15px 0; }
         .section-separator { border-top: 1px dashed #ddd; margin: 30px 0 20px; position: relative; }
         .section-separator span { position: absolute; top: -12px; left: 0; background: #fff; padding-right: 10px; font-size: 12px; color: #888; font-weight: 600; text-transform: uppercase; }
-
         .form-row { display: flex; gap: 20px; margin-bottom: 15px; } .form-row .form-group { flex: 1; margin-bottom: 0; }
         .form-group { margin-bottom: 20px; } .form-label { display: block; margin-bottom: 8px; font-weight: 500; color: var(--dark); font-size: 14px; }
         .form-input, .form-select, .form-textarea { width: 100%; padding: 12px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; transition: 0.3s; font-size: 14px; box-sizing: border-box; }
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
         .required { color: red; margin-left: 3px; font-weight: bold; }
-
         .button-group { display: flex; justify-content: flex-end; gap: 15px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
         .btn-cancel { padding: 12px 25px; background: #6c757d; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
         .btn-cancel:hover { background: #5a6268; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(90, 98, 104, 0.4); }
         .btn-save { padding: 12px 25px; background: linear-gradient(135deg, #F28585 0%, #ff9a9a 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px; }
         .btn-save:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(242, 133, 133, 0.4); }
-
-        /* BUTTON CLEAR STYLE MATCHING BRANCH EDIT */
         .btn-clear { padding: 12px 25px; background: white; color: #555; border: 1px solid #ddd; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
         .btn-clear:hover { background: #f8f9fa; border-color: #aaa; color: #333; transform: translateY(-1px); }
-
         .upload-box { border: 2px dashed #ccc; background: #fafafa; border-radius: 8px; padding: 25px; text-align: center; cursor: pointer; position: relative; transition: 0.3s; }
         .upload-box:hover { border-color: var(--primary); background: #fff5f5; }
         .upload-box i { font-size: 30px; color: #aaa; margin-bottom: 10px; display: block; }
         .upload-box input[type="file"] { position: absolute; width: 100%; height: 100%; top: 0; left: 0; opacity: 0; cursor: pointer; }
         .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; margin-top: 15px; }
-        .preview-item { position: relative; height: 80px; border-radius: 6px; overflow: hidden; border: 1px solid #eee; }
+        .preview-item { position: relative; height: 80px; border-radius: 6px; overflow: hidden; border: 1px solid #eee; display:flex; align-items:center; justify-content:center; background:#fff; }
         .preview-item img { width: 100%; height: 100%; object-fit: cover; }
+        .preview-file-icon { font-size: 30px; color: #dc3545; }
         .remove-img-btn { position: absolute; top: 2px; right: 2px; background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        
         .input-error { border-color: #dc3545 !important; background-color: #fff5f5; }
         .inline-error { color: #dc3545; font-size: 11px; margin-top: 4px; display: block; font-weight: 500; }
         .custom-alert { position: fixed; top: 20px; right: 20px; background: white; border-left: 5px solid; padding: 15px 20px; border-radius: 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 12px; z-index: 9999; transform: translateX(120%); transition: transform 0.3s ease-out; max-width: 350px; }
         .custom-alert.show { transform: translateX(0); }
         .custom-alert.error { border-color: #dc3545; } .custom-alert.error i { color: #dc3545; }
         .alert-content h4 { margin: 0 0 5px; font-size: 14px; color: #333; } .alert-content p { margin: 0; font-size: 13px; color: #666; }
-        
         .phone-format { display: flex; align-items: center; }
         .phone-prefix { padding: 12px 15px; background: #f8f9fa; border: 1px solid #ddd; border-right: none; border-radius: 5px 0 0 5px; color: #666; font-size: 14px; font-weight: bold; }
         .phone-input { border-radius: 0 5px 5px 0 !important; }
-
-        /* Modal Styles */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center; }
         .success-modal { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .success-icon { width: 70px; height: 70px; background: #e6f4ea; border-radius: 50%; color: #28a745; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 20px; }
         .modal-btn-group { display: flex; gap: 10px; justify-content: center; margin-top: 25px; }
         @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
         @media (max-width: 768px) { .form-row { flex-direction: column; gap: 0; } .page-header-compact { flex-direction: column; align-items: flex-start; gap: 10px; } .header-title { padding-right: 0; text-align: left; width: 100%; } }
     </style>
 </head>
@@ -224,6 +231,7 @@ $existingImages = $case['Case_Images']; // JSON String
                 <form id="editSpecialCaseForm" action="special_case_edit.php?id=<?php echo $caseId; ?>" method="POST" enctype="multipart/form-data" onsubmit="return validateSpecialCaseForm()" novalidate>
                     <input type="hidden" name="update_special_case" value="1">
                     <input type="hidden" id="existing_images_json" name="existing_images_json" value='<?php echo htmlspecialchars($existingImages ?: "[]"); ?>'>
+                    <input type="hidden" id="existing_reports_json" name="existing_reports_json" value='<?php echo htmlspecialchars($existingReports ?: "[]"); ?>'>
                     <input type="hidden" id="original_case_status" value="<?php echo $case['Case_Status']; ?>">
                     
                     <div class="form-header"><h2>Edit Details</h2></div>
@@ -233,10 +241,21 @@ $existingImages = $case['Case_Images']; // JSON String
                         <div class="upload-box">
                             <i class="fas fa-cloud-upload-alt"></i>
                             <p>Add more images (Existing images shown below)</p>
-                            <input type="file" id="case_images" name="case_images[]" multiple accept="image/*" onchange="handleFileSelect(event)">
+                            <input type="file" id="case_images" name="case_images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'image')">
                         </div>
                         <div class="preview-grid" id="preview_container"></div>
                         <small class="form-guide">Manage images for this case. You can add new ones or remove existing ones.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Medical Reports (Max 5)</label>
+                        <div class="upload-box" style="border-color:#17a2b8; background:#f0fbff;">
+                            <i class="fas fa-file-medical-alt" style="color:#17a2b8;"></i>
+                            <p style="color:#0056b3;">Add more reports (PDF, JPG, PNG)</p>
+                            <input type="file" id="medical_reports" name="medical_reports[]" multiple accept=".pdf, .jpg, .jpeg, .png" onchange="handleFileSelect(event, 'report')">
+                        </div>
+                        <div class="preview-grid" id="report_preview_container"></div>
+                        <small class="form-guide">Manage medical documents.</small>
                     </div>
 
                     <div class="form-section-title">Basic Information</div>
@@ -408,105 +427,114 @@ $existingImages = $case['Case_Images']; // JSON String
             showSystemAlert("<?php echo addslashes($errorMessage); ?>", 'error');
         <?php endif; ?>
 
-        // --- IMAGE HANDLING ---
+        // --- IMAGE & REPORT HANDLING ---
         let existingFiles = [];
+        let existingReports = [];
         try { existingFiles = JSON.parse(document.getElementById('existing_images_json').value); } catch(e) { existingFiles = []; }
+        try { existingReports = JSON.parse(document.getElementById('existing_reports_json').value); } catch(e) { existingReports = []; }
+        
         let newFiles = [];
+        let newReports = [];
 
         function renderAllPreviews() {
-            const container = document.getElementById('preview_container');
-            container.innerHTML = '';
-            
+            // Images
+            const imgContainer = document.getElementById('preview_container');
+            imgContainer.innerHTML = '';
             existingFiles.forEach((src, index) => {
-                const item = document.createElement('div');
-                item.className = 'preview-item';
-                item.innerHTML = `<img src="${src}"><button type="button" class="remove-img-btn" onclick="removeExisting(${index})"><i class="fas fa-times"></i></button>`;
-                container.appendChild(item);
+                imgContainer.innerHTML += `<div class="preview-item"><img src="${src}"><button type="button" class="remove-img-btn" onclick="removeExisting(${index}, 'image')"><i class="fas fa-times"></i></button></div>`;
             });
-
             newFiles.forEach((file, index) => {
                 const reader = new FileReader();
-                reader.onload = function(e) {
-                    const item = document.createElement('div');
-                    item.className = 'preview-item';
-                    item.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-img-btn" onclick="removeNew(${index})"><i class="fas fa-times"></i></button>`;
-                    container.appendChild(item);
-                }
+                reader.onload = e => {
+                    const div = document.createElement('div'); div.className='preview-item';
+                    div.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-img-btn" onclick="removeNew(${index}, 'image')"><i class="fas fa-times"></i></button>`;
+                    imgContainer.appendChild(div);
+                };
                 reader.readAsDataURL(file);
             });
-        }
-        function handleFileSelect(event) {
-            newFiles = newFiles.concat(Array.from(event.target.files));
-            updateFileInput();
-            renderAllPreviews();
-        }
-        function removeNew(index) {
-            newFiles.splice(index, 1);
-            updateFileInput();
-            renderAllPreviews();
-        }
-        function removeExisting(index) {
-            existingFiles.splice(index, 1);
-            document.getElementById('existing_images_json').value = JSON.stringify(existingFiles);
-            renderAllPreviews();
-        }
-        function updateFileInput() {
-            const dt = new DataTransfer();
-            newFiles.forEach(file => dt.items.add(file));
-            document.getElementById('case_images').files = dt.files;
+
+            // Reports
+            const repContainer = document.getElementById('report_preview_container');
+            repContainer.innerHTML = '';
+            existingReports.forEach((src, index) => {
+                const isPdf = src.toLowerCase().endsWith('.pdf');
+                const content = isPdf 
+                    ? `<i class="fas fa-file-pdf preview-file-icon"></i><div style="font-size:10px; position:absolute; bottom:2px;">Existing PDF</div>`
+                    : `<img src="${src}">`;
+                repContainer.innerHTML += `<div class="preview-item">${content}<button type="button" class="remove-img-btn" onclick="removeExisting(${index}, 'report')"><i class="fas fa-times"></i></button></div>`;
+            });
+            newReports.forEach((file, index) => {
+                const isPdf = file.type === 'application/pdf';
+                const div = document.createElement('div'); div.className='preview-item';
+                if(isPdf) {
+                    div.innerHTML = `<i class="fas fa-file-pdf preview-file-icon"></i><div style="font-size:10px; position:absolute; bottom:2px; overflow:hidden; width:100%; white-space:nowrap;">${file.name}</div><button type="button" class="remove-img-btn" onclick="removeNew(${index}, 'report')"><i class="fas fa-times"></i></button>`;
+                    repContainer.appendChild(div);
+                } else {
+                    const r = new FileReader();
+                    r.onload = e => {
+                        div.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-img-btn" onclick="removeNew(${index}, 'report')"><i class="fas fa-times"></i></button>`;
+                        repContainer.appendChild(div);
+                    };
+                    r.readAsDataURL(file);
+                }
+            });
         }
 
-        // --- VALIDATION HELPERS ---
-        function showFieldError(inputId, message) {
-            const input = document.getElementById(inputId);
-            if (!input) return;
-            input.classList.add('input-error');
-            let parent = input.parentNode;
-            if (parent.classList.contains('phone-format') || parent.classList.contains('upload-box')) { parent = parent.parentNode; }
-            let errorDiv = parent.querySelector('.inline-error');
-            if (!errorDiv) {
-                errorDiv = document.createElement('div');
-                errorDiv.className = 'inline-error';
-                parent.appendChild(errorDiv);
+        function handleFileSelect(event, type) {
+            const files = Array.from(event.target.files);
+            if(type === 'image') newFiles = newFiles.concat(files);
+            else newReports = newReports.concat(files);
+            updateFileInput(type);
+            renderAllPreviews();
+        }
+
+        function removeNew(index, type) {
+            if(type === 'image') newFiles.splice(index, 1);
+            else newReports.splice(index, 1);
+            updateFileInput(type);
+            renderAllPreviews();
+        }
+
+        function removeExisting(index, type) {
+            if(type === 'image') {
+                existingFiles.splice(index, 1);
+                document.getElementById('existing_images_json').value = JSON.stringify(existingFiles);
+            } else {
+                existingReports.splice(index, 1);
+                document.getElementById('existing_reports_json').value = JSON.stringify(existingReports);
             }
-            errorDiv.textContent = message;
+            renderAllPreviews();
+        }
+
+        function updateFileInput(type) {
+            const dt = new DataTransfer();
+            const arr = (type==='image') ? newFiles : newReports;
+            arr.forEach(f => dt.items.add(f));
+            document.getElementById(type==='image'?'case_images':'medical_reports').files = dt.files;
+        }
+
+        // --- VALIDATION (Updated Email Check) ---
+        function showFieldError(id, msg) {
+            const el = document.getElementById(id);
+            if(!el) return;
+            el.classList.add('input-error');
+            let p = el.parentNode;
+            if(p.classList.contains('phone-format')) p = p.parentNode;
+            let err = p.querySelector('.inline-error');
+            if(!err) { err = document.createElement('div'); err.className='inline-error'; p.appendChild(err); }
+            err.textContent = msg;
         }
         function clearFormErrors() {
-            document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
-            document.querySelectorAll('.inline-error').forEach(el => el.remove());
+            document.querySelectorAll('.input-error').forEach(e=>e.classList.remove('input-error'));
+            document.querySelectorAll('.inline-error').forEach(e=>e.remove());
         }
 
-        const bankRules = {
-            "Maybank": { digits: 12 }, "CIMB": { digits: 10 }, "Public Bank": { digits: 10 }, "RHB": { digits: 10 },
-            "Hong Leong": { digits: 11 }, "AmBank": { digits: 13 }, "UOB": { digits: 11 }, "Bank Rakyat": { digits: 12 },
-            "OCBC": { digits: 10 }, "HSBC": { digits: 12 }, "Bank Islam": { digits: 14 }, "Affin Bank": { digits: 10 },
-            "Alliance Bank": { digits: 10 }, "Standard Chartered": { digits: 10 }, "MBSB": { digits: 10 },
-            "Citibank": { digits: 10 }, "Bank Muamalat": { digits: 14 }, "Agrobank": { digits: 15 }, "BSN": { digits: 16 }
-        };
-
-        function setupBankValidation() {
-            const bankSelect = document.getElementById('bank_name');
-            const accInput = document.getElementById('bank_account');
-            const rule = bankRules[bankSelect.value];
-            if(rule){
-                accInput.maxLength = rule.digits;
-                accInput.placeholder = `Enter ${rule.digits} digits`;
-                handleBankInput();
-            }
-        }
-        function handleBankInput() {
-            const input = document.getElementById('bank_account');
-            const counter = document.getElementById('bank_counter');
-            const bankSelect = document.getElementById('bank_name');
-            input.value = input.value.replace(/[^0-9]/g, '');
-            const rule = bankRules[bankSelect.value];
-            if(rule){
-                const current = input.value.length;
-                counter.innerText = `Digits: ${current} / ${rule.digits}`;
-                counter.style.color = (current === rule.digits) ? '#28a745' : '#dc3545';
-            }
-        }
-
+        // Exact Bank Logic
+        const bankRules = { "Maybank": { digits: 12 }, "CIMB": { digits: 10 }, "Public Bank": { digits: 10 }, "RHB": { digits: 10 }, "Hong Leong": { digits: 11 }, "AmBank": { digits: 13 }, "UOB": { digits: 11 }, "Bank Rakyat": { digits: 12 }, "OCBC": { digits: 10 }, "HSBC": { digits: 12 }, "Bank Islam": { digits: 14 }, "Affin Bank": { digits: 10 }, "Alliance Bank": { digits: 10 }, "Standard Chartered": { digits: 10 }, "MBSB": { digits: 10 }, "Citibank": { digits: 10 }, "Bank Muamalat": { digits: 14 }, "Agrobank": { digits: 15 }, "BSN": { digits: 16 } };
+        function setupBankValidation(){ const b=document.getElementById('bank_name').value; const i=document.getElementById('bank_account'); if(bankRules[b]){ i.maxLength=bankRules[b].digits; handleBankInput(); } }
+        function handleBankInput(){ const i=document.getElementById('bank_account'); i.value=i.value.replace(/\D/g,''); const b=document.getElementById('bank_name').value; if(bankRules[b]){ const c=document.getElementById('bank_counter'); c.innerText=`Digits: ${i.value.length} / ${bankRules[b].digits}`; c.style.color=(i.value.length===bankRules[b].digits)?'#28a745':'#dc3545'; } }
+        
+        // Exact Email Logic (from Add page)
         function validateEmailDetailed(email) {
             if (!email) return "Email is required.";
             if (!email.includes('@')) return "Missing '@' symbol in email.";
@@ -518,7 +546,7 @@ $existingImages = $case['Case_Images']; // JSON String
             return "";
         }
 
-        // UPDATED: Exact logic from branch_add.php
+        // Exact Phone Logic
         function validatePhoneDetailed(val) {
             if (!val.includes('-')) return "Missing hyphen symbol ( - ). Please use the dash key.";
             const parts = val.split('-'); 
@@ -540,7 +568,6 @@ $existingImages = $case['Case_Images']; // JSON String
             clearFormErrors();
             let hasError = false;
             
-            // OPTIONAL fields removed: location, address, postcode, city, state
             const reqFields = ['case_title', 'target_amount', 'start_date', 'end_date', 'case_organizer', 'contact_name', 'contact_number', 'contact_email', 'bank_name', 'bank_account'];
             
             reqFields.forEach(id => {
@@ -553,18 +580,21 @@ $existingImages = $case['Case_Images']; // JSON String
                 showFieldError('cancel_reason', "Reason is required when Cancelled."); hasError=true;
             }
 
-            // Amount Validation
+            // Amount
             const amount = document.getElementById('target_amount');
             if (amount.value.trim() && parseFloat(amount.value) < 0) {
                 showFieldError('target_amount', "Cannot be negative.");
                 hasError = true;
             }
 
-            // Email (only on submit)
+            // Email (Updated Validation)
             const email = document.getElementById('contact_email').value;
-            if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showFieldError('contact_email', "Invalid email format."); hasError=true; }
+            if(email.trim()) {
+                const err = validateEmailDetailed(email.trim());
+                if(err) { showFieldError('contact_email', err); hasError = true; }
+            }
 
-            // Phone (Updated)
+            // Phone
             const phone = document.getElementById('contact_number');
             if(phone.value.trim()) {
                 const err = validatePhoneDetailed(phone.value.trim());

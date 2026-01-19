@@ -18,6 +18,17 @@ $isStaff = isset($_SESSION['staff_id']);
 $searchTerm = "";
 $filterType = "";
 $filterValue = "";
+
+// Date specific variables (Creation Date / Start Date)
+$filterDateDay = "";
+$filterDateMonth = "";
+$filterDateYear = "";
+
+// End Date specific variables
+$filterEndDateDay = "";
+$filterEndDateMonth = "";
+$filterEndDateYear = "";
+
 $conditions = []; 
 $orderClause = "ORDER BY a.Activity_StartDate DESC"; 
 
@@ -56,9 +67,34 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
         $filterValue = $_GET['filter_val_bsort'];
         if ($filterValue == 'asc') $orderClause = "ORDER BY b.Branch_Name ASC";
         elseif ($filterValue == 'desc') $orderClause = "ORDER BY b.Branch_Name DESC";
-    } elseif ($filterType == 'date_range') {
-        $queryParams['filter_start_date'] = $_GET['filter_start_date'];
-        $queryParams['filter_end_date'] = $_GET['filter_end_date'];
+    } elseif ($filterType == 'date') {
+        // Creation Date Logic (Using Activity_StartDate as creation reference based on previous context)
+        if (isset($_GET['filter_val_date_day']) && $_GET['filter_val_date_day'] !== '') {
+            $filterDateDay = $conn->real_escape_string($_GET['filter_val_date_day']);
+            $conditions[] = "DAY(a.Activity_StartDate) = '$filterDateDay'";
+        }
+        if (isset($_GET['filter_val_date_month']) && $_GET['filter_val_date_month'] !== '') {
+            $filterDateMonth = $conn->real_escape_string($_GET['filter_val_date_month']);
+            $conditions[] = "MONTH(a.Activity_StartDate) = '$filterDateMonth'";
+        }
+        if (isset($_GET['filter_val_date_year']) && $_GET['filter_val_date_year'] !== '') {
+            $filterDateYear = $conn->real_escape_string($_GET['filter_val_date_year']);
+            $conditions[] = "YEAR(a.Activity_StartDate) = '$filterDateYear'";
+        }
+    } elseif ($filterType == 'end_date') {
+        // End Date Logic
+        if (isset($_GET['filter_val_end_date_day']) && $_GET['filter_val_end_date_day'] !== '') {
+            $filterEndDateDay = $conn->real_escape_string($_GET['filter_val_end_date_day']);
+            $conditions[] = "DAY(a.Activity_EndDate) = '$filterEndDateDay'";
+        }
+        if (isset($_GET['filter_val_end_date_month']) && $_GET['filter_val_end_date_month'] !== '') {
+            $filterEndDateMonth = $conn->real_escape_string($_GET['filter_val_end_date_month']);
+            $conditions[] = "MONTH(a.Activity_EndDate) = '$filterEndDateMonth'";
+        }
+        if (isset($_GET['filter_val_end_date_year']) && $_GET['filter_val_end_date_year'] !== '') {
+            $filterEndDateYear = $conn->real_escape_string($_GET['filter_val_end_date_year']);
+            $conditions[] = "YEAR(a.Activity_EndDate) = '$filterEndDateYear'";
+        }
     }
 }
 
@@ -167,13 +203,13 @@ $allActivityImagesMap = [];
         .btn-success { background: var(--success); color: white; } 
         .btn-danger { background: var(--danger); color: white; }
 
-        .filter-search-bar { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee; }
+        .filter-search-bar { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #eee; flex-wrap: wrap; }
         .filter-group { display: flex; align-items: center; gap: 8px; }
         .filter-select { padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; background: white; min-width: 140px; cursor: pointer; }
         .secondary-filter { display: none; animation: fadeIn 0.3s; }
-        .secondary-filter.active { display: block; }
+        .secondary-filter.active { display: flex; gap: 5px; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-        .search-input { flex: 1; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; background: white; }
+        .search-input { flex: 1; padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; background: white; min-width: 200px; }
 
         .case-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; margin-top: 10px; }
         .case-card { background: white; border-radius: 12px; position: relative; display: flex; flex-direction: column; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border: 1px solid #f0f0f0; transition: transform 0.3s; }
@@ -288,7 +324,8 @@ $allActivityImagesMap = [];
                             <option value="city" <?php echo ($filterType == 'city') ? 'selected' : ''; ?>>City</option>
                             <option value="capacity" <?php echo ($filterType == 'capacity') ? 'selected' : ''; ?>>Capacity</option>
                             <option value="branch_sort" <?php echo ($filterType == 'branch_sort') ? 'selected' : ''; ?>>Branch Name Sort</option>
-                            <option value="date_range" <?php echo ($filterType == 'date_range') ? 'selected' : ''; ?>>Date Range</option>
+                            <option value="date" <?php echo ($filterType == 'date') ? 'selected' : ''; ?>>Creation Date</option>
+                            <option value="end_date" <?php echo ($filterType == 'end_date') ? 'selected' : ''; ?>>End Date</option>
                         </select>
                     </div>
                     <div id="filter_status_container" class="secondary-filter"><select name="filter_val_status" class="filter-select"><option value="">Select Status...</option><option value="Active" <?php echo ($filterValue == 'Active') ? 'selected' : ''; ?>>Active</option><option value="Upcoming" <?php echo ($filterValue == 'Upcoming') ? 'selected' : ''; ?>>Upcoming</option><option value="Completed" <?php echo ($filterValue == 'Completed') ? 'selected' : ''; ?>>Completed</option><option value="Cancelled" <?php echo ($filterValue == 'Cancelled') ? 'selected' : ''; ?>>Cancelled</option></select></div>
@@ -298,10 +335,45 @@ $allActivityImagesMap = [];
                     <div id="filter_city_container" class="secondary-filter"><select name="filter_val_city" class="filter-select"><option value="">Select City...</option><?php foreach($cities as $c): ?><option value="<?php echo $c; ?>" <?php if($filterValue == $c) echo 'selected'; ?>><?php echo $c; ?></option><?php endforeach; ?></select></div>
                     <div id="filter_capacity_container" class="secondary-filter"><select name="filter_val_capacity" class="filter-select"><option value="">Select Range...</option><option value="below_100" <?php if($filterValue == 'below_100') echo 'selected'; ?>>Below 100</option><option value="100_500" <?php if($filterValue == '100_500') echo 'selected'; ?>>100 - 500</option><option value="above_500" <?php if($filterValue == 'above_500') echo 'selected'; ?>>Above 500</option></select></div>
                     <div id="filter_branch_sort_container" class="secondary-filter"><select name="filter_val_bsort" class="filter-select"><option value="">Select Order...</option><option value="asc" <?php if($filterValue == 'asc') echo 'selected'; ?>>Branch Name (A-Z)</option><option value="desc" <?php if($filterValue == 'desc') echo 'selected'; ?>>Branch Name (Z-A)</option></select></div>
-                    <div id="filter_date_range_container" class="secondary-filter" style="display:none; align-items:center; gap:5px;">
-                        <input type="date" name="filter_start_date" class="filter-select" value="<?php echo isset($_GET['filter_start_date']) ? $_GET['filter_start_date'] : ''; ?>">
-                        <span>to</span>
-                        <input type="date" name="filter_end_date" class="filter-select" value="<?php echo isset($_GET['filter_end_date']) ? $_GET['filter_end_date'] : ''; ?>">
+                    
+                    <div id="filter_date_container" class="secondary-filter">
+                        <select name="filter_val_date_day" class="filter-select" style="min-width: 80px;">
+                            <option value="">Day</option>
+                            <?php for($i=1; $i<=31; $i++) echo "<option value='$i' ".($filterDateDay==$i?'selected':'').">$i</option>"; ?>
+                        </select>
+                        <select name="filter_val_date_month" class="filter-select" style="min-width: 100px;">
+                            <option value="">Month</option>
+                            <?php 
+                            $months = [1=>'Jan', 2=>'Feb', 3=>'Mar', 4=>'Apr', 5=>'May', 6=>'Jun', 7=>'Jul', 8=>'Aug', 9=>'Sep', 10=>'Oct', 11=>'Nov', 12=>'Dec'];
+                            foreach($months as $k=>$v) echo "<option value='$k' ".($filterDateMonth==$k?'selected':'').">$v</option>"; 
+                            ?>
+                        </select>
+                        <select name="filter_val_date_year" class="filter-select" style="min-width: 90px;">
+                            <option value="">Year</option>
+                            <?php 
+                            $currYear = date('Y');
+                            for($i=$currYear; $i>=2023; $i--) echo "<option value='$i' ".($filterDateYear==$i?'selected':'').">$i</option>"; 
+                            ?>
+                        </select>
+                    </div>
+
+                    <div id="filter_end_date_container" class="secondary-filter">
+                        <select name="filter_val_end_date_day" class="filter-select" style="min-width: 80px;">
+                            <option value="">Day</option>
+                            <?php for($i=1; $i<=31; $i++) echo "<option value='$i' ".($filterEndDateDay==$i?'selected':'').">$i</option>"; ?>
+                        </select>
+                        <select name="filter_val_end_date_month" class="filter-select" style="min-width: 100px;">
+                            <option value="">Month</option>
+                            <?php 
+                            foreach($months as $k=>$v) echo "<option value='$k' ".($filterEndDateMonth==$k?'selected':'').">$v</option>"; 
+                            ?>
+                        </select>
+                        <select name="filter_val_end_date_year" class="filter-select" style="min-width: 90px;">
+                            <option value="">Year</option>
+                            <?php 
+                            for($i=$currYear; $i>=2023; $i--) echo "<option value='$i' ".($filterEndDateYear==$i?'selected':'').">$i</option>"; 
+                            ?>
+                        </select>
                     </div>
 
                     <input type="text" name="search" class="search-input" placeholder="Search activity, description, city..." value="<?php echo htmlspecialchars($searchTerm); ?>">
@@ -397,9 +469,17 @@ $allActivityImagesMap = [];
                             if ($filterType == 'city' && !empty($filterValue)) $queryParams['filter_val_city'] = $filterValue;
                             if ($filterType == 'capacity' && !empty($filterValue)) $queryParams['filter_val_capacity'] = $filterValue;
                             if ($filterType == 'branch_sort' && !empty($filterValue)) $queryParams['filter_val_bsort'] = $filterValue;
-                            if ($filterType == 'date_range') {
-                                $queryParams['filter_start_date'] = $_GET['filter_start_date'];
-                                $queryParams['filter_end_date'] = $_GET['filter_end_date'];
+                            // Add date params to pagination
+                            if ($filterType == 'date') {
+                                if(!empty($filterDateDay)) $queryParams['filter_val_date_day'] = $filterDateDay;
+                                if(!empty($filterDateMonth)) $queryParams['filter_val_date_month'] = $filterDateMonth;
+                                if(!empty($filterDateYear)) $queryParams['filter_val_date_year'] = $filterDateYear;
+                            }
+                            // Add end date params to pagination
+                            if ($filterType == 'end_date') {
+                                if(!empty($filterEndDateDay)) $queryParams['filter_val_end_date_day'] = $filterEndDateDay;
+                                if(!empty($filterEndDateMonth)) $queryParams['filter_val_end_date_month'] = $filterEndDateMonth;
+                                if(!empty($filterEndDateYear)) $queryParams['filter_val_end_date_year'] = $filterEndDateYear;
                             }
                         }
                         $search_query = !empty($queryParams) ? '&' . http_build_query($queryParams) : '';
@@ -442,7 +522,16 @@ $allActivityImagesMap = [];
             else if (type === 'city') { document.getElementById('filter_city_container').classList.add('active'); document.getElementById('filter_city_container').querySelector('select').disabled = false; }
             else if (type === 'capacity') { document.getElementById('filter_capacity_container').classList.add('active'); document.getElementById('filter_capacity_container').querySelector('select').disabled = false; }
             else if (type === 'branch_sort') { document.getElementById('filter_branch_sort_container').classList.add('active'); document.getElementById('filter_branch_sort_container').querySelector('select').disabled = false; }
-            else if (type === 'date_range') { document.getElementById('filter_date_range_container').classList.add('active'); document.getElementById('filter_date_range_container').style.display = 'flex'; }
+            else if (type === 'date') { 
+                document.getElementById('filter_date_container').classList.add('active'); 
+                const dateSelects = document.getElementById('filter_date_container').querySelectorAll('select');
+                dateSelects.forEach(s => s.disabled = false);
+            }
+            else if (type === 'end_date') { 
+                document.getElementById('filter_end_date_container').classList.add('active'); 
+                const endDateSelects = document.getElementById('filter_end_date_container').querySelectorAll('select');
+                endDateSelects.forEach(s => s.disabled = false);
+            }
         }
 
         function moveCarousel(cardId, direction) {

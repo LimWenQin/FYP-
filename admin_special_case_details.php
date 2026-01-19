@@ -3,7 +3,7 @@
 session_start();
 
 // Check Login
-if (!isset($_SESSION['admin_id'])) {
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     die("Access Denied.");
 }
 
@@ -36,6 +36,14 @@ if (!is_array($images) && !empty($case['Case_Images'])) {
 }
 $hasImages = ($images && !empty($images));
 if (!$hasImages) $images = [];
+
+// --- NEW FUNCTION: Handle Medical Reports JSON ---
+$reports = json_decode($case['Case_Medical_Report'], true);
+if (!is_array($reports) && !empty($case['Case_Medical_Report'])) {
+    $reports = [$case['Case_Medical_Report']];
+}
+$hasReports = ($reports && !empty($reports));
+if (!$hasReports) $reports = [];
 
 // Format Address
 $fullAddress = $case['Case_Address1'];
@@ -141,7 +149,10 @@ if ($case['Case_Status'] == 'Upcoming') $statusClass = 'status-upcoming';
 
     <div class="detail-wrapper">
         <div class="top-bar">
-            <a href="javascript:void(0);" onclick="goBackAndClose()" class="back-link"><i class="fas fa-arrow-left"></i> Back to Special Case Management</a>
+            <div style="display:flex; gap:10px;">
+                <a href="javascript:void(0);" onclick="goBackAndClose()" class="back-link"><i class="fas fa-arrow-left"></i> Back to Special Case Management</a>
+                <a href="special_case_comments.php?case_id=<?php echo $id; ?>" target="_blank" class="back-link" style="color: #17a2b8;"><i class="fas fa-comments"></i> View Comments</a>
+            </div>
             <div style="font-size:12px; color:#999;">Case ID: #<?php echo str_pad($case['Case_ID'], 4, '0', STR_PAD_LEFT); ?></div>
         </div>
 
@@ -184,6 +195,27 @@ if ($case['Case_Status'] == 'Upcoming') $statusClass = 'status-upcoming';
                 <div class="left-col">
                     <div class="section-title"><i class="fas fa-align-left"></i> Description & Story</div>
                     <div class="description-box"><?php echo nl2br(htmlspecialchars($case['Case_Description'])); ?></div>
+
+                    <?php if($hasReports): ?>
+                    <div class="section-title"><i class="fas fa-file-medical-alt"></i> Medical Reports</div>
+                    <div class="info-card">
+                        <?php foreach($reports as $rep): 
+                            $name = basename($rep);
+                            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                            $icon = ($ext == 'pdf') ? 'fa-file-pdf' : 'fa-image';
+                            $color = ($ext == 'pdf') ? '#dc3545' : '#28a745';
+                        ?>
+                        <a href="<?php echo htmlspecialchars($rep); ?>" target="_blank" style="display:flex; align-items:center; gap:15px; padding:10px 0; border-bottom:1px solid #f9f9f9; text-decoration:none; color:inherit;">
+                            <div class="ir-icon" style="background:#f8f9fa;"><i class="fas <?php echo $icon; ?>" style="color:<?php echo $color; ?>"></i></div>
+                            <div class="ir-data">
+                                <h5>Document</h5>
+                                <p><?php echo htmlspecialchars($name); ?></p>
+                            </div>
+                            <i class="fas fa-external-link-alt" style="color:#ccc; font-size:12px;"></i>
+                        </a>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
 
                     <div class="section-title"><i class="fas fa-info-circle"></i> Case Logistics</div>
                     <div class="info-card">

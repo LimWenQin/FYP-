@@ -11,7 +11,7 @@ if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
 include 'dataconnection.php';
 
 if (!isset($_GET['case_id'])) {
-    header("Location: special_case_management.php");
+    echo "<script>window.close();</script>";
     exit();
 }
 
@@ -23,8 +23,8 @@ $caseTitle = ($caseRes->num_rows > 0) ? $caseRes->fetch_assoc()['Case_Title'] : 
 
 // --- 1. 获取筛选和排序参数 ---
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
-$sort = isset($_GET['sort']) ? $_GET['sort'] : 'date'; // 默认按日期
-$order = isset($_GET['order']) ? $_GET['order'] : 'desc'; // 默认降序
+$sort = isset($_GET['sort']) ? $_GET['sort'] : 'date'; 
+$order = isset($_GET['order']) ? $_GET['order'] : 'desc'; 
 
 // 日期特定筛选
 $filterDate = isset($_GET['f_date']) ? $_GET['f_date'] : '';
@@ -39,11 +39,12 @@ $minAmount = isset($_GET['min_amount']) && $_GET['min_amount'] !== '' ? floatval
 $maxAmount = isset($_GET['max_amount']) && $_GET['max_amount'] !== '' ? floatval($_GET['max_amount']) : '';
 
 // --- 2. 构建 SQL 查询 ---
+// 注意：Special Case History 通常只显示成功的捐款
 $whereClauses = ["o.Case_ID = $caseId", "(o.Order_Status = 'Completed' OR o.Order_Status = 'Success')"];
 
 if ($search) {
     $s = $conn->real_escape_string($search);
-    $whereClauses[] = "(d.Donor_Name LIKE '%$s%' OR o.Order_ID LIKE '%$s%' OR o.Order_TXN_Ref LIKE '%$s%')";
+    $whereClauses[] = "(d.Donor_Name LIKE '%$s%' OR o.Order_ID LIKE '%$s%' OR o.Order_TXN_Ref LIKE '%$s%' OR d.Donor_Email LIKE '%$s%')";
 }
 
 // 日期/月份/年份 筛选逻辑
@@ -57,13 +58,11 @@ if ($filterDate) {
     $whereClauses[] = "YEAR(o.Order_Created_At) = '$filterYear'";
 }
 
+// 支付方式筛选
 if ($filterMethod) {
-    // 假设 Payment_Method 存储在 payment 表中，需要 Join
-    // 如果 orders 表直接有 Payment_Method 字段，可以直接用
-    // 这里假设需要 Join payment 表 (根据你的 admin_payment_details 逻辑)
-    // 但为了性能，如果 payment 表 join 比较复杂，且你只要 method，可以视情况调整
-    // 这里使用简单的 LEFT JOIN payment
-    $whereClauses[] = "p.Payment_Method = '" . $conn->real_escape_string($filterMethod) . "'";
+    $fm = $conn->real_escape_string($filterMethod);
+    // 同时检查 payment 表和 orders 表，确保覆盖所有情况
+    $whereClauses[] = "(p.Payment_Method = '$fm' OR o.Order_PaymentMethod = '$fm')";
 }
 
 if ($minAmount !== '') {
@@ -73,11 +72,17 @@ if ($maxAmount !== '') {
     $whereClauses[] = "o.Order_Amount <= $maxAmount";
 }
 
+// 核心修复：定义 Display_Method 逻辑用于排序
+// 如果 payment 表中是空的，则使用 orders 表中的 Order_PaymentMethod
+$methodColumnSQL = "COALESCE(NULLIF(p.Payment_Method, ''), o.Order_PaymentMethod)";
+
 // 排序字段映射
 $sortMap = [
     'date' => 'o.Order_Created_At',
     'amount' => 'o.Order_Amount',
-    'name' => 'd.Donor_Name'
+    'name' => 'd.Donor_Name',
+    'donor' => 'd.Donor_Name', 
+    'method' => 'Display_Method' // 现在支持按 Method 排序
 ];
 $orderBy = isset($sortMap[$sort]) ? $sortMap[$sort] : 'o.Order_Created_At';
 $orderDir = ($order === 'asc') ? 'ASC' : 'DESC';
@@ -85,15 +90,16 @@ $orderDir = ($order === 'asc') ? 'ASC' : 'DESC';
 $whereSql = implode(' AND ', $whereClauses);
 
 // 分页
-$limit = 15;
+$limit = 10; 
 $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
 
 // 主查询
-$sql = "SELECT o.Order_ID, o.Order_Created_At, o.Order_Amount, o.Order_TXN_Ref, 
+// 这里使用了 COALESCE 来修复 "N/A" 问题
+$sql = "SELECT o.Order_ID, o.Order_Created_At, o.Order_Amount, o.Order_TXN_Ref, o.Order_Status,
                d.Donor_Name, d.Donor_Email, 
-               p.Payment_Method
+               $methodColumnSQL as Display_Method
         FROM orders o 
         JOIN donor d ON o.Donor_ID = d.Donor_ID 
         LEFT JOIN payment p ON o.Payment_ID = p.Payment_ID
@@ -102,6 +108,10 @@ $sql = "SELECT o.Order_ID, o.Order_Created_At, o.Order_Amount, o.Order_TXN_Ref,
         LIMIT $offset, $limit";
 
 $result = $conn->query($sql);
+$donations = [];
+if ($result) {
+    while($row = $result->fetch_assoc()) $donations[] = $row;
+}
 
 // 总数查询 (用于分页)
 $countSql = "SELECT COUNT(*) as total 
@@ -122,13 +132,26 @@ $sumSql = "SELECT SUM(o.Order_Amount) as total_sum
 $sumRes = $conn->query($sumSql);
 $totalAmountFiltered = $sumRes->fetch_assoc()['total_sum'] ?: 0;
 
-// URL 参数辅助函数 (保留当前筛选参数)
-function getQueryLink($newParams = []) {
-    $params = $_GET;
-    foreach ($newParams as $key => $val) {
-        $params[$key] = $val;
-    }
-    return '?' . http_build_query($params);
+// Variables mapping for UI consistency
+$total_records = $totalRows;
+$total_pages = $totalPages;
+$start_record = ($total_records > 0) ? $offset + 1 : 0;
+$end_record = min($offset + $limit, $total_records);
+$totalRaised = $totalAmountFiltered;
+
+// 辅助数据 for UI
+$years = range(date('Y'), 2023); 
+$months = [
+    '1' => 'January', '2' => 'February', '3' => 'March', '4' => 'April',
+    '5' => 'May', '6' => 'June', '7' => 'July', '8' => 'August',
+    '9' => 'September', '10' => 'October', '11' => 'November', '12' => 'December'
+];
+
+// URL 构建函数
+function buildUrl($params = []) {
+    $current = $_GET;
+    $merged = array_merge($current, $params);
+    return '?' . http_build_query($merged);
 }
 ?>
 
@@ -138,215 +161,269 @@ function getQueryLink($newParams = []) {
     <meta charset="UTF-8">
     <title>Donation History - <?php echo htmlspecialchars($caseTitle); ?></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="admin_common.css"> <style>
-        /* 复用 branch_donation_history 的样式 */
+    <link rel="stylesheet" href="admin_common.css">
+    <style>
+        :root { --primary: #F28585; }
+        
         body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .page-header-compact { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-top: 10px; }
-        .back-btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: #666; font-weight: 600; font-size: 14px; padding: 8px 12px; border-radius: 5px; background: #f8f9fa; border: 1px solid #eee; transition: all 0.2s; }
+        .back-btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: #666; font-weight: 600; font-size: 14px; padding: 8px 12px; border-radius: 5px; background: #f8f9fa; border: 1px solid #eee; transition: all 0.2s; cursor: pointer; }
         .back-btn:hover { background: #e9ecef; color: #333; }
         .header-title { flex: 1; text-align: center; padding-right: 120px; }
-        .header-title h1 { margin: 0; font-size: 22px; color: #333; font-weight: 700; }
-        .header-title p { margin: 5px 0 0; color: #666; font-size: 13px; }
-        
-        .filters-container { background: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-        .search-group { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 250px; }
-        .filter-input, .filter-select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; outline: none; font-size: 13px; }
-        .filter-input:focus, .filter-select:focus { border-color: var(--primary, #F28585); }
-        .btn-filter { background: #f8f9fa; border: 1px solid #ddd; color: #555; padding: 8px 12px; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: 0.2s; }
-        .btn-filter:hover { background: #e2e6ea; }
-        .btn-primary { background: var(--primary, #F28585); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
-        
-        .table-card { background: white; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden; }
-        .table-header-info { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fafafa; }
-        .total-amount { font-size: 16px; font-weight: 700; color: #28a745; }
-        
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #f1f3f5; color: #495057; font-weight: 600; padding: 12px 15px; text-align: left; font-size: 13px; border-bottom: 2px solid #eee; }
-        td { padding: 12px 15px; border-bottom: 1px solid #f1f1f1; font-size: 13px; color: #333; }
-        tr:hover { background-color: #f8f9fa; cursor: pointer; }
-        
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
-        .badge-method { background: #e2e3e5; color: #383d41; }
-        
-        .pagination { display: flex; justify-content: flex-end; padding: 15px 20px; gap: 5px; }
-        .page-link { padding: 6px 12px; border: 1px solid #eee; background: white; color: #333; text-decoration: none; border-radius: 4px; font-size: 13px; transition: 0.2s; }
-        .page-link.active { background: var(--primary, #F28585); color: white; border-color: var(--primary, #F28585); }
-        .page-link:hover:not(.active) { background: #f1f1f1; }
+        .header-title h1 { margin: 0; font-size: 24px; color: #333; font-weight: 700; }
+        .header-title p { margin: 5px 0 0; color: #666; font-size: 14px; }
 
-        /* Modal for Date/Amount Filters */
-        .filter-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.1); z-index: 1000; justify-content: center; align-items: flex-start; padding-top: 100px; }
-        .filter-modal-content { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); width: 300px; position: relative; border: 1px solid #eee; animation: fadeIn 0.2s; }
-        @keyframes fadeIn { from {opacity:0; transform:translateY(-10px);} to {opacity:1; transform:translateY(0);} }
-        .filter-row { margin-bottom: 12px; }
-        .filter-label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; color: #555; }
-        .close-filter { position: absolute; top: 10px; right: 10px; cursor: pointer; color: #999; }
-        .btn-apply-full { width: 100%; background: #28a745; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: 600; }
+        .history-container { background: white; border-radius: 10px; padding: 30px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); max-width: 1000px; margin: 0 auto 30px; }
+
+        .balance-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        .b-card { padding: 20px; border-radius: 8px; color: white; display: flex; flex-direction: column; justify-content: center; position: relative; overflow: hidden; }
+        .b-card-1 { background: linear-gradient(135deg, #F28585 0%, #ff9a9a 100%); box-shadow: 0 4px 15px rgba(242, 133, 133, 0.3); }
+        .b-card-2 { background: linear-gradient(135deg, #6c757d 0%, #868e96 100%); box-shadow: 0 4px 15px rgba(108, 117, 125, 0.2); }
+        .b-label { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: 5px; }
+        .b-val { font-size: 28px; font-weight: 700; }
+        .b-icon { position: absolute; right: 20px; bottom: 20px; font-size: 40px; opacity: 0.2; }
+
+        .search-filter-container { display: flex; gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #eee; align-items: center; }
+        .search-input { flex: 1; padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; outline: none; }
+        .search-btn { padding: 10px 20px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; display:flex; align-items:center; gap:5px; }
+        .clear-btn { padding: 10px 15px; background: #fff; border: 1px solid #ddd; color: #555; border-radius: 5px; cursor: pointer; text-decoration: none; display:flex; align-items:center; gap:5px; }
+
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th { text-align: left; padding: 15px; background: #f8f9fa; color: #555; font-weight: 600; font-size: 13px; text-transform: uppercase; border-bottom: 2px solid #eee; cursor: pointer; user-select: none; }
+        .data-table td { padding: 15px; border-bottom: 1px solid #eee; color: #333; font-size: 14px; vertical-align: middle; }
+        .data-table tr:hover { background-color: #fcfcfc; }
+        .clickable-row { cursor: pointer; transition: background 0.2s; }
+        .clickable-row:hover { background-color: #fff5f5 !important; }
+
+        .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        .st-method { background: #e2e3e5; color: #383d41; }
         
-        .amount-row { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
-        .amount-label { font-size: 12px; width: 60px; color: #666; }
-        .sort-icon { color: #ccc; margin-left: 5px; font-size: 11px; }
-        .sort-icon.active { color: #555; }
+        .purpose-text { font-weight: 600; color: #333; }
+        .sub-text { font-size: 12px; color: #888; margin-top: 2px; }
+        .amount-pos { font-weight: 700; color: #28a745; }
+
+        /* Pagination Styles */
+        .pagination-container { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid #eee; margin-top: 20px; }
+        .pagination-info { font-size: 13px; color: #666; }
+        .pagination-controls { display: flex; gap: 5px; }
+        .pagination-btn { padding: 6px 12px; border: 1px solid #ddd; background-color: #fff; color: #333; text-decoration: none; border-radius: 4px; font-size: 13px; transition: all 0.2s; }
+        .pagination-btn:hover { background-color: #f8f9fa; border-color: #ccc; }
+        .pagination-btn.active { background-color: var(--primary); color: white; border-color: var(--primary); }
+        .pagination-btn.disabled { color: #ccc; cursor: not-allowed; background-color: #f9f9f9; }
+
+        /* Modals */
+        .sort-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 2000; justify-content: center; align-items: center; }
+        .sort-modal-content { background: white; width: 300px; border-radius: 10px; padding: 20px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); animation: fadeIn 0.2s; }
+        .sort-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .sort-header h3 { margin: 0; font-size: 16px; color: #333; }
+        .sort-close { cursor: pointer; font-size: 20px; color: #999; }
+        .sort-btn { display: block; width: 100%; padding: 10px; margin-bottom: 5px; border: 1px solid #eee; background: #fff; text-align: left; border-radius: 5px; cursor: pointer; transition: 0.2s; font-size: 14px; color: #555; text-decoration: none; }
+        .sort-btn:hover { background: #f8f9fa; border-color: #ddd; color: var(--primary); }
+        .filter-row { display: flex; gap: 5px; margin-bottom: 5px; }
+        .filter-select { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; width: 100%; margin-bottom: 8px; }
+        .filter-input { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+        .filter-go { padding: 8px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-apply-full { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; margin-top: 5px; }
+        .amount-input-group { display: flex; flex-direction: column; gap: 10px; }
+        .amount-row { display: flex; align-items: center; gap: 10px; }
+        .amount-label { width: 60px; font-size: 13px; color: #666; font-weight: 600; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
-
     <?php include 'admin_sidebar.php'; ?>
 
-    <div class="main-content">
+    <div class="main-content" id="mainContent">
         <?php include 'admin_header.php'; ?>
 
-        <div class="page-header-compact">
-            <a href="special_case_management.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Cases</a>
-            <div class="header-title">
-                <h1>Donation History</h1>
-                <p>Case: <?php echo htmlspecialchars($caseTitle); ?></p>
+        <div class="dashboard-content" style="padding-top: 10px;">
+            <div class="page-header-compact">
+                <a href="#" onclick="window.close(); return false;" class="back-btn"><i class="fas fa-arrow-left"></i> Back </a>
+                <div class="header-title">
+                    <h1>Donation History</h1>
+                    <p>Case: <?php echo htmlspecialchars($caseTitle); ?></p>
+                </div>
+                <div style="width: 80px;"></div>
             </div>
-        </div>
 
-        <form method="GET" class="filters-container">
-            <input type="hidden" name="case_id" value="<?php echo $caseId; ?>">
-            <div class="search-group">
-                <input type="text" name="search" class="filter-input" placeholder="Search Donor, ID, Ref..." value="<?php echo htmlspecialchars($search); ?>" style="flex:1;">
-                <button type="submit" class="btn-primary"><i class="fas fa-search"></i></button>
-                <?php if($search || $filterDate || $filterMonth || $filterYear || $filterMethod || $minAmount || $maxAmount): ?>
-                    <a href="special_case_donation_history.php?case_id=<?php echo $caseId; ?>" class="btn-filter" style="color:#dc3545; border-color:#dc3545;">Clear</a>
+            <div class="history-container">
+                <div class="balance-cards">
+                    <div class="b-card b-card-1">
+                        <span class="b-label">Total Raised</span>
+                        <span class="b-val">RM <?php echo number_format($totalRaised, 2); ?></span>
+                        <i class="fas fa-hand-holding-heart b-icon"></i>
+                    </div>
+                    <div class="b-card b-card-2">
+                        <span class="b-label">Total Transactions</span>
+                        <span class="b-val"><?php echo number_format($total_records); ?></span>
+                        <i class="fas fa-users b-icon"></i>
+                    </div>
+                </div>
+
+                <form class="search-filter-container" method="GET">
+                    <input type="hidden" name="case_id" value="<?php echo $caseId; ?>">
+                    <input type="hidden" name="sort" value="<?php echo $sort; ?>">
+                    <input type="hidden" name="order" value="<?php echo $order; ?>">
+                    <?php if(!empty($filterDate)) echo "<input type='hidden' name='f_date' value='$filterDate'>"; ?>
+                    <?php if(!empty($filterYear)) echo "<input type='hidden' name='f_year' value='$filterYear'>"; ?>
+                    <?php if(!empty($filterMonth)) echo "<input type='hidden' name='f_month' value='$filterMonth'>"; ?>
+                    <?php if(!empty($filterMethod)) echo "<input type='hidden' name='f_method' value='$filterMethod'>"; ?>
+                    <?php if($minAmount !== '') echo "<input type='hidden' name='min_amount' value='$minAmount'>"; ?>
+                    <?php if($maxAmount !== '') echo "<input type='hidden' name='max_amount' value='$maxAmount'>"; ?>
+
+                    <input type="text" name="search" class="search-input" placeholder="Search Donor, ID or Ref No..." value="<?php echo htmlspecialchars($search); ?>">
+                    <button type="submit" class="search-btn"><i class="fas fa-search"></i> Search</button>
+                    <?php if(!empty($search) || !empty($filterDate) || !empty($filterYear) || !empty($filterMonth) || !empty($filterMethod) || $minAmount !== '' || $maxAmount !== ''): ?>
+                        <a href="?case_id=<?php echo $caseId; ?>" class="clear-btn"><i class="fas fa-times"></i> Clear</a>
+                    <?php endif; ?>
+                </form>
+
+                <?php if(!empty($filterDate) || !empty($filterYear) || !empty($filterMonth) || !empty($filterMethod) || $minAmount !== '' || $maxAmount !== ''): ?>
+                    <div style="margin-bottom:15px; font-size:13px; color:#666; background:#fff3cd; padding:8px 12px; border-radius:5px; border:1px solid #ffeeba; display:inline-block;">
+                        <i class="fas fa-filter"></i> Active Filters: 
+                        <?php if(!empty($filterDate)) echo "Date: <b>$filterDate</b>; "; ?>
+                        <?php if(!empty($filterYear)) echo "Year: <b>$filterYear</b>; "; ?>
+                        <?php if(!empty($filterMonth)) echo "Month: <b>".$months[$filterMonth]."</b>; "; ?>
+                        <?php if(!empty($filterMethod)) echo "Method: <b>$filterMethod</b>; "; ?>
+                        <?php if($minAmount !== '' || $maxAmount !== '') echo "Amount: <b>RM " . ($minAmount ?: '0') . " - " . ($maxAmount ?: '∞') . "</b>;"; ?>
+                    </div>
                 <?php endif; ?>
-            </div>
-            
-            <div style="display:flex; gap:8px;">
-                <button type="button" class="btn-filter" onclick="openModal('dateModal')">
-                    <i class="far fa-calendar-alt"></i> 
-                    <?php echo ($filterDate || $filterMonth || $filterYear) ? 'Date Filtered' : 'Date'; ?>
-                </button>
-                <button type="button" class="btn-filter" onclick="openModal('amountModal')">
-                    <i class="fas fa-dollar-sign"></i> 
-                    <?php echo ($minAmount || $maxAmount) ? 'Amt Filtered' : 'Amount'; ?>
-                </button>
-            </div>
-        </form>
 
-        <div class="table-card">
-            <div class="table-header-info">
-                <span>Showing <?php echo $result->num_rows; ?> of <?php echo $totalRows; ?> records</span>
-                <span class="total-amount">Total: RM <?php echo number_format($totalAmountFiltered, 2); ?></span>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>
-                            <a href="<?php echo getQueryLink(['sort'=>'date', 'order'=>($sort=='date' && $order=='desc')?'asc':'desc']); ?>" style="color:inherit; text-decoration:none;">
-                                Date <i class="fas fa-sort<?php echo ($sort=='date') ? (($order=='desc')?'-down':'-up') : ''; ?> sort-icon <?php echo ($sort=='date')?'active':''; ?>"></i>
-                            </a>
-                        </th>
-                        <th>Transaction Ref</th>
-                        <th>
-                            <a href="<?php echo getQueryLink(['sort'=>'name', 'order'=>($sort=='name' && $order=='asc')?'desc':'asc']); ?>" style="color:inherit; text-decoration:none;">
-                                Donor Name <i class="fas fa-sort<?php echo ($sort=='name') ? (($order=='asc')?'-up':'-down') : ''; ?> sort-icon <?php echo ($sort=='name')?'active':''; ?>"></i>
-                            </a>
-                        </th>
-                        <th>Donor Email</th>
-                        <th>Method</th>
-                        <th>
-                            <a href="<?php echo getQueryLink(['sort'=>'amount', 'order'=>($sort=='amount' && $order=='desc')?'asc':'desc']); ?>" style="color:inherit; text-decoration:none;">
-                                Amount (RM) <i class="fas fa-sort<?php echo ($sort=='amount') ? (($order=='desc')?'-down':'-up') : ''; ?> sort-icon <?php echo ($sort=='amount')?'active':''; ?>"></i>
-                            </a>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if ($result && $result->num_rows > 0): ?>
-                        <?php while($row = $result->fetch_assoc()): ?>
-                            <tr onclick="window.open('admin_payment_details.php?id=<?php echo $row['Order_ID']; ?>', '_blank')">
-                                <td><?php echo date('d M Y, h:i A', strtotime($row['Order_Created_At'])); ?></td>
-                                <td style="font-family:monospace; color:#666;"><?php echo htmlspecialchars($row['Order_TXN_Ref']); ?></td>
-                                <td><?php echo htmlspecialchars($row['Donor_Name']); ?></td>
-                                <td><?php echo htmlspecialchars($row['Donor_Email']); ?></td>
-                                <td><span class="badge badge-method"><?php echo htmlspecialchars($row['Payment_Method'] ?: 'N/A'); ?></span></td>
-                                <td style="font-weight:bold; color:#28a745;">RM <?php echo number_format($row['Order_Amount'], 2); ?></td>
+                <?php if (count($donations) > 0): ?>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th onclick="openModal('dateSortModal')">Date <?php if($sort=='date') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?></th>
+                                <th onclick="openModal('donorSortModal')">Donor <?php if($sort=='donor' || $sort=='name') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?></th>
+                                <th onclick="openModal('methodSortModal')">Method / Ref <?php if($sort=='method') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?></th>
+                                <th style="text-align:left;" onclick="openModal('amountSortModal')">Amount <?php if($sort=='amount') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?></th>
+                                <th style="text-align:left;">View</th>
                             </tr>
-                        <?php endwhile; ?>
-                    <?php else: ?>
-                        <tr><td colspan="6" style="text-align:center; padding:30px; color:#999;">No donations found matching criteria.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-            
-            <?php if ($totalPages > 1): ?>
-            <div class="pagination">
-                <?php if ($page > 1): ?>
-                    <a href="<?php echo getQueryLink(['page' => $page - 1]); ?>" class="page-link">&laquo;</a>
-                <?php endif; ?>
-                
-                <?php for($i=1; $i<=$totalPages; $i++): ?>
-                    <?php if($i == 1 || $i == $totalPages || ($i >= $page - 2 && $i <= $page + 2)): ?>
-                        <a href="<?php echo getQueryLink(['page' => $i]); ?>" class="page-link <?php echo ($i == $page) ? 'active' : ''; ?>"><?php echo $i; ?></a>
-                    <?php elseif($i == $page - 3 || $i == $page + 3): ?>
-                        <span style="padding: 6px;">...</span>
-                    <?php endif; ?>
-                <?php endfor; ?>
+                        </thead>
+                        <tbody>
+                            <?php foreach($donations as $d): ?>
+                                <tr class="clickable-row" onclick="window.open('admin_payment_details.php?id=<?php echo $d['Order_ID']; ?>', '_blank')">
+                                    <td>
+                                        <div style="font-weight:600;"><?php echo date('d M Y', strtotime($d['Order_Created_At'])); ?></div>
+                                        <div class="sub-text"><?php echo date('h:i A', strtotime($d['Order_Created_At'])); ?></div>
+                                    </td>
+                                    <td>
+                                        <div class="purpose-text"><?php echo htmlspecialchars($d['Donor_Name']); ?></div>
+                                        <div class="sub-text"><i class="far fa-envelope"></i> <?php echo htmlspecialchars($d['Donor_Email']); ?></div>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge st-method"><?php echo htmlspecialchars($d['Display_Method'] ?: 'Unknown'); ?></span>
+                                        <div class="sub-text" style="margin-top:4px; font-family:monospace;"><?php echo htmlspecialchars($d['Order_TXN_Ref']); ?></div>
+                                    </td>
+                                    <td style="text-align:left;"><span class="amount-pos">+ RM <?php echo number_format($d['Order_Amount'], 2); ?></span></td>
+                                    <td style="text-align:left;"><span style="color:var(--primary); font-size:12px; font-weight:600;">Details <i class="fas fa-external-link-alt"></i></span></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
 
-                <?php if ($page < $totalPages): ?>
-                    <a href="<?php echo getQueryLink(['page' => $page + 1]); ?>" class="page-link">&raquo;</a>
+                    <div class="pagination-container">
+                        <div class="pagination-info">
+                            Showing <?php echo $start_record; ?> to <?php echo $end_record; ?> of <?php echo $total_records; ?> results
+                        </div>
+                        <div class="pagination-controls">
+                            <?php if ($page > 1): ?>
+                                <a href="<?php echo buildUrl(['page' => $page - 1]); ?>" class="pagination-btn">Previous</a>
+                            <?php else: ?>
+                                <span class="pagination-btn disabled">Previous</span>
+                            <?php endif; ?>
+
+                            <?php
+                            $start_window = max(1, $page - 1);
+                            $end_window = min($total_pages, $page + 1);
+                            if ($page == 1) $end_window = min($total_pages, 3);
+                            if ($page == $total_pages) $start_window = max(1, $total_pages - 2);
+
+                            for ($i = $start_window; $i <= $end_window; $i++) {
+                                $active = ($i == $page) ? 'active' : '';
+                                echo "<a href='" . buildUrl(['page' => $i]) . "' class='pagination-btn $active'>$i</a>";
+                            }
+                            ?>
+
+                            <?php if ($page < $total_pages): ?>
+                                <a href="<?php echo buildUrl(['page' => $page + 1]); ?>" class="pagination-btn">Next</a>
+                            <?php else: ?>
+                                <span class="pagination-btn disabled">Next</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                <?php else: ?>
+                    <div class="empty-state" style="text-align:center; padding:50px;">
+                        <i class="fas fa-hand-holding-usd" style="font-size:40px; color:#ddd; margin-bottom:15px;"></i>
+                        <p style="color:#666;">No donation records found matching criteria.</p>
+                    </div>
                 <?php endif; ?>
             </div>
-            <?php endif; ?>
         </div>
     </div>
 
-    <div id="dateModal" class="filter-modal" onclick="closeModal(event, 'dateModal')">
-        <div class="filter-modal-content">
-            <span class="close-filter" onclick="document.getElementById('dateModal').style.display='none'">&times;</span>
-            <h4 style="margin:0 0 15px 0; font-size:14px;">Filter by Date</h4>
-            
+    <div id="dateSortModal" class="sort-modal" onclick="closeModal(event, 'dateSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Date Options</h3><span class="sort-close" onclick="document.getElementById('dateSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'date', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-amount-up"></i> Oldest to Newest</a>
+            <a href="<?php echo buildUrl(['sort'=>'date', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-amount-down"></i> Newest to Oldest</a>
+            <hr style="border:0; border-top:1px dashed #eee; margin:15px 0;">
+            <span class="sort-title">Filter by Specific Date</span>
+            <form class="filter-row" method="GET">
+                <?php foreach($_GET as $key => $val) if(!in_array($key, ['f_date', 'f_month', 'f_year', 'page'])) echo "<input type='hidden' name='$key' value='$val'>"; ?>
+                <input type="date" name="f_date" class="filter-input" required value="<?php echo htmlspecialchars($filterDate); ?>">
+                <button type="submit" class="filter-go">Go</button>
+            </form>
+            <span class="sort-title" style="margin-top:10px;">Filter by Month & Year</span>
             <form method="GET">
-                <?php foreach($_GET as $key => $val) if(!in_array($key, ['f_date', 'f_month', 'f_year'])) echo "<input type='hidden' name='$key' value='$val'>"; ?>
-                
-                <div class="filter-row">
-                    <span class="filter-label">Exact Date:</span>
-                    <input type="date" name="f_date" class="filter-input" style="width:100%; box-sizing:border-box;" value="<?php echo $filterDate; ?>">
-                </div>
-                
-                <div style="text-align:center; margin:10px 0; font-size:11px; color:#888;">- OR -</div>
-                
-                <div class="filter-row" style="display:flex; gap:10px;">
-                    <div style="flex:1;">
-                        <span class="filter-label">Month:</span>
-                        <select name="f_month" class="filter-select" style="width:100%;">
-                            <option value="">All</option>
-                            <?php for($m=1; $m<=12; $m++) echo "<option value='$m' ".($filterMonth==$m?'selected':'').">".date('M', mktime(0,0,0,$m,1))."</option>"; ?>
-                        </select>
-                    </div>
-                    <div style="flex:1;">
-                        <span class="filter-label">Year:</span>
-                        <select name="f_year" class="filter-select" style="width:100%;">
-                            <option value="">All</option>
-                            <?php for($y=date('Y'); $y>=2023; $y--) echo "<option value='$y' ".($filterYear==$y?'selected':'').">$y</option>"; ?>
-                        </select>
-                    </div>
-                </div>
-                
-                <button type="submit" class="btn-apply-full">Apply Filter</button>
+                <?php foreach($_GET as $key => $val) if(!in_array($key, ['f_date', 'f_month', 'f_year', 'page'])) echo "<input type='hidden' name='$key' value='$val'>"; ?>
+                <select name="f_year" class="filter-select">
+                    <option value="">All Years</option>
+                    <?php foreach($years as $y) echo "<option value='$y' ".($filterYear==$y?'selected':'').">$y</option>"; ?>
+                </select>
+                <select name="f_month" class="filter-select">
+                    <option value="">All Months</option>
+                    <?php foreach($months as $k => $v) echo "<option value='$k' ".($filterMonth==$k?'selected':'').">$v</option>"; ?>
+                </select>
+                <button type="submit" class="btn-apply-full">Apply Date Filter</button>
             </form>
         </div>
     </div>
+    
+    <div id="donorSortModal" class="sort-modal" onclick="closeModal(event, 'donorSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Donor Sorting</h3><span class="sort-close" onclick="document.getElementById('donorSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'donor', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-alpha-down"></i> Name A to Z</a>
+            <a href="<?php echo buildUrl(['sort'=>'donor', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-alpha-up"></i> Name Z to A</a>
+        </div>
+    </div>
+    
+    <div id="methodSortModal" class="sort-modal" onclick="closeModal(event, 'methodSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Method Options</h3><span class="sort-close" onclick="document.getElementById('methodSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'method', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-alpha-down"></i> Method A to Z</a>
+            <a href="<?php echo buildUrl(['sort'=>'method', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-alpha-up"></i> Method Z to A</a>
+            <hr style="border:0; border-top:1px dashed #eee; margin:15px 0;">
+            <span class="sort-title">Filter by Method</span>
+            <a href="<?php echo buildUrl(['f_method'=>'TNG eWallet', 'page'=>1]); ?>" class="sort-btn"><i class="fas fa-wallet" style="color:#295396;"></i> TNG eWallet</a>
+            <a href="<?php echo buildUrl(['f_method'=>'System E-Wallet', 'page'=>1]); ?>" class="sort-btn"><i class="fas fa-coins" style="color:#e67e22;"></i> System E-Wallet</a>
+            <a href="<?php echo buildUrl(['f_method'=>'Credit Card', 'page'=>1]); ?>" class="sort-btn"><i class="far fa-credit-card" style="color:#27ae60;"></i> Credit Card</a>
+            <a href="<?php echo buildUrl(['f_method'=>'', 'page'=>1]); ?>" class="sort-btn" style="background:#eee;"><i class="fas fa-list"></i> Show All</a>
+        </div>
+    </div>
 
-    <div id="amountModal" class="filter-modal" onclick="closeModal(event, 'amountModal')">
-        <div class="filter-modal-content">
-            <span class="close-filter" onclick="document.getElementById('amountModal').style.display='none'">&times;</span>
-            <h4 style="margin:0 0 15px 0; font-size:14px;">Filter by Amount</h4>
-            
-            <form method="GET">
-                <?php foreach($_GET as $key => $val) if(!in_array($key, ['min_amount', 'max_amount'])) echo "<input type='hidden' name='$key' value='$val'>"; ?>
-                
-                <div class="amount-row">
-                    <span class="amount-label">Min (RM):</span>
-                    <input type="number" name="min_amount" class="filter-input" placeholder="0.00" step="0.01" min="0" value="<?php echo htmlspecialchars($minAmount); ?>">
-                </div>
-                <div class="amount-row">
-                    <span class="amount-label">Max (RM):</span>
-                    <input type="number" name="max_amount" class="filter-input" placeholder="No Limit" step="0.01" min="0" value="<?php echo htmlspecialchars($maxAmount); ?>">
-                </div>
-                
+    <div id="amountSortModal" class="sort-modal" onclick="closeModal(event, 'amountSortModal')">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Amount Options</h3><span class="sort-close" onclick="document.getElementById('amountSortModal').style.display='none'">&times;</span></div>
+            <a href="<?php echo buildUrl(['sort'=>'amount', 'order'=>'asc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-down"></i> Small to Large</a>
+            <a href="<?php echo buildUrl(['sort'=>'amount', 'order'=>'desc']); ?>" class="sort-btn"><i class="fas fa-sort-numeric-up"></i> Large to Small</a>
+            <hr style="border:0; border-top:1px dashed #eee; margin:15px 0;">
+            <span class="sort-title">Filter by Amount Range</span>
+            <form class="amount-input-group" method="GET">
+                <?php foreach($_GET as $key => $val) if(!in_array($key, ['min_amount', 'max_amount', 'page'])) echo "<input type='hidden' name='$key' value='$val'>"; ?>
+                <div class="amount-row"><span class="amount-label">Min:</span><input type="number" name="min_amount" class="filter-input" step="0.01" value="<?php echo htmlspecialchars($minAmount); ?>"></div>
+                <div class="amount-row"><span class="amount-label">Max:</span><input type="number" name="max_amount" class="filter-input" step="0.01" value="<?php echo htmlspecialchars($maxAmount); ?>"></div>
                 <button type="submit" class="btn-apply-full">Apply Filter</button>
             </form>
         </div>

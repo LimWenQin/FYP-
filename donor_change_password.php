@@ -55,14 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $update_stmt->bind_param("si", $new_hashed_password, $_SESSION['donor_id']);
                 
                 if ($update_stmt->execute()) {
-                    // Password changed successfully!
-                    // Destroy session now
                     session_unset();
                     session_destroy();
-                    
-                    // Set flag to true to trigger SweetAlert in HTML below
                     $password_changed = true; 
-                    
                 } else {
                     $error_message = "Database error: Could not update password.";
                 }
@@ -88,7 +83,6 @@ include 'header_UI.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Change Password - Love Bridge</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
@@ -125,13 +119,38 @@ include 'header_UI.php';
         .form-group { margin-bottom: 25px; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--dark-gray); }
         
-        .form-group input {
-            width: 100%; padding: 12px 15px; border: 2px solid var(--border-color);
-            border-radius: 6px; font-size: 16px; transition: all 0.3s ease;
+        /* --- 关键修改：密码框容器和图标样式 --- */
+        .password-wrapper {
+            position: relative;
+            width: 100%;
         }
+
+        .password-wrapper input {
+            width: 100%; 
+            padding: 12px 45px 12px 15px; /* 右侧留出空间给眼睛图标 */
+            border: 2px solid var(--border-color);
+            border-radius: 6px; 
+            font-size: 16px; 
+            transition: all 0.3s ease;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: var(--medium-gray);
+            z-index: 10;
+        }
+
+        .toggle-password:hover {
+            color: var(--primary-red);
+        }
+        /* ------------------------------------ */
         
-        .form-group input:focus { outline: none; border-color: var(--primary-red); box-shadow: 0 0 0 3px var(--light-red); }
-        .form-group input.error { border-color: var(--error-red); }
+        .password-wrapper input:focus { outline: none; border-color: var(--primary-red); box-shadow: 0 0 0 3px var(--light-red); }
+        .password-wrapper input.error { border-color: var(--error-red); }
         
         /* Password Strength Bars */
         .password-strength { height: 5px; background: var(--light-gray); border-radius: 3px; margin-top: 5px; overflow: hidden; }
@@ -197,12 +216,18 @@ include 'header_UI.php';
             <form method="POST" action="" id="passwordForm">
                 <div class="form-group">
                     <label for="current_password">Current Password</label>
-                    <input type="password" id="current_password" name="current_password" required placeholder="Enter your current password">
+                    <div class="password-wrapper">
+                        <input type="password" id="current_password" name="current_password" required placeholder="Enter your current password">
+                        <i class="fas fa-eye toggle-password" data-target="current_password"></i>
+                    </div>
                 </div>
                 
                 <div class="form-group">
                     <label for="new_password">New Password</label>
-                    <input type="password" id="new_password" name="new_password" required placeholder="Enter new password">
+                    <div class="password-wrapper">
+                        <input type="password" id="new_password" name="new_password" required placeholder="Enter new password">
+                        <i class="fas fa-eye toggle-password" data-target="new_password"></i>
+                    </div>
                     
                     <div class="match-error" id="samePasswordError">
                         <i class="fas fa-exclamation-circle"></i> New password cannot be the same as current password
@@ -232,7 +257,10 @@ include 'header_UI.php';
                 
                 <div class="form-group">
                     <label for="confirm_password">Confirm New Password</label>
-                    <input type="password" id="confirm_password" name="confirm_password" required placeholder="Re-enter new password">
+                    <div class="password-wrapper">
+                        <input type="password" id="confirm_password" name="confirm_password" required placeholder="Re-enter new password">
+                        <i class="fas fa-eye toggle-password" data-target="confirm_password"></i>
+                    </div>
                     <div class="match-error" id="passwordMatchError">
                         <i class="fas fa-exclamation-circle"></i> Passwords do not match
                     </div>
@@ -276,6 +304,27 @@ include 'header_UI.php';
             const passwordMatchSuccess = document.getElementById('passwordMatchSuccess');
             const samePasswordError = document.getElementById('samePasswordError');
             
+            // --- 关键修改：查看密码逻辑 ---
+            const toggleIcons = document.querySelectorAll('.toggle-password');
+            
+            toggleIcons.forEach(icon => {
+                icon.addEventListener('click', function() {
+                    const targetId = this.getAttribute('data-target');
+                    const input = document.getElementById(targetId);
+                    
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        this.classList.remove('fa-eye');
+                        this.classList.add('fa-eye-slash');
+                    } else {
+                        input.type = 'password';
+                        this.classList.remove('fa-eye-slash');
+                        this.classList.add('fa-eye');
+                    }
+                });
+            });
+            // ---------------------------
+
             // Requirements Elements
             const lengthReq = document.getElementById('lengthReq');
             const uppercaseReq = document.getElementById('uppercaseReq');
@@ -411,7 +460,6 @@ include 'header_UI.php';
                 const currentPasswordValue = document.getElementById('current_password').value;
                 
                 if (currentPasswordValue === '') {
-                    // Replaced alert with SweetAlert
                     Swal.fire({
                         icon: 'error',
                         title: 'Oops...',
@@ -423,7 +471,6 @@ include 'header_UI.php';
                 }
 
                 if (currentPasswordValue === newPassword.value) {
-                    // Replaced alert with SweetAlert
                     Swal.fire({
                         icon: 'error',
                         title: 'Invalid Password',
@@ -435,7 +482,6 @@ include 'header_UI.php';
                 }
                 
                 if (!checkAllRequirements()) {
-                    // Replaced alert with SweetAlert
                     Swal.fire({
                         icon: 'warning',
                         title: 'Weak Password',
@@ -447,7 +493,6 @@ include 'header_UI.php';
                 }
                 
                 if (newPassword.value !== confirmPassword.value) {
-                    // Replaced alert with SweetAlert
                     Swal.fire({
                         icon: 'error',
                         title: 'Mismatch',

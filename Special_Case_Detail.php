@@ -396,7 +396,7 @@ include 'header_UI.php';
                 </a>
             <?php else: ?>
                 <button class="btn-donate-large btn-disabled" disabled>
-                    <i class="fas fa-check-circle"></i> Goal Reached / Completed
+                    <i class="fas fa-check-circle"></i> Goal Reached
                 </button>
             <?php endif; ?>
 
