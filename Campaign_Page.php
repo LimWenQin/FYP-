@@ -2,8 +2,7 @@
 include 'dataconnection.php';
 include 'header_function.php'; 
 
-// --- 1. 获取全局统计数据 (不受分页影响) ---
-// 因为分页后每次只查6条，无法在循环中计算总金额和总数量，所以需要单独查询
+
 $stats_query = "SELECT 
     COUNT(*) as total_campaigns,
     SUM(Activity_GetAmount) as total_raised,
@@ -20,14 +19,12 @@ $total_raised_stat = $stats_data['total_raised'] ?? 0;
 $active_now_stat = $stats_data['active_now_count'] ?? 0;
 
 
-// --- 2. 处理筛选和分页参数 ---
 $filter = isset($_GET['filter']) ? $_GET['filter'] : 'all';
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$items_per_page = 6; // 一页 6 个
+$items_per_page = 6; 
 $offset = ($page - 1) * $items_per_page;
 
 
-// --- 3. 构建查询条件 (WHERE Clause) ---
 $where_clause = "1=1"; // 默认查询全部
 
 switch ($filter) {
@@ -113,7 +110,7 @@ include 'header_UI.php';
             background-position: center;
             background-repeat: no-repeat;
             color: white;
-            padding: 160px 20px 80px 20px; /* 增加顶部 padding 避开 Navbar */
+            padding: 160px 20px 80px 20px; 
             text-align: center;
             position: relative;
             overflow: hidden;
@@ -233,7 +230,7 @@ include 'header_UI.php';
             display: flex;
             align-items: center;
             gap: 8px;
-            text-decoration: none; /* 去除下划线 */
+            text-decoration: none; 
         }
         
         .filter-btn i {
@@ -267,7 +264,6 @@ include 'header_UI.php';
             overflow: hidden;
             box-shadow: 0 8px 25px var(--shadow);
             border: 1px solid var(--medium-gray);
-            /* 移除 JS 动画所需的初始样式，防止加载闪烁 */
             transition: transform 0.4s ease, box-shadow 0.3s ease;
             display: flex;
             flex-direction: column;
@@ -610,7 +606,7 @@ include 'header_UI.php';
                     $endDate = $campaign['Activity_EndDate'];
                     $status = $campaign['Activity_Status'];
                     
-                    // 计算状态和 Badge (虽然SQL已经筛选过，但为了 Badge 样式还是需要判断)
+                   
                     if ($status == 'Active') {
                         if ($currentDate >= $startDate && $currentDate <= $endDate) {
                             $campaignStatus = 'ongoing';
@@ -794,7 +790,7 @@ include 'header_UI.php';
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            // 使用 PHP 传递的统计数据
+           
             const totalCampaigns = <?php echo $total_campaigns_stat; ?>;
             const activeCampaigns = <?php echo $active_now_stat; ?>;
             const totalRaised = <?php echo $total_raised_stat; ?>;
