@@ -43,7 +43,7 @@ $alert_script = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
     
-    // 功能一：地址更新处理 (保留)
+    // 功能一：地址更新处理
     if (isset($_POST['update_address'])) {
         $addr1 = $_POST['addr1']; $addr2 = $_POST['addr2']; $city = $_POST['city']; $state = $_POST['state']; $zip = $_POST['zip'];
         $sql = "UPDATE donor SET Donor_Address1=?, Donor_Address2=?, Donor_City=?, Donor_State=?, Donor_PostalCode=? WHERE Donor_ID=?";
@@ -54,41 +54,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $current_donor_id) {
         }
     }
 
-    // 功能二：兑换请求处理 (保留，已包含 Low Stock 逻辑)
+    // 功能二：兑换请求处理 (加入 7 天限制检查)
     if (isset($_POST['redeem_item_id'])) {
         $item_id = $_POST['redeem_item_id'];
-        $stmt = $conn->prepare("SELECT * FROM reward_item WHERE Reward_ID = ? AND (Reward_Status = 'Active' OR Reward_Status = 'Low Stock')");
-        $stmt->bind_param("i", $item_id);
-        $stmt->execute();
-        $item = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
 
-        if (!$item || $item['Reward_Stock'] <= 0 || $donor_points < $item['Reward_RequiredPoint'] || !$donor_address_complete) {
-            $alert_script = "Swal.fire('Error', 'Unable to redeem. Please check your points or stock.', 'error');";
+        // ⭐ 安全校验：检查 7 天内是否已兑换过
+        $check_recent = $conn->prepare("SELECT COUNT(*) as total FROM redemption_order WHERE Donor_ID = ? AND Reward_ID = ? AND Redemption_Status != 'Cancelled' AND Created_At >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+        $check_recent->bind_param("ii", $current_donor_id, $item_id);
+        $check_recent->execute();
+        $count_res = $check_recent->get_result()->fetch_assoc();
+        
+        if ($count_res['total'] > 0) {
+            $alert_script = "Swal.fire('Limit Reached', 'This handicraft item is limited to one redemption every 7 days.', 'warning');";
         } else {
-            $conn->begin_transaction();
-            try {
-                $new_points = $donor_points - $item['Reward_RequiredPoint'];
-                $conn->query("UPDATE point SET Points_Total = $new_points, Points_Updated_At = NOW() WHERE Donor_ID = $current_donor_id");
-                $conn->query("UPDATE reward_item SET Reward_Stock = Reward_Stock - 1 WHERE Reward_ID = $item_id");
-                
-                $insert_ord = $conn->prepare("INSERT INTO redemption_order (Redemption_Address1, Redemption_Address2, Redemption_City, Redemption_State, Redemption_PostalCode, Redemption_Country, Redemption_ContactNumber, Redemption_PointsSpent, Redemption_Status, Redemption_Updated_At, Donor_ID, Reward_ID) VALUES (?, ?, ?, ?, ?, 'Malaysia', ?, ?, 'Processing', NOW(), ?, ?)");
-                $insert_ord->bind_param("ssssssiii", $donor_data['Donor_Address1'], $donor_data['Donor_Address2'], $donor_data['Donor_City'], $donor_data['Donor_State'], $donor_data['Donor_PostalCode'], $donor_data['Donor_ContactNumber'], $item['Reward_RequiredPoint'], $current_donor_id, $item_id);
-                $insert_ord->execute();
-                
-                $conn->commit();
-                $alert_script = "Swal.fire({ title: 'Redemption Successful!', text: 'Your reward is being processed.', icon: 'success', confirmButtonColor: '#dc2626' }).then(() => { window.location.href='Redemption_Page.php'; });";
-            } catch (Exception $e) {
-                $conn->rollback();
-                $alert_script = "Swal.fire('Failed', 'Transaction failed.', 'error');";
+            // 原有兑换逻辑
+            $stmt = $conn->prepare("SELECT * FROM reward_item WHERE Reward_ID = ? AND (Reward_Status = 'Active' OR Reward_Status = 'Low Stock')");
+            $stmt->bind_param("i", $item_id);
+            $stmt->execute();
+            $item = $stmt->get_result()->fetch_assoc();
+
+            if (!$item || $item['Reward_Stock'] <= 0 || $donor_points < $item['Reward_RequiredPoint'] || !$donor_address_complete) {
+                $alert_script = "Swal.fire('Error', 'Unable to redeem. Please check your points or stock.', 'error');";
+            } else {
+                $conn->begin_transaction();
+                try {
+                    $new_points = $donor_points - $item['Reward_RequiredPoint'];
+                    $conn->query("UPDATE point SET Points_Total = $new_points, Points_Updated_At = NOW() WHERE Donor_ID = $current_donor_id");
+                    $conn->query("UPDATE reward_item SET Reward_Stock = Reward_Stock - 1 WHERE Reward_ID = $item_id");
+                    
+                    $insert_ord = $conn->prepare("INSERT INTO redemption_order (Redemption_Address1, Redemption_Address2, Redemption_City, Redemption_State, Redemption_PostalCode, Redemption_Country, Redemption_ContactNumber, Redemption_PointsSpent, Redemption_Status, Redemption_Updated_At, Donor_ID, Reward_ID, Created_At) VALUES (?, ?, ?, ?, ?, 'Malaysia', ?, ?, 'Processing', NOW(), ?, ?, NOW())");
+                    $insert_ord->bind_param("ssssssiii", $donor_data['Donor_Address1'], $donor_data['Donor_Address2'], $donor_data['Donor_City'], $donor_data['Donor_State'], $donor_data['Donor_PostalCode'], $donor_data['Donor_ContactNumber'], $item['Reward_RequiredPoint'], $current_donor_id, $item_id);
+                    $insert_ord->execute();
+                    
+                    $conn->commit();
+                    $alert_script = "Swal.fire({ title: 'Redemption Successful!', text: 'Your reward is being processed.', icon: 'success', confirmButtonColor: '#dc2626' }).then(() => { window.location.href='Redemption_Page.php'; });";
+                } catch (Exception $e) {
+                    $conn->rollback();
+                    $alert_script = "Swal.fire('Failed', 'Transaction failed.', 'error');";
+                }
             }
         }
     }
 
-    // ⭐ 新增功能：确认收货处理 (用于更新数据库状态)
+    // 功能三：确认收货
     if (isset($_POST['confirm_receive_id'])) {
         $order_id = $_POST['confirm_receive_id'];
-        // 只有状态为 Shipped 的订单才能被改为 Completed
         $stmt = $conn->prepare("UPDATE redemption_order SET Redemption_Status = 'Completed', Redemption_Updated_At = NOW() WHERE Redemption_ID = ? AND Donor_ID = ? AND Redemption_Status = 'Shipped'");
         $stmt->bind_param("ii", $order_id, $current_donor_id);
         if ($stmt->execute()) {
