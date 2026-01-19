@@ -103,7 +103,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // 1. 添加新 Story
     if (isset($_POST['add_story'])) {
         $title = $_POST['title'];
-        $author = $_POST['author']; // [新增] 获取作者
+        $category = $_POST['category']; // [新增] 获取 Category
+        $author = $_POST['author'];
         $desc = $_POST['description'];
         
         $jsonImages = "[]";
@@ -118,15 +119,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // 检查是否有 Created_At 列
             $checkCol = $conn->query("SHOW COLUMNS FROM story LIKE 'Created_At'");
             if($checkCol && $checkCol->num_rows > 0) {
-                // [修改] SQL 插入 Author
-                $sql = "INSERT INTO story (Story_Title, Story_Author, Story_Description, Story_Image, Created_At) VALUES (?, ?, ?, ?, NOW())";
+                // [修改] SQL 插入 Category
+                $sql = "INSERT INTO story (Story_Title, Story_Category, Story_Author, Story_Description, Story_Image, Created_At) VALUES (?, ?, ?, ?, ?, NOW())";
                 $stmt = $conn->prepare($sql);
-                // [修改] bind_param "ssss"
-                $stmt->bind_param("ssss", $title, $author, $desc, $jsonImages);
+                // [修改] bind_param "sssss"
+                $stmt->bind_param("sssss", $title, $category, $author, $desc, $jsonImages);
             } else {
-                $sql = "INSERT INTO story (Story_Title, Story_Author, Story_Description, Story_Image) VALUES (?, ?, ?, ?)";
+                $sql = "INSERT INTO story (Story_Title, Story_Category, Story_Author, Story_Description, Story_Image) VALUES (?, ?, ?, ?, ?)";
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("ssss", $title, $author, $desc, $jsonImages);
+                $stmt->bind_param("sssss", $title, $category, $author, $desc, $jsonImages);
             }
             
             if ($stmt->execute()) {
@@ -142,7 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['update_story'])) {
         $storyId = intval($_POST['story_id']);
         $title = $_POST['edit_title'];
-        $author = $_POST['edit_author']; // [新增] 获取编辑的作者
+        $category = $_POST['edit_category']; // [新增] 获取编辑的 Category
+        $author = $_POST['edit_author'];
         $desc = $_POST['edit_description'];
 
         // 获取剩余的旧图片
@@ -161,11 +163,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         
         $jsonImages = json_encode($finalImages);
 
-        // [修改] SQL 更新 Author
-        $updateSql = "UPDATE story SET Story_Title = ?, Story_Author = ?, Story_Description = ?, Story_Image = ? WHERE Story_ID = ?";
+        // [修改] SQL 更新 Category
+        $updateSql = "UPDATE story SET Story_Title = ?, Story_Category = ?, Story_Author = ?, Story_Description = ?, Story_Image = ? WHERE Story_ID = ?";
         $stmt = $conn->prepare($updateSql);
-        // [修改] bind_param "ssssi"
-        $stmt->bind_param("ssssi", $title, $author, $desc, $jsonImages, $storyId);
+        // [修改] bind_param "sssssi"
+        $stmt->bind_param("sssssi", $title, $category, $author, $desc, $jsonImages, $storyId);
 
         if ($stmt->execute()) {
             header("Location: admin_manage_stories.php?success=Story updated successfully!");
@@ -291,7 +293,7 @@ $galleryData = [];
         }
         
         /* Story Styles */
-        .story-title { font-weight: 700; font-size: 15px; color: var(--dark); margin-bottom: 4px; }
+        .story-title { font-weight: 700; font-size: 15px; color: var(--dark); margin-bottom: 4px; display: flex; align-items: center; gap: 8px;}
         .story-author { font-size: 12px; color: var(--primary); margin-bottom: 6px; font-weight: 600; display: block; }
         .story-desc { 
             font-size: 13px; color: var(--gray); line-height: 1.5; max-width: 450px; 
@@ -301,6 +303,10 @@ $galleryData = [];
 
         .story-date { font-size: 13px; color: #888; font-weight: 500; white-space: nowrap;}
         
+        /* Category Badge Style */
+        .badge-news { background: #e3f2fd; color: #1976d2; font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+        .badge-donor { background: #e8f5e9; color: #2e7d32; font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+
         /* Action Menu */
         .action-menu { position: relative; display: inline-block; }
         .menu-btn { width: 32px; height: 32px; border-radius: 50%; background: white; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: #777; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
@@ -364,9 +370,18 @@ $galleryData = [];
                     <div class="card-body">
                         <form method="POST" enctype="multipart/form-data" id="storyForm">
                             <input type="hidden" name="add_story" value="1">
+                            
                             <div class="form-group">
                                 <label class="form-label">Story Title</label>
                                 <input type="text" name="title" class="form-control" required placeholder="e.g., A New Home for Shelly">
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Category</label>
+                                <select name="category" class="form-control" required>
+                                    <option value="News">News</option>
+                                    <option value="Donor Story">Donor Story</option>
+                                </select>
                             </div>
 
                             <div class="form-group">
@@ -389,7 +404,7 @@ $galleryData = [];
                                         <input type="file" id="add_images" name="images[]" multiple accept="image/*" onchange="handleFileSelect(event, 'add')">
                                     </div>
                                     <div class="preview-grid" id="add_preview_container">
-                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -449,6 +464,10 @@ $galleryData = [];
 
                                         $galleryData[] = (!empty($displayImg) && file_exists($displayImg)) ? $displayImg : 'https://placehold.co/400?text=No+Image';
                                         $currentIndex = count($galleryData) - 1; 
+
+                                        // 处理显示 Category
+                                        $cat = isset($row['Story_Category']) ? $row['Story_Category'] : 'News';
+                                        $badgeClass = ($cat === 'Donor Story') ? 'badge-donor' : 'badge-news';
                                 ?>
                                 <tr>
                                     <td>
@@ -464,7 +483,10 @@ $galleryData = [];
                                         </div>
                                     </td>
                                     <td>
-                                        <div class="story-title"><?php echo htmlspecialchars($row['Story_Title']); ?></div>
+                                        <div class="story-title">
+                                            <?php echo htmlspecialchars($row['Story_Title']); ?>
+                                            <span class="<?php echo $badgeClass; ?>"><?php echo htmlspecialchars($cat); ?></span>
+                                        </div>
                                         <div class="story-author">By: <?php echo htmlspecialchars($row['Story_Author'] ?? 'Unknown'); ?></div>
                                         <div class="story-desc"><?php echo htmlspecialchars($row['Story_Description']); ?></div>
                                     </td>
@@ -517,6 +539,14 @@ $galleryData = [];
                     <div class="form-group">
                         <label class="form-label">Story Title</label>
                         <input type="text" id="edit_title" name="edit_title" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Story Category</label>
+                        <select id="edit_category" name="edit_category" class="form-control" required>
+                            <option value="News">News</option>
+                            <option value="Donor Story">Donor Story</option>
+                        </select>
                     </div>
 
                     <div class="form-group">
@@ -695,6 +725,9 @@ $galleryData = [];
             document.getElementById('edit_story_id').value = story.Story_ID;
             document.getElementById('edit_title').value = story.Story_Title;
             
+            // [新增] 自动设置编辑时的 Category
+            document.getElementById('edit_category').value = story.Story_Category || 'News';
+
             // 填充 Author, 防止 null 报错
             document.getElementById('edit_author').value = story.Story_Author || '';
             

@@ -2,12 +2,48 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-// 获取所有故事，按日期倒序排列（最新的在前）
-$query = "SELECT * FROM story ORDER BY Story_Date DESC";
-$result = $conn->query($query);
+// --- 1. 定义分类配置 ---
+// 仿照 Special Case 的结构定义分类
+$categories = [
+    'news' => [
+        'name' => 'News',
+        'icon' => 'fas fa-newspaper',
+        'color' => '#1976d2', // 蓝色
+        'sql_condition' => "Story_Category LIKE '%News%'"
+    ],
+    'story' => [
+        'name' => 'Donor Stories',
+        'icon' => 'fas fa-heart',
+        'color' => '#e53935', // 红色
+        'sql_condition' => "Story_Category NOT LIKE '%News%'" // 假设非News的都是Story
+    ]
+];
 
-// 获取故事总数
-$totalStories = $result->num_rows;
+// 获取 URL 参数
+$category_filter = isset($_GET['category']) ? $_GET['category'] : 'all';
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+
+// --- 2. 构建查询条件 ---
+$where_clause = "1=1"; // 默认查询所有
+
+if ($category_filter !== 'all' && isset($categories[$category_filter])) {
+    $where_clause = $categories[$category_filter]['sql_condition'];
+}
+
+// 分页逻辑
+$items_per_page = 4; // 每页显示 4 个故事
+$offset = ($page - 1) * $items_per_page;
+
+// --- 3. 获取总数 (用于分页) ---
+$count_query = "SELECT COUNT(*) as total FROM story WHERE $where_clause";
+$count_result = $conn->query($count_query);
+$total_stories = $count_result->fetch_assoc()['total'];
+$total_pages = ceil($total_stories / $items_per_page);
+
+// --- 4. 获取当前页数据 ---
+// 按照日期倒序排列
+$query = "SELECT * FROM story WHERE $where_clause ORDER BY Story_Date DESC LIMIT $items_per_page OFFSET $offset";
+$result = $conn->query($query);
 
 include 'header_UI.php';
 ?>
@@ -58,7 +94,7 @@ include 'header_UI.php';
             flex-direction: column;
         }
         
-        /* Header Styles */
+        /* --- Header Styles (保持 Special Case 的风格但用 Story 的背景) --- */
         .stories-header {
             background: url('https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80'); 
             background-size: cover;
@@ -77,17 +113,17 @@ include 'header_UI.php';
             position: absolute;
             top: 0;
             left: 0;
-            width: 120%;
-            height: 120%;
-            right: 0;
-            bottom: 0;
+            width: 100%;
+            height: 100%;
             background-color: rgba(0, 0, 0, 0.5); 
-            background-size: 120px;
+            z-index: 1;
         }
         
         .page-header-content {
             position: relative;
             z-index: 2;
+            max-width: 1400px;
+            margin: 0 auto;
         }
         
         .page-title {
@@ -96,6 +132,19 @@ include 'header_UI.php';
             margin-bottom: 20px;
             position: relative;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            display: inline-block;
+        }
+
+        .page-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: var(--primary-red);
+            border-radius: 2px;
         }
         
         .page-description {
@@ -109,53 +158,66 @@ include 'header_UI.php';
             font-weight: 500;
         }
         
-        /* --- Filter Buttons Styles (New) --- */
-        .filter-container {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 40px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        .filter-btn {
-            border: none;
-            outline: none;
-            padding: 10px 25px;
-            background-color: white;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-            border-radius: 30px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            color: #555;
-        }
-
-        .filter-btn:hover {
-            background-color: #f0f0f0;
-            transform: translateY(-2px);
-        }
-
-        .filter-btn.active {
-            background-color: var(--primary-red);
-            color: white;
-            box-shadow: 0 4px 15px rgba(229, 57, 53, 0.3);
-        }
-
-        /* Filter Logic: Hidden Elements */
-        .story-item.hide {
-            display: none;
-        }
-
         /* Main Container */
         .stories-container {
             flex: 1;
             max-width: 1400px;
             margin: 0 auto;
-            padding: 20px 40px 60px 40px; /* Top padding reduced */
+            padding: 40px 20px 60px 20px;
             width: 100%;
+        }
+
+        /* --- Categories Grid (从 Special Case 移植过来的样式) --- */
+        .categories-container { 
+            margin-bottom: 40px; 
+            margin-top: 20px;
+        }
+        .categories-title { 
+            font-size: 24px; 
+            color: var(--primary-red); 
+            margin-bottom: 25px; 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+        }
+        /* 调整Grid布局，适应News只有2-3个分类的情况，居中显示 */
+        .categories-grid { 
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .category-item { 
+            background: var(--white); 
+            border: 2px solid #eee; 
+            border-radius: 10px; 
+            padding: 15px 30px; 
+            text-align: center; 
+            cursor: pointer; 
+            transition: all 0.3s ease; 
+            text-decoration: none; 
+            color: var(--text); 
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 150px;
+            justify-content: center;
+        }
+        .category-item:hover { 
+            transform: translateY(-5px); 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1); 
+        }
+        .category-item.active { 
+            color: white; 
+            transform: translateY(-5px); 
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15); 
+        }
+        .category-icon { 
+            font-size: 20px; 
+        }
+        .category-name { 
+            font-size: 16px; 
+            font-weight: 600; 
         }
         
         /* Story Grid */
@@ -163,6 +225,7 @@ include 'header_UI.php';
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 40px;
+            margin-bottom: 50px;
         }
         
         /* Story Card */
@@ -342,6 +405,42 @@ include 'header_UI.php';
             margin: 0 auto;
             line-height: 1.6;
         }
+
+        /* --- Pagination (从 Special Case 移植) --- */
+        .pagination { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            gap: 10px; 
+            margin-top: 40px; 
+        }
+        .pagination a, .pagination span { 
+            padding: 10px 18px; 
+            text-decoration: none; 
+            border: 2px solid var(--primary-red); 
+            color: var(--primary-red); 
+            border-radius: 8px; 
+            font-weight: 600; 
+            transition: all 0.3s ease; 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 5px; 
+        }
+        .pagination a:hover { 
+            background: var(--primary-red); 
+            color: white; 
+            transform: translateY(-2px); 
+            box-shadow: 0 5px 15px rgba(229, 57, 53, 0.3); 
+        }
+        .pagination .current { 
+            background: var(--primary-red); 
+            color: white; 
+            border-color: var(--primary-red); 
+        }
+        .pagination .disabled { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+        }
         
         /* Responsive Design */
         @media (max-width: 1200px) {
@@ -364,6 +463,7 @@ include 'header_UI.php';
             .story-content { padding: 25px; }
             .story-title { font-size: 22px; }
             .story-description { font-size: 16px; }
+            .categories-grid { flex-direction: column; }
         }
         
         @media (max-width: 576px) {
@@ -393,14 +493,30 @@ include 'header_UI.php';
         </div>
 
         <div class="stories-container">
-            <div class="filter-container">
-                <button class="filter-btn active" onclick="filterSelection('all')">Show All</button>
-                <button class="filter-btn" onclick="filterSelection('news')">News</button>
-                <button class="filter-btn" onclick="filterSelection('story')">Donor Stories</button>
+            
+            <div class="categories-container">
+                <div class="categories-grid">
+                    <a href="?category=all&page=1" class="category-item <?php echo $category_filter == 'all' ? 'active' : ''; ?>" style="<?php echo $category_filter == 'all' ? 'background: #e53935; border-color: #e53935;' : ''; ?>">
+                        <i class="fas fa-layer-group category-icon" style="<?php echo $category_filter == 'all' ? 'color: white;' : 'color: #e53935;'; ?>"></i>
+                        <span class="category-name">Show All</span>
+                    </a>
+
+                    <?php foreach($categories as $key => $cat_data): ?>
+                        <?php 
+                            $isActive = ($category_filter == $key);
+                            $bgStyle = $isActive ? "background: {$cat_data['color']}; border-color: {$cat_data['color']};" : "border-color: {$cat_data['color']};";
+                            $iconColor = $isActive ? "white" : $cat_data['color'];
+                        ?>
+                        <a href="?category=<?php echo $key; ?>&page=1" class="category-item <?php echo $isActive ? 'active' : ''; ?>" style="<?php echo $bgStyle; ?>">
+                            <i class="<?php echo $cat_data['icon']; ?> category-icon" style="color: <?php echo $iconColor; ?>"></i>
+                            <span class="category-name"><?php echo $cat_data['name']; ?></span>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
             </div>
 
             <div class="stories-grid">
-                <?php if ($totalStories > 0): 
+                <?php if ($result->num_rows > 0): 
                     while($story = $result->fetch_assoc()): 
                         $storyDate = date('F d, Y', strtotime($story['Story_Date']));
                         
@@ -422,17 +538,14 @@ include 'header_UI.php';
                         $category = !empty($story['Story_Category']) ? $story['Story_Category'] : "General";
                         $description = $story['Story_Description'];
 
-                        // --- 逻辑 1: Filter Tag & Filter Category ---
-                        // 如果 Category 包含 "News" (不区分大小写)，设为 News 类型，否则为 Story 类型
+                        // 设置 Badge 颜色
                         if (stripos($category, 'News') !== false) {
                             $badgeClass = 'badge-blue';
-                            $filterCategory = 'news'; // 用于 Filter
                         } else {
                             $badgeClass = 'badge-red'; 
-                            $filterCategory = 'story'; // 用于 Filter
                         }
                 ?>
-                    <div class="story-item" data-category="<?php echo $filterCategory; ?>">
+                    <div class="story-item">
                         <div class="story-card">
                             <div class="story-image-container">
                                 <img src="<?php echo htmlspecialchars($imagePath); ?>" 
@@ -472,11 +585,48 @@ include 'header_UI.php';
                 <?php else: ?>
                     <div class="no-stories">
                         <i class="fas fa-book-open"></i>
-                        <h3>No Stories Available</h3>
-                        <p>We're currently gathering inspiring stories from our community. Check back soon.</p>
+                        <h3>No Stories Found</h3>
+                        <p>We couldn't find any stories in this category.</p>
+                        <?php if ($category_filter !== 'all'): ?>
+                            <p style="margin-top: 15px;"><a href="?category=all" style="color: var(--primary-red); font-weight: bold;">View All Stories</a></p>
+                        <?php endif; ?>
                     </div>
                 <?php endif; ?>
             </div>
+            
+            <?php if ($total_pages > 1): ?>
+                <div class="pagination">
+                    <?php if ($page > 1): ?>
+                        <a href="?category=<?php echo $category_filter; ?>&page=<?php echo $page - 1; ?>">
+                            <i class="fas fa-chevron-left"></i> Previous
+                        </a>
+                    <?php else: ?>
+                        <span class="disabled"><i class="fas fa-chevron-left"></i> Previous</span>
+                    <?php endif; ?>
+                    
+                    <?php 
+                    $start_page = max(1, $page - 2);
+                    $end_page = min($total_pages, $start_page + 4);
+                    $start_page = max(1, $end_page - 4);
+                    
+                    for ($i = $start_page; $i <= $end_page; $i++):
+                    ?>
+                        <?php if ($i == $page): ?>
+                            <span class="current"><?php echo $i; ?></span>
+                        <?php else: ?>
+                            <a href="?category=<?php echo $category_filter; ?>&page=<?php echo $i; ?>"><?php echo $i; ?></a>
+                        <?php endif; ?>
+                    <?php endfor; ?>
+                    
+                    <?php if ($page < $total_pages): ?>
+                        <a href="?category=<?php echo $category_filter; ?>&page=<?php echo $page + 1; ?>">
+                            Next <i class="fas fa-chevron-right"></i>
+                        </a>
+                    <?php else: ?>
+                        <span class="disabled">Next <i class="fas fa-chevron-right"></i></span>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         </div>
         
         <?php include 'footer.php'; ?>
@@ -497,114 +647,19 @@ include 'header_UI.php';
                 backdrop: `rgba(0,0,0,0.8)`
             });
         }
-
-        // --- Filter Logic (筛选逻辑) ---
-        function filterSelection(c) {
-            var x, i;
-            x = document.getElementsByClassName("story-item");
-            
-            // 切换按钮的 active 状态
-            var btns = document.getElementsByClassName("filter-btn");
-            for (i = 0; i < btns.length; i++) {
-                // 如果当前按钮被点击
-                if (btns[i].innerText.toLowerCase().includes(c) || (c === 'all' && btns[i].innerText === 'Show All') || (c === 'story' && btns[i].innerText === 'Donor Stories')) {
-                    // 简单的遍历移除 active 再添加有点麻烦，这里直接用 event.target 逻辑会更好
-                    // 但为了简单适配 onclick，我们用一个专门的循环处理 Button active
-                }
-            }
-            
-            // 执行筛选
-            if (c == "all") c = "";
-            for (i = 0; i < x.length; i++) {
-                removeClass(x[i], "hide"); // 先移除隐藏
-                let itemCategory = x[i].getAttribute('data-category');
-                
-                // 如果不匹配，则隐藏
-                if (c !== "" && itemCategory !== c) {
-                    addClass(x[i], "hide");
-                }
-            }
-            
-            // 重新触发进场动画
-            animateStoryCards();
-        }
-
-        // 辅助函数：添加类
-        function addClass(element, name) {
-            var arr1, arr2;
-            arr1 = element.className.split(" ");
-            arr2 = name.split(" ");
-            for (var i = 0; i < arr2.length; i++) {
-                if (arr1.indexOf(arr2[i]) == -1) {element.className += " " + arr2[i];}
-            }
-        }
-
-        // 辅助函数：移除类
-        function removeClass(element, name) {
-            var arr1, arr2;
-            arr1 = element.className.split(" ");
-            arr2 = name.split(" ");
-            for (var i = 0; i < arr2.length; i++) {
-                while (arr1.indexOf(arr2[i]) > -1) {
-                    arr1.splice(arr1.indexOf(arr2[i]), 1);     
-                }
-            }
-            element.className = arr1.join(" ");
-        }
-
-        // 处理按钮 Active 样式
-        var btnContainer = document.querySelector(".filter-container");
-        var btns = btnContainer.getElementsByClassName("filter-btn");
-        for (var i = 0; i < btns.length; i++) {
-            btns[i].addEventListener("click", function(){
-                var current = document.getElementsByClassName("active");
-                if (current.length > 0) { 
-                    current[0].className = current[0].className.replace(" active", "");
-                }
-                this.className += " active";
-            });
-        }
-
-        // --- Animation Logic ---
-        function animateStoryCards() {
-            const storyCards = document.querySelectorAll('.story-card');
-            
-            // 重置状态
-            storyCards.forEach(card => {
-                // 如果父级被隐藏了，就不管它
-                if(!card.parentElement.classList.contains('hide')) {
-                    card.style.opacity = '0';
-                    card.style.transform = 'translateY(20px)';
-                }
-            });
-
-            // 稍微延迟后开始动画
-            setTimeout(() => {
-                storyCards.forEach((card, index) => {
-                    // 只动画显示的元素
-                    if(!card.parentElement.classList.contains('hide')) {
-                        const rect = card.getBoundingClientRect();
-                        // 简单的依次显示，或者视口检测
-                        setTimeout(() => {
-                            card.style.opacity = '1';
-                            card.style.transform = 'translateY(0)';
-                        }, index * 100); 
-                    }
-                });
-            }, 100);
-        }
-
-        // Initialize
+        
+        // 进场动画
         document.addEventListener('DOMContentLoaded', function() {
             const storyCards = document.querySelectorAll('.story-card');
-            storyCards.forEach(card => {
+            storyCards.forEach((card, index) => {
                 card.style.opacity = '0';
                 card.style.transform = 'translateY(20px)';
+                
+                setTimeout(() => {
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, index * 100);
             });
-            
-            // Trigger initial animation
-            setTimeout(animateStoryCards, 100);
-        
         });
     </script>
 </body>
