@@ -24,7 +24,7 @@ if (isset($_SESSION['admin_id'])) {
     $sidebar_Role = "Staff";
 }
 
-// --- 2. 定义权限列表 (根据你的要求) ---
+// --- 2. 定义权限列表 ---
 // true = 允许访问, false = 禁止访问 (显示锁头)
 
 // 默认全都不允许，下面根据角色开启
@@ -34,7 +34,7 @@ $perms = [
     'admin_manage' => false,
     'branch' => false,
     'activity' => false, // In-person & Special Case
-    'payment' => false,
+    'payment' => false,  // Payment & E-Wallet
     'receipts' => false,
     'reward' => false,   // Reward & Redemption
     'block_list' => false
@@ -127,7 +127,28 @@ function renderMenuItem($isAllowed, $url, $iconClass, $text, $isActive) {
                 <?php endif; ?>
             </li>
 
-            <?php renderMenuItem($perms['payment'], 'payment_management.php', 'fas fa-credit-card', 'Payment Management', $current_page == 'payment_management.php'); ?>
+            <?php 
+                // --- Payment Management (Transaction & E-Wallet) ---
+                $is_payment_active = ($current_page == 'payment_management.php' || $current_page == 'ewallet_management.php');
+                $payment_allowed = $perms['payment'];
+            ?>
+            <li class="has-submenu <?php echo $is_payment_active ? 'open' : ''; ?>">
+                <a href="javascript:void(0)" <?php echo $payment_allowed ? 'onclick="toggleSubmenu(this)"' : 'onclick="showAccessDenied()" style="color:#aaa; cursor:not-allowed;"'; ?>>
+                    <i class="fas fa-credit-card"></i> 
+                    <span>Payment System</span>
+                    <?php if($payment_allowed): ?>
+                        <i class="fas fa-chevron-down arrow"></i>
+                    <?php else: ?>
+                        <i class="fas fa-lock" style="float: right; font-size: 12px; margin-top: 4px;"></i>
+                    <?php endif; ?>
+                </a>
+                <?php if($payment_allowed): ?>
+                <ul class="submenu <?php echo $is_payment_active ? 'show' : ''; ?>">
+                    <li><a href="payment_management.php" class="<?php echo $current_page == 'payment_management.php' ? 'active' : ''; ?>">Transaction History</a></li>
+                    <li><a href="ewallet_management.php" class="<?php echo $current_page == 'ewallet_management.php' ? 'active' : ''; ?>">E-Wallet Management</a></li>
+                </ul>
+                <?php endif; ?>
+            </li>
 
             <?php renderMenuItem($perms['receipts'], 'admin_receipts.php', 'fas fa-file-invoice-dollar', 'Tax Receipt Requests', $current_page == 'admin_receipts.php'); ?>
 

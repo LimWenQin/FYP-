@@ -542,8 +542,8 @@ $defaultAvatarPlaceholder = "https://via.placeholder.com/500x500.png?text=No+Pro
                                         <div class="action-menu">
                                             <button class="menu-btn" onclick="toggleMenu(event, <?php echo $donor['Donor_ID']; ?>)"><i class="fas fa-ellipsis-v"></i></button>
                                             <div id="menu-<?php echo $donor['Donor_ID']; ?>" class="dropdown-content">
-                                                <a href="admin_donor_view_edit.php?id=<?php echo $donor['Donor_ID']; ?>&mode=view"><i class="fas fa-eye"></i> View Details</a>
-                                                <a href="admin_donor_view_edit.php?id=<?php echo $donor['Donor_ID']; ?>&mode=edit"><i class="fas fa-edit"></i> Edit Details</a>
+                                                <a href="admin_donor_view_edit.php?id=<?php echo $donor['Donor_ID']; ?>&mode=view" target="_blank"><i class="fas fa-eye"></i> View Details</a>
+                                                <a href="admin_donor_view_edit.php?id=<?php echo $donor['Donor_ID']; ?>&mode=edit" target="_blank"><i class="fas fa-edit"></i> Edit Details</a>
                                                 
                                                 <a href="admin_donor_payment_history.php?donor_id=<?php echo $donor['Donor_ID']; ?>" target="_blank"><i class="fas fa-history"></i> Payment History</a>
                                                 <a href="admin_donor_redemption_history.php?donor_id=<?php echo $donor['Donor_ID']; ?>" target="_blank"><i class="fas fa-gift"></i> Redemption History</a>

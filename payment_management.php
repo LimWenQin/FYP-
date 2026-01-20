@@ -10,202 +10,10 @@ if (!isset($_SESSION['admin_id'])) {
 
 include 'dataconnection.php';
 
-// --- Get Current Admin Info ---
 $currentAdminId = $_SESSION['admin_id'];
-$adminSql = "SELECT Admin_Name, Admin_Role, Admin_ProfilePicture FROM admin WHERE Admin_ID = $currentAdminId";
-$adminResult = $conn->query($adminSql);
-
-$adminName = "Admin";
-$adminRole = "Staff";
-$adminProfilePicture = null;
-
-if ($adminResult && $adminResult->num_rows > 0) {
-    $adminData = $adminResult->fetch_assoc();
-    $adminName = $adminData['Admin_Name'];
-    $adminRole = $adminData['Admin_Role'];
-    $adminProfilePicture = $adminData['Admin_ProfilePicture']; 
-}
-
-// --- FILE UPLOAD HELPER ---
-function handleWithdrawalUpload($files) {
-    $paths = [];
-    $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
-    $dir = "uploads/withdrawals/";
-    if (!is_dir($dir)) mkdir($dir, 0777, true);
-
-    if (!is_array($files['name'])) return [];
-
-    $count = count($files['name']);
-    for ($i = 0; $i < $count; $i++) {
-        if ($files['error'][$i] == 0) {
-            $ext = strtolower(pathinfo($files['name'][$i], PATHINFO_EXTENSION));
-            if (in_array($ext, $allowed)) {
-                $name = 'wd_' . time() . '_' . uniqid() . '_' . $i . '.' . $ext;
-                if (move_uploaded_file($files['tmp_name'][$i], $dir . $name)) {
-                    $paths[] = $dir . $name;
-                }
-            }
-        }
-    }
-    return $paths;
-}
 
 // ==========================================
-// 0. HANDLE WITHDRAWAL APPROVAL / REJECTION
-// ==========================================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type'])) {
-    $action = $_POST['action_type']; // 'approve' or 'reject'
-    $wd_id = intval($_POST['withdrawal_id']);
-    
-    // Only Super Admin can approve/reject
-    if ($adminRole !== 'Super Admin') {
-        header("Location: payment_management.php?error=Permission Denied. Only Super Admin can perform this action.");
-        exit();
-    }
-
-    // Get Withdrawal Details to check who requested it
-    $checkSql = "SELECT Admin_ID, Status FROM withdrawals WHERE Withdrawal_ID = $wd_id";
-    $checkRes = $conn->query($checkSql);
-    
-    if($checkRes->num_rows > 0) {
-        $wdData = $checkRes->fetch_assoc();
-        
-        // Cannot approve own request
-        if ($wdData['Admin_ID'] == $currentAdminId) {
-            header("Location: payment_management.php?error=You cannot approve your own withdrawal request.");
-            exit();
-        }
-
-        if ($wdData['Status'] !== 'Pending') {
-             header("Location: payment_management.php?error=This request has already been processed.");
-             exit();
-        }
-
-        if ($action == 'approve') {
-            // Update to Completed
-            $stmt = $conn->prepare("UPDATE withdrawals SET Status = 'Completed', Approved_By = ?, Processed_Date = NOW() WHERE Withdrawal_ID = ?");
-            $stmt->bind_param("ii", $currentAdminId, $wd_id);
-            if($stmt->execute()) {
-                header("Location: payment_management.php?success=Withdrawal Approved Successfully.");
-                exit();
-            }
-        } elseif ($action == 'reject') {
-            // Update to Rejected
-            $stmt = $conn->prepare("UPDATE withdrawals SET Status = 'Rejected', Approved_By = ?, Processed_Date = NOW() WHERE Withdrawal_ID = ?");
-            $stmt->bind_param("ii", $currentAdminId, $wd_id);
-             if($stmt->execute()) {
-                header("Location: payment_management.php?success=Withdrawal Rejected.");
-                exit();
-            }
-        }
-    } else {
-        header("Location: payment_management.php?error=Record not found.");
-        exit();
-    }
-}
-
-// ==========================================
-// 0. HANDLE WITHDRAWAL FORM SUBMISSION
-// ==========================================
-if (isset($_POST['submit_withdrawal'])) {
-    $errors = []; 
-
-    $w_type = $_POST['withdrawal_type'] ?? '';
-    $w_amount = floatval($_POST['amount'] ?? 0);
-    $w_bank_name = $_POST['bank_name'] ?? '';
-    $w_bank_acc = $_POST['bank_account'] ?? '';
-    
-    // PHP Side Validation (Backup)
-    if (empty($w_type)) $errors[] = "Withdrawal Source Type is required.";
-    if ($w_amount <= 0) $errors[] = "Amount must be greater than RM 0.00.";
-
-    $branch_id = null;
-    $activity_id = null;
-    $case_id = null;
-    $current_balance = 0;
-    
-    if ($w_type == 'branch') {
-        $branch_id = $_POST['target_id_branch'] ?? null;
-        if(!$branch_id) $errors[] = "Please select a Branch.";
-        else {
-            $in = $conn->query("SELECT SUM(Order_Amount) as t FROM orders WHERE Branch_ID = $branch_id AND Order_PaymentStatus IN ('Success','Completed')")->fetch_assoc()['t'] ?? 0;
-            $out = $conn->query("SELECT SUM(Amount) as t FROM withdrawals WHERE Branch_ID = $branch_id AND Status != 'Rejected'")->fetch_assoc()['t'] ?? 0;
-            $current_balance = $in - $out;
-        }
-
-    } elseif ($w_type == 'activity') {
-        $activity_id = $_POST['target_id_activity'] ?? null;
-        if(!$activity_id) $errors[] = "Please select an Activity.";
-        else {
-            $act_sql = "SELECT Branch_ID, Activity_GetAmount FROM activity WHERE Activity_ID = '$activity_id'";
-            $act_res = $conn->query($act_sql);
-            if($act_res->num_rows > 0) {
-                $act_row = $act_res->fetch_assoc();
-                $branch_id = $act_row['Branch_ID'];
-                $raised = $act_row['Activity_GetAmount'];
-                $out = $conn->query("SELECT SUM(Amount) as t FROM withdrawals WHERE Activity_ID = $activity_id AND Status != 'Rejected'")->fetch_assoc()['t'] ?? 0;
-                $current_balance = $raised - $out;
-            }
-        }
-
-    } elseif ($w_type == 'case') {
-        $case_id = $_POST['target_id_case'] ?? null;
-        $branch_id = $_POST['handling_branch_id'] ?? null; 
-        if(!$case_id) $errors[] = "Please select a Special Case.";
-        if(!$branch_id) $errors[] = "Please select a Processing Branch.";
-        else {
-            $case_row = $conn->query("SELECT Raised_Amount FROM special_case WHERE Case_ID = $case_id")->fetch_assoc();
-            $raised = $case_row['Raised_Amount'] ?? 0;
-            $out = $conn->query("SELECT SUM(Amount) as t FROM withdrawals WHERE Case_ID = $case_id AND Status != 'Rejected'")->fetch_assoc()['t'] ?? 0;
-            $current_balance = $raised - $out;
-        }
-    }
-
-    if ($w_amount > $current_balance) {
-        $errors[] = "Insufficient funds! Available: RM " . number_format($current_balance, 2);
-    }
-
-    $proof_json = "[]";
-    if (empty($errors)) {
-        if (isset($_FILES['proof_file']) && !empty($_FILES['proof_file']['name'][0])) {
-            $uploaded_paths = handleWithdrawalUpload($_FILES['proof_file']);
-            if (empty($uploaded_paths)) {
-                $errors[] = "Failed to upload files or invalid format (Only JPG, PNG, PDF).";
-            } else {
-                $proof_json = json_encode($uploaded_paths);
-            }
-        } else {
-            $errors[] = "At least one Reference Proof file is required.";
-        }
-    }
-
-    if (empty($errors) && $branch_id && $w_amount > 0) {
-        // Status: Pending
-        $stmt = $conn->prepare("INSERT INTO withdrawals (Branch_ID, Activity_ID, Case_ID, Amount, Bank_Name, Bank_Account, Reference_Proof, Status, Admin_ID, Request_Date) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', ?, NOW())");
-        
-        $stmt->bind_param("iiidsssi", $branch_id, $activity_id, $case_id, $w_amount, $w_bank_name, $w_bank_acc, $proof_json, $currentAdminId);
-        
-        if ($stmt->execute()) {
-            header("Location: payment_management.php?success=Withdrawal request submitted. Waiting for Super Admin approval.");
-            exit();
-        } else {
-            $error = "Database Error: " . $stmt->error;
-            header("Location: payment_management.php?error=" . urlencode($error));
-            exit();
-        }
-        $stmt->close();
-    } elseif (!empty($errors)) {
-        $errorString = implode("<br>", $errors);
-        header("Location: payment_management.php?error=" . urlencode($errorString));
-        exit();
-    } else {
-        header("Location: payment_management.php?error=Invalid details provided.");
-        exit();
-    }
-}
-
-// ==========================================
-// 1. HANDLE EXPORT: INCOME
+// 1. EXPORT LOGIC (Kept as requested)
 // ==========================================
 if (isset($_GET['export']) && $_GET['export'] == 'income') {
     $filename = "report_transaction_history_" . date('Ymd') . ".xls";
@@ -261,121 +69,65 @@ if (isset($_GET['export']) && $_GET['export'] == 'income') {
     exit();
 }
 
-// ==========================================
-// 2. HANDLE EXPORT: E-WALLET
-// ==========================================
-if (isset($_GET['export']) && $_GET['export'] == 'ewallet') {
-    $filename = "report_ewallet_log_" . date('Ymd') . ".xls";
-    header("Content-Type: application/vnd.ms-excel");
-    header("Content-Disposition: attachment; filename=\"$filename\"");
-    header("Pragma: no-cache");
-    header("Expires: 0");
-
-    echo '<table border="1">';
-    echo '<tr>
-            <th>Txn ID</th><th>Date & Time</th>
-            <th>Donor ID</th><th>Donor Name</th><th>Donor Email</th><th>Donor Contact</th>
-            <th>Current Wallet Balance (RM)</th>
-            <th>Transaction Type</th><th>Amount (RM)</th>
-            <th>Description</th><th>Linked Order Ref</th>
-          </tr>';
-    
-    $sql = "SELECT w.*, d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber, d.Donor_Wallet, o.Order_TXN_Ref
-            FROM wallet_transaction w
-            JOIN donor d ON w.Donor_ID = d.Donor_ID
-            LEFT JOIN orders o ON w.Order_ID = o.Order_ID
-            ORDER BY w.Created_At DESC";
-            
-    $res = $conn->query($sql);
-    while($row = $res->fetch_assoc()) {
-        $txnID = $row['Wallet_Trans_ID'];
-        echo "<tr>
-            <td>{$txnID}</td>
-            <td>{$row['Created_At']}</td>
-            <td>{$row['Donor_ID']}</td>
-            <td>{$row['Donor_Name']}</td>
-            <td>{$row['Donor_Email']}</td>
-            <td>'{$row['Donor_ContactNumber']}</td>
-            <td>{$row['Donor_Wallet']}</td>
-            <td>{$row['Transaction_Type']}</td>
-            <td>{$row['Amount']}</td>
-            <td>{$row['Description']}</td>
-            <td>{$row['Order_TXN_Ref']}</td>
-        </tr>";
-    }
-    echo '</table>';
-    exit();
-}
-
-// --- Fetch Data ---
-$branchList = [];
-$branches = $conn->query("SELECT Branch_ID, Branch_Name, Branch_BankName, Branch_BankAccount FROM branch WHERE Is_Deleted = 0 ORDER BY Branch_Name ASC");
-while($b = $branches->fetch_assoc()) {
-    $bid = $b['Branch_ID'];
-    $in = $conn->query("SELECT SUM(Order_Amount) as t FROM orders WHERE Branch_ID = $bid AND Order_PaymentStatus IN ('Success','Completed')")->fetch_assoc()['t'] ?? 0;
-    $out = $conn->query("SELECT SUM(Amount) as t FROM withdrawals WHERE Branch_ID = $bid AND Status != 'Rejected'")->fetch_assoc()['t'] ?? 0;
-    $b['balance'] = $in - $out;
-    $branchList[] = $b;
-}
-
-$activityList = [];
-$activities = $conn->query("SELECT a.Activity_ID, a.Activity_Name, a.Activity_GetAmount, a.Branch_ID, b.Branch_BankName, b.Branch_BankAccount 
-                            FROM activity a JOIN branch b ON a.Branch_ID = b.Branch_ID 
-                            WHERE a.Activity_Status != 'Cancelled' ORDER BY a.Activity_Name ASC");
-while($a = $activities->fetch_assoc()) {
-    $aid = $a['Activity_ID'];
-    $raised = $a['Activity_GetAmount']; 
-    $out = $conn->query("SELECT SUM(Amount) as t FROM withdrawals WHERE Activity_ID = $aid AND Status != 'Rejected'")->fetch_assoc()['t'] ?? 0;
-    $a['balance'] = $raised - $out;
-    $activityList[] = $a;
-}
-
-$caseList = [];
-$cases = $conn->query("SELECT Case_ID, Case_Title, Case_BankName, Case_BankAccount, Raised_Amount FROM special_case WHERE Case_Status != 'Cancelled' ORDER BY Case_Title ASC");
-while($c = $cases->fetch_assoc()) {
-    $cid = $c['Case_ID'];
-    $raised = $c['Raised_Amount'];
-    $out = $conn->query("SELECT SUM(Amount) as t FROM withdrawals WHERE Case_ID = $cid AND Status != 'Rejected'")->fetch_assoc()['t'] ?? 0;
-    $c['balance'] = $raised - $out;
-    $caseList[] = $c;
-}
-
-$jsonBranches = json_encode($branchList);
-$jsonActivities = json_encode($activityList);
-$jsonCases = json_encode($caseList);
-
 $totalRevenue = $conn->query("SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus IN ('Completed', 'Success')")->fetch_assoc()['total'] ?? 0;
 $recurringRevenue = $conn->query("SELECT SUM(Order_Amount) as total FROM orders WHERE Order_PaymentStatus IN ('Completed', 'Success') AND Order_Type = 'Recurring'")->fetch_assoc()['total'] ?? 0;
-$totalWalletBalance = $conn->query("SELECT SUM(Donor_Wallet) as total FROM donor")->fetch_assoc()['total'] ?? 0;
 $pendingCount = $conn->query("SELECT COUNT(*) as count FROM orders WHERE Order_PaymentStatus = 'Pending'")->fetch_assoc()['count'];
 
 // ==========================================
-// LIST 1: TRANSACTION HISTORY
+// 2. LIST LOGIC WITH TABS, SORTING & NEW FILTERS
 // ==========================================
+
+function buildUrl($params) {
+    $current = $_GET;
+    // Handle array parameters like f_role[]
+    foreach ($params as $key => $value) {
+        $current[$key] = $value;
+    }
+    return '?' . http_build_query($current);
+}
+
+// Params
+$activeTab = isset($_GET['tab']) ? $_GET['tab'] : 'all';
+$sort = isset($_GET['sort']) ? $_GET['sort'] : 'date';
+$order = isset($_GET['order']) ? $_GET['order'] : 'desc';
+$search_tx = isset($_GET['search_tx']) ? mysqli_real_escape_string($conn, $_GET['search_tx']) : '';
+
+// --- NEW FILTERS ---
+$f_date_y = isset($_GET['f_date_y']) ? $_GET['f_date_y'] : '';
+$f_date_m = isset($_GET['f_date_m']) ? $_GET['f_date_m'] : '';
+$f_date_d = isset($_GET['f_date_d']) ? $_GET['f_date_d'] : '';
+
+// Role is now an array for multi-select
+$f_role = isset($_GET['f_role']) ? $_GET['f_role'] : []; 
+
+$f_target = isset($_GET['f_target']) ? $_GET['f_target'] : ''; // branch, activity, case
+$f_min    = isset($_GET['f_min']) ? $_GET['f_min'] : '';
+$f_max    = isset($_GET['f_max']) ? $_GET['f_max'] : '';
+$f_method = isset($_GET['f_method']) ? $_GET['f_method'] : '';
+
 $limit = 5; 
 $page_tx = isset($_GET['page_tx']) && is_numeric($_GET['page_tx']) ? (int)$_GET['page_tx'] : 1;
 if ($page_tx < 1) $page_tx = 1;
 $offset_tx = ($page_tx - 1) * $limit;
 
-$search_tx = isset($_GET['search_tx']) ? mysqli_real_escape_string($conn, $_GET['search_tx']) : '';
-$filter_type_tx = isset($_GET['filter_type_tx']) ? $_GET['filter_type_tx'] : '';
-$filter_date_tx = isset($_GET['filter_date_tx']) ? $_GET['filter_date_tx'] : '';
-$filter_method_tx = isset($_GET['filter_method_tx']) ? $_GET['filter_method_tx'] : '';
+// --- Base Queries ---
+// Added 'Target_Sort_Name' for sorting capability on Target Column
 
-// 1. Orders
-$q1 = "SELECT 
+// Income (Donations) Query
+$qIncome = "SELECT 
         o.Order_ID as ID, 
         o.Order_TXN_Ref as Ref, 
         d.Donor_Name as Name, 
         d.Donor_Email as Email,
         'Donor' as User_Role, 
-        NULL as Request_Admin_ID,
         o.Order_Amount as Amount, 
         o.Order_Created_At as Date, 
         o.Order_PaymentMethod as Method, 
         'Income' as Type,
         o.Order_Status as Status_Text,
-        b.Branch_Name, a.Activity_Name, s.Case_Title
+        b.Branch_Name, a.Activity_Name, s.Case_Title,
+        COALESCE(b.Branch_Name, a.Activity_Name, s.Case_Title, 'General') as Target_Sort_Name,
+        o.Order_Type, o.Branch_ID, o.Activity_ID, o.Case_ID
        FROM orders o
        JOIN donor d ON o.Donor_ID = d.Donor_ID
        LEFT JOIN branch b ON o.Branch_ID = b.Branch_ID
@@ -383,20 +135,21 @@ $q1 = "SELECT
        LEFT JOIN special_case s ON o.Case_ID = s.Case_ID
        WHERE o.Order_PaymentStatus IN ('Success', 'Completed')";
 
-// 2. Withdrawals
-$q2 = "SELECT 
+// Expense (Withdrawals) Query
+$qExpense = "SELECT 
         w.Withdrawal_ID as ID, 
         CONCAT('WDR-', w.Withdrawal_ID) as Ref, 
         adm.Admin_Name as Name, 
         adm.Admin_Email as Email,
         adm.Admin_Role as User_Role, 
-        w.Admin_ID as Request_Admin_ID,
         w.Amount as Amount, 
         w.Request_Date as Date, 
         'Bank Transfer' as Method, 
         'Withdrawal' as Type,
         w.Status as Status_Text,
-        b.Branch_Name, a.Activity_Name, s.Case_Title
+        b.Branch_Name, a.Activity_Name, s.Case_Title,
+        COALESCE(b.Branch_Name, a.Activity_Name, s.Case_Title, 'General') as Target_Sort_Name,
+        'Withdrawal' as Order_Type, w.Branch_ID, w.Activity_ID, w.Case_ID
        FROM withdrawals w
        JOIN admin adm ON w.Admin_ID = adm.Admin_ID
        LEFT JOIN branch b ON w.Branch_ID = b.Branch_ID
@@ -404,68 +157,114 @@ $q2 = "SELECT
        LEFT JOIN special_case s ON w.Case_ID = s.Case_ID
        WHERE 1=1";
 
-$union_sql = "SELECT * FROM ($q1 UNION ALL $q2) AS Combined_Tx WHERE 1=1";
+// --- Tab Construction Logic ---
+$base_combined = "";
 
-if (!empty($filter_type_tx)) {
-    if ($filter_type_tx == 'date' && !empty($filter_date_tx)) {
-        $union_sql .= " AND DATE(Date) = '$filter_date_tx'";
-    }
-    elseif ($filter_type_tx == 'donor_name' && !empty($search_tx)) {
-        $union_sql .= " AND Name LIKE '%$search_tx%'";
-    }
-    elseif ($filter_type_tx == 'email' && !empty($search_tx)) {
-        $union_sql .= " AND Email LIKE '%$search_tx%'";
-    }
-    elseif ($filter_type_tx == 'target' && !empty($search_tx)) {
-        $union_sql .= " AND (Branch_Name LIKE '%$search_tx%' OR Activity_Name LIKE '%$search_tx%' OR Case_Title LIKE '%$search_tx%')";
-    }
-    elseif ($filter_type_tx == 'amount' && !empty($search_tx)) {
-        $union_sql .= " AND Amount = '$search_tx'";
-    }
-    elseif ($filter_type_tx == 'method' && !empty($filter_method_tx)) {
-        $union_sql .= " AND Method = '$filter_method_tx'";
-    }
+if ($activeTab == 'all') {
+    $base_combined = "SELECT * FROM ($qIncome UNION ALL $qExpense) AS Combined_Tx WHERE 1=1";
+} elseif ($activeTab == 'withdrawals') {
+    $base_combined = "SELECT * FROM ($qExpense) AS Combined_Tx WHERE 1=1";
+} elseif ($activeTab == 'onetime') {
+    $qIncome .= " AND o.Order_Type != 'Recurring'"; 
+    $base_combined = "SELECT * FROM ($qIncome) AS Combined_Tx WHERE 1=1";
+} elseif ($activeTab == 'monthly') {
+    $qIncome .= " AND o.Order_Type = 'Recurring'";
+    $base_combined = "SELECT * FROM ($qIncome) AS Combined_Tx WHERE 1=1";
+} elseif ($activeTab == 'branch') {
+    $qIncome .= " AND o.Branch_ID IS NOT NULL";
+    $base_combined = "SELECT * FROM ($qIncome) AS Combined_Tx WHERE 1=1";
+} elseif ($activeTab == 'activity') {
+    $qIncome .= " AND o.Activity_ID IS NOT NULL";
+    $base_combined = "SELECT * FROM ($qIncome) AS Combined_Tx WHERE 1=1";
+} elseif ($activeTab == 'case') {
+    $qIncome .= " AND o.Case_ID IS NOT NULL";
+    $base_combined = "SELECT * FROM ($qIncome) AS Combined_Tx WHERE 1=1";
 } else {
-    if (!empty($search_tx)) {
-        $union_sql .= " AND (Ref LIKE '%$search_tx%' OR Name LIKE '%$search_tx%' OR Email LIKE '%$search_tx%' OR Method LIKE '%$search_tx%')";
+    $base_combined = "SELECT * FROM ($qIncome UNION ALL $qExpense) AS Combined_Tx WHERE 1=1";
+}
+
+$final_sql = $base_combined;
+
+// --- Applying Filters ---
+
+// 1. Search Text
+if (!empty($search_tx)) {
+    $final_sql .= " AND (Ref LIKE '%$search_tx%' OR Name LIKE '%$search_tx%' OR Email LIKE '%$search_tx%' OR Method LIKE '%$search_tx%')";
+}
+
+// 2. Date Filtering
+if (!empty($f_date_y)) {
+    $final_sql .= " AND YEAR(Date) = '" . mysqli_real_escape_string($conn, $f_date_y) . "'";
+}
+if (!empty($f_date_m)) {
+    $final_sql .= " AND MONTH(Date) = '" . mysqli_real_escape_string($conn, $f_date_m) . "'";
+}
+if (!empty($f_date_d)) {
+    $final_sql .= " AND DAY(Date) = '" . mysqli_real_escape_string($conn, $f_date_d) . "'";
+}
+
+// 3. Role Filtering (Updated for Multi-Select)
+if (!empty($f_role)) {
+    // $f_role is an array. We need to build a string for SQL IN clause
+    // Sanitize each role
+    $escaped_roles = array_map(function($r) use ($conn) {
+        return "'" . mysqli_real_escape_string($conn, $r) . "'";
+    }, $f_role);
+    
+    $role_str = implode(',', $escaped_roles);
+    $final_sql .= " AND User_Role IN ($role_str)";
+}
+
+// 4. Target Type Filtering
+if (!empty($f_target)) {
+    if ($f_target == 'branch') {
+        $final_sql .= " AND Branch_ID IS NOT NULL";
+    } elseif ($f_target == 'activity') {
+        $final_sql .= " AND Activity_ID IS NOT NULL";
+    } elseif ($f_target == 'case') {
+        $final_sql .= " AND Case_ID IS NOT NULL";
     }
 }
 
-$count_res = $conn->query("SELECT COUNT(*) as total FROM ($union_sql) as Cnt");
+// 5. Amount Min/Max
+if (!empty($f_min)) {
+    $final_sql .= " AND Amount >= " . (float)$f_min;
+}
+if (!empty($f_max)) {
+    $final_sql .= " AND Amount <= " . (float)$f_max;
+}
+
+// 6. Payment Method
+if (!empty($f_method)) {
+    $final_sql .= " AND Method = '" . mysqli_real_escape_string($conn, $f_method) . "'";
+}
+
+
+// --- Sorting ---
+$sortMap = [
+    'date' => 'Date',
+    'id' => 'ID',
+    'ref' => 'Ref',
+    'amount' => 'Amount',
+    'name' => 'Name',
+    'method' => 'Method',
+    'target' => 'Target_Sort_Name' // Added Target Sort
+];
+$orderBy = isset($sortMap[$sort]) ? $sortMap[$sort] : 'Date';
+$dir = ($order == 'asc') ? 'ASC' : 'DESC';
+
+$final_sql .= " ORDER BY $orderBy $dir";
+
+// Pagination
+$count_res = $conn->query("SELECT COUNT(*) as total FROM ($final_sql) as Cnt");
 $total_tx_recs = $count_res->fetch_assoc()['total'];
 $total_pages_tx = ceil($total_tx_recs / $limit);
 
-$union_sql .= " ORDER BY Date DESC LIMIT $offset_tx, $limit";
-$recentTransactions = $conn->query($union_sql);
+$final_sql .= " LIMIT $offset_tx, $limit";
+$recentTransactions = $conn->query($final_sql);
 
 $start_tx = ($total_tx_recs > 0) ? $offset_tx + 1 : 0;
 $end_tx = min($offset_tx + $limit, $total_tx_recs);
-
-// List 2: E-Wallet
-$page_wl = isset($_GET['page_wl']) && is_numeric($_GET['page_wl']) ? (int)$_GET['page_wl'] : 1;
-if ($page_wl < 1) $page_wl = 1;
-$offset_wl = ($page_wl - 1) * $limit; 
-$search_wl = isset($_GET['search_wl']) ? mysqli_real_escape_string($conn, $_GET['search_wl']) : '';
-$filter_type_wl = isset($_GET['filter_type_wl']) ? $_GET['filter_type_wl'] : '';
-$filter_date_wl = isset($_GET['filter_date_wl']) ? $_GET['filter_date_wl'] : '';
-$filter_trans_type_wl = isset($_GET['filter_trans_type_wl']) ? $_GET['filter_trans_type_wl'] : '';
-$where_wl = "WHERE 1=1";
-if (!empty($filter_type_wl)) {
-    if ($filter_type_wl == 'donor_name' && !empty($search_wl)) $where_wl .= " AND d.Donor_Name LIKE '%$search_wl%'";
-    elseif ($filter_type_wl == 'email' && !empty($search_wl)) $where_wl .= " AND d.Donor_Email LIKE '%$search_wl%'";
-    elseif ($filter_type_wl == 'date' && !empty($filter_date_wl)) $where_wl .= " AND DATE(w.Created_At) = '$filter_date_wl'";
-    elseif ($filter_type_wl == 'type' && !empty($filter_trans_type_wl)) $where_wl .= " AND w.Transaction_Type = '$filter_trans_type_wl'";
-    elseif ($filter_type_wl == 'amount' && !empty($search_wl)) $where_wl .= " AND w.Amount = '$search_wl'";
-} else {
-    if (!empty($search_wl)) $where_wl .= " AND (d.Donor_Name LIKE '%$search_wl%' OR d.Donor_Email LIKE '%$search_wl%' OR o.Order_TXN_Ref LIKE '%$search_wl%')";
-}
-$sql_wl_count = "SELECT COUNT(*) as total FROM wallet_transaction w JOIN donor d ON w.Donor_ID = d.Donor_ID LEFT JOIN orders o ON w.Order_ID = o.Order_ID $where_wl";
-$total_wl_recs = $conn->query($sql_wl_count)->fetch_assoc()['total'];
-$total_pages_wl = ceil($total_wl_recs / $limit);
-$sql_wl = "SELECT w.*, d.Donor_Name, d.Donor_Email, d.Donor_ProfilePicture, o.Order_TXN_Ref FROM wallet_transaction w JOIN donor d ON w.Donor_ID = d.Donor_ID LEFT JOIN orders o ON w.Order_ID = o.Order_ID $where_wl ORDER BY w.Created_At DESC LIMIT $offset_wl, $limit";
-$walletTransactions = $conn->query($sql_wl);
-$start_wl = ($total_wl_recs > 0) ? $offset_wl + 1 : 0;
-$end_wl = min($offset_wl + $limit, $total_wl_recs);
 
 // Chart Data
 function getMonthlyRevenueChartData($conn) {
@@ -488,7 +287,7 @@ $chartData = getMonthlyRevenueChartData($conn);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Management - Love Bridge</title>
+    <title>Transaction History - Love Bridge</title>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -510,7 +309,7 @@ $chartData = getMonthlyRevenueChartData($conn);
         body { background-color: #f4f6f9; }
         .dashboard-content { padding: 25px; }
 
-        /* Floating Alerts - INCREASED Z-INDEX TO 9999 TO BE ABOVE MODAL */
+        /* Floating Alerts */
         .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 9999; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; animation: slideIn 0.3s; }
         .floating-alert i { margin-top: 3px; }
         .floating-alert-success { background: white; color: var(--success); border-left: 4px solid var(--success); }
@@ -523,15 +322,10 @@ $chartData = getMonthlyRevenueChartData($conn);
         .btn-withdraw:hover { background-color: #e6700c; color: white; }
 
         .admin-search-container { display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px 15px; border-radius: 8px; border: 1px solid #eee; flex-wrap: wrap; width: 100%; margin-top: 15px; box-sizing: border-box; }
-        .filter-group { display: flex; align-items: center; gap: 8px; }
-        .filter-select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; outline: none; background-color: white; min-width: 150px; cursor: pointer; font-size: 13px; }
         .search-input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; outline: none; background: white; min-width: 200px; font-size: 13px; }
-        .search-input:focus, .filter-select:focus { border-color: var(--primary); }
+        .search-input:focus { border-color: var(--primary); }
         .btn-search { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px; display:flex; align-items:center; gap:5px; }
         .btn-clear { background: var(--danger); color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; text-decoration: none; display: flex; align-items: center; font-size: 13px; }
-        .secondary-filter { display: none; animation: fadeIn 0.3s; flex: 1; }
-        .secondary-filter.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
         .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
@@ -539,18 +333,24 @@ $chartData = getMonthlyRevenueChartData($conn);
         .stat-info h3 { font-size: 14px; color: #6c757d; margin-bottom: 5px; }
         .stat-info h2 { font-size: 24px; font-weight: 600; color: #333; margin-bottom: 5px; }
         .stat-info p { font-size: 12px; margin: 0; font-weight: 500; display: flex; align-items: center; gap: 5px; }
-        .text-success { color: var(--success); } .text-info { color: var(--info); } .text-warning { color: var(--warning); } .text-danger { color: var(--danger); }
+        .text-success { color: var(--success); } .text-info { color: var(--info); } .text-danger { color: var(--danger); }
         .stat-icon { width: 60px; height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
         
-        .payment-content-grid { display: flex; flex-direction: column; gap: 30px; margin-bottom: 30px; width: 100%; }
-        .content-card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05); border: 1px solid #f0f0f0; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; }
+        .content-card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05); border: 1px solid #f0f0f0; display: flex; flex-direction: column; width: 100%; box-sizing: border-box; margin-bottom: 30px; }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0px; }
         .section-header h2 { font-size: 18px; font-weight: 700; color: #333; margin: 0; }
         .header-actions { display: flex; align-items: center; }
 
+        .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 25px; margin-top: 20px; }
+        .tab-item { padding: 15px 30px; font-size: 15px; font-weight: 600; color: #888; text-decoration: none; cursor: pointer; transition: 0.3s; position: relative; }
+        .tab-item:hover { color: #555; background: #f9f9f9; }
+        .tab-item.active { color: var(--primary); }
+        .tab-item.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 2px; background: var(--primary); }
+
         .table-container { flex: 1; overflow-x: auto; margin-top: 20px; }
         .custom-table { width: 100%; border-collapse: separate; border-spacing: 0 10px; }
-        .custom-table thead th { color: #8898aa; font-weight: 600; text-transform: uppercase; font-size: 13px; padding: 0 15px 10px 15px; text-align: left; white-space: nowrap; }
+        .custom-table thead th { color: #8898aa; font-weight: 600; text-transform: uppercase; font-size: 13px; padding: 0 15px 10px 15px; text-align: left; white-space: nowrap; cursor: pointer; user-select: none; }
+        .custom-table thead th:hover { background-color: #fcfcfc; color: #333; }
         .custom-table tbody tr { background: white; transition: transform 0.2s; }
         .custom-table tbody tr:hover { background-color: #fcfcfc; }
         .custom-table td { padding: 15px; vertical-align: top; color: #525f7f; font-size: 14px; border-top: 1px solid #f5f5f5; border-bottom: 1px solid #f5f5f5; }
@@ -558,21 +358,10 @@ $chartData = getMonthlyRevenueChartData($conn);
         .custom-table td:last-child { border-right: 1px solid #f5f5f5; border-radius: 0 8px 8px 0; }
 
         .badge { padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; display: inline-block; }
-        .badge-credit { background: #e6f4ea; color: #1e7e34; }
-        .badge-debit { background: #fce8e6; color: #c5221f; }
         .badge-role { background: #e3f2fd; color: #0d47a1; margin-left: 5px; font-size: 10px; }
-        .badge-pending { background: #fff3cd; color: #856404; }
-        .badge-rejected { background: #f8d7da; color: #721c24; }
 
         .btn-action { display: inline-flex; align-items: center; justify-content: center; width: 35px; height: 35px; background-color: #e3f2fd; color: #1976d2; border-radius: 50%; text-decoration: none; transition: all 0.2s; border: 1px solid #bbdefb; }
         .btn-action:hover { background-color: #1976d2; color: white; transform: translateY(-2px); }
-
-        /* Approval Buttons in Table */
-        .btn-table-approve { display: inline-flex; align-items: center; justify-content: center; width: 35px; height: 35px; background-color: #e6f4ea; color: #28a745; border-radius: 50%; border: 1px solid #c3e6cb; cursor: pointer; transition: all 0.2s; margin-right: 5px; }
-        .btn-table-approve:hover { background-color: #28a745; color: white; transform: translateY(-2px); }
-        .btn-table-reject { display: inline-flex; align-items: center; justify-content: center; width: 35px; height: 35px; background-color: #f8d7da; color: #dc3545; border-radius: 50%; border: 1px solid #f5c6cb; cursor: pointer; transition: all 0.2s; }
-        .btn-table-reject:hover { background-color: #dc3545; color: white; transform: translateY(-2px); }
-        .table-action-form { display: inline-block; margin: 0; }
 
         .pagination-container { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid #eee; margin-top: auto; }
         .pagination-info { font-size: 13px; color: #8898aa; }
@@ -582,42 +371,28 @@ $chartData = getMonthlyRevenueChartData($conn);
         .pagination-btn.active { background-color: var(--primary); color: white; border-color: var(--primary); cursor: default; }
         .pagination-btn.disabled { color: #ccc; cursor: not-allowed; pointer-events: none; }
 
-        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); animation: fadeIn 0.3s; }
-        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 0; border: 1px solid #888; width: 50%; max-width: 600px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideInTop 0.4s; }
-        @keyframes slideInTop { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .modal-header { padding: 15px 20px; background-color: #f8f9fa; border-bottom: 1px solid #eee; border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; align-items: center; }
-        .modal-header h3 { margin: 0; font-size: 18px; color: #333; }
-        .close-modal { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
-        .close-modal:hover { color: #333; }
-        .modal-body { padding: 20px; }
+        /* Sorting/Filter Modals Styles */
+        .sort-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 2000; justify-content: center; align-items: center; }
+        .sort-modal-content { background: white; width: 300px; border-radius: 10px; padding: 20px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); animation: fadeIn 0.2s; }
+        .sort-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .sort-header h3 { margin: 0; font-size: 16px; color: #333; }
+        .sort-close { cursor: pointer; font-size: 20px; color: #999; }
         
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px; color: #555; }
-        .form-control { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; box-sizing: border-box; }
-        .form-control:focus { outline: none; border-color: var(--primary); }
-        .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
-        
-        .modal-footer { padding: 15px 20px; background-color: #f8f9fa; border-top: 1px solid #eee; border-radius: 0 0 10px 10px; text-align: right; }
-        .btn-cancel { background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-right: 10px; }
-        .btn-submit { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
-        .btn-submit:hover { background: #d66; }
+        .sort-btn { display: block; width: 100%; padding: 10px; margin-bottom: 5px; border: 1px solid #eee; background: #fff; text-align: left; border-radius: 5px; cursor: pointer; transition: 0.2s; font-size: 14px; color: #555; text-decoration: none; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
+        .sort-btn:hover { background: #f8f9fa; border-color: #ddd; color: var(--primary); }
 
-        .balance-display { font-size: 13px; color: var(--success); margin-top: 5px; font-weight: 600; display: none; }
-        .balance-error { color: var(--danger); }
-
-        .upload-container { width: 100%; }
-        .upload-box { border: 2px dashed #ccc; padding: 20px; text-align: center; cursor: pointer; border-radius: 8px; position: relative; background: #fafafa; }
-        .upload-box:hover { background: #fff5f5; border-color: var(--primary); }
-        .upload-box input { position: absolute; width: 100%; height: 100%; top: 0; left: 0; opacity: 0; cursor: pointer; }
-        .upload-box i { font-size: 32px; color: #aaa; margin-bottom: 10px; display: block; }
-        .upload-box p { margin: 0; font-size: 13px; color: #666; font-weight: 500; }
+        /* New Filter Styles inside Modal */
+        .modal-filter-group { background: #f9f9f9; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #eee; }
+        .modal-filter-label { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 8px; display: block; }
+        .modal-input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; margin-bottom: 8px; box-sizing: border-box; }
+        .modal-row { display: flex; gap: 5px; }
+        .modal-apply-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .modal-apply-btn:hover { opacity: 0.9; }
         
-        .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 12px; margin-top: 15px; }
-        .preview-item { position: relative; height: 80px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border: 1px solid #eee; background:white; display: flex; align-items: center; justify-content: center; }
-        .preview-item img { width: 100%; height: 100%; object-fit: cover; }
-        .preview-item i { font-size: 30px; color: #dc3545; }
-        .remove-img-btn { position: absolute; top: 4px; right: 4px; background: #ff4d4d; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 10; }
-        .remove-img-btn:hover { background: #cc0000; transform: scale(1.1); }
+        /* Checkbox Style */
+        .checkbox-group { display: flex; flex-direction: column; gap: 6px; }
+        .checkbox-label { display: flex; align-items: center; font-size: 13px; color: #333; cursor: pointer; }
+        .checkbox-label input { margin-right: 8px; }
     </style>
 </head>
 <body>
@@ -640,8 +415,8 @@ $chartData = getMonthlyRevenueChartData($conn);
         <div class="dashboard-content">
             
             <div class="welcome-section">
-                <h1>Payment Management</h1>
-                <p>Monitor revenue, wallet usage, and donation records.</p>
+                <h1>Transaction History</h1>
+                <p>Monitor donation revenue and withdrawal requests.</p>
             </div>
 
             <div class="stats-cards">
@@ -654,345 +429,173 @@ $chartData = getMonthlyRevenueChartData($conn);
                     <div class="stat-icon" style="background: rgba(23, 162, 184, 0.2); color: #17a2b8;"><i class="fas fa-sync"></i></div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-info"><h3>SYSTEM WALLET FUNDS</h3><h2>RM <?php echo number_format($totalWalletBalance, 2); ?></h2><p class="text-warning">User Holdings</p></div>
-                    <div class="stat-icon" style="background: rgba(255, 193, 7, 0.2); color: #ffc107;"><i class="fas fa-coins"></i></div>
-                </div>
-                <div class="stat-card">
                     <div class="stat-info"><h3>PENDING</h3><h2><?php echo $pendingCount; ?></h2><p class="text-danger">Needs Action</p></div>
                     <div class="stat-icon" style="background: rgba(220, 53, 69, 0.2); color: #dc3545;"><i class="fas fa-exclamation"></i></div>
                 </div>
             </div>
 
-            <div class="payment-content-grid">
-                
-                <div class="content-card">
-                    <div class="section-header">
-                        <h2>Transaction History</h2>
-                        <div class="header-actions">
-                            <button onclick="openWithdrawModal()" class="btn-withdraw"><i class="fas fa-money-bill-wave"></i> Withdraw</button>
-                            <a href="?export=income" class="btn-export"><i class="fas fa-download"></i> Export</a>
-                        </div>
-                    </div>
-                    
-                    <form method="GET" class="admin-search-container">
-                        <?php if($page_wl > 1) echo "<input type='hidden' name='page_wl' value='$page_wl'>"; ?>
-                        
-                        <div class="filter-group">
-                            <i class="fas fa-filter" style="color:#666;"></i>
-                            <select name="filter_type_tx" id="filterTypeTx" class="filter-select" onchange="toggleTxFilters()">
-                                <option value="">Filter By...</option>
-                                <option value="date" <?php echo ($filter_type_tx == 'date') ? 'selected' : ''; ?>>Date</option>
-                                <option value="donor_name" <?php echo ($filter_type_tx == 'donor_name') ? 'selected' : ''; ?>>Donor/Admin Name</option>
-                                <option value="email" <?php echo ($filter_type_tx == 'email') ? 'selected' : ''; ?>>Email</option>
-                                <option value="target" <?php echo ($filter_type_tx == 'target') ? 'selected' : ''; ?>>Target (Branch/Act)</option>
-                                <option value="amount" <?php echo ($filter_type_tx == 'amount') ? 'selected' : ''; ?>>Amount</option>
-                                <option value="method" <?php echo ($filter_type_tx == 'method') ? 'selected' : ''; ?>>Method</option>
-                            </select>
-                        </div>
-
-                        <div id="filter_date_tx" class="secondary-filter">
-                            <input type="date" name="filter_date_tx" class="search-input" value="<?php echo htmlspecialchars($filter_date_tx); ?>">
-                        </div>
-
-                        <div id="filter_method_tx" class="secondary-filter">
-                            <select name="filter_method_tx" class="search-input">
-                                <option value="">Select Method</option>
-                                <option value="Card" <?php echo ($filter_method_tx == 'Card') ? 'selected' : ''; ?>>Card</option>
-                                <option value="FPX" <?php echo ($filter_method_tx == 'FPX') ? 'selected' : ''; ?>>FPX</option>
-                                <option value="E-Wallet" <?php echo ($filter_method_tx == 'E-Wallet') ? 'selected' : ''; ?>>E-Wallet</option>
-                            </select>
-                        </div>
-                        
-                        <div id="filter_text_tx" class="secondary-filter active">
-                            <input type="text" name="search_tx" class="search-input" placeholder="Search keyword..." value="<?php echo htmlspecialchars($search_tx); ?>">
-                        </div>
-
-                        <button type="submit" class="btn-search"><i class="fas fa-search"></i> Search</button>
-                        
-                        <?php if(!empty($search_tx) || !empty($filter_type_tx)): ?>
-                            <a href="payment_management.php" class="btn-clear"><i class="fas fa-times"></i></a>
-                        <?php endif; ?>
-                    </form>
-
-                    <div class="table-container">
-                        <table class="custom-table">
-                            <thead>
-                                <tr>
-                                    <th>Date / Ref No</th>
-                                    <th>Donor / Entity</th>
-                                    <th>Target</th>
-                                    <th>Amount</th>
-                                    <th>Method</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if($recentTransactions->num_rows > 0): ?>
-                                    <?php while($txn = $recentTransactions->fetch_assoc()): 
-                                        $targetName = "General Fund";
-                                        if ($txn['Case_Title']) $targetName = "Case: " . $txn['Case_Title'];
-                                        elseif ($txn['Activity_Name']) $targetName = "Act: " . $txn['Activity_Name'];
-                                        elseif ($txn['Branch_Name']) $targetName = "Branch: " . $txn['Branch_Name'];
-                                        
-                                        $dateTimeObj = new DateTime($txn['Date']);
-                                        $dateStr = $dateTimeObj->format('M d, Y');
-                                        $timeStr = $dateTimeObj->format('h:i A');
-
-                                        $isWithdrawal = ($txn['Type'] == 'Withdrawal');
-                                        $amountColor = $isWithdrawal ? '#dc3545' : '#28a745';
-                                        $amountPrefix = $isWithdrawal ? '-' : '';
-                                        $detailsLink = $isWithdrawal ? "admin_withdrawal_details.php?id=" . $txn['ID'] : "admin_payment_details.php?id=" . $txn['ID'];
-                                        
-                                        // Status Badge Logic
-                                        $statusBadge = "";
-                                        if($isWithdrawal && $txn['Status_Text'] == 'Pending') {
-                                            $statusBadge = "<br><span class='badge badge-pending'>Pending Approval</span>";
-                                        } elseif($isWithdrawal && $txn['Status_Text'] == 'Rejected') {
-                                            $statusBadge = "<br><span class='badge badge-rejected'>Rejected</span>";
-                                        }
-
-                                        // --- APPROVAL BUTTON LOGIC (New) ---
-                                        $showApproveBtns = false;
-                                        if ($isWithdrawal && 
-                                            $txn['Status_Text'] == 'Pending' && 
-                                            $adminRole == 'Super Admin' && 
-                                            $txn['Request_Admin_ID'] != $currentAdminId) {
-                                            $showApproveBtns = true;
-                                        }
-                                    ?>
-                                    <tr>
-                                        <td>
-                                            <div style="font-weight:600; color:#333; font-size:14px;"><?php echo $txn['Ref']; ?></div>
-                                            <div style="font-size:12px; color:#888; margin-top:3px;"><?php echo $dateStr . ' ' . $timeStr; ?></div>
-                                            <?php echo $statusBadge; ?>
-                                        </td>
-                                        <td>
-                                            <div style="font-weight:600; font-size:14px;">
-                                                <?php echo htmlspecialchars($txn['Name']); ?>
-                                                <?php if($isWithdrawal && !empty($txn['User_Role'])): ?>
-                                                    <span class="badge badge-role"><?php echo $txn['User_Role']; ?></span>
-                                                <?php endif; ?>
-                                            </div>
-                                            <div style="font-size:12px; color:#888; margin-top:3px;"><?php echo htmlspecialchars($txn['Email']); ?></div>
-                                        </td>
-                                        <td><span style="font-size:13px; display:block; max-width:150px; white-space:normal; line-height:1.4;"><?php echo htmlspecialchars($targetName); ?></span></td>
-                                        <td style="font-weight:700; color:<?php echo $amountColor; ?>; font-size:14px;">
-                                            <?php echo $amountPrefix; ?> RM <?php echo number_format($txn['Amount'], 2); ?>
-                                        </td>
-                                        <td><span style="font-size:13px; color:#555;"><?php echo $txn['Method']; ?></span></td>
-                                        <td>
-                                            <?php if ($showApproveBtns): ?>
-                                                <form method="POST" action="payment_management.php" class="table-action-form" onsubmit="return confirm('Approve this withdrawal?');">
-                                                    <input type="hidden" name="withdrawal_id" value="<?php echo $txn['ID']; ?>">
-                                                    <button type="submit" name="action_type" value="approve" class="btn-table-approve" title="Approve">
-                                                        <i class="fas fa-check"></i>
-                                                    </button>
-                                                </form>
-                                                <form method="POST" action="payment_management.php" class="table-action-form" onsubmit="return confirm('Reject this withdrawal?');">
-                                                    <input type="hidden" name="withdrawal_id" value="<?php echo $txn['ID']; ?>">
-                                                    <button type="submit" name="action_type" value="reject" class="btn-table-reject" title="Reject">
-                                                        <i class="fas fa-times"></i>
-                                                    </button>
-                                                </form>
-                                            <?php endif; ?>
-
-                                            <a href="<?php echo $detailsLink; ?>" class="btn-action" target="_blank" title="View Details">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                    <?php endwhile; ?>
-                                <?php else: ?>
-                                    <tr><td colspan="6" style="text-align:center; padding:30px; color:#999;">No transaction records found.</td></tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="pagination-container">
-                        <div class="pagination-info">Showing <?php echo $start_tx; ?> - <?php echo $end_tx; ?> of <?php echo $total_tx_recs; ?></div>
-                        <div class="pagination-controls">
-                            <?php $pgParams = $_GET; ?>
-                            <?php if ($page_tx > 1): $pgParams['page_tx'] = $page_tx - 1; ?>
-                                <a href="?<?php echo http_build_query($pgParams); ?>" class="pagination-btn">Previous</a>
-                            <?php else: ?>
-                                <span class="pagination-btn disabled">Previous</span>
-                            <?php endif; ?>
-
-                            <?php 
-                            $tx_range_start = max(1, $page_tx - 1);
-                            $tx_range_end = min($total_pages_tx, $page_tx + 1);
-                            
-                            if($total_pages_tx >= 3) {
-                                if($page_tx == 1) { $tx_range_end = 3; } 
-                                elseif($page_tx == $total_pages_tx) { $tx_range_start = $total_pages_tx - 2; }
-                            } else {
-                                $tx_range_start = 1; $tx_range_end = $total_pages_tx;
-                            }
-
-                            for($i = $tx_range_start; $i <= $tx_range_end; $i++): 
-                                $pgParams['page_tx'] = $i; 
-                            ?>
-                                <a href="?<?php echo http_build_query($pgParams); ?>" class="pagination-btn <?php echo ($i==$page_tx)?'active':''; ?>"><?php echo $i; ?></a>
-                            <?php endfor; ?>
-
-                            <?php if ($page_tx < $total_pages_tx): $pgParams['page_tx'] = $page_tx + 1; ?>
-                                <a href="?<?php echo http_build_query($pgParams); ?>" class="pagination-btn">Next</a>
-                            <?php else: ?>
-                                <span class="pagination-btn disabled">Next</span>
-                            <?php endif; ?>
-                        </div>
+            <div class="content-card">
+                <div class="section-header">
+                    <h2>Transactions & Withdrawals</h2>
+                    <div class="header-actions">
+                        <a href="admin_withdrawal_add.php" class="btn-withdraw"><i class="fas fa-money-bill-wave"></i> Withdraw</a>
+                        <a href="?export=income" class="btn-export"><i class="fas fa-download"></i> Export</a>
                     </div>
                 </div>
+                
+                <div class="tabs">
+                    <a href="<?php echo buildUrl(['tab'=>'all', 'page_tx'=>1]); ?>" class="tab-item <?php echo ($activeTab=='all')?'active':''; ?>">All</a>
+                    <a href="<?php echo buildUrl(['tab'=>'withdrawals', 'page_tx'=>1]); ?>" class="tab-item <?php echo ($activeTab=='withdrawals')?'active':''; ?>">Withdrawals</a>
+                    <a href="<?php echo buildUrl(['tab'=>'onetime', 'page_tx'=>1]); ?>" class="tab-item <?php echo ($activeTab=='onetime')?'active':''; ?>">One-Time</a>
+                    <a href="<?php echo buildUrl(['tab'=>'monthly', 'page_tx'=>1]); ?>" class="tab-item <?php echo ($activeTab=='monthly')?'active':''; ?>">Monthly</a>
+                    <a href="<?php echo buildUrl(['tab'=>'branch', 'page_tx'=>1]); ?>" class="tab-item <?php echo ($activeTab=='branch')?'active':''; ?>">Branch</a>
+                    <a href="<?php echo buildUrl(['tab'=>'activity', 'page_tx'=>1]); ?>" class="tab-item <?php echo ($activeTab=='activity')?'active':''; ?>">Activity</a>
+                    <a href="<?php echo buildUrl(['tab'=>'case', 'page_tx'=>1]); ?>" class="tab-item <?php echo ($activeTab=='case')?'active':''; ?>">Special Case</a>
+                </div>
 
-                <div class="content-card">
-                    <div class="section-header">
-                        <h2><i class="fas fa-wallet" style="color: #F28585; margin-right:8px;"></i> E-Wallet Log</h2>
-                        <a href="?export=ewallet" class="btn-export"><i class="fas fa-download"></i> Export</a>
-                    </div>
+                <form method="GET" class="admin-search-container" style="margin-top:0;">
+                    <input type="hidden" name="tab" value="<?php echo $activeTab; ?>">
+                    <input type="hidden" name="sort" value="<?php echo $sort; ?>">
+                    <input type="hidden" name="order" value="<?php echo $order; ?>">
                     
-                    <form method="GET" class="admin-search-container">
-                        <?php if($page_tx > 1) echo "<input type='hidden' name='page_tx' value='$page_tx'>"; ?>
-                        
-                        <div class="filter-group">
-                            <i class="fas fa-filter" style="color:#666;"></i>
-                            <select name="filter_type_wl" id="filterTypeWl" class="filter-select" onchange="toggleWlFilters()">
-                                <option value="">Filter By...</option>
-                                <option value="donor_name" <?php echo ($filter_type_wl == 'donor_name') ? 'selected' : ''; ?>>Donor Name</option>
-                                <option value="email" <?php echo ($filter_type_wl == 'email') ? 'selected' : ''; ?>>Email</option>
-                                <option value="date" <?php echo ($filter_type_wl == 'date') ? 'selected' : ''; ?>>Date</option>
-                                <option value="type" <?php echo ($filter_type_wl == 'type') ? 'selected' : ''; ?>>Type</option>
-                                <option value="amount" <?php echo ($filter_type_wl == 'amount') ? 'selected' : ''; ?>>Amount</option>
-                            </select>
-                        </div>
-
-                        <div id="filter_date_wl" class="secondary-filter">
-                            <input type="date" name="filter_date_wl" class="search-input" value="<?php echo htmlspecialchars($filter_date_wl); ?>">
-                        </div>
-
-                        <div id="filter_type_wl_select" class="secondary-filter">
-                            <select name="filter_trans_type_wl" class="search-input">
-                                <option value="">Select Type</option>
-                                <option value="Credit" <?php echo ($filter_trans_type_wl == 'Credit') ? 'selected' : ''; ?>>Credit (+)</option>
-                                <option value="Debit" <?php echo ($filter_trans_type_wl == 'Debit') ? 'selected' : ''; ?>>Debit (-)</option>
-                            </select>
-                        </div>
-
-                        <div id="filter_text_wl" class="secondary-filter active">
-                            <input type="text" name="search_wl" class="search-input" placeholder="Search keyword..." value="<?php echo htmlspecialchars($search_wl); ?>">
-                        </div>
-
-                        <button type="submit" class="btn-search"><i class="fas fa-search"></i> Search</button>
-
-                        <?php if(!empty($search_wl) || !empty($filter_type_wl)): ?>
-                            <a href="payment_management.php" class="btn-clear"><i class="fas fa-times"></i></a>
-                        <?php endif; ?>
-                    </form>
+                    <input type="hidden" name="f_date_y" value="<?php echo $f_date_y; ?>">
+                    <input type="hidden" name="f_date_m" value="<?php echo $f_date_m; ?>">
+                    <input type="hidden" name="f_date_d" value="<?php echo $f_date_d; ?>">
+                    <?php if(!empty($f_role)): foreach($f_role as $r): ?>
+                        <input type="hidden" name="f_role[]" value="<?php echo htmlspecialchars($r); ?>">
+                    <?php endforeach; endif; ?>
                     
-                    <div class="table-container">
-                        <table class="custom-table">
-                            <thead>
+                    <input type="hidden" name="f_target" value="<?php echo $f_target; ?>">
+                    <input type="hidden" name="f_min" value="<?php echo $f_min; ?>">
+                    <input type="hidden" name="f_max" value="<?php echo $f_max; ?>">
+                    <input type="hidden" name="f_method" value="<?php echo $f_method; ?>">
+
+                    <input type="text" name="search_tx" class="search-input" placeholder="Search Ref, Name, Email, Method..." value="<?php echo htmlspecialchars($search_tx); ?>">
+                    <button type="submit" class="btn-search"><i class="fas fa-search"></i> Search</button>
+                    
+                    <?php 
+                    // Check if any filter is active to show Clear button
+                    $isFiltered = !empty($search_tx) || $activeTab != 'all' || !empty($f_date_y) || !empty($f_role) || !empty($f_target) || !empty($f_min) || !empty($f_method);
+                    if($isFiltered): 
+                    ?>
+                        <a href="payment_management.php" class="btn-clear"><i class="fas fa-times"></i></a>
+                    <?php endif; ?>
+                </form>
+
+                <div class="table-container">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th onclick="openModal('sortDateModal')">
+                                    Date / Ref No 
+                                    <?php if($sort=='date') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?>
+                                    <?php if($f_date_y || $f_date_m || $f_date_d) echo '<i class="fas fa-filter" style="font-size:10px; color:var(--primary);"></i>'; ?>
+                                </th>
+                                <th onclick="openModal('sortNameModal')">
+                                    Donor / Entity 
+                                    <?php if($sort=='name') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?>
+                                    <?php if(!empty($f_role)) echo '<i class="fas fa-filter" style="font-size:10px; color:var(--primary);"></i>'; ?>
+                                </th>
+                                <th onclick="openModal('sortTargetModal')">
+                                    Target 
+                                    <?php if($sort=='target') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?>
+                                    <?php if($f_target) echo '<i class="fas fa-filter" style="font-size:10px; color:var(--primary);"></i>'; ?>
+                                </th>
+                                <th onclick="openModal('sortAmountModal')">
+                                    Amount 
+                                    <?php if($sort=='amount') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?>
+                                    <?php if($f_min || $f_max) echo '<i class="fas fa-filter" style="font-size:10px; color:var(--primary);"></i>'; ?>
+                                </th>
+                                <th onclick="openModal('sortMethodModal')">
+                                    Method 
+                                    <?php if($sort=='method') echo ($order=='asc' ? '<i class="fas fa-sort-up"></i>' : '<i class="fas fa-sort-down"></i>'); else echo '<i class="fas fa-sort"></i>'; ?>
+                                    <?php if($f_method) echo '<i class="fas fa-filter" style="font-size:10px; color:var(--primary);"></i>'; ?>
+                                </th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if($recentTransactions->num_rows > 0): ?>
+                                <?php while($txn = $recentTransactions->fetch_assoc()): 
+                                    $targetName = "General Fund";
+                                    if ($txn['Case_Title']) $targetName = "Case: " . $txn['Case_Title'];
+                                    elseif ($txn['Activity_Name']) $targetName = "Act: " . $txn['Activity_Name'];
+                                    elseif ($txn['Branch_Name']) $targetName = "Branch: " . $txn['Branch_Name'];
+                                    
+                                    $dateTimeObj = new DateTime($txn['Date']);
+                                    $dateStr = $dateTimeObj->format('M d, Y');
+                                    $timeStr = $dateTimeObj->format('h:i A');
+
+                                    $isWithdrawal = ($txn['Type'] == 'Withdrawal');
+                                    $amountColor = $isWithdrawal ? '#dc3545' : '#28a745';
+                                    $amountPrefix = $isWithdrawal ? '-' : '';
+                                    $detailsLink = $isWithdrawal ? "admin_withdrawal_details.php?id=" . $txn['ID'] : "admin_payment_details.php?id=" . $txn['ID'];
+                                ?>
                                 <tr>
-                                    <th>Donor</th>
-                                    <th>Transaction Details</th> 
-                                    <th>Type</th>
-                                    <th>Amount</th>
-                                    <th>Action</th>
+                                    <td>
+                                        <div style="font-weight:600; color:#333; font-size:14px;"><?php echo $txn['Ref']; ?></div>
+                                        <div style="font-size:12px; color:#888; margin-top:3px;"><?php echo $dateStr . ' ' . $timeStr; ?></div>
+                                    </td>
+                                    <td>
+                                        <div style="font-weight:600; font-size:14px;">
+                                            <?php echo htmlspecialchars($txn['Name']); ?>
+                                            <?php if($isWithdrawal && !empty($txn['User_Role'])): ?>
+                                                <span class="badge badge-role"><?php echo $txn['User_Role']; ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div style="font-size:12px; color:#888; margin-top:3px;"><?php echo htmlspecialchars($txn['Email']); ?></div>
+                                    </td>
+                                    <td><span style="font-size:13px; display:block; max-width:150px; white-space:normal; line-height:1.4;"><?php echo htmlspecialchars($targetName); ?></span></td>
+                                    <td style="font-weight:700; color:<?php echo $amountColor; ?>; font-size:14px;">
+                                        <?php echo $amountPrefix; ?> RM <?php echo number_format($txn['Amount'], 2); ?>
+                                    </td>
+                                    <td><span style="font-size:13px; color:#555;"><?php echo $txn['Method']; ?></span></td>
+                                    <td>
+                                        <a href="<?php echo $detailsLink; ?>" class="btn-action" target="_blank" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                <?php if($walletTransactions && $walletTransactions->num_rows > 0): ?>
-                                    <?php while($wt = $walletTransactions->fetch_assoc()): 
-                                         $wtTime = new DateTime($wt['Created_At']);
-                                         $wtDateStr = $wtTime->format('M d, Y');
-                                         $wtTimeStr = $wtTime->format('h:i A');
-                                         $isCredit = ($wt['Transaction_Type'] == 'Credit');
-                                         $txnID = $wt['Wallet_Trans_ID'];
-                                         $desc = !empty($wt['Description']) ? $wt['Description'] : '-';
-                                    ?>
-                                    <tr>
-                                        <td>
-                                            <div style="display: flex; align-items: center; margin-bottom:5px;">
-                                                <?php if($wt['Donor_ProfilePicture']): ?>
-                                                    <img src="<?php echo $wt['Donor_ProfilePicture']; ?>" style="width:35px; height:35px; border-radius:50%; margin-right:10px; object-fit:cover;">
-                                                <?php else: ?>
-                                                    <div style="width:35px; height:35px; border-radius:50%; background:#eee; margin-right:10px; font-size:14px; display:flex; align-items:center; justify-content:center; color:#888;"><i class="fas fa-user"></i></div>
-                                                <?php endif; ?>
-                                                <div>
-                                                    <div style="font-weight:600; font-size:14px; color:#333;"><?php echo htmlspecialchars($wt['Donor_Name']); ?></div>
-                                                    <div style="font-size:12px; color:#777; margin-top:2px;"><?php echo htmlspecialchars($wt['Donor_Email']); ?></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        
-                                        <td>
-                                            <div style="font-weight:500; font-size:13px; color:#333; margin-bottom:3px;">
-                                                <?php echo htmlspecialchars($desc); ?>
-                                            </div>
-                                            <div style="font-size:12px; color:#888;">
-                                                <i class="far fa-clock" style="font-size:11px; margin-right:4px;"></i> <?php echo $wtDateStr . ' ' . $wtTimeStr; ?>
-                                                <span style="color:#ddd; margin:0 8px;">|</span>
-                                                Ref: #<?php echo $txnID; ?>
-                                            </div>
-                                        </td>
-
-                                        <td>
-                                            <span class="badge <?php echo $isCredit ? 'badge-credit' : 'badge-debit'; ?>">
-                                                <?php echo $isCredit ? 'Credit' : 'Debit'; ?>
-                                            </span>
-                                        </td>
-
-                                        <td style="font-weight:700; color: <?php echo $isCredit ? '#28a745' : '#dc3545'; ?>; font-size:14px;">
-                                            <?php echo $isCredit ? '+' : '-'; ?> RM <?php echo number_format($wt['Amount'], 2); ?>
-                                        </td>
-
-                                        <td>
-                                            <a href="admin_ewallet_details.php?id=<?php echo $txnID; ?>" class="btn-action" target="_blank" title="View Wallet Details">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                    <?php endwhile; ?>
-                                <?php else: ?>
-                                    <tr><td colspan="5" style="text-align:center; padding:30px; color:#999;">No wallet activity found.</td></tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="pagination-container">
-                        <div class="pagination-info">Showing <?php echo $start_wl; ?> - <?php echo $end_wl; ?> of <?php echo $total_wl_recs; ?></div>
-                        <div class="pagination-controls">
-                            <?php $wlParams = $_GET; ?>
-                            <?php if ($page_wl > 1): $wlParams['page_wl'] = $page_wl - 1; ?>
-                                <a href="?<?php echo http_build_query($wlParams); ?>" class="pagination-btn">Previous</a>
+                                <?php endwhile; ?>
                             <?php else: ?>
-                                <span class="pagination-btn disabled">Previous</span>
+                                <tr><td colspan="6" style="text-align:center; padding:30px; color:#999;">No transaction records found matching your filters.</td></tr>
                             <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
 
-                            <?php 
-                            $wl_range_start = max(1, $page_wl - 1);
-                            $wl_range_end = min($total_pages_wl, $page_wl + 1);
-                            
-                            if($total_pages_wl >= 3) {
-                                if($page_wl == 1) { $wl_range_end = 3; } 
-                                elseif($page_wl == $total_pages_wl) { $wl_range_start = $total_pages_wl - 2; }
-                            } else {
-                                $wl_range_start = 1; $wl_range_end = $total_pages_wl;
-                            }
+                <div class="pagination-container">
+                    <div class="pagination-info">Showing <?php echo $start_tx; ?> - <?php echo $end_tx; ?> of <?php echo $total_tx_recs; ?></div>
+                    <div class="pagination-controls">
+                        <?php $pgParams = $_GET; ?>
+                        <?php if ($page_tx > 1): $pgParams['page_tx'] = $page_tx - 1; ?>
+                            <a href="?<?php echo buildUrl($pgParams); ?>" class="pagination-btn">Previous</a>
+                        <?php else: ?>
+                            <span class="pagination-btn disabled">Previous</span>
+                        <?php endif; ?>
 
-                            for($i = $wl_range_start; $i <= $wl_range_end; $i++): 
-                                $wlParams['page_wl'] = $i; 
-                            ?>
-                                <a href="?<?php echo http_build_query($wlParams); ?>" class="pagination-btn <?php echo ($i==$page_wl)?'active':''; ?>"><?php echo $i; ?></a>
-                            <?php endfor; ?>
+                        <?php 
+                        $tx_range_start = max(1, $page_tx - 1);
+                        $tx_range_end = min($total_pages_tx, $page_tx + 1);
+                        
+                        if($total_pages_tx >= 3) {
+                            if($page_tx == 1) { $tx_range_end = 3; } 
+                            elseif($page_tx == $total_pages_tx) { $tx_range_start = $total_pages_tx - 2; }
+                        } else {
+                            $tx_range_start = 1; $tx_range_end = $total_pages_tx;
+                        }
 
-                            <?php if ($page_wl < $total_pages_wl): $wlParams['page_wl'] = $page_wl + 1; ?>
-                                <a href="?<?php echo http_build_query($wlParams); ?>" class="pagination-btn">Next</a>
-                            <?php else: ?>
-                                <span class="pagination-btn disabled">Next</span>
-                            <?php endif; ?>
-                        </div>
+                        for($i = $tx_range_start; $i <= $tx_range_end; $i++): 
+                            $pgParams['page_tx'] = $i; 
+                        ?>
+                            <a href="?<?php echo buildUrl($pgParams); ?>" class="pagination-btn <?php echo ($i==$page_tx)?'active':''; ?>"><?php echo $i; ?></a>
+                        <?php endfor; ?>
+
+                        <?php if ($page_tx < $total_pages_tx): $pgParams['page_tx'] = $page_tx + 1; ?>
+                            <a href="?<?php echo buildUrl($pgParams); ?>" class="pagination-btn">Next</a>
+                        <?php else: ?>
+                            <span class="pagination-btn disabled">Next</span>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -1005,96 +608,190 @@ $chartData = getMonthlyRevenueChartData($conn);
         </div>
     </div>
 
-    <div id="withdrawModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Withdrawal Request</h3>
-                <span class="close-modal" onclick="closeWithdrawModal()">&times;</span>
-            </div>
-            <form method="POST" action="payment_management.php" enctype="multipart/form-data" onsubmit="return validateWithdrawal()" novalidate>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="withdrawal_type">Withdrawal Source Type <span style="color:red">*</span></label>
-                        <select name="withdrawal_type" id="withdrawal_type" class="form-control" onchange="toggleWithdrawTarget()">
-                            <option value="">-- Select Source --</option>
-                            <option value="branch">Branch Fund</option>
-                            <option value="activity">Activity Fund</option>
-                            <option value="case">Special Case Fund</option>
-                        </select>
-                        <small class="form-guide">Select the funding source (Branch, Activity, or Special Case) for this withdrawal.</small>
-                    </div>
+    <div id="sortDateModal" class="sort-modal" onclick="closeModal('sortDateModal', event)">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Filter & Sort Date</h3><span class="sort-close" onclick="closeModal('sortDateModal')">&times;</span></div>
+            
+            <form method="GET" class="modal-filter-group">
+                <input type="hidden" name="tab" value="<?php echo $activeTab; ?>">
+                <input type="hidden" name="sort" value="<?php echo $sort; ?>">
+                <input type="hidden" name="order" value="<?php echo $order; ?>">
+                <input type="hidden" name="search_tx" value="<?php echo htmlspecialchars($search_tx); ?>">
+                <?php if(!empty($f_role)): foreach($f_role as $r): ?>
+                    <input type="hidden" name="f_role[]" value="<?php echo htmlspecialchars($r); ?>">
+                <?php endforeach; endif; ?>
+                <input type="hidden" name="f_target" value="<?php echo $f_target; ?>">
+                <input type="hidden" name="f_min" value="<?php echo $f_min; ?>">
+                <input type="hidden" name="f_max" value="<?php echo $f_max; ?>">
+                <input type="hidden" name="f_method" value="<?php echo $f_method; ?>">
 
-                    <div class="form-group" id="group_branch" style="display:none;">
-                        <label for="target_id_branch">Select Branch <span style="color:red">*</span></label>
-                        <select name="target_id_branch" id="target_id_branch" class="form-control" onchange="updateBankAndBalance('branch')">
-                            <option value="">-- Select Branch --</option>
-                        </select>
-                        <div id="balance_branch" class="balance-display"></div>
-                        <small class="form-guide">Choose the specific branch entity from which funds will be deducted.</small>
-                    </div>
-
-                    <div class="form-group" id="group_activity" style="display:none;">
-                        <label for="target_id_activity">Select Activity <span style="color:red">*</span></label>
-                        <select name="target_id_activity" id="target_id_activity" class="form-control" onchange="updateBankAndBalance('activity')">
-                            <option value="">-- Select Activity --</option>
-                        </select>
-                         <div id="balance_activity" class="balance-display"></div>
-                         <small class="form-guide">Choose the specific activity fund from which funds will be deducted.</small>
-                    </div>
-
-                    <div class="form-group" id="group_case" style="display:none;">
-                        <label for="target_id_case">Select Special Case <span style="color:red">*</span></label>
-                        <select name="target_id_case" id="target_id_case" class="form-control" onchange="updateBankAndBalance('case')">
-                            <option value="">-- Select Case --</option>
-                        </select>
-                        <div id="balance_case" class="balance-display"></div>
-                        <small class="form-guide">Choose the specific special case fund from which funds will be deducted.</small>
-                    </div>
-
-                    <div class="form-group" id="group_handling_branch" style="display:none;">
-                        <label for="handling_branch_id">Processing Branch <span style="color:red">*</span></label>
-                        <select name="handling_branch_id" id="handling_branch_id" class="form-control">
-                            <option value="">-- Select Processing Branch --</option>
-                        </select>
-                        <small class="form-guide">Select the branch responsible for processing this special case withdrawal.</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Amount (RM) <span style="color:red">*</span></label>
-                        <input type="number" step="1" min="0" name="amount" id="withdraw_amount" class="form-control" placeholder="e.g. 500.00">
-                        <small class="form-guide">Specify the total amount to withdraw (e.g. 1000). Arrows increase by RM 1.</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Bank Name <span style="color:red">*</span></label>
-                        <input type="text" name="bank_name" id="bank_name" class="form-control" placeholder="The bank name associated with the selected source (Auto-filled)." readonly>
-                        <small class="form-guide">The bank associated with the selected source.</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Account Number <span style="color:red">*</span></label>
-                        <input type="text" name="bank_account" id="bank_account" class="form-control" placeholder="The account number associated with the selected source (Auto-filled)." readonly>
-                        <small class="form-guide">The bank account number for the transfer.</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Reference / Proof (Images/PDF) <span style="color:red">*</span></label>
-                        <div class="upload-container">
-                            <div class="upload-box">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <p>Click or Drag Proof files (Max 5, PDF/Images)</p>
-                                <input type="file" id="proof_file" name="proof_file[]" multiple accept=".jpg,.jpeg,.png,.pdf" onchange="handleFileSelect(event)">
-                            </div>
-                            <div class="preview-grid" id="proof_preview_container"></div>
-                        </div>
-                        <small class="form-guide">Upload official receipts, bank transfer slips, or invoices as proof of withdrawal.</small>
-                    </div>
+                <span class="modal-filter-label">Filter by Specific Date:</span>
+                <div class="modal-row">
+                    <select name="f_date_y" id="f_date_y" class="modal-input" onchange="updateDays('f_date_y', 'f_date_m', 'f_date_d')">
+                        <option value="">Year...</option>
+                        <?php 
+                        $currentYear = date('Y');
+                        for($y = 2021; $y <= $currentYear + 1; $y++) {
+                            $sel = ($f_date_y == $y) ? 'selected' : '';
+                            echo "<option value='$y' $sel>$y</option>";
+                        }
+                        ?>
+                    </select>
+                    <input type="number" name="f_date_d" id="f_date_d" placeholder="Day" class="modal-input" value="<?php echo $f_date_d; ?>" min="1" max="31">
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel" onclick="closeWithdrawModal()">Cancel</button>
-                    <button type="submit" name="submit_withdrawal" class="btn-submit">Submit Withdrawal</button>
-                </div>
+                <select name="f_date_m" id="f_date_m" class="modal-input" onchange="updateDays('f_date_y', 'f_date_m', 'f_date_d')">
+                    <option value="">Month...</option>
+                    <?php for($m=1; $m<=12; $m++): ?>
+                        <option value="<?php echo $m; ?>" <?php echo ($f_date_m==$m)?'selected':''; ?>><?php echo date('F', mktime(0,0,0,$m,10)); ?></option>
+                    <?php endfor; ?>
+                </select>
+                <button type="submit" class="modal-apply-btn">Apply Filter</button>
             </form>
+
+            <a href="<?php echo buildUrl(['sort'=>'date', 'order'=>'desc']); ?>" class="sort-btn">Newest to Oldest <i class="fas fa-sort-amount-down"></i></a>
+            <a href="<?php echo buildUrl(['sort'=>'date', 'order'=>'asc']); ?>" class="sort-btn">Oldest to Newest <i class="fas fa-sort-amount-up"></i></a>
+        </div>
+    </div>
+
+    <div id="sortNameModal" class="sort-modal" onclick="closeModal('sortNameModal', event)">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Filter & Sort Name</h3><span class="sort-close" onclick="closeModal('sortNameModal')">&times;</span></div>
+            
+            <form method="GET" class="modal-filter-group">
+                <input type="hidden" name="tab" value="<?php echo $activeTab; ?>">
+                <input type="hidden" name="sort" value="<?php echo $sort; ?>">
+                <input type="hidden" name="order" value="<?php echo $order; ?>">
+                <input type="hidden" name="search_tx" value="<?php echo htmlspecialchars($search_tx); ?>">
+                
+                <input type="hidden" name="f_date_y" value="<?php echo $f_date_y; ?>">
+                <input type="hidden" name="f_date_m" value="<?php echo $f_date_m; ?>">
+                <input type="hidden" name="f_date_d" value="<?php echo $f_date_d; ?>">
+                <input type="hidden" name="f_target" value="<?php echo $f_target; ?>">
+                <input type="hidden" name="f_min" value="<?php echo $f_min; ?>">
+                <input type="hidden" name="f_max" value="<?php echo $f_max; ?>">
+                <input type="hidden" name="f_method" value="<?php echo $f_method; ?>">
+
+                <span class="modal-filter-label">Filter by Role:</span>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="f_role[]" value="Donor" <?php echo (in_array('Donor', $f_role)) ? 'checked' : ''; ?>> Donor
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="f_role[]" value="Admin" <?php echo (in_array('Admin', $f_role)) ? 'checked' : ''; ?>> Admin
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="f_role[]" value="Super Admin" <?php echo (in_array('Super Admin', $f_role)) ? 'checked' : ''; ?>> Super Admin
+                    </label>
+                </div>
+                <br>
+                <button type="submit" class="modal-apply-btn">Apply Filter</button>
+            </form>
+
+            <a href="<?php echo buildUrl(['sort'=>'name', 'order'=>'asc']); ?>" class="sort-btn">A to Z <i class="fas fa-sort-alpha-down"></i></a>
+            <a href="<?php echo buildUrl(['sort'=>'name', 'order'=>'desc']); ?>" class="sort-btn">Z to A <i class="fas fa-sort-alpha-up"></i></a>
+        </div>
+    </div>
+
+    <div id="sortTargetModal" class="sort-modal" onclick="closeModal('sortTargetModal', event)">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Filter & Sort Target</h3><span class="sort-close" onclick="closeModal('sortTargetModal')">&times;</span></div>
+            
+            <form method="GET" class="modal-filter-group">
+                <input type="hidden" name="tab" value="<?php echo $activeTab; ?>">
+                <input type="hidden" name="sort" value="<?php echo $sort; ?>">
+                <input type="hidden" name="order" value="<?php echo $order; ?>">
+                <input type="hidden" name="search_tx" value="<?php echo htmlspecialchars($search_tx); ?>">
+                
+                <input type="hidden" name="f_date_y" value="<?php echo $f_date_y; ?>">
+                <input type="hidden" name="f_date_m" value="<?php echo $f_date_m; ?>">
+                <input type="hidden" name="f_date_d" value="<?php echo $f_date_d; ?>">
+                <?php if(!empty($f_role)): foreach($f_role as $r): ?>
+                    <input type="hidden" name="f_role[]" value="<?php echo htmlspecialchars($r); ?>">
+                <?php endforeach; endif; ?>
+                <input type="hidden" name="f_min" value="<?php echo $f_min; ?>">
+                <input type="hidden" name="f_max" value="<?php echo $f_max; ?>">
+                <input type="hidden" name="f_method" value="<?php echo $f_method; ?>">
+
+                <span class="modal-filter-label">Filter by Target Type:</span>
+                <select name="f_target" class="modal-input">
+                    <option value="">All Targets</option>
+                    <option value="branch" <?php echo ($f_target=='branch')?'selected':''; ?>>Branch</option>
+                    <option value="activity" <?php echo ($f_target=='activity')?'selected':''; ?>>Activity</option>
+                    <option value="case" <?php echo ($f_target=='case')?'selected':''; ?>>Special Case</option>
+                </select>
+                <button type="submit" class="modal-apply-btn">Apply Filter</button>
+            </form>
+
+            <a href="<?php echo buildUrl(['sort'=>'target', 'order'=>'asc']); ?>" class="sort-btn">A to Z <i class="fas fa-sort-alpha-down"></i></a>
+            <a href="<?php echo buildUrl(['sort'=>'target', 'order'=>'desc']); ?>" class="sort-btn">Z to A <i class="fas fa-sort-alpha-up"></i></a>
+        </div>
+    </div>
+
+    <div id="sortAmountModal" class="sort-modal" onclick="closeModal('sortAmountModal', event)">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Filter & Sort Amount</h3><span class="sort-close" onclick="closeModal('sortAmountModal')">&times;</span></div>
+            
+            <form method="GET" class="modal-filter-group">
+                <input type="hidden" name="tab" value="<?php echo $activeTab; ?>">
+                <input type="hidden" name="sort" value="<?php echo $sort; ?>">
+                <input type="hidden" name="order" value="<?php echo $order; ?>">
+                <input type="hidden" name="search_tx" value="<?php echo htmlspecialchars($search_tx); ?>">
+                
+                <input type="hidden" name="f_date_y" value="<?php echo $f_date_y; ?>">
+                <input type="hidden" name="f_date_m" value="<?php echo $f_date_m; ?>">
+                <input type="hidden" name="f_date_d" value="<?php echo $f_date_d; ?>">
+                <?php if(!empty($f_role)): foreach($f_role as $r): ?>
+                    <input type="hidden" name="f_role[]" value="<?php echo htmlspecialchars($r); ?>">
+                <?php endforeach; endif; ?>
+                <input type="hidden" name="f_target" value="<?php echo $f_target; ?>">
+                <input type="hidden" name="f_method" value="<?php echo $f_method; ?>">
+
+                <span class="modal-filter-label">Amount Range (RM):</span>
+                <div class="modal-row">
+                    <input type="number" step="0.01" name="f_min" placeholder="Min" class="modal-input" value="<?php echo $f_min; ?>">
+                    <input type="number" step="0.01" name="f_max" placeholder="Max" class="modal-input" value="<?php echo $f_max; ?>">
+                </div>
+                <button type="submit" class="modal-apply-btn">Apply Filter</button>
+            </form>
+
+            <a href="<?php echo buildUrl(['sort'=>'amount', 'order'=>'desc']); ?>" class="sort-btn">High to Low <i class="fas fa-sort-numeric-down-alt"></i></a>
+            <a href="<?php echo buildUrl(['sort'=>'amount', 'order'=>'asc']); ?>" class="sort-btn">Low to High <i class="fas fa-sort-numeric-up"></i></a>
+        </div>
+    </div>
+
+    <div id="sortMethodModal" class="sort-modal" onclick="closeModal('sortMethodModal', event)">
+        <div class="sort-modal-content">
+            <div class="sort-header"><h3>Filter & Sort Method</h3><span class="sort-close" onclick="closeModal('sortMethodModal')">&times;</span></div>
+            
+            <form method="GET" class="modal-filter-group">
+                <input type="hidden" name="tab" value="<?php echo $activeTab; ?>">
+                <input type="hidden" name="sort" value="<?php echo $sort; ?>">
+                <input type="hidden" name="order" value="<?php echo $order; ?>">
+                <input type="hidden" name="search_tx" value="<?php echo htmlspecialchars($search_tx); ?>">
+                
+                <input type="hidden" name="f_date_y" value="<?php echo $f_date_y; ?>">
+                <input type="hidden" name="f_date_m" value="<?php echo $f_date_m; ?>">
+                <input type="hidden" name="f_date_d" value="<?php echo $f_date_d; ?>">
+                <?php if(!empty($f_role)): foreach($f_role as $r): ?>
+                    <input type="hidden" name="f_role[]" value="<?php echo htmlspecialchars($r); ?>">
+                <?php endforeach; endif; ?>
+                <input type="hidden" name="f_target" value="<?php echo $f_target; ?>">
+                <input type="hidden" name="f_min" value="<?php echo $f_min; ?>">
+                <input type="hidden" name="f_max" value="<?php echo $f_max; ?>">
+
+                <span class="modal-filter-label">Filter by Method:</span>
+                <select name="f_method" class="modal-input">
+                    <option value="">All Methods</option>
+                    <option value="FPX" <?php echo ($f_method=='FPX')?'selected':''; ?>>FPX</option>
+                    <option value="Card" <?php echo ($f_method=='Card')?'selected':''; ?>>Credit/Debit Card</option>
+                    <option value="E-Wallet" <?php echo ($f_method=='E-Wallet')?'selected':''; ?>>E-Wallet</option>
+                    <option value="Bank Transfer" <?php echo ($f_method=='Bank Transfer')?'selected':''; ?>>Bank Transfer (Withdrawal)</option>
+                </select>
+                <button type="submit" class="modal-apply-btn">Apply Filter</button>
+            </form>
+
+            <a href="<?php echo buildUrl(['sort'=>'method', 'order'=>'asc']); ?>" class="sort-btn">A to Z <i class="fas fa-sort-alpha-down"></i></a>
+            <a href="<?php echo buildUrl(['sort'=>'method', 'order'=>'desc']); ?>" class="sort-btn">Z to A <i class="fas fa-sort-alpha-up"></i></a>
         </div>
     </div>
 
@@ -1114,241 +811,12 @@ $chartData = getMonthlyRevenueChartData($conn);
             options: { responsive: true, maintainAspectRatio: false }
         });
 
-        const branchesData = <?php echo $jsonBranches; ?>;
-        const activitiesData = <?php echo $jsonActivities; ?>;
-        const casesData = <?php echo $jsonCases; ?>;
-        let currentMaxBalance = 0;
-
-        function populateSelect(id, data, valKey, textKey) {
-            const sel = document.getElementById(id);
-            sel.innerHTML = '<option value="">-- Select --</option>';
-            data.forEach(item => {
-                const opt = document.createElement('option');
-                opt.value = item[valKey];
-                opt.text = item[textKey];
-                sel.add(opt);
-            });
-        }
-
-        populateSelect('target_id_branch', branchesData, 'Branch_ID', 'Branch_Name');
-        populateSelect('target_id_activity', activitiesData, 'Activity_ID', 'Activity_Name');
-        populateSelect('target_id_case', casesData, 'Case_ID', 'Case_Title');
-        
-        const handleSel = document.querySelector('[name="handling_branch_id"]');
-        handleSel.innerHTML = '<option value="">-- Select Processing Branch --</option>';
-        branchesData.forEach(b => {
-            const opt = document.createElement('option');
-            opt.value = b.Branch_ID;
-            opt.text = b.Branch_Name;
-            handleSel.add(opt);
-        });
-
-        function toggleTxFilters() {
-            const type = document.getElementById('filterTypeTx').value;
-            document.querySelectorAll('#filter_date_tx, #filter_method_tx, #filter_text_tx').forEach(el => el.classList.remove('active'));
-            if (type === 'date') document.getElementById('filter_date_tx').classList.add('active');
-            else if (type === 'method') document.getElementById('filter_method_tx').classList.add('active');
-            else document.getElementById('filter_text_tx').classList.add('active');
-        }
-        toggleTxFilters();
-
-        function toggleWlFilters() {
-            const type = document.getElementById('filterTypeWl').value;
-            document.querySelectorAll('#filter_date_wl, #filter_type_wl_select, #filter_text_wl').forEach(el => el.classList.remove('active'));
-            if (type === 'date') document.getElementById('filter_date_wl').classList.add('active');
-            else if (type === 'type') document.getElementById('filter_type_wl_select').classList.add('active');
-            else document.getElementById('filter_text_wl').classList.add('active');
-        }
-        toggleWlFilters();
-
-        function showSystemError(messageHTML) {
-            const errorBox = document.getElementById('floatingError');
-            const errorText = document.getElementById('floatingErrorText');
-            if(errorBox && errorText) {
-                errorText.innerHTML = messageHTML;
-                errorBox.style.display = 'flex';
-                setTimeout(() => { errorBox.style.display = 'none'; }, 5000);
+        // Modals Logic
+        function openModal(id) { document.getElementById(id).style.display = "flex"; }
+        function closeModal(id, e) {
+            if (!e || e.target.id === id || e.target.classList.contains('sort-close')) {
+                document.getElementById(id).style.display = "none";
             }
-        }
-
-        let selectedFiles = [];
-
-        function handleFileSelect(event) {
-            const input = event.target;
-            const newFiles = Array.from(input.files);
-            
-            if (selectedFiles.length + newFiles.length > 5) {
-                showSystemError("You can only upload a maximum of 5 proof files.");
-                input.value = ''; 
-                return;
-            }
-
-            selectedFiles = selectedFiles.concat(newFiles);
-            updateFileInput();
-            renderPreview();
-        }
-
-        function removeFile(index) {
-            selectedFiles.splice(index, 1);
-            updateFileInput();
-            renderPreview();
-        }
-
-        function updateFileInput() {
-            const input = document.getElementById('proof_file');
-            const dataTransfer = new DataTransfer();
-            selectedFiles.forEach(file => dataTransfer.items.add(file));
-            input.files = dataTransfer.files;
-        }
-
-        function renderPreview() {
-            const container = document.getElementById('proof_preview_container');
-            container.innerHTML = '';
-            
-            selectedFiles.forEach((file, index) => {
-                const item = document.createElement('div');
-                item.className = 'preview-item';
-                
-                if (file.type === 'application/pdf') {
-                    item.innerHTML = `
-                        <i class="fas fa-file-pdf" style="font-size: 24px; color: #dc3545;"></i>
-                        <button type="button" class="remove-img-btn" onclick="removeFile(${index})"><i class="fas fa-times"></i></button>
-                    `;
-                    container.appendChild(item);
-                } else {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        item.innerHTML = `<img src="${e.target.result}"><button type="button" class="remove-img-btn" onclick="removeFile(${index})"><i class="fas fa-times"></i></button>`;
-                        container.appendChild(item);
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
-        }
-
-        function openWithdrawModal() {
-            selectedFiles = [];
-            document.getElementById('proof_preview_container').innerHTML = '';
-            document.getElementById('withdrawModal').style.display = 'block';
-        }
-
-        function closeWithdrawModal() {
-            document.getElementById('withdrawModal').style.display = 'none';
-        }
-
-        window.onclick = function(event) {
-            var modal = document.getElementById('withdrawModal');
-            if (event.target == modal) { modal.style.display = "none"; }
-        }
-
-        function toggleWithdrawTarget() {
-            var type = document.getElementById('withdrawal_type').value;
-            
-            document.getElementById('group_branch').style.display = 'none';
-            document.getElementById('group_activity').style.display = 'none';
-            document.getElementById('group_case').style.display = 'none';
-            document.getElementById('group_handling_branch').style.display = 'none';
-            document.querySelectorAll('.balance-display').forEach(e => e.style.display = 'none');
-
-            document.getElementById('bank_name').value = '';
-            document.getElementById('bank_account').value = '';
-            document.getElementById('withdraw_amount').value = '';
-            currentMaxBalance = 0;
-
-            if (type === 'branch') {
-                document.getElementById('group_branch').style.display = 'block';
-            } else if (type === 'activity') {
-                document.getElementById('group_activity').style.display = 'block';
-            } else if (type === 'case') {
-                document.getElementById('group_case').style.display = 'block';
-                document.getElementById('group_handling_branch').style.display = 'block';
-            }
-        }
-
-        function updateBankAndBalance(type) {
-            let id, data, balId;
-            let bankKey, accKey;
-
-            if (type === 'branch') {
-                id = document.getElementById('target_id_branch').value;
-                data = branchesData.find(b => b.Branch_ID == id);
-                bankKey = 'Branch_BankName'; accKey = 'Branch_BankAccount';
-                balId = 'balance_branch';
-            } else if (type === 'activity') {
-                id = document.getElementById('target_id_activity').value;
-                data = activitiesData.find(a => a.Activity_ID == id);
-                bankKey = 'Branch_BankName'; accKey = 'Branch_BankAccount'; 
-                balId = 'balance_activity';
-            } else if (type === 'case') {
-                id = document.getElementById('target_id_case').value;
-                data = casesData.find(c => c.Case_ID == id);
-                bankKey = 'Case_BankName'; accKey = 'Case_BankAccount';
-                balId = 'balance_case';
-            }
-
-            const balEl = document.getElementById(balId);
-            if (data) {
-                document.getElementById('bank_name').value = data[bankKey] || 'N/A';
-                document.getElementById('bank_account').value = data[accKey] || 'N/A';
-                
-                currentMaxBalance = parseFloat(data.balance);
-                balEl.innerHTML = "Available Balance: RM " + currentMaxBalance.toFixed(2);
-                balEl.style.display = 'block';
-                
-                if (currentMaxBalance <= 0) {
-                    balEl.className = 'balance-display balance-error';
-                    document.getElementById('withdraw_amount').disabled = true;
-                    document.getElementById('withdraw_amount').placeholder = "Insufficient Funds";
-                } else {
-                    balEl.className = 'balance-display';
-                    document.getElementById('withdraw_amount').disabled = false;
-                    document.getElementById('withdraw_amount').placeholder = "e.g. 500.00";
-                    document.getElementById('withdraw_amount').max = currentMaxBalance;
-                }
-            } else {
-                document.getElementById('bank_name').value = '';
-                document.getElementById('bank_account').value = '';
-                balEl.style.display = 'none';
-                currentMaxBalance = 0;
-            }
-        }
-
-        // Custom Validation (Manually checking instead of using 'required')
-        function validateWithdrawal() {
-            const type = document.getElementById('withdrawal_type').value;
-            const amt = parseFloat(document.getElementById('withdraw_amount').value);
-            const errors = [];
-
-            if(type === "") {
-                errors.push("Please select a Withdrawal Source Type.");
-            }
-
-            // Sub-selection validation
-            if(type === 'branch' && document.getElementById('target_id_branch').value === "") {
-                errors.push("Please select a Branch.");
-            } else if(type === 'activity' && document.getElementById('target_id_activity').value === "") {
-                errors.push("Please select an Activity.");
-            } else if(type === 'case') {
-                if(document.getElementById('target_id_case').value === "") errors.push("Please select a Special Case.");
-                if(document.getElementById('handling_branch_id').value === "") errors.push("Please select a Processing Branch.");
-            }
-            
-            if (isNaN(amt) || amt <= 0) {
-                errors.push("Amount must be greater than 0.");
-            }
-            if (amt > currentMaxBalance) {
-                errors.push("Amount cannot exceed available funds (RM " + currentMaxBalance.toFixed(2) + ").");
-            }
-            if (selectedFiles.length === 0) {
-                errors.push("Please upload at least one proof file.");
-            }
-
-            if (errors.length > 0) {
-                // Use Custom System Error
-                showSystemError(errors.join('<br>'));
-                return false;
-            }
-            return true;
         }
 
         setTimeout(() => {
@@ -1357,6 +825,29 @@ $chartData = getMonthlyRevenueChartData($conn);
             if(success) success.style.display = 'none';
             if(error) error.style.display = 'none';
         }, 5000);
+
+        // Date Picker Logic
+        function updateDays(yearId, monthId, dayId) {
+            const yearSelect = document.getElementById(yearId);
+            const monthSelect = document.getElementById(monthId);
+            const dayInput = document.getElementById(dayId);
+
+            const year = parseInt(yearSelect.value) || new Date().getFullYear();
+            const month = parseInt(monthSelect.value);
+
+            if (month) {
+                // Get last day of the month (Day 0 of next month is last day of current)
+                const daysInMonth = new Date(year, month, 0).getDate();
+                dayInput.max = daysInMonth;
+                
+                // Reset value if it exceeds new max
+                if (dayInput.value > daysInMonth) {
+                    dayInput.value = daysInMonth;
+                }
+            } else {
+                dayInput.max = 31;
+            }
+        }
     </script>
 </body>
 </html>
