@@ -2,12 +2,9 @@
 // Branch_Selection.php
 session_start();
 include 'dataconnection.php';
+include 'header_function.php';
 
-// 1. 登录检查
-if (!isset($_SESSION['donor_id'])) {
-    echo "<script>alert('Please login first.'); window.location.href='donor_login.php';</script>";
-    exit();
-}
+
 
 // ==========================================
 // 2. 初始化流程数据
