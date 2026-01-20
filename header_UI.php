@@ -30,7 +30,6 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         $stmt->close();
 
         // B. [新增] 获取即将到期的 Recurring Donation (未来7天内扣款)
-        // 逻辑：状态为 Active，且 Recurring_Deduction_Date 在今天和未来7天之间
         $stmt_notif = $conn->prepare("SELECT Recurring_ID, Recurring_Amount, Recurring_Deduction_Date FROM recurring_donation WHERE Donor_ID = ? AND Recurring_Status = 'Active' AND Recurring_Deduction_Date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)");
         
         if ($stmt_notif) {
@@ -153,7 +152,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             font-family: 'Segoe UI', sans-serif; 
         }
 
-        /* --- [新增] Notification 样式 --- */
+        /* --- Notification 样式 --- */
         .notification-container {
             position: relative;
             display: flex;
@@ -422,14 +421,72 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         .header-menu {
             display: flex;
             gap: 25px;
+            align-items: center;
         }
+        
         .header-menu a {
             color: #333;
             font-weight: 500;
             font-size: 16px;
             padding: 10px 5px;
         }
-        .header-menu a:hover { color: var(--primary-color); }
+        .header-menu > li > a:hover { color: var(--primary-color); }
+
+        
+        .header-menu li {
+            position: relative; 
+        }
+
+        /* --- 修改：仅依靠 .active 类显示 --- */
+        .header-menu .team-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-radius: 4px;
+            min-width: 160px;
+            padding: 5px 0;
+            z-index: 1100;
+        }
+
+        /* 修改：移除了 li:hover 的规则，改用 .active 类 */
+        .header-menu .team-dropdown-menu.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .header-menu .team-dropdown-menu li {
+            display: block;
+            margin: 0;
+        }
+
+        .header-menu .team-dropdown-menu a {
+            display: block;
+            padding: 10px 15px;
+            font-size: 14px;
+            color: #333;
+            border-bottom: 1px solid #f0f0f0;
+            white-space: nowrap;
+        }
+
+        .header-menu .team-dropdown-menu li:last-child a {
+            border-bottom: none;
+        }
+
+        .header-menu .team-dropdown-menu a:hover {
+            background-color: #f9f9f9;
+            color: var(--primary-color);
+            padding-left: 20px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* --- 结束新增样式 --- */
 
         .header-search {
             display: flex;
@@ -452,19 +509,57 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             color: #777;
         }
 
+        
         .header-donate-btn {
             background-color: #ffbb6dff;
             color: #fff !important;
-            padding: 10px 25px;
+            
+            /* 设置固定宽高，确保切换时不跳动 */
+            width: 120px; 
+            height: 44px;
+            
+            /* Flex 布局居中 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            
             border-radius: 30px;
             font-weight: bold;
             margin-left: 15px;
             box-shadow: 0 4px 10px rgba(209, 47, 2, 0.3);
             cursor: pointer;
+            transition: all 0.3s ease;
         }
+
         .header-donate-btn:hover {
-            background-color: #f79c34ff ;
+            background-color: #f79c34ff;
             transform: translateY(-2px);
+        }
+
+        /* 文字样式：默认显示 */
+        .btn-text {
+            display: block;
+        }
+
+        /* 图标样式：默认隐藏 */
+        .btn-icon {
+            display: none;
+        }
+
+        /* Hover 触发：文字隐藏，图标显示 */
+        .header-donate-btn:hover .btn-text {
+            display: none;
+        }
+        
+        .header-donate-btn:hover .btn-icon {
+            display: block;
+            /* 简单的弹出动画 */
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.5); }
+            100% { opacity: 1; transform: scale(1); }
         }
 
         @media (max-width: 900px) {
@@ -592,10 +687,21 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             <nav>
                 <ul class="header-menu">
                     <li><a href="Homepage.php">Home</a></li>
-                    <li><a href="Campaign_Page.php">Campaign</a></li>
                     <li><a href="New&Story.php">News & Story</a></li>
+                    <li><a href="Campaign_Page.php">Campaign</a></li>
                     <li><a href="Special_case Page.php">Special Case</a></li>
-                </ul>
+                    
+                    <li>
+                        <a href="#" onclick="toggleTeamDropdown(event)">Our Teams</a>
+                        
+                        <ul class="team-dropdown-menu" id="teamDropdown">
+                            <li><a href="About_Us.php">About Us</a></li>
+                            <li><a href="Contact_Us.php">Contact Us</a></li>
+                            <li><a href="Branch_Page.php">Our Branches</a></li>
+                             
+                        </ul>
+                    </li>
+                    </ul>
             </nav>
 
             <div style="display:flex; align-items:center;">
@@ -605,22 +711,59 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
                 </form>
 
                 <?php if ($logged_in): ?>
-                    <a href="Branch_Selection.php" class="header-donate-btn">Donate</a>
+                    <a href="Branch_Selection.php" class="header-donate-btn">
+                        <span class="btn-text">Donate</span>
+                        <span class="btn-icon">
+                            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="white" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                            </svg>
+                        </span>
+                    </a>
                 <?php else: ?>
-                    <a href="#" class="header-donate-btn" onclick="showLoginAlert(event)">Donate</a>
+                    <a href="#" class="header-donate-btn" onclick="showLoginAlert(event)">
+                        <span class="btn-text">Donate</span>
+                        <span class="btn-icon">
+                            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="white" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                            </svg>
+                        </span>
+                    </a>
                 <?php endif; ?>
+
             </div>
         </div>
     </header>
 
     <script>
+        // --- 新增：Team Dropdown 的逻辑 ---
+        function toggleTeamDropdown(event) {
+            // 阻止链接默认跳转
+            event.preventDefault();
+            // 阻止冒泡，防止触发全局的点击关闭
+            event.stopPropagation();
+
+            const teamDropdown = document.getElementById('teamDropdown');
+            const profileDropdown = document.getElementById('profileDropdown');
+            const notifDropdown = document.getElementById('notificationDropdown');
+
+            // 确保其他的下拉菜单关闭，避免重叠
+            if(profileDropdown) profileDropdown.classList.remove('active');
+            if(notifDropdown) notifDropdown.classList.remove('active');
+
+            // 切换 Our Teams 下拉菜单的状态
+            teamDropdown.classList.toggle('active');
+        }
+
         // 1. Account Dropdown Logic
         function toggleDropdown() {
             const dropdown = document.getElementById('profileDropdown');
             const notifDropdown = document.getElementById('notificationDropdown');
+            const teamDropdown = document.getElementById('teamDropdown'); // 新增
             
-            // 关闭通知，打开 Account
+            // 关闭其他
             if(notifDropdown) notifDropdown.classList.remove('active');
+            if(teamDropdown) teamDropdown.classList.remove('active'); // 新增
+            
             dropdown.classList.toggle('active');
         }
 
@@ -628,29 +771,32 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         function toggleNotification() {
             const notifDropdown = document.getElementById('notificationDropdown');
             const accountDropdown = document.getElementById('profileDropdown');
+            const teamDropdown = document.getElementById('teamDropdown'); // 新增
 
-            // 当用户点击铃铛时，隐藏红色角标
+            // 隐藏红点逻辑
             const badge = document.querySelector('.notification-badge');
             if (badge) {
                 badge.style.display = 'none';
             }
-
-            // [新增] 设置一个 Cookie，告诉服务器“我已经看过通知了”
-            // path=/ 确保整个网站都生效
             document.cookie = "notif_read=true; path=/";
 
-            // 关闭 Account，打开通知
+            // 关闭其他
             if(accountDropdown) accountDropdown.classList.remove('active');
+            if(teamDropdown) teamDropdown.classList.remove('active'); // 新增
+            
             notifDropdown.classList.toggle('active');
         }
 
-        // 3. Global Click Listener (Close dropdowns when clicking outside)
+        // 3. Global Click Listener (点击外部关闭所有下拉)
         document.addEventListener('click', function(event) {
             const profileDropdown = document.getElementById('profileDropdown');
             const profileTrigger = document.querySelector('.profile-trigger');
             
             const notifDropdown = document.getElementById('notificationDropdown');
             const notifTrigger = document.querySelector('.notification-trigger');
+
+            // 获取 Team Dropdown
+            const teamDropdown = document.getElementById('teamDropdown');
 
             // 处理 Account 点击外部关闭
             if (profileTrigger && !profileTrigger.contains(event.target) && !profileDropdown.contains(event.target)) {
@@ -661,20 +807,32 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
             if (notifTrigger && !notifTrigger.contains(event.target) && !notifDropdown.contains(event.target)) {
                 notifDropdown.classList.remove('active');
             }
+
+            // [新增] 处理 Our Teams 点击外部关闭
+            // 逻辑：如果点击的不是菜单内部，且不是点击菜单里的链接，则关闭
+            if (teamDropdown && teamDropdown.classList.contains('active')) {
+                // 如果点击的目标不是 Dropdown 本身
+                if (!teamDropdown.contains(event.target)) {
+                    teamDropdown.classList.remove('active');
+                }
+            }
         });
 
-        // 阻止下拉框内部点击冒泡
+        // 阻止下拉框内部点击冒泡 (确保点击菜单内的选项时不会立即关闭)
         document.getElementById('profileDropdown')?.addEventListener('click', function(event) {
             event.stopPropagation();
         });
         document.getElementById('notificationDropdown')?.addEventListener('click', function(event) {
             event.stopPropagation();
         });
+        // [新增] 阻止 Team Dropdown 冒泡
+        document.getElementById('teamDropdown')?.addEventListener('click', function(event) {
+            event.stopPropagation();
+        });
 
-        // 4. 显示登录提示 (Donate 按钮)
+        // 4. 显示登录提示
         function showLoginAlert(event) {
             event.preventDefault(); 
-
             Swal.fire({
                 icon: 'info',
                 title: 'Login Required',
@@ -694,7 +852,6 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         // 5. 登出确认函数
         function confirmLogout(event) {
             event.preventDefault(); 
-
             Swal.fire({
                 title: 'Are you sure?',
                 text: "You will be logged out of your account.",

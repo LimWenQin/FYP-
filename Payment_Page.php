@@ -118,8 +118,49 @@ include 'header_UI.php';
     .checkbox-label input { width: 18px; height: 18px; margin-right: 10px; cursor: pointer; }
     .tax-note { font-size: 12px; color: #666; margin-top: 5px; margin-left: 28px; }
     
-    .btn-next { background: #00a651; color: white; width: 100%; padding: 15px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; border: none; cursor: pointer; transition: 0.2s; }
-    .btn-next:hover { background: #008f45; }
+    /* 按钮容器，让 Next 和 Previous 并排 */
+.button-group {
+    display: flex;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.btn-next { 
+    background: #00a651; 
+    color: white; 
+    flex: 2; /* Next 按钮占主要宽度 */
+    padding: 15px; 
+    border-radius: 8px; 
+    font-size: 1.1rem; 
+    font-weight: bold; 
+    border: none; 
+    cursor: pointer; 
+    transition: 0.2s; 
+}
+.btn-next:hover { background: #008f45; }
+
+/* 新增 Previous 按钮样式 */
+.btn-prev {
+    background: #f3f4f6;
+    color: #4b5563;
+    flex: 1; /* Previous 按钮占次要宽度 */
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border: 1px solid #d1d5db;
+    cursor: pointer;
+    transition: 0.2s;
+    text-align: center;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-prev:hover {
+    background: #e5e7eb;
+    color: #1f2937;
+}
 
     /* Showcase Block (推荐板块) */
     .bottom-section { padding: 60px 0; }
@@ -195,7 +236,17 @@ include 'header_UI.php';
                         <div class="tax-note">* Minimum donation: <strong>RM 30</strong><br>* Requires complete Profile (IC & Address)</div>
                     </div>
                     
-                    <button type="submit" class="btn-next">Next <i class="fas fa-arrow-right"></i></button>
+                    <div class="button-group">
+                        <a href="Branch_Selection.php" class="btn-prev">
+                            <i class="fas fa-arrow-left"></i>
+                            <span style="margin-left: 8px;">Back to Branch Selection</span>
+                        </a>
+                        <button type="submit" class="btn-next">Next <i class="fas fa-arrow-right"></i></button>
+                    </div>
+
+                    <div style="text-align:center; margin-top:15px;">
+                            <p style="color:#999; font-size:0.85rem;">Step 2 of 4: Amount & Policy</p>
+                    </div>
                     
                     <div style="text-align:center; margin-top:15px;">
                         <a href="Branch_Selection.php" style="color:#999; font-size:0.85rem; text-decoration:none;"><i class="fas fa-undo"></i> Change destination</a>

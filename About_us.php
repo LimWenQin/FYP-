@@ -78,7 +78,7 @@ include 'header_UI.php';
         .team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
         .team-member { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.1); text-align: center; }
         .team-img { height: 250px; background: #ddd; width: 100%; position: relative; }
-        .team-img img { width: 100%; height: 100%; object-fit: cover; }
+        .team-img img {  height: 100%; object-fit: cover; }
         .team-info { padding: 25px; }
         .team-info h4 { color: #d32f2f; margin-bottom: 10px; }
         

@@ -68,9 +68,10 @@ $hasImages = !empty($images);
         .h-main h1 { margin: 10px 0; font-size: 28px; color: #333; font-weight: 800; line-height: 1.3; }
         .badge-cat { background: #e3f2fd; color: #1976d2; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; }
         
-        /* 时间显示：修改为显示具体时间点 */
-        .pub-date { font-size: 14px; color: #666; display: flex; align-items: center; gap: 8px; margin-top: 8px; font-weight: 500;}
+        /* 时间和作者显示区域 */
+        .pub-date { font-size: 14px; color: #666; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; font-weight: 500;}
         .pub-date i { color: #F28585; }
+        .separator { color: #ddd; margin: 0 5px; }
 
         /* GALLERY SECTION (PREVIEW) - 复用 Branch Details 样式 */
         .gallery-container { height: 400px; position: relative; background: #f8f9fa; border-bottom: 1px solid #eee; overflow: hidden; }
@@ -151,7 +152,12 @@ $hasImages = !empty($images);
                 
                 <div class="pub-date">
                     <i class="far fa-clock"></i> 
-                    Published on: <?php echo date('d M Y, h:i A', strtotime($story['Created_At'])); ?>
+                    <span>Published on: <?php echo date('d M Y, h:i A', strtotime($story['Created_At'])); ?></span>
+                    
+                    <span class="separator">|</span>
+                    
+                    <i class="fas fa-user"></i>
+                    <span>By: <?php echo isset($story['Story_Author']) ? htmlspecialchars($story['Story_Author']) : 'Unknown Author'; ?></span>
                 </div>
             </div>
 

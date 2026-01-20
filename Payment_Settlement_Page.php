@@ -22,13 +22,15 @@ if (!isset($_GET['txn_ref']) || empty($_GET['txn_ref'])) {
 $txn_ref = $_GET['txn_ref'];
 
 // ==========================================
-// 3. 核心查询 (关联 Payment, Orders, Donor 表)
+// 3. 核心查询 (修正版：加入了收据所需的 IC 和 详细地址字段)
 // ==========================================
 $sql = "SELECT 
             p.Payment_TXN_Ref, p.Payment_Status, p.Payment_Paid_At, p.Payment_Method,
             o.Order_ID, o.Order_Amount, o.Order_Type, o.Order_Status, 
             o.Branch_ID, o.Case_ID, o.Activity_ID, o.Order_Created_At, o.Order_TXN_Ref,
-            d.Donor_ID, d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber
+            o.Order_Name, o.Order_ICNumber, o.Order_Email, o.Order_ContactNumber, -- 从 orders 提取快照
+            d.Donor_ID, d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber,
+            d.Donor_Address1, d.Donor_Address2, d.Donor_City, d.Donor_State, d.Donor_PostalCode -- 增加地址字段
         FROM payment p 
         JOIN orders o ON p.Payment_ID = o.Payment_ID 
         JOIN donor d ON o.Donor_ID = d.Donor_ID
@@ -93,13 +95,14 @@ if (!empty($row['Case_ID'])) {
 $is_success_status = (stripos($payment_status, 'Success') !== false || stripos($payment_status, 'Completed') !== false);
 
 // ==========================================
-// 5. 邮件发送逻辑
+// 5. 邮件发送逻辑 (确保传入包含地址信息的 $row)
 // ==========================================
 $email_msg = "Processing receipt...";
 $sess_key_mail = 'email_sent_' . $txn_ref;
 
 if (!isset($_SESSION[$sess_key_mail]) && $is_success_status) {
     if (function_exists('sendReceiptEmail')) {
+        // 这里传入的 $row 现在包含了完整的地址和 IC 字段
         $isSent = sendReceiptEmail($row, $project_name); 
         if ($isSent) {
             $_SESSION[$sess_key_mail] = true;
@@ -138,13 +141,11 @@ if ($points_to_add > 0 && $is_success_status && !isset($_SESSION[$sess_key_point
     $_SESSION[$sess_key_points] = true;
 }
 
-// ⭐ 原 Section 7 (Update Fund & Count) 已根据要求删除，防止重复加钱 ⭐
-
 include 'header_UI.php'; 
 ?>
 
 <style>
-    /* 页面专用样式 */
+    /* 页面专用样式保持不变... */
     .hero-wrap { 
         height: 350px; 
         background-image: url('images/hero_1.jpg'); 
@@ -158,12 +159,10 @@ include 'header_UI.php';
     .hero-content h1 { font-family: 'Segoe UI', sans-serif; color: #fff; font-size: 3.5rem; margin-bottom: 10px; }
     .hero-content p { color: rgba(255,255,255,0.9); font-size: 1.2rem; }
 
-    /* 成功消息区域 */
     .success-box { text-align: center; padding: 40px 20px; }
     .icon-success { font-size: 80px; color: #dc2626; margin-bottom: 20px; }
     .thank-you-msg { font-size: 2.2rem; font-weight: 800; color: #333; margin-bottom: 15px; }
     
-    /* 积分徽章 */
     .points-badge { 
         background-color: #fff5f5; color: #dc2626; 
         border: 2px solid #dc2626; padding: 10px 25px; 
@@ -172,7 +171,6 @@ include 'header_UI.php';
         box-shadow: 0 4px 10px rgba(220, 38, 38, 0.1);
     }
 
-    /* 收据卡片 */
     .receipt-card { 
         background: #fff; padding: 40px; border-radius: 12px; 
         box-shadow: 0 10px 30px rgba(0,0,0,0.08); 

@@ -90,6 +90,7 @@ include 'header_UI.php';
             display: inline-flex; align-items: center; gap: 8px; 
             padding: 8px 16px; background: white; border-radius: 50px; 
             box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.2s;
+            cursor: pointer;
         }
         .back-link:hover { background: var(--primary-red); color: white; transform: translateY(-2px); }
 
@@ -141,8 +142,8 @@ include 'header_UI.php';
 
 <div class="detail-wrapper">
     <div class="top-bar">
-        <a href="Branch_Selection.php" class="back-link">
-            <i class="fas fa-arrow-left"></i> Back to Selection
+        <a href="Branch_Selection.php" onclick="if(document.referrer){history.back(); return false;}" class="back-link">
+            <i class="fas fa-arrow-left"></i> Back
         </a>
         <div style="font-size:12px; color:#999;">Type: <?php echo $type; ?></div>
     </div>
