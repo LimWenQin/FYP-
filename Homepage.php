@@ -13,10 +13,6 @@ $logged_in = isset($_SESSION['donor_id']) && !empty($_SESSION['donor_id']);
 // ==========================================
 // [核心逻辑] 自动检查并更新满额的案例状态
 // ==========================================
-// 这一步非常关键：
-// 1. 系统查找所有金额已达标 (Raised >= Target) 的 Emergency Relief 案例。
-// 2. 将它们的状态从 'Active' 改为 'Completed'。
-// 3. 结果：因为下面的查询只找 'Active'，所以这些刚刚变成 Completed 的案例会自动从主页隐藏。
 $auto_update_sql = "UPDATE special_case 
                     SET Case_Status = 'Completed', Completed_At = NOW() 
                     WHERE Case_Category = 'Emergency Relief' 
@@ -27,9 +23,6 @@ $conn->query($auto_update_sql);
 
 // --- 3. 获取 Special Cases (Emergency Relief) 用于主页轮播 ---
 $special_cases = [];
-
-// 这里只选择 Active 的案例。
-// 由于上面的代码已经把满额的改成了 Completed，所以这里自然不会选出满额的案例。
 $query_sc = "SELECT * FROM special_case 
              WHERE Case_Category = 'Emergency Relief' 
              AND Case_Status = 'Active' 
@@ -39,23 +32,21 @@ $result_sc = $conn->query($query_sc);
 
 if ($result_sc && $result_sc->num_rows > 0) {
     while ($row = $result_sc->fetch_assoc()) {
-        // Image Handling (支持 JSON 格式 或 普通字符串)
+        // Image Handling
         $image_url = "https://images.unsplash.com/photo-1579684385127-1ef15d508118?ixlib=rb-1.2.1&auto=format&fit=crop&w=1600&q=80"; 
         if (!empty($row['Case_Images'])) {
             $decoded = json_decode($row['Case_Images'], true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded) && count($decoded) > 0) {
-                $image_url = $decoded[0]; // 取第一张
+                $image_url = $decoded[0];
             } else {
                 $image_url = $row['Case_Images'];
             }
         }
 
-        // 计算发布了多少天 (用于显示倒计时或天数，虽然主页显示的是倒计时)
         $created_date = new DateTime($row['Created_At']);
         $now = new DateTime();
         $interval = $created_date->diff($now);
         
-        // 按钮点击逻辑
         if ($logged_in) {
             $target_url = "S_C_Payment_Page.php?case_id=" . $row['Case_ID'];
             $btn_onclick = "window.location.href='$target_url';";
@@ -73,35 +64,124 @@ if ($result_sc && $result_sc->num_rows > 0) {
             "donors" => intval($row['Donor_Count']),
             "days_active" => $interval->days,
             "start_date" => $row['Start_Date'], 
-            "end_date" => $row['End_Date'],     
+            "end_date" => $row['End_Date'],      
             "tagline" => "EMERGENCY RELIEF",
             "btn_action" => $btn_onclick
         ];
     }
 }
 
-// --- 4. 获取即将开始的活动 (Upcoming Activities) ---
+// --- 4. 定义捐款种类数组 ---
+$donation_categories = [
+    'emergency' => [
+        'db_name' => 'Emergency Relief', 
+        'name' => 'Emergency Relief', 
+        'icon' => 'fas fa-first-aid', 
+        'color' => '#d32f2f'
+    ],
+    'medical' => [
+        'db_name' => 'Medical', 
+        'name' => 'Medical Aid', 
+        'icon' => 'fas fa-heartbeat', 
+        'color' => '#f57c00'
+    ],
+    'disability' => [
+        'db_name' => 'Disability Support', 
+        'name' => 'Disability Support', 
+        'icon' => 'fas fa-wheelchair', 
+        'color' => '#f57c00'
+    ],
+    'elderly' => [
+        'db_name' => 'Elderly Care', 
+        'name' => 'Elderly Care', 
+        'icon' => 'fas fa-user-friends', 
+        'color' => '#f57c00'
+    ],
+    'children' => [
+        'db_name' => 'Children Support', 
+        'name' => 'Children Support', 
+        'icon' => 'fas fa-child', 
+        'color' => '#f57c00'
+    ],
+    'other' => [
+        'db_name' => 'Other Cases', 
+        'name' => 'Other Cases', 
+        'icon' => 'fas fa-hand-holding-heart', 
+        'color' => '#f57c00'
+    ]
+];
+
+// --- [新] 5. 获取 News & Stories (Stories) ---
+$stories = [];
+$query_story = "SELECT * FROM story 
+                WHERE Story_Status = 'Published' 
+                ORDER BY Created_At DESC LIMIT 3";
+$result_story = $conn->query($query_story);
+
+if ($result_story && $result_story->num_rows > 0) {
+    while ($row = $result_story->fetch_assoc()) {
+        // Story Image Handling
+        $story_img = "https://images.unsplash.com/photo-1504159506876-f8338247a14a?auto=format&fit=crop&q=80"; // Default
+        if (!empty($row['Story_Image'])) {
+            $decoded = json_decode($row['Story_Image'], true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded) && count($decoded) > 0) {
+                $story_img = $decoded[0];
+            } else {
+                // 如果不是 JSON，直接使用字符串，或者如果是单张图片路径
+                $story_img = $row['Story_Image'];
+            }
+        }
+
+        // Generate Date (Use Story_Date if available, else Created_At)
+        $date_source = !empty($row['Story_Date']) ? $row['Story_Date'] : $row['Created_At'];
+        $story_date = date('d M Y', strtotime($date_source));
+
+        // Create Link (假设详情页是 story_details.php)
+        $story_link = "story_details.php?id=" . $row['Story_ID'];
+
+        $stories[] = [
+            "id" => $row['Story_ID'],
+            "title" => $row['Story_Title'],
+            "category" => $row['Story_Category'],
+            "image" => $story_img,
+            "date" => $story_date,
+            "description" => $row['Story_Description'],
+            "link" => $story_link
+        ];
+    }
+}
+
+// --- 6. 获取活动 (Activity/Campaigns) ---
 $activities = [];
+$today = date('Y-m-d');
+
 $query_act = "SELECT * FROM activity 
-              WHERE Activity_Status IN ('Active', 'Upcoming') 
+              WHERE Activity_Status IN ('Active', 'Upcoming', 'Ongoing') 
+              AND (Activity_EndDate IS NULL OR Activity_EndDate >= '$today')
               ORDER BY Activity_StartDate ASC LIMIT 3";
 
 $result_act = $conn->query($query_act);
 
 if ($result_act && $result_act->num_rows > 0) {
     while ($row = $result_act->fetch_assoc()) {
+        $is_ongoing = ($row['Activity_StartDate'] <= $today);
+        $details_link = "activity_details.php?id=" . $row['Activity_ID'];
+
         $activities[] = [
             "id" => $row['Activity_ID'],
             "title" => $row['Activity_Name'],
             "date" => $row['Activity_StartDate'], 
+            "display_status" => $is_ongoing ? 'Ongoing' : date('d M Y', strtotime($row['Activity_StartDate'])),
+            "is_ongoing" => $is_ongoing,
             "time" => date('h:i A', strtotime($row['Activity_StartDate'])), 
             "location" => $row['Activity_Venue'],
-            "description" => $row['Activity_Description']
+            "description" => $row['Activity_Description'],
+            "link" => $details_link
         ];
     }
 }
 
-// --- Helper: 底部大 CTA 按钮的逻辑 ---
+// --- Helper: CTA Button ---
 $cta_url = "Payment_page.php"; 
 if ($logged_in) {
     $cta_onclick = "window.location.href='$cta_url'; return false;";
@@ -147,313 +227,209 @@ if ($logged_in) {
             padding: 0;
         }
 
-        /* --- Special Case Hero Slider --- */
+        /* --- Special Case Hero Slider (Styles unchanged) --- */
         .special-case-hero {
             position: relative;
             height: 85vh; 
             min-height: 600px;
             overflow: hidden;
-            margin-bottom: 60px;
+            margin-bottom: 0px; /* Removed margin to connect with intro */
             background-color: #000; 
         }
 
-        .special-case-slides {
-            position: relative;
-            width: 100%;
-            height: 100%;
-        }
-
-        .special-case-slide {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            transition: opacity 1s ease-in-out;
-            visibility: hidden; 
-        }
-
-        .special-case-slide.active {
-            opacity: 1;
-            z-index: 1;
-            visibility: visible;
-        }
-
-        .special-case-image-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-
-        .special-case-image {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            filter: none; /* 图片保持原亮度 */
-        }
-
-        /* 渐变遮罩：让底部文字清晰可见 */
-        .slide-overlay-gradient {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 70%; 
-            background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 60%, transparent 100%);
-            z-index: 1;
-            pointer-events: none;
-        }
-
-        /* --- 内容容器 --- */
-        .special-case-content {
-            position: absolute;
-            bottom: 0; /* 贴底布局 */
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 2;
-            width: 90%;
-            max-width: 1200px;
-            text-align: left;
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            flex-wrap: wrap;
-            gap: 30px;
-            padding-bottom: 110px; 
-            height: 100%; 
-            pointer-events: none; 
-        }
-
-        /* 恢复子元素的点击事件 */
-        .special-case-content > * {
-            pointer-events: auto;
-        }
-
-        .slide-text-content {
-            flex: 1;
-            min-width: 300px;
-            margin-bottom: 20px;
-        }
-
-        .fund-tagline {
-            font-size: 1rem;
-            color: var(--primary-red);
-            font-weight: 800;
-            letter-spacing: 2px;
-            margin-bottom: 5px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-        }
-
-        .fund-title {
-            font-size: 3rem; 
-            font-weight: 800;
-            color: white;
-            margin-bottom: 10px;
-            line-height: 1.1;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
-        }
-
-        .special-case-description {
-            font-size: 1.1rem;
-            color: rgba(255,255,255,0.9);
-            line-height: 1.5;
-            max-width: 600px;
-            margin-bottom: 20px;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        .slide-action-content {
-            text-align: right;
-            min-width: 250px;
-            margin-bottom: 20px; 
-        }
-
-        .days-counter {
-            font-size: 0.9rem;
-            font-weight: 700;
-            color: #fbbf24;
-            letter-spacing: 1px;
-            margin-bottom: 5px;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-        }
-
-        .time-units {
-            font-family: 'Courier New', monospace;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 15px;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-        }
-
-        .donate-btn {
-            display: inline-block;
-            background: var(--primary-red);
-            color: white;
-            padding: 12px 35px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-size: 1.1rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(220, 38, 38, 0.4);
-        }
-
-        .donate-btn:hover {
-            background: var(--dark-red);
-            transform: translateY(-2px);
-        }
-
-        /* --- 进度条容器 --- */
-        .bottom-progress-container {
-            position: absolute;
-            bottom: 40px; 
-            left: 0;
-            width: 100%;
-            z-index: 10;
-            pointer-events: auto;
-        }
-
-        .progress-stats-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            margin-bottom: 8px;
-            color: white;
-            font-family: 'Segoe UI', sans-serif;
-        }
-
-        .raised-amount {
-            font-size: 2rem; 
-            font-weight: 800;
-            color: var(--primary-red);
-            line-height: 1;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-
-        .raised-label {
-            font-size: 0.8rem;
-            color: rgba(255,255,255,0.7);
-            text-transform: uppercase;
-            margin-bottom: 2px;
-        }
-
-        .target-amount {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: rgba(255,255,255,0.9);
-            text-align: right;
-        }
-
-        .target-label {
-            font-size: 0.8rem;
-            color: rgba(255,255,255,0.5);
-            text-transform: uppercase;
-            margin-bottom: 2px;
-            text-align: right;
-        }
-
-        .progress-bar-track {
-            width: 100%;
-            height: 12px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 6px;
-            overflow: hidden;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #ef4444, #dc2626);
-            border-radius: 6px;
-            position: relative;
-            transition: width 1s ease-out;
-        }
-
-        /* Navigation Arrows */
-        .nav-arrow {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 30px;
-            cursor: pointer;
-            z-index: 3;
-            transition: all 0.3s ease;
-            padding: 20px;
-            background: transparent;
-        }
-
-        .nav-arrow:hover {
-            color: white;
-            background: rgba(0,0,0,0.3);
-            border-radius: 5px;
-        }
-
+        /* ... [保留所有 Slider 相关的 CSS，这里省略重复部分以节省篇幅] ... */
+        .special-case-slides { position: relative; width: 100%; height: 100%; }
+        .special-case-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1s ease-in-out; visibility: hidden; }
+        .special-case-slide.active { opacity: 1; z-index: 1; visibility: visible; }
+        .special-case-image-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .special-case-image { width: 100%; height: 100%; object-fit: cover; filter: none; }
+        .slide-overlay-gradient { position: absolute; bottom: 0; left: 0; width: 100%; height: 70%; background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 60%, transparent 100%); z-index: 1; pointer-events: none; }
+        .special-case-content { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); z-index: 2; width: 90%; max-width: 1200px; text-align: left; color: white; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 30px; padding-bottom: 110px; height: 100%; pointer-events: none; }
+        .special-case-content > * { pointer-events: auto; }
+        .slide-text-content { flex: 1; min-width: 300px; margin-bottom: 20px; }
+        .fund-tagline { font-size: 1rem; color: var(--primary-red); font-weight: 800; letter-spacing: 2px; margin-bottom: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        .fund-title { font-size: 3rem; font-weight: 800; color: white; margin-bottom: 10px; line-height: 1.1; text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
+        .special-case-description { font-size: 1.1rem; color: rgba(255,255,255,0.9); line-height: 1.5; max-width: 600px; margin-bottom: 20px; text-shadow: 0 1px 3px rgba(0,0,0,0.8); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .slide-action-content { text-align: right; min-width: 250px; margin-bottom: 20px; }
+        .days-counter { font-size: 0.9rem; font-weight: 700; color: #fbbf24; letter-spacing: 1px; margin-bottom: 5px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        .time-units { font-family: 'Courier New', monospace; font-size: 1.5rem; font-weight: 700; color: white; margin-bottom: 15px; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+        .donate-btn { display: inline-block; background: var(--primary-red); color: white; padding: 12px 35px; border-radius: 5px; text-decoration: none; font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s ease; border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(220, 38, 38, 0.4); }
+        .donate-btn:hover { background: var(--dark-red); transform: translateY(-2px); }
+        .bottom-progress-container { position: absolute; bottom: 40px; left: 0; width: 100%; z-index: 10; pointer-events: auto; }
+        .progress-stats-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; color: white; font-family: 'Segoe UI', sans-serif; }
+        .raised-amount { font-size: 2rem; font-weight: 800; color: var(--primary-red); line-height: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .raised-label { font-size: 0.8rem; color: rgba(255,255,255,0.7); text-transform: uppercase; margin-bottom: 2px; }
+        .target-amount { font-size: 1.2rem; font-weight: 600; color: rgba(255,255,255,0.9); text-align: right; }
+        .target-label { font-size: 0.8rem; color: rgba(255,255,255,0.5); text-transform: uppercase; margin-bottom: 2px; text-align: right; }
+        .progress-bar-track { width: 100%; height: 12px; background: rgba(255,255,255,0.2); border-radius: 6px; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: linear-gradient(90deg, #ef4444, #dc2626); border-radius: 6px; position: relative; transition: width 1s ease-out; }
+        .nav-arrow { position: absolute; top: 50%; transform: translateY(-50%); color: rgba(255, 255, 255, 0.5); font-size: 30px; cursor: pointer; z-index: 3; transition: all 0.3s ease; padding: 20px; background: transparent; }
+        .nav-arrow:hover { color: white; background: rgba(0,0,0,0.3); border-radius: 5px; }
         .nav-arrow.prev { left: 10px; }
         .nav-arrow.next { right: 10px; }
-
-        /* Slider Dots */
-        .slider-controls {
-            position: absolute;
-            bottom: 15px; 
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 20;
-        }
-
+        .slider-controls { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 20; }
         .slider-dots { display: flex; gap: 8px; }
-        
-        .slider-dot {
-            width: 30px;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.4);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border-radius: 2px;
-        }
+        .slider-dot { width: 30px; height: 4px; background: rgba(255, 255, 255, 0.4); cursor: pointer; transition: all 0.3s ease; border-radius: 2px; }
+        .slider-dot.active { background: white; width: 45px; }
 
-        .slider-dot.active {
-            background: white;
-            width: 45px;
-        }
-
-        /* --- Vision & Mission Section --- */
-        .vision-mission-section { padding: 80px 40px; background: var(--light-gray); }
-        .section-title { text-align: center; font-size: 2.5rem; color: var(--primary-red); margin-bottom: 50px; position: relative; font-weight: 800; }
+        /* --- [Modified] Intro & Categories Section --- */
+        .categories-section { padding: 80px 40px; background: var(--white); }
+        .section-title { text-align: center; font-size: 2.5rem; color: var(--primary-red); margin-bottom: 35px; position: relative; font-weight: 800; }
         .section-title::after { content: ''; position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); width: 80px; height: 4px; background: var(--primary-red); }
-        .vm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 50px; max-width: 1400px; margin: 0 auto; }
-        .vm-card { background: var(--white); border-radius: 15px; padding: 50px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); transition: transform 0.3s ease; }
-        .vm-card:hover { transform: translateY(-10px); }
-        .vm-card h3 { font-size: 2rem; color: var(--dark-gray); margin-bottom: 20px; border-left: 5px solid var(--primary-red); padding-left: 15px; }
-        .vm-points { list-style: none; padding: 0; }
-        .vm-points li { padding: 10px 0; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px; font-size: 1.05rem; }
-        .point-icon { color: var(--primary-red); }
+        
+        .intro-text-box {
+            max-width: 800px;
+            margin: 0 auto 50px auto; /* Margin bottom to separate from grid */
+            text-align: center;
+        }
+        .intro-text-box p {
+            font-size: 1.2rem;
+            line-height: 1.6;
+            color: var(--medium-gray);
+        }
 
-        /* --- Activities Section --- */
+        .categories-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+            gap: 30px; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
+        .category-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 30px 20px;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            border: 1px solid #f0f0f0;
+            cursor: pointer;
+            text-decoration: none; 
+            display: block;
+        }
+        .category-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-color: var(--light-red);
+        }
+        .cat-icon-wrapper {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: var(--light-red);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px auto;
+            transition: all 0.3s ease;
+        }
+        .category-card:hover .cat-icon-wrapper {
+            background: var(--primary-red);
+        }
+        .cat-icon-wrapper i {
+            font-size: 1.8rem;
+            color: var(--primary-red);
+            transition: all 0.3s ease;
+        }
+        .category-card:hover .cat-icon-wrapper i {
+            color: white;
+        }
+        .cat-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--dark-gray);
+        }
+
+        /* --- [New] Stories Section --- */
+        .stories-section { padding: 80px 40px; background: var(--light-gray); }
+        .stories-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+            gap: 40px; 
+            max-width: 1400px; 
+            margin: 0 auto; 
+        }
+        .story-card-link { text-decoration: none; color: inherit; display: block; }
+        .story-card {
+            background: var(--white);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .story-card-link:hover .story-card {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+        }
+        .story-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+        .story-content {
+            padding: 25px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .story-category {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--primary-red);
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .story-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            line-height: 1.4;
+            color: var(--dark-gray);
+        }
+        .story-excerpt {
+            color: var(--medium-gray);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
+        .story-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: #999;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+        .read-more-txt {
+            color: var(--primary-red);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* --- Activities Section (Styles unchanged) --- */
         .activities-section { padding: 80px 40px; background: var(--white); }
+        /* ... [保留 Activity CSS] ... */
         .activities-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 40px; max-width: 1400px; margin: 0 auto; align-items: stretch; }
-        .activity-card { background: var(--white); border: 1px solid #eee; border-radius: 15px; padding: 30px; transition: all 0.3s ease; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; }
-        .activity-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.1); border-color: var(--light-red); }
+        .activity-card-link { text-decoration: none; color: inherit; display: block; }
+        .activity-card { background: var(--white); border: 1px solid #eee; border-radius: 15px; padding: 30px; transition: all 0.3s ease; position: relative; box-shadow: 0 5px 15px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; height: 100%; box-sizing: border-box; }
+        .activity-card-link:hover .activity-card { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.1); border-color: var(--light-red); }
         .activity-date-badge { background: var(--primary-red); color: white; padding: 5px 15px; border-radius: 20px; font-weight: 600; font-size: 0.9rem; width: fit-content; margin-bottom: 15px; }
+        .activity-date-badge.ongoing { background: #10b981; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
         .activity-title { font-size: 1.4rem; color: var(--text-dark); margin-bottom: 15px; font-weight: 700; }
         .activity-meta { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; color: var(--medium-gray); font-size: 0.95rem; }
         .meta-item { display: flex; align-items: center; gap: 10px; }
         .meta-item i { color: var(--primary-red); width: 20px; text-align: center; }
         .activity-desc { color: var(--medium-gray); line-height: 1.5; font-size: 1rem; }
 
-        /* --- CTA Section --- */
+        /* --- CTA Section (Unchanged) --- */
         .cta-section { padding: 100px 20px; background: linear-gradient(rgba(220, 38, 38, 0.9), rgba(185, 28, 28, 0.9)), url('https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80'); background-size: cover; background-position: center; background-attachment: fixed; text-align: center; color: white; }
         .cta-content h2 { font-size: 3rem; margin-bottom: 20px; font-weight: 800; }
         .cta-content p { font-size: 1.3rem; margin-bottom: 40px; max-width: 800px; margin-left: auto; margin-right: auto; }
@@ -463,43 +439,17 @@ if ($logged_in) {
         .btn-secondary { border: 2px solid white; color: white; background: transparent; }
         .btn-secondary:hover { background: rgba(255,255,255,0.1); transform: translateY(-3px); }
 
-        /* Responsive */
-        @media (max-width: 1024px) {
-            .vm-grid { grid-template-columns: 1fr; }
-            .special-case-hero { height: auto; min-height: 700px; }
-            .fund-title { font-size: 2.5rem; }
-        }
-
+        /* Responsive (Partial) */
         @media (max-width: 768px) {
-            .special-case-content {
-                flex-direction: column;
-                align-items: flex-start;
-                justify-content: flex-end; /* 沉底 */
-                padding-bottom: 140px; /* 移动端增加更多底部留白 */
-            }
-            .slide-text-content, .slide-action-content {
-                width: 100%;
-                text-align: left;
-                margin-bottom: 10px;
-            }
-            .slide-action-content { 
-                margin-top: 0; 
-                display: flex;
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            .donate-btn {
-                width: 100%; /* 全宽按钮更好点 */
-                text-align: center;
-            }
+            .special-case-content { flex-direction: column; align-items: flex-start; justify-content: flex-end; padding-bottom: 140px; }
+            .slide-text-content, .slide-action-content { width: 100%; text-align: left; margin-bottom: 10px; }
+            .slide-action-content { margin-top: 0; display: flex; flex-direction: column; align-items: flex-start; }
+            .donate-btn { width: 100%; text-align: center; }
             .fund-title { font-size: 2rem; }
             .nav-arrow { display: none; }
-            /* 移动端字体微调 */
             .raised-amount { font-size: 1.5rem; }
             .target-amount { font-size: 1rem; }
-            .bottom-progress-container {
-                bottom: 50px; /* 稍微抬高一点 */
-            }
+            .bottom-progress-container { bottom: 50px; }
         }
     </style>
 </head>
@@ -588,62 +538,92 @@ if ($logged_in) {
                 </div>
             </div>
         </section>
+        
+        <section class="categories-section">
+            <h2 class="section-title">Our Mission</h2>
+            
+            <div class="intro-text-box">
+                <p>Love Bridge Foundation is a non-profit organization dedicated to creating positive change through compassion, care, and community support. Since 2010, we've been connecting generous hearts with those in need.</p>
+            </div>
 
-        <section class="vision-mission-section">
-            <h2 class="section-title">Our Purpose</h2>
-            <div class="vm-grid">
-                <div class="vm-card">
-                    <h3>Our Vision</h3>
-                    <p>To create a world where compassion bridges every gap, and no one is left behind in times of need. We envision communities where every individual has access to basic necessities, healthcare, education, and opportunities for a dignified life.</p>
-                    <ul class="vm-points">
-                        <li><span class="point-icon">•</span> Build sustainable support systems for vulnerable communities</li>
-                        <li><span class="point-icon">•</span> Create bridges of hope between donors and recipients</li>
-                        <li><span class="point-icon">•</span> Foster a culture of giving and social responsibility</li>
-                        <li><span class="point-icon">•</span> Ensure every donation creates maximum impact</li>
-                    </ul>
-                </div>
-                
-                <div class="vm-card">
-                    <h3>Our Mission</h3>
-                    <p>To efficiently connect compassionate donors with credible causes through a transparent, secure, and user-friendly platform. We are committed to ensuring that every contribution, big or small, reaches those who need it most.</p>
-                    <ul class="vm-points">
-                        <li><span class="point-icon">•</span> Provide immediate relief during emergencies and crises</li>
-                        <li><span class="point-icon">•</span> Support long-term community development projects</li>
-                        <li><span class="point-icon">•</span> Maintain 100% transparency in fund allocation</li>
-                        <li><span class="point-icon">•</span> Engage and empower volunteers in meaningful work</li>
-                        <li><span class="point-icon">•</span> Educate and raise awareness about social issues</li>
-                    </ul>
-                </div>
+            <div class="categories-grid">
+                <?php foreach($donation_categories as $key => $cat): ?>
+                <a href="Campaign_Page.php?category=<?php echo urlencode($cat['db_name']); ?>" class="category-card">
+                    <div class="cat-icon-wrapper">
+                        <i class="<?php echo $cat['icon']; ?>"></i>
+                    </div>
+                    <div class="cat-name"><?php echo $cat['name']; ?></div>
+                </a>
+                <?php endforeach; ?>
+            </div>
+        </section>
+
+        <section class="stories-section">
+            <h2 class="section-title">Latest News & Stories</h2>
+            <div class="stories-grid">
+                <?php if(count($stories) > 0): ?>
+                    <?php foreach ($stories as $story): ?>
+                    <a href="<?php echo $story['link']; ?>" class="story-card-link">
+                        <div class="story-card">
+                            <img src="<?php echo htmlspecialchars($story['image']); ?>" alt="Story Image" class="story-image">
+                            <div class="story-content">
+                                <div class="story-category"><?php echo htmlspecialchars($story['category']); ?></div>
+                                <div class="story-title"><?php echo htmlspecialchars($story['title']); ?></div>
+                                <div class="story-excerpt">
+                                    <?php echo substr(strip_tags($story['description']), 0, 90) . '...'; ?>
+                                </div>
+                                <div class="story-footer">
+                                    <span><?php echo $story['date']; ?></span>
+                                    <span class="read-more-txt">Read More <i class="fas fa-arrow-right"></i></span>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p style="text-align:center; width:100%;">No news stories available yet.</p>
+                <?php endif; ?>
             </div>
         </section>
 
         <section class="activities-section">
-            <h2 class="section-title">Upcoming Campaigns</h2>
+            <h2 class="section-title">Upcoming & Ongoing Activities</h2>
             <div class="activities-grid">
                 <?php if(count($activities) > 0): ?>
                     <?php foreach ($activities as $act): ?>
-                    <div class="activity-card">
-                        <div>
-                            <div class="activity-date-badge">
-                                <?php echo date('d M Y', strtotime($act['date'])); ?>
-                            </div>
-                            <h3 class="activity-title"><?php echo htmlspecialchars($act['title']); ?></h3>
-                            <div class="activity-meta">
-                                <div class="meta-item">
-                                    <i class="far fa-clock"></i> <?php echo $act['time']; ?>
+                    
+                    <a href="<?php echo $act['link']; ?>" class="activity-card-link">
+                        <div class="activity-card">
+                            <div>
+                                <?php if($act['is_ongoing']): ?>
+                                    <div class="activity-date-badge ongoing">
+                                        Ongoing
+                                    </div>
+                                <?php else: ?>
+                                    <div class="activity-date-badge">
+                                        <?php echo $act['display_status']; ?>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <h3 class="activity-title"><?php echo htmlspecialchars($act['title']); ?></h3>
+                                <div class="activity-meta">
+                                    <div class="meta-item">
+                                        <i class="far fa-clock"></i> <?php echo $act['time']; ?>
+                                    </div>
+                                    <div class="meta-item">
+                                        <i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($act['location']); ?>
+                                    </div>
                                 </div>
-                                <div class="meta-item">
-                                    <i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($act['location']); ?>
-                                </div>
+                                <p class="activity-desc">
+                                    <?php echo substr(htmlspecialchars($act['description']), 0, 100) . '...'; ?>
+                                </p>
                             </div>
-                            <p class="activity-desc">
-                                <?php echo substr(htmlspecialchars($act['description']), 0, 100) . '...'; ?>
-                            </p>
                         </div>
-                    </div>
+                    </a>
+
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <p style="text-align:center; width:100%;">No upcoming campaigns scheduled at the moment.</p>
+                    <p style="text-align:center; width:100%;">No upcoming activities scheduled at the moment.</p>
                 <?php endif; ?>
             </div>
         </section>
@@ -712,7 +692,6 @@ if ($logged_in) {
                 const distance = endDate - now;
 
                 const timerDisplay = slide.querySelector('.countdown-timer');
-                // Check if timerDisplay exists (in case of 'No Active Cases' slide)
                 if (!timerDisplay) return;
 
                 if (distance < 0) {

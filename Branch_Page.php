@@ -4,10 +4,8 @@ session_start();
 include 'dataconnection.php';
 include 'header_function.php';
 
-
-
 // ==========================================
-// 2. 初始化流程数据
+// 2. Initialize Session Data
 // ==========================================
 if (!isset($_SESSION['donation_data'])) {
     $_SESSION['donation_data'] = [
@@ -20,7 +18,7 @@ if (!isset($_SESSION['donation_data'])) {
     ];
 }
 
-// 清理互斥数据
+// Clear conflicting data
 if (isset($_GET['case_id'])) {
     $_SESSION['donation_data']['case_id'] = $_GET['case_id'];
     $_SESSION['donation_data']['activity_id'] = '';
@@ -31,7 +29,7 @@ if (isset($_GET['activity_id'])) {
 }
 
 // ==========================================
-// 3. 获取数据 (HQ & Branches)
+// 3. Fetch Data (HQ & Branches)
 // ==========================================
 // HQ
 $hq_sql = "SELECT HQ_Name, HQ_Description, HQ_Image, Headquarters_State FROM headquarters WHERE HQ_ID = 1 LIMIT 1";
@@ -176,7 +174,6 @@ include 'header_UI.php';
         height: 100%;
         display: flex;
         flex-direction: column;
-        /* 确保默认是可见的，不依赖JS控制 */
         opacity: 1;
         transform: translateY(0);
     }
@@ -192,6 +189,8 @@ include 'header_UI.php';
         position: relative;
         height: 300px;
         overflow: hidden;
+        /* Add cursor zoom-in to indicate it's clickable */
+        cursor: zoom-in; 
     }
 
     .story-image {
@@ -218,10 +217,11 @@ include 'header_UI.php';
         background: var(--primary-red);
         color: white;
         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        z-index: 5;
     }
     
     .badge-hq {
-        background: #f59e0b; /* Amber for HQ */
+        background: #f59e0b;
     }
 
     .story-content {
@@ -276,7 +276,7 @@ include 'header_UI.php';
         padding-top: 20px;
         border-top: 1px solid var(--lighter-red);
         display: flex;
-        justify-content: flex-end; /* 让 Read More 靠右 */
+        justify-content: flex-end; 
         align-items: center;
     }
 
@@ -304,6 +304,46 @@ include 'header_UI.php';
         .stories-header { padding: 80px 20px; }
         .page-title { font-size: 32px; }
         .story-image-container { height: 200px; }
+    }
+
+    /* -------------------------------------------
+       NEW: LIGHTBOX / ZOOM STYLES
+    ------------------------------------------- */
+    .lightbox-overlay {
+        display: none; /* Hidden by default */
+        position: fixed;
+        z-index: 10000;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.9);
+        justify-content: center;
+        align-items: center;
+    }
+
+    .lightbox-content {
+        max-width: 90%;
+        max-height: 90%;
+        box-shadow: 0 0 20px rgba(255,255,255,0.2);
+        border-radius: 4px;
+        object-fit: contain;
+    }
+
+    .lightbox-close {
+        position: absolute;
+        top: 20px;
+        right: 30px;
+        color: white;
+        font-size: 40px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: 0.3s;
+        z-index: 10001;
+    }
+
+    .lightbox-close:hover {
+        color: var(--primary-red);
     }
 </style>
 
@@ -334,7 +374,9 @@ include 'header_UI.php';
                         <img src="<?php echo htmlspecialchars($imgSrc); ?>" 
                              alt="<?php echo htmlspecialchars($branch['Branch_Name']); ?>" 
                              class="story-image"
-                             onerror="this.src='images/hero_3.jpg';">
+                             onerror="this.src='images/hero_3.jpg';"
+                             onclick="openLightbox(event, '<?php echo htmlspecialchars($imgSrc); ?>')">
+                        
                         <span class="<?php echo $badgeClass; ?>"><?php echo htmlspecialchars($branch['Branch_Type']); ?></span>
                     </div>
 
@@ -370,5 +412,32 @@ include 'header_UI.php';
         </div>
     </form>
 </div>
+
+<div id="imageLightbox" class="lightbox-overlay" onclick="closeLightbox()">
+    <span class="lightbox-close">&times;</span>
+    <img class="lightbox-content" id="lightboxImg" src="">
+</div>
+
+<script>
+    function openLightbox(event, imageSrc) {
+        // 1. Prevent Default Action
+        event.preventDefault(); 
+        
+        // 2. STOP PROPAGATION (The most important part)
+        // This stops the click event from bubbling up to the <label> tag.
+        // Therefore, the form submission is NEVER triggered.
+        event.stopPropagation(); 
+
+        var lightbox = document.getElementById('imageLightbox');
+        var img = document.getElementById('lightboxImg');
+        
+        img.src = imageSrc;
+        lightbox.style.display = 'flex';
+    }
+
+    function closeLightbox() {
+        document.getElementById('imageLightbox').style.display = 'none';
+    }
+</script>
 
 <?php include 'footer.php'; ?>

@@ -39,8 +39,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_comment'])) {
     if (session_status() === PHP_SESSION_NONE) session_start();
     
     if (!isset($_SESSION['donor_id'])) {
-        // 后端校验：未登录试图评论 (虽然前端有JS拦截，这里做双重保险)
-        // 使用 Session 存储错误信息，或者直接跳转登录
         header("Location: donor_login.php");
         exit();
     } else {
@@ -51,7 +49,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_comment'])) {
             $stmt = $conn->prepare("INSERT INTO case_comments (Case_ID, Donor_ID, Comment_Text) VALUES (?, ?, ?)");
             $stmt->bind_param("iis", $case_id, $donor_id, $comment);
             if ($stmt->execute()) {
-                // 刷新页面以显示新评论
                 header("Location: Special_Case_Detail.php?case_id=" . $case_id);
                 exit();
             }
@@ -72,7 +69,7 @@ if ($result->num_rows == 0) {
 
 $case = $result->fetch_assoc();
 
-// 4. 查询捐赠者列表 (只显示成功的支付)
+// 4. 查询捐赠者列表
 $donor_query = "SELECT o.Order_Name, o.Order_Amount, o.Order_Created_At 
                 FROM orders o 
                 WHERE o.Case_ID = ? AND o.Order_PaymentStatus = 'Success' 
@@ -93,11 +90,14 @@ $stmt_comments->bind_param("i", $case_id);
 $stmt_comments->execute();
 $comments_result = $stmt_comments->get_result();
 
-// 数据处理逻辑 (进度条、图片等)
+// ==========================================
+// 数据处理逻辑 (图片 & 医疗报告)
+// ==========================================
 $target = $case['Target_Amount'];
 $raised = $case['Raised_Amount'];
 $progress = ($target > 0) ? min(($raised / $target) * 100, 100) : 0;
 
+// 处理主案例图片
 $defaultImage = 'images/case-default.jpg';
 $images = [];
 $dbImage = isset($case['Case_Images']) ? $case['Case_Images'] : '';
@@ -113,6 +113,22 @@ if (!empty($dbImage)) {
     $images[] = $defaultImage;
 }
 $mainImage = $images[0];
+
+// --- [新增] 处理医疗报告图片 (支持多张) ---
+$medical_images = [];
+$dbMedical = isset($case['Case_Medical_Report']) ? $case['Case_Medical_Report'] : '';
+
+if (!empty($dbMedical)) {
+    // 尝试当作 JSON 解码
+    $decodedMed = json_decode($dbMedical, true);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($decodedMed)) {
+        $medical_images = $decodedMed;
+    } else {
+        // 如果不是 JSON，就当作单张图片路径
+        $medical_images[] = $dbMedical;
+    }
+}
+// ----------------------------------------
 
 $isCompleted = ($case['Case_Status'] === 'Completed') || ($progress >= 100);
 $statusLabel = $isCompleted ? "Completed" : "Active";
@@ -138,6 +154,8 @@ include 'header_UI.php';
             --dark-red: #c62828;
             --light-gray: #f5f5f5;
             --text-color: #333;
+            --medical-blue: #1976d2; /* 新增医疗蓝色 */
+            --medical-bg: #e3f2fd;
         }
 
         body {
@@ -180,6 +198,56 @@ include 'header_UI.php';
         .section-title { font-size: 20px; font-weight: 700; margin: 30px 0 15px; border-left: 4px solid var(--primary-red); padding-left: 10px; color: #333; }
         .description-text { line-height: 1.8; color: #555; font-size: 16px; white-space: pre-line; }
 
+        /* --- [新增样式] 医疗报告区域 --- */
+        .medical-container {
+            background-color: var(--medical-bg);
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 5px solid var(--medical-blue);
+        }
+        .medical-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--medical-blue);
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .medical-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        .medical-thumb-box {
+            position: relative;
+            height: 120px;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .medical-thumb-box:hover {
+            transform: scale(1.05);
+            border-color: var(--medical-blue);
+        }
+        .medical-thumb-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .medical-thumb-overlay {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            font-size: 10px;
+            text-align: center;
+            padding: 3px;
+        }
+        /* --------------------------- */
+
         .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; background: #fff5f5; padding: 20px; border-radius: 10px; margin-top: 20px; }
         .info-item label { display: block; font-size: 12px; color: #888; text-transform: uppercase; font-weight: bold; }
         .info-item span { font-weight: 600; color: #333; font-size: 15px; }
@@ -200,15 +268,6 @@ include 'header_UI.php';
 
         .organizer-info { display: flex; align-items: center; gap: 15px; margin-top: 25px; padding-top: 20px; border-top: 1px solid #eee; }
         .org-avatar { width: 50px; height: 50px; background: #ffebee; color: var(--primary-red); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-
-        /* Medical Report Button */
-        .medical-report-btn {
-            display: inline-flex; align-items: center; gap: 10px;
-            background: white; border: 2px solid var(--primary-red); color: var(--primary-red);
-            padding: 10px 20px; border-radius: 8px; font-weight: 600; text-decoration: none;
-            transition: 0.3s; margin-top: 10px;
-        }
-        .medical-report-btn:hover { background: var(--primary-red); color: white; }
 
         /* Tabs */
         .tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 20px; }
@@ -278,18 +337,28 @@ include 'header_UI.php';
                 <?php echo htmlspecialchars($case['Case_Description']); ?>
             </div>
 
-            <?php if (!empty($case['Case_Medical_Report'])): ?>
-            <h3 class="section-title">Medical Documents</h3>
-            <div style="background: #f0f7ff; padding: 15px; border-radius: 8px; border-left: 4px solid #2196f3;">
-                <p style="margin: 0 0 10px; color: #0d47a1; font-size: 14px;">
-                    <i class="fas fa-file-medical"></i> Verified Medical Report available for this case.
+            <?php if (!empty($medical_images)): ?>
+            <h3 class="section-title" style="border-left-color: var(--medical-blue);">Verified Medical Documents</h3>
+            <div class="medical-container">
+                <div class="medical-header">
+                    <i class="fas fa-file-medical-alt fa-lg"></i>
+                    <span>Medical Reports & Proof</span>
+                </div>
+                <div class="medical-gallery">
+                    <?php foreach($medical_images as $index => $mImg): ?>
+                        <div class="medical-thumb-box" onclick="viewImage('<?php echo htmlspecialchars($mImg); ?>')">
+                            <img src="<?php echo htmlspecialchars($mImg); ?>" alt="Medical Doc">
+                            <div class="medical-thumb-overlay">
+                                <i class="fas fa-search-plus"></i> View
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <p style="margin-top:10px; font-size:13px; color:#666;">
+                    * All documents have been verified by Love Bridge Team.
                 </p>
-                <a href="<?php echo htmlspecialchars($case['Case_Medical_Report']); ?>" target="_blank" class="medical-report-btn">
-                    <i class="fas fa-download"></i> View Medical Report
-                </a>
             </div>
             <?php endif; ?>
-
             <h3 class="section-title">Case Information</h3>
             <div class="info-grid">
                 <div class="info-item">
@@ -422,20 +491,20 @@ include 'header_UI.php';
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
         
         document.getElementById(tabName).classList.add('active');
-        // Find the button that was clicked (simple way)
+        // Find the button that was clicked
         const btns = document.querySelectorAll('.tab-btn');
         if(tabName === 'donors') btns[0].classList.add('active');
         else btns[1].classList.add('active');
     }
 
-    // Change Image
+    // Change Main Image (Case Gallery)
     function changeImage(src, element) {
         document.getElementById('mainDisplay').src = src;
         document.querySelectorAll('.thumbnail').forEach(el => el.classList.remove('active'));
         element.classList.add('active');
     }
 
-    // View Image
+    // View Image (Lightbox - Used for both Case Images and Medical Reports)
     function viewImage(src) {
         Swal.fire({
             imageUrl: src,
