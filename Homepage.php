@@ -548,7 +548,7 @@ if ($logged_in) {
 
             <div class="categories-grid">
                 <?php foreach($donation_categories as $key => $cat): ?>
-                <a href="Campaign_Page.php?category=<?php echo urlencode($cat['db_name']); ?>" class="category-card">
+                <a href="Special_Case Page.php?category=<?php echo urlencode($cat['db_name']); ?>" class="category-card">
                     <div class="cat-icon-wrapper">
                         <i class="<?php echo $cat['icon']; ?>"></i>
                     </div>
