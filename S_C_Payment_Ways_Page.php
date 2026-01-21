@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
     $case_id = isset($_POST['case_id']) ? (int)$_POST['case_id'] : 0;
     $activity_id = isset($_POST['activity_id']) ? (int)$_POST['activity_id'] : 0;
     $type = $_POST['donation_type'];
-    $tax_receipt = isset($_POST['tax_receipt']) ? 1 : 0;
+    $tax_receipt = (isset($_POST['tax_receipt']) && $_POST['tax_receipt'] == '1') ? 1 : 0;
 
     if ($amount <= 0 || ($case_id <= 0 && $activity_id <= 0)) {
         echo "<script>alert('Invalid data. No project selected.'); window.history.back();</script>";
