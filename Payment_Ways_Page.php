@@ -23,11 +23,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $_SESSION['donation_data']['type'] = $_POST['donation_type'] ?? 'One-Time';
         $_SESSION['donation_data']['case_id'] = $_POST['case_id'] ?? 0;
         $_SESSION['donation_data']['activity_id'] = $_POST['activity_id'] ?? 0;
+        
+        // --- 【新增】接收 Tax Receipt 状态 ---
+        // 检查 POST 里有没有 tax_receipt，如果有且值为 '1'，存入 Session
+        if (isset($_POST['tax_receipt']) && $_POST['tax_receipt'] == '1') {
+            $_SESSION['donation_data']['tax_receipt'] = 1;
+        } else {
+            $_SESSION['donation_data']['tax_receipt'] = 0;
+        }
+        // -------------------------------------
     }
 }
 
 if (empty($_SESSION['donation_data'])) {
-    header("Location: Donate_Page.php");
+    header("Location: Payment_Page.php");
     exit();
 }
 
@@ -42,17 +51,16 @@ $wallet_sql = "SELECT Donor_Wallet FROM donor WHERE Donor_ID = ?";
 $w_stmt = $conn->prepare($wallet_sql);
 $w_stmt->bind_param("i", $current_donor_id);
 $w_stmt->execute();
-$w_res = $w_stmt->get_result()->fetch_assoc();
-$current_balance = $w_res['Donor_Wallet'] ?? 0.00;
+$current_balance = $w_stmt->get_result()->fetch_assoc()['Donor_Wallet'] ?? 0.00;
 
-// 4. 获取显示名称
+// 获取名称
 $display_name = "General Fund (HQ)"; 
 if(!empty($case_id)) {
-    $res = $conn->query("SELECT Case_Title FROM special_case WHERE Case_ID = $case_id");
-    if($r = $res->fetch_assoc()) $display_name = "Case: " . $r['Case_Title'];
+    $r = $conn->query("SELECT Case_Title FROM special_case WHERE Case_ID = $case_id")->fetch_assoc();
+    if($r) $display_name = "Case: " . $r['Case_Title'];
 } elseif(!empty($activity_id)) {
-    $res = $conn->query("SELECT Activity_Name FROM activity WHERE Activity_ID = $activity_id");
-    if($r = $res->fetch_assoc()) $display_name = "Activity: " . $r['Activity_Name'];
+    $r = $conn->query("SELECT Activity_Name FROM activity WHERE Activity_ID = $activity_id")->fetch_assoc();
+    if($r) $display_name = "Activity: " . $r['Activity_Name'];
 } elseif ($branch_id > 0) {
     $stmt = $conn->prepare("SELECT Branch_Name FROM branch WHERE Branch_ID = ?");
     $stmt->bind_param("i", $branch_id);
@@ -67,16 +75,14 @@ include 'header_UI.php';
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <style>
-    /* --- 核心变量保持与首页一致 --- */
+    /* --- 核心变量 --- */
     :root {
         --primary-red: #dc2626;
-        --dark-red: #b91c1c;
         --white: #ffffff;
-        --light-gray: #f5f5f5;
     }
 
     .hero-wrap {
-        height: 500px; position: relative;
+        height: 400px; position: relative;
         background-image: url('images/hero_3.jpg'); background-size: cover; background-position: center;
         display: flex; align-items: center; justify-content: center; text-align: center;
     }
@@ -84,104 +90,121 @@ include 'header_UI.php';
     .hero-content { position: relative; z-index: 2; color: #fff; }
     .hero-content h1 { font-family: 'Segoe UI', sans-serif; font-size: 3rem; margin-bottom: 5px; }
 
-    /* 保留原 Summary 设计 */
-    .summary-section-title { font-weight: bold; color: #e16161ff; font-size: 1.2rem; margin-bottom: 10px; }
-    .summary-card {
-        background: #fff; padding: 25px 40px; border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 6px solid #e16161ff;
-        margin-bottom: 40px;
-    }
-    .summary-item { display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px dashed #eee; padding-bottom: 12px; }
-    .summary-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-    .summary-label { font-weight: 600; color: #555; }
-    .summary-value { font-weight: 700; color: #333; }
-    .summary-total { color: #dc2626; font-size: 1.15rem; }
-
-    /* 三列水平排列支付方式 */
-    .payment-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
-        margin-bottom: 60px;
-    }
-
-    .payment-option {
-        border: 2px solid #eee; border-radius: 12px; padding: 30px 15px;
-        text-align: center; cursor: pointer; transition: all 0.3s ease;
-        background: #fff; display: flex; flex-direction: column; 
-        align-items: center; justify-content: center; height: 100%; min-height: 300px;
-    }
-    .payment-option:hover {
-        border-color: #e16161ff; box-shadow: 0 8px 25px rgba(225, 97, 97, 0.15); transform: translateY(-5px);
-    }
-    .payment-option.disabled { opacity: 0.6; cursor: not-allowed; background: #fafafa; }
-    
-    .payment-img { height: 60px; object-fit: contain; margin-bottom: 20px; }
-    .payment-title { font-weight: 700; color: #333; font-size: 1.1rem; display: block; margin-bottom: 8px; }
-    .payment-desc { font-size: 0.85rem; color: #777; margin-bottom: 20px; flex-grow: 1; line-height: 1.4; } 
-    
-    .btn-pay {
-        background-color: #ffbb6dff; color: white; border: none; padding: 10px 20px;
-        border-radius: 30px; font-weight: bold; transition: 0.3s; width: 100%; margin-top: auto;
-    }
-    .payment-option:not(.disabled):hover .btn-pay { background-color: #f79c34ff; }
-
-    /* 橙色返回按钮 */
+    /* --- Back Button --- */
     .btn-orange-back {
         display: inline-flex; align-items: center; gap: 10px;
         background-color: #f79c34; color: white !important;
-        padding: 12px 25px; border-radius: 8px;
-        font-weight: 700; font-size: 1.1rem;
+        padding: 10px 20px; border-radius: 8px;
+        font-weight: 600; font-size: 1rem;
         transition: 0.2s ease; text-decoration: none !important;
-        box-shadow: 0 4px 6px rgba(247, 156, 52, 0.2); margin-bottom: 20px;        
+        box-shadow: 0 4px 6px rgba(247, 156, 52, 0.2); 
+        margin-bottom: 20px;        
     }
-    .btn-orange-back:hover { background-color: #e68a20; transform: translateX(-5px); }
+    .btn-orange-back:hover { background-color: #e68a20; transform: translateX(-3px); }
 
-    /* --- ⭐ [参考首页] CTA Section 样式整合 ⭐ --- */
-    /* --- CTA Section 样式整合 --- */
-.cta-section { 
-    padding: 60px 20px; /* 适当缩小上下内边距，因为没有按钮了 */
-    background: linear-gradient(rgba(220, 38, 38, 0.9), rgba(185, 28, 28, 0.9)), 
-                url('https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80'); 
-    background-size: cover; 
-    background-position: center; 
-    background-attachment: fixed; 
-    text-align: center; 
-    color: white; 
-    border-radius: 15px;
-    margin-top: 40px;
-    box-shadow: 0 10px 30px rgba(220, 38, 38, 0.2);
-}
+    /* --- Top Layout: Summary + Video --- */
+    .info-video-grid {
+        display: grid;
+        grid-template-columns: 1fr 1.2fr; /* 左边 Summary 占 1份，右边视频占 1.2份 */
+        gap: 30px;
+        align-items: stretch; /* 等高 */
+        margin-bottom: 50px;
+    }
 
-.cta-content h2 { 
-    font-size: 2.5rem; 
-    margin-bottom: 15px; 
-    font-weight: 800; 
-    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
+    /* 1. Summary Card (Style retained) */
+    .summary-card-modern {
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        border: 1px solid #eee;
+        display: flex; flex-direction: column; /* 确保内容撑开 */
+        height: 100%;
+    }
 
-.cta-content p { 
-    font-size: 1.1rem; 
-    margin-bottom: 0; /* 移除底部间距，因为没有按钮了 */
-    max-width: 800px; 
-    margin-left: auto; 
-    margin-right: auto; 
-    line-height: 1.6;
-    opacity: 0.95;
-}
+    .sc-header {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        padding: 25px 20px;
+        text-align: center; color: white;
+    }
+    .sc-amount { font-size: 2.2rem; font-weight: 800; margin-top: 5px; }
+    .sc-amount small { font-size: 1rem; margin-right: 5px; opacity: 0.9; }
 
-@media (max-width: 768px) {
-    .cta-content h2 { font-size: 1.8rem; }
-    .cta-content p { font-size: 1rem; }
-}
-文案修
+    .sc-body { padding: 25px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
+    .sc-row { display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px dashed #eee; padding-bottom: 15px; }
+    .sc-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .sc-label { color: #888; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
+    .sc-label i { color: #dc2626; width: 16px; }
+    .sc-value { font-weight: 700; color: #333; text-align: right; }
+
+    /* 2. Video Section */
+    .video-card {
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        position: relative;
+        height: 100%; min-height: 300px;
+    }
+    .video-card video {
+        width: 100%; height: 100%; object-fit: cover;
+        opacity: 0.8; transition: opacity 0.3s;
+    }
+    .video-card:hover video { opacity: 1; }
+    
+    .video-overlay {
+        position: absolute; bottom: 0; left: 0; right: 0;
+        background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+        padding: 20px; color: white; pointer-events: none; /* 让点击穿透到视频控件 */
+    }
+    .video-text h5 { margin: 0; font-weight: 700; font-size: 1.1rem; }
+    .video-text p { margin: 5px 0 0; font-size: 0.85rem; opacity: 0.9; }
+
+    /* --- Bottom Layout: Payment Options --- */
+    .section-title-center {
+        text-align: center; margin-bottom: 30px; 
+        font-weight: 800; color: #333; position: relative;
+    }
+    .section-title-center::after {
+        content: ''; display: block; width: 50px; height: 3px; 
+        background: #dc2626; margin: 10px auto 0;
+    }
+
+    .payment-grid {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+        margin-bottom: 40px;
+    }
+    .payment-option {
+        border: 2px solid #eee; border-radius: 12px; padding: 25px 20px;
+        text-align: center; cursor: pointer; transition: all 0.3s ease;
+        background: #fff; display: flex; flex-direction: column; 
+        align-items: center; min-height: 300px;
+    }
+    .payment-option:hover {
+        border-color: #dc2626; box-shadow: 0 8px 25px rgba(220, 38, 38, 0.1); transform: translateY(-5px);
+    }
+    .payment-option.disabled { opacity: 0.6; cursor: not-allowed; background: #fafafa; }
+    .payment-img { height: 50px; object-fit: contain; margin-bottom: 15px; }
+    .payment-title { font-weight: 700; color: #333; font-size: 1.05rem; margin-bottom: 8px; }
+    .payment-desc { font-size: 0.85rem; color: #666; margin-bottom: 20px; flex-grow: 1; }
+    .btn-pay {
+        background-color: #333; color: white; border: none; padding: 8px 20px;
+        border-radius: 30px; font-weight: bold; transition: 0.3s; width: 100%; margin-top: auto;
+    }
+    .payment-option:not(.disabled):hover .btn-pay { background-color: #dc2626; }
+
+    @media (max-width: 768px) {
+        .info-video-grid { grid-template-columns: 1fr; } /* 手机上垂直排列 */
+        .payment-grid { grid-template-columns: 1fr; }
+        .hero-wrap { height: 300px; }
+    }
 </style>
 
 <div class="hero-wrap">
     <div class="overlay"></div>
     <div class="hero-content">
-        <h1>Payment Selection</h1>
-        <p>Complete your act of kindness with your preferred method.</p>
+        <h1>Confirm Donation</h1>
+        <p>Make a difference today.</p>
     </div>
 </div>
 
@@ -200,23 +223,49 @@ include 'header_UI.php';
             </a>
         </div>
 
-        <h3 class="summary-section-title">Summary</h3>
-        <div class="summary-card">
-            <div class="summary-item">
-                <span class="summary-label">Target</span>
-                <span class="summary-value"><?php echo htmlspecialchars($display_name); ?></span>
+        <div class="info-video-grid">
+            
+            <div class="summary-card-modern">
+                <div class="sc-header">
+                    <div style="font-size: 0.8rem; text-transform: uppercase; opacity: 0.8; letter-spacing: 1px;">Total Contribution</div>
+                    <div class="sc-amount"><small>RM</small><?php echo number_format($amount, 2); ?></div>
+                </div>
+                <div class="sc-body">
+                    <div class="sc-row">
+                        <span class="sc-label"><i class="fas fa-heart"></i> Beneficiary</span>
+                        <span class="sc-value"><?php echo htmlspecialchars($display_name); ?></span>
+                    </div>
+                    <div class="sc-row">
+                        <span class="sc-label"><i class="fas fa-clock"></i> Type</span>
+                        <span class="sc-value"><?php echo htmlspecialchars($donation_type); ?></span>
+                    </div>
+                    <div class="sc-row">
+                        <span class="sc-label"><i class="fas fa-calendar-alt"></i> Date</span>
+                        <span class="sc-value"><?php echo date("d M Y"); ?></span>
+                    </div>
+                    <div style="text-align: center; margin-top: 15px; font-size: 0.75rem; color: #aaa;">
+                        ID: <?php echo uniqid('DON-'); ?>
+                    </div>
+                </div>
             </div>
-            <div class="summary-item">
-                <span class="summary-label">Frequency</span>
-                <span class="summary-value"><?php echo htmlspecialchars($donation_type); ?></span>
-            </div>
-            <div class="summary-item">
-                <span class="summary-label">Total</span>
-                <span class="summary-value summary-total">RM <?php echo number_format($amount, 2); ?></span>
-            </div>
+
+                <div class="video-card">
+                    <video autoplay muted loop playsinline poster="images/cover_image.jpg" style="width:100%; height:100%; object-fit: cover;">
+                        <source src="video/thank_you.mp4" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+
+                    <div class="video-overlay">
+                        <div class="video-text">
+                            <h5><i class="fas fa-play-circle"></i> See Your Impact</h5>
+                            <p>Thank you for your generosity.</p>
+                        </div>
+                    </div>
+                </div>
+
         </div>
 
-        <h3 class="text-center mb-4" style="font-weight: 700; color: #333;">Select Payment Method</h3>
+        <h3 class="section-title-center">Select Payment Method</h3>
         
         <form id="paymentForm" method="POST" action="">
             <input type="hidden" name="payment_method" id="selected_payment_method" value="">
@@ -227,38 +276,31 @@ include 'header_UI.php';
                     <img src="images/e-wallet.png" alt="Wallet" class="payment-img">
                     <span class="payment-title">E-Wallet Balance</span>
                     <p class="payment-desc">
-                        Use your internal balance.<br>
-                        Available: <b style="color:<?php echo ($current_balance < $amount)?'#dc2626':'#16a34a';?>">RM <?php echo number_format($current_balance, 2); ?></b>
+                        Current Balance: <br>
+                        <b style="color:<?php echo ($current_balance < $amount)?'#dc2626':'#16a34a';?>">RM <?php echo number_format($current_balance, 2); ?></b>
                     </p>
-                    <button type="button" class="btn-pay"><?php echo ($current_balance < $amount)?'Insufficient':'Pay Now';?></button>
+                    <button type="button" class="btn-pay"><?php echo ($current_balance < $amount)?'Top-up Required':'Pay Now';?></button>
                 </div>
 
                 <div class="payment-option" onclick="submitTo('Credit_Debit_Page.php')">
                     <img src="images/BankTransfer.jpg" alt="Card" class="payment-img">
                     <span class="payment-title">Credit / Debit Card</span>
-                    <p class="payment-desc">Safe & secure checkout via Visa or Mastercard.<br><small>Support local banks</small></p>
-                    <button type="button" class="btn-pay">Select</button>
+                    <p class="payment-desc">Secure checkout via Visa or Mastercard.</p>
+                    <button type="button" class="btn-pay">Pay with Card</button>
                 </div>
 
                 <div class="payment-option" onclick="submitTo('TNG_Page.php')">
                     <img src="images/TNG.png" alt="TNG" class="payment-img">
-                    <span class="payment-title">Touch 'n Go eWallet</span>
-                    <p class="payment-desc">Scan & Pay using your mobile device.<br><small>Malaysia's favorite wallet</small></p>
-                    <button type="button" class="btn-pay">Select</button>
+                    <span class="payment-title">Touch 'n Go</span>
+                    <p class="payment-desc">Scan QR Code using your mobile wallet.</p>
+                    <button type="button" class="btn-pay">Pay with TNG</button>
                 </div>
             </div>
         </form>
 
-        <section class="cta-section">
-            <div class="cta-content">
-                <h2>Bridge to a Brighter Future</h2>
-                <p>Your contribution is more than just a transaction; it's a lifeline of hope. <br>
-                    Please select your preferred secure payment method above to finalize your support.</p>
-                <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 10px;">
-                <i class="fas fa-shield-alt"></i> Your security is our priority. All transactions are encrypted and secure.
-                </div>
-            </div>
-        </section>
+        <div style="text-align: center; opacity: 0.7; font-size: 0.9rem; margin-bottom: 40px;">
+            <i class="fas fa-lock"></i> All transactions are secure and encrypted.
+        </div>
 
     </div>
 </div>
