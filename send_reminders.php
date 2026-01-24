@@ -14,7 +14,7 @@ $sql = "SELECT rd.*, d.Donor_Email, d.Donor_Name
         FROM recurring_donation rd
         JOIN donor d ON rd.Donor_ID = d.Donor_ID
         WHERE rd.Recurring_Status = 'Active' 
-        AND DATEDIFF(rd.Recurring_Deduction_Date, CURDATE()) = 0";
+        AND DATEDIFF(rd.Recurring_Deduction_Date, CURDATE()) = 3";
 
 $result = $conn->query($sql);
 

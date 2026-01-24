@@ -6,7 +6,7 @@ session_start();
 include 'dataconnection.php'; // 确保数据库连接正常
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
-// 引入发送邮件的辅助文件 (如果文件不存在，不会报错)
+// 引入发送邮件的辅助文件
 if (file_exists('mail_receipt.php')) {
     require_once 'mail_receipt.php';
 }
@@ -22,15 +22,16 @@ if (!isset($_GET['txn_ref']) || empty($_GET['txn_ref'])) {
 $txn_ref = $_GET['txn_ref'];
 
 // ==========================================
-// 3. 核心查询 (修正版：加入了收据所需的 IC 和 详细地址字段)
+// 3. 核心查询 (已修正字段名)
 // ==========================================
 $sql = "SELECT 
             p.Payment_TXN_Ref, p.Payment_Status, p.Payment_Paid_At, p.Payment_Method,
             o.Order_ID, o.Order_Amount, o.Order_Type, o.Order_Status, 
             o.Branch_ID, o.Case_ID, o.Activity_ID, o.Order_Created_At, o.Order_TXN_Ref,
-            o.Order_Name, o.Order_ICNumber, o.Order_Email, o.Order_ContactNumber, -- 从 orders 提取快照
+            o.Order_Name, o.Order_ICNumber, o.Order_Email, o.Order_ContactNumber,
+            o.Tax_Receipt_Status,  -- <--- 【修正】这是你数据库里真正的字段名
             d.Donor_ID, d.Donor_Name, d.Donor_Email, d.Donor_ContactNumber,
-            d.Donor_Address1, d.Donor_Address2, d.Donor_City, d.Donor_State, d.Donor_PostalCode -- 增加地址字段
+            d.Donor_Address1, d.Donor_Address2, d.Donor_Address3, d.Donor_City, d.Donor_State, d.Donor_PostalCode
         FROM payment p 
         JOIN orders o ON p.Payment_ID = o.Payment_ID 
         JOIN donor d ON o.Donor_ID = d.Donor_ID
@@ -95,14 +96,13 @@ if (!empty($row['Case_ID'])) {
 $is_success_status = (stripos($payment_status, 'Success') !== false || stripos($payment_status, 'Completed') !== false);
 
 // ==========================================
-// 5. 邮件发送逻辑 (确保传入包含地址信息的 $row)
+// 5. 邮件发送逻辑
 // ==========================================
 $email_msg = "Processing receipt...";
 $sess_key_mail = 'email_sent_' . $txn_ref;
 
 if (!isset($_SESSION[$sess_key_mail]) && $is_success_status) {
     if (function_exists('sendReceiptEmail')) {
-        // 这里传入的 $row 现在包含了完整的地址和 IC 字段
         $isSent = sendReceiptEmail($row, $project_name); 
         if ($isSent) {
             $_SESSION[$sess_key_mail] = true;
@@ -120,32 +120,69 @@ if (!isset($_SESSION[$sess_key_mail]) && $is_success_status) {
 // ==========================================
 // 6. 积分逻辑 (Love Points)
 // ==========================================
-$points_to_add = floor($amount_val / 10); 
-$sess_key_points = 'points_awarded_' . $txn_ref;
+// 注意：你的数据库 orders 表有 Trigger 会自动计算积分，
+// 但为了确保前台显示的正确性，或者防止 Trigger 没触发，这里保留逻辑作为双重保障是OK的。
+// 不过根据你的 SQL Dump，你在 orders 插入或更新时已经有 Trigger 计算积分了。
+// 这里我们只做 Session 控制，不重复写入数据库，以免 Trigger 触发两次。
 
-if ($points_to_add > 0 && $is_success_status && !isset($_SESSION[$sess_key_points])) {
-    $donor_id = $row['Donor_ID'];
-    $chk = $conn->query("SELECT Points_ID FROM point WHERE Donor_ID = $donor_id");
+$points_to_add = floor($amount_val / 10); 
+// 既然数据库有 Trigger (calculate_points_on_update)，PHP 这里其实不需要再 update point 表了
+// 只要 Order 状态是 Success，Trigger 就会加分。
+// 为了避免重复加分，这里我们只做显示用途。
+
+// ==========================================
+// 7. 【修正】自动处理 Tax Exemption Request
+// ==========================================
+// 逻辑：如果 Session 里用户要报税，或者数据库里已经是 Requested，就显示成功。
+// 如果数据库是 'Not_Requested' 但 Session 说要，我们就 UPDATE 它。
+
+// 1. 检查 Session (用户在填表时是否勾选)
+$user_wants_tax = isset($_SESSION['donation_data']['tax_receipt']) && $_SESSION['donation_data']['tax_receipt'] == 1;
+
+// 2. 检查数据库当前状态
+$db_tax_status = $row['Tax_Receipt_Status']; // 'Not_Requested', 'Requested', etc.
+
+$sess_key_tax = 'tax_request_processed_' . $txn_ref;
+
+if ($is_success_status && !isset($_SESSION[$sess_key_tax])) {
     
-    if ($chk && $chk->num_rows > 0) {
-        $upd = $conn->prepare("UPDATE point SET Points_Total = Points_Total + ?, Points_Earned = Points_Earned + ?, Points_Updated_At = NOW() WHERE Donor_ID = ?");
-        $upd->bind_param("iii", $points_to_add, $points_to_add, $donor_id);
-        $upd->execute();
-        $upd->close();
-    } else {
-        $ins = $conn->prepare("INSERT INTO point (Points_Earned, Points_Total, Points_Updated_At, Donor_ID) VALUES (?, ?, NOW(), ?)");
-        $ins->bind_param("iii", $points_to_add, $points_to_add, $donor_id);
-        $ins->execute();
-        $ins->close();
+    // 如果用户想要，但数据库里还没记录 (状态是 Not_Requested)
+    if ($user_wants_tax && $db_tax_status == 'Not_Requested') {
+        
+        // 执行 UPDATE。你的数据库 Trigger `after_tax_receipt_request` 会自动检测到这个变更
+        // 并自动插入一条 admin_notifications。
+        $order_id = $row['Order_ID'];
+        $update_tax = $conn->prepare("UPDATE orders SET Tax_Receipt_Status = 'Requested' WHERE Order_ID = ?");
+        $update_tax->bind_param("i", $order_id);
+        
+        if ($update_tax->execute()) {
+            $email_msg .= "<br>Tax exemption request submitted to Admin.";
+            $db_tax_status = 'Requested'; // 更新当前变量用于显示
+        }
+        $update_tax->close();
     }
-    $_SESSION[$sess_key_points] = true;
+    // 如果数据库里已经是 Requested (可能在创建订单时就写入了)
+    elseif ($db_tax_status == 'Requested' || $db_tax_status == 'Generated') {
+         // 不做任何事，已经申请了
+    }
+
+    $_SESSION[$sess_key_tax] = true;
+}
+
+// 如果状态是申请中或已生成，在页面提示用户
+if ($db_tax_status == 'Requested') {
+    $tax_msg = "Tax Exemption Requested";
+} elseif ($db_tax_status == 'Generated') {
+    $tax_msg = "Tax Receipt Generated";
+} else {
+    $tax_msg = "No Tax Receipt Requested";
 }
 
 include 'header_UI.php'; 
 ?>
 
 <style>
-    /* 页面专用样式保持不变... */
+    /* 页面专用样式 */
     .hero-wrap { 
         height: 350px; 
         background-image: url('images/hero_1.jpg'); 
@@ -289,6 +326,10 @@ include 'header_UI.php';
                         <div class="info-row">
                             <span class="label">Status</span>
                             <span class="value" style="color:#16a34a;"><?php echo htmlspecialchars($payment_status); ?></span>
+                        </div>
+                         <div class="info-row">
+                            <span class="label">Tax Receipt</span>
+                            <span class="value" style="color:#e16161;"><?php echo htmlspecialchars($tax_msg); ?></span>
                         </div>
                     </div>
 
