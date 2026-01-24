@@ -16,33 +16,33 @@ if (!isset($_GET['donor_id'])) {
 
 $donorId = intval($_GET['donor_id']);
 
-// --- 1. 获取 Donor 名字 ---
+// --- 1. Get Donor Name ---
 $donorSql = "SELECT * FROM donor WHERE Donor_ID = $donorId";
 $donorRes = $conn->query($donorSql);
 if ($donorRes->num_rows == 0) die("Donor not found.");
 $donorData = $donorRes->fetch_assoc();
 $donorName = $donorData['Donor_Name'];
 
-// --- [核心修复]：超级强力的余额计算逻辑 ---
-// 1. 先尝试拿 Donor 表里的余额
+// --- [Core Fix]: Robust Balance Calculation Logic ---
+// 1. Try getting balance from Donor table first
 $balanceFromTable = isset($donorData['Donor_WalletBalance']) ? floatval($donorData['Donor_WalletBalance']) : 0.00;
 
-// 2. 实时从流水账计算 (作为主要依据，因为这才是 History 页面显示的内容)
-// 逻辑修复：使用 LIKE 模糊匹配，并且如果 Type 没匹配到，就去 Description 找
+// 2. Calculate real-time from transaction history (Primary source as this is what's displayed in History)
+// Logic Fix: Use LIKE for fuzzy matching, fallback to Description if Type doesn't match
 $calcSql = "SELECT 
     SUM(
         CASE 
-            -- 1. 先看 Transaction_Type 是否包含 Credit/Top-up (不分大小写)
+            -- 1. Check if Transaction_Type contains Credit/Top-up (Case insensitive)
             WHEN Transaction_Type LIKE '%Credit%' OR Transaction_Type LIKE '%Top-up%' OR Transaction_Type LIKE '%Deposit%' OR Transaction_Type LIKE '%Refund%' THEN Amount 
             
-            -- 2. 再看 Transaction_Type 是否包含 Debit/Payment
+            -- 2. Check if Transaction_Type contains Debit/Payment
             WHEN Transaction_Type LIKE '%Debit%' OR Transaction_Type LIKE '%Payment%' OR Transaction_Type LIKE '%Donation%' OR Transaction_Type LIKE '%Withdrawal%' THEN -Amount 
             
-            -- 3. [关键修复] 如果 Type 是空的或者没匹配到，去 Description 找关键字
+            -- 3. [Key Fix] If Type is empty or no match, look for keywords in Description
             WHEN Description LIKE '%Top-up%' OR Description LIKE '%Deposit%' OR Description LIKE '%Credit%' THEN Amount
             WHEN Description LIKE '%Donate%' OR Description LIKE '%Donation%' OR Description LIKE '%Payment%' OR Description LIKE '%Debit%' THEN -Amount
             
-            -- 4. 实在无法识别，算作 0
+            -- 4. If unrecognized, treat as 0
             ELSE 0 
         END
     ) as Calculated_Balance
@@ -53,11 +53,11 @@ $calcRes = $conn->query($calcSql);
 $calcData = $calcRes->fetch_assoc();
 $balanceFromHistory = $calcData['Calculated_Balance'] ? floatval($calcData['Calculated_Balance']) : 0.00;
 
-// 逻辑：如果 Table 里是 0 (可能没更新)，就用算出来的 History 余额
+// Logic: If Table balance is 0 (potentially not updated), use the calculated History balance
 $currentBalance = ($balanceFromTable != 0) ? $balanceFromTable : $balanceFromHistory;
 
 
-// --- 2. 获取筛选和排序参数 ---
+// --- 2. Get Filter and Sort Parameters ---
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $sort = isset($_GET['sort']) ? $_GET['sort'] : 'date';
 $order = isset($_GET['order']) ? $_GET['order'] : 'desc';
@@ -73,7 +73,7 @@ $filterType = isset($_GET['f_type']) ? $_GET['f_type'] : '';
 $minAmount = isset($_GET['min_amount']) && $_GET['min_amount'] !== '' ? floatval($_GET['min_amount']) : '';
 $maxAmount = isset($_GET['max_amount']) && $_GET['max_amount'] !== '' ? floatval($_GET['max_amount']) : '';
 
-// --- 3. 构建 SQL ---
+// --- 3. Build SQL ---
 $conditions = [];
 $conditions[] = "w.Donor_ID = $donorId";
 
@@ -223,7 +223,7 @@ function buildUrl($params = []) {
         <?php include 'admin_header.php'; ?>
         <div class="dashboard-content" style="padding-top: 10px;">
             <div class="page-header-compact">
-                <a onclick="window.close(); return false;" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+                <a href="admin_donor_page.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
                 <div class="header-title">
                     <h1>Wallet History</h1>
                     <p>Donor: <?php echo htmlspecialchars($donorName); ?></p>
@@ -272,17 +272,17 @@ function buildUrl($params = []) {
                         <?php if (count($transactions) > 0): ?>
                             <?php foreach($transactions as $t): ?>
                                 <?php 
-                                    // 智能判断颜色和符号
+                                    // Smartly determine color and sign
                                     $type = $t['Transaction_Type'];
                                     
-                                    // 统一转小写进行判断
+                                    // Convert to lowercase for checking
                                     $typeLower = strtolower($type);
                                     $descLower = strtolower($t['Description']);
                                     
-                                    // 默认为 Credit (绿色)
+                                    // Default to Credit (Green)
                                     $isCredit = false;
                                     
-                                    // 关键词匹配逻辑 (显示层)
+                                    // Keyword matching logic (Display layer)
                                     if (strpos($typeLower, 'credit') !== false || 
                                         strpos($typeLower, 'top-up') !== false || 
                                         strpos($typeLower, 'deposit') !== false || 
@@ -290,12 +290,12 @@ function buildUrl($params = []) {
                                         $isCredit = true;
                                     }
                                     
-                                    // 如果描述里有 top-up，也强制认为是 credit
+                                    // If description contains top-up, force as credit
                                     if (strpos($descLower, 'top-up') !== false || strpos($descLower, 'deposit') !== false) {
                                         $isCredit = true;
                                     }
                                     
-                                    // 如果描述里有 payment/donation，认为是 debit
+                                    // If description contains payment/donation, treat as debit
                                     if (strpos($descLower, 'payment') !== false || strpos($descLower, 'donation') !== false) {
                                         $isCredit = false;
                                     }
@@ -304,7 +304,7 @@ function buildUrl($params = []) {
                                     $sign = $isCredit ? '+' : '-';
                                     $bg = $isCredit ? '#e6f9ed' : '#ffe6e6';
                                     
-                                    // 如果 Type 是空的，给个默认值
+                                    // If Type is empty, provide a default value
                                     $displayType = !empty($type) ? $type : ($isCredit ? 'Credit' : 'Debit');
                                 ?>
                                 <tr>

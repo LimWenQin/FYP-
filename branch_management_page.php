@@ -188,11 +188,11 @@ function getBranchStats($conn) {
 
     $sqlActiveNow = "SELECT COUNT(*) as total FROM branch WHERE Branch_OperationalStatus = 'Open' AND Is_Deleted = 0";
     $activeBranchesNow = $conn->query($sqlActiveNow)->fetch_assoc()['total'];
-    $activePercentChange = 0; // Simplified for brevity
+    $activePercentChange = 0; 
 
     $sqlDonationNow = "SELECT SUM(Order_Amount) as total FROM orders WHERE Branch_ID IS NOT NULL AND (Order_Status = 'Success' OR Order_Status = 'Completed')";
     $totalDonationNow = (float)($conn->query($sqlDonationNow)->fetch_assoc()['total'] ?? 0);
-    $donationPercentChange = 0; // Simplified
+    $donationPercentChange = 0; 
 
     return [
         'totalBranches' => $totalBranchesNow,
@@ -476,7 +476,7 @@ $exportUrl = "?" . http_build_query($exportParams);
                                     <div class="action-menu">
                                         <button class="menu-btn" onclick="toggleCardMenu(event, <?php echo $b['Branch_ID']; ?>)"><i class="fas fa-ellipsis-v"></i></button>
                                         <div id="card-menu-<?php echo $b['Branch_ID']; ?>" class="action-dropdown">
-                                            <a href="admin_branch_details.php?id=<?php echo $b['Branch_ID']; ?>" class="action-item" target="_blank"><i class="fas fa-eye"></i> View Details</a>
+                                            <a href="admin_branch_details.php?id=<?php echo $b['Branch_ID']; ?>" class="action-item"><i class="fas fa-eye"></i> View Details</a>
                                             <a href="activity_management.php?filter_type=branch&filter_val_branch=<?php echo $b['Branch_ID']; ?>" class="action-item"><i class="fas fa-calendar-alt"></i> View Activities</a>
                                             
                                             <a href="branch_edit.php?id=<?php echo $b['Branch_ID']; ?>" class="action-item"><i class="fas fa-edit"></i> Edit Branch</a>
@@ -524,7 +524,7 @@ $exportUrl = "?" . http_build_query($exportParams);
 
                                     <div class="card-stats">
                                         <div><span class="raised-label">Total Donated</span><span class="raised-amount">RM <?php echo number_format($b['TotalDonated'], 2); ?></span></div>
-                                        <a href="admin_branch_details.php?id=<?php echo $b['Branch_ID']; ?>" target="_blank" style="color:var(--primary); font-size:12px; font-weight:bold; text-decoration:none;">More Info <i class="fas fa-arrow-right"></i></a>
+                                        <a href="admin_branch_details.php?id=<?php echo $b['Branch_ID']; ?>" style="color:var(--primary); font-size:12px; font-weight:bold; text-decoration:none;">More Info <i class="fas fa-arrow-right"></i></a>
                                     </div>
                                 </div>
                             </div>

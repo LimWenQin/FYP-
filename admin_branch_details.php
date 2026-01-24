@@ -2,7 +2,7 @@
 // admin_branch_details.php
 session_start();
 
-// 检查权限
+// Check Permissions
 if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     die("Access Denied.");
 }
@@ -15,13 +15,13 @@ if (!isset($_GET['id'])) {
 
 $id = intval($_GET['id']);
 
-// 获取 Branch Data
+// Get Branch Data
 $sql = "SELECT * FROM branch WHERE Branch_ID = $id";
 $result = $conn->query($sql);
 if ($result->num_rows == 0) die("Branch not found.");
 $branch = $result->fetch_assoc();
 
-// 获取统计数据 (Total Donated & Count)
+// Get Statistics (Total Donated & Count)
 $statsSql = "SELECT COUNT(*) as donorCount, SUM(Order_Amount) as totalRaised 
              FROM orders 
              WHERE Branch_ID = $id AND (Order_Status = 'Success' OR Order_Status = 'Completed')";
@@ -30,7 +30,7 @@ $stats = $statsRes->fetch_assoc();
 $totalRaised = $stats['totalRaised'] ?? 0;
 $donorCount = $stats['donorCount'] ?? 0;
 
-// 处理图片 JSON
+// Handle Image JSON
 $images = json_decode($branch['Branch_Images'], true);
 $hasImages = ($images && !empty($images));
 if (!$hasImages) {
@@ -119,7 +119,7 @@ if (!$hasImages) {
 
     <div class="detail-wrapper">
         <div class="top-bar">
-            <a href="javascript:void(0);" onclick="goBackAndClose()" class="back-link">
+            <a href="branch_management_page.php" class="back-link">
                 <i class="fas fa-arrow-left"></i> Back to Branch Management
             </a>
             <div style="font-size:12px; color:#999;">ID: #<?php echo str_pad($branch['Branch_ID'], 4, '0', STR_PAD_LEFT); ?></div>
@@ -270,11 +270,6 @@ if (!$hasImages) {
     </div>
 
     <script>
-        function goBackAndClose() {
-            window.close();
-            setTimeout(function() { if (!window.closed) { window.location.href = 'branch_management_page.php'; } }, 100);
-        }
-
         let slideIndex = 0;
         const slides = document.querySelectorAll('.gallery-img');
         

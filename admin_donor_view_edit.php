@@ -217,7 +217,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_donor'])) {
             <h2 style="margin-bottom: 10px; font-size: 22px;">Update Successful!</h2>
             <p style="color: #666; line-height: 1.5;">Donor details have been successfully updated.</p>
             <div class="modal-btn-group">
-                <a href="javascript:void(0);" onclick="window.close();" class="btn-cancel" style="border: 1px solid #ddd; background: white; color: #555;">Return to List</a>
+                <a href="admin_donor_page.php" class="btn-cancel" style="border: 1px solid #ddd; background: white; color: #555;">Return to List</a>
                 <button type="button" class="btn-save" onclick="document.getElementById('successModal').style.display='none';">Stay Here</button>
             </div>
         </div>
@@ -238,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_donor'])) {
         
         <div class="dashboard-content" style="padding-top: 10px;">
             <div class="page-header-compact">
-                <a href="javascript:void(0);" onclick="window.close();" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Donor List</a>
+                <a href="admin_donor_page.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Donor List</a>
                 <div class="header-title">
                     <h1>Donor Details</h1>
                     <p>View or modify donor information.</p>

@@ -23,7 +23,7 @@ $donorRes = $conn->query($donorSql);
 if ($donorRes->num_rows == 0) die("Donor not found.");
 $donorName = $donorRes->fetch_assoc()['Donor_Name'];
 
-// --- 1. 获取筛选和排序参数 ---
+// --- 1. Get Filter and Sort Parameters ---
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $sort = isset($_GET['sort']) ? $_GET['sort'] : 'date';
 $order = isset($_GET['order']) ? $_GET['order'] : 'desc';
@@ -31,20 +31,20 @@ $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] :
 if ($page < 1) $page = 1;
 $results_per_page = 10; 
 
-// 日期特定筛选
+// Date Specific Filter
 $filterDate = isset($_GET['f_date']) ? $_GET['f_date'] : '';
 $filterMonth = isset($_GET['f_month']) ? $_GET['f_month'] : '';
 $filterYear = isset($_GET['f_year']) ? $_GET['f_year'] : '';
 
-// 支付方式 & 状态 筛选
+// Payment Method & Status Filter
 $filterMethod = isset($_GET['f_method']) ? $_GET['f_method'] : '';
 $filterStatus = isset($_GET['f_status']) ? $_GET['f_status'] : '';
 
-// 金额范围筛选
+// Amount Range Filter
 $minAmount = isset($_GET['min_amount']) && $_GET['min_amount'] !== '' ? floatval($_GET['min_amount']) : '';
 $maxAmount = isset($_GET['max_amount']) && $_GET['max_amount'] !== '' ? floatval($_GET['max_amount']) : '';
 
-// --- 2. 构建 SQL 查询条件 ---
+// --- 2. Build SQL Query Conditions ---
 $conditions = [];
 $conditions[] = "o.Donor_ID = $donorId";
 
@@ -104,12 +104,12 @@ if ($maxAmount !== '') {
 
 $whereSql = "WHERE " . implode(" AND ", $conditions);
 
-// --- 3. 计算总金额 ---
+// --- 3. Calculate Total Amount ---
 $sumSql = "SELECT SUM(o.Order_Amount) as total FROM orders o $whereSql AND (o.Order_PaymentStatus = 'Success' OR o.Order_PaymentStatus = 'Completed' OR o.Order_Status = 'Completed')";
 $sumResult = $conn->query($sumSql);
 $totalAmount = ($sumResult && $row = $sumResult->fetch_assoc()) ? (float)$row['total'] : 0;
 
-// --- 4. 分页计算 ---
+// --- 4. Pagination Calculation ---
 $countSql = "SELECT COUNT(*) as total FROM orders o $whereSql";
 $countRes = $conn->query($countSql);
 $total_records = ($countRes && $row = $countRes->fetch_assoc()) ? $row['total'] : 0;
@@ -120,7 +120,7 @@ $start_from = ($page - 1) * $results_per_page;
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
 $end_record = min($start_from + $results_per_page, $total_records);
 
-// --- 5. 获取数据 ---
+// --- 5. Fetch Data ---
 $sortMap = [
     'date' => 'o.Order_Created_At',
     'amount' => 'o.Order_Amount',
@@ -231,7 +231,7 @@ function buildUrl($params = []) {
         
         <div class="dashboard-content" style="padding-top: 10px;">
             <div class="page-header-compact">
-                <a onclick="window.close(); return false;" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+                <a href="admin_donor_page.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
                 <div class="header-title">
                     <h1>Payment History</h1>
                     <p>Donor: <?php echo htmlspecialchars($donorName); ?></p>

@@ -358,15 +358,15 @@ $caseCategoryStats = getCaseCategoryStats($conn); // Pie Chart Data
             margin-bottom: 30px; 
         }
 
-        /* Row 2: Special Case (4) : Recent Redemptions (6) */
+        /* Row 2: Special Case (6) : Recent Redemptions (4) -> CHANGED TO MATCH TOP ROW */
         .charts-row-bottom { 
             display: grid; 
-            grid-template-columns: 4fr 6fr; 
+            grid-template-columns: 6fr 4fr; /* Updated to 6fr 4fr to match top row length */
             gap: 20px; 
             margin-bottom: 30px; 
         }
 
-        .chart-container, .recent-list { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; flex-direction: column; }
+        .chart-container, .recent-list { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; flex-direction: column; overflow: hidden; /* Added overflow hidden */ }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .section-header h2 { font-size: 18px; font-weight: 600; margin: 0; }
         .section-header a, .section-header button { color: var(--primary); text-decoration: none; font-size: 13px; font-weight: 500; border: none; background: none; cursor: pointer; }
@@ -376,13 +376,13 @@ $caseCategoryStats = getCaseCategoryStats($conn); // Pie Chart Data
         /* Table Styles - General */
         table { width: 100%; border-collapse: collapse; }
         th, td { 
-            padding: 12px 10px; 
+            padding: 10px 4px; /* Reduced padding from 12px 10px */
             text-align: left; 
             vertical-align: middle; 
             border-bottom: 1px solid #f0f0f0; 
-            font-size: 13px; 
+            font-size: 12px; /* Reduced font size slightly */
         }
-        th { font-weight: 600; color: #888; text-transform: uppercase; font-size: 12px; }
+        th { font-weight: 600; color: #888; text-transform: uppercase; font-size: 11px; }
         
         .date-box {
             display: flex;
@@ -392,15 +392,26 @@ $caseCategoryStats = getCaseCategoryStats($conn); // Pie Chart Data
             text-align: center;
             line-height: 1.2;
             color: #555;
-            min-width: 50px;
+            min-width: 40px; /* Reduced min-width */
         }
-        .d-year { font-size: 12px; font-weight: bold; color: #333; }
-        .d-month { font-size: 11px; text-transform: uppercase; margin: 2px 0; }
-        .d-day { font-size: 14px; font-weight: bold; color: #333; }
-        .d-time { font-size: 10px; color: #999; margin-top: 2px; font-weight: 500; } /* 新增的时间样式 */
+        .d-year { font-size: 11px; font-weight: bold; color: #333; }
+        .d-month { font-size: 10px; text-transform: uppercase; margin: 2px 0; }
+        .d-day { font-size: 13px; font-weight: bold; color: #333; }
+        .d-time { font-size: 9px; color: #999; margin-top: 2px; font-weight: 500; }
         
         .amount-right { text-align: right; }
         .redemption-table th, .redemption-table td { text-align: center !important; }
+        
+        /* --- New Redemption Table Specifics to prevent scrolling --- */
+        .redemption-table { 
+            table-layout: fixed; /* Force fixed layout */
+            width: 100%; 
+        }
+        .redemption-table td, .redemption-table th {
+            white-space: normal; /* Allow wrapping */
+            word-wrap: break-word; /* Break long words */
+            overflow-wrap: break-word;
+        }
 
         .info-cell { display: flex; align-items: center; text-align: left;}
         .avatar-circle { width: 32px; height: 32px; border-radius: 50%; background: #eee; color: #555; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 10px; font-size: 12px; flex-shrink: 0; overflow: hidden; }
@@ -408,7 +419,7 @@ $caseCategoryStats = getCaseCategoryStats($conn); // Pie Chart Data
         .text-info h4 { margin: 0; font-size: 13px; color: #333; }
         .text-info p { margin: 0; font-size: 11px; color: #888; }
         
-        .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .status-badge { padding: 3px 6px; border-radius: 12px; font-size: 10px; font-weight: 600; display: inline-block; }
         .status-success { background: #e6f9ed; color: #28a745; }
         .status-completed { background: #d4edda; color: #155724; }
         .status-pending { background: #fff3cd; color: #856404; }
@@ -712,11 +723,11 @@ $caseCategoryStats = getCaseCategoryStats($conn); // Pie Chart Data
                     <table class="redemption-table">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Donor Name</th>
-                                <th>Reward Item</th>
-                                <th>Points Used</th>
-                                <th>Status</th>
+                                <th style="width: 15%;">Date</th>
+                                <th style="width: 22%;">Donor Name</th>
+                                <th style="width: 23%;">Reward Item</th>
+                                <th style="width: 20%;">Points Used</th>
+                                <th style="width: 20%;">Status</th>
                             </tr>
                         </thead>
                         <tbody>
