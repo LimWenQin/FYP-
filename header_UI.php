@@ -511,14 +511,14 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
 
         
         .header-donate-btn {
-            background-color: #ffbb6dff;
-            color: #fff !important;
+            background-color: rgb(251, 182, 103);
+            color: #333 !important;
             
-            /* 设置固定宽高，确保切换时不跳动 */
+          
             width: 120px; 
             height: 44px;
             
-            /* Flex 布局居中 */
+           
             display: flex;
             justify-content: center;
             align-items: center;
@@ -533,10 +533,11 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
 
         .header-donate-btn:hover {
             background-color: #f79c34ff;
+            color: #fff !important;
             transform: translateY(-2px);
         }
 
-        /* 文字样式：默认显示 */
+      
         .btn-text {
             display: block;
         }
@@ -553,7 +554,7 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
         
         .header-donate-btn:hover .btn-icon {
             display: block;
-            /* 简单的弹出动画 */
+            
             animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
