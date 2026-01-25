@@ -39,7 +39,7 @@ $d_email   = $d_row['Donor_Email'];
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
     
-    $amount = (float)$_POST['amount'];
+    $amount = floor((float)$_POST['amount']); // 强制取整，丢弃所有小数位
     $method = $_POST['payment_method']; 
 
     if ($amount > 0 && !empty($method)) {
@@ -206,7 +206,7 @@ include 'header_UI.php';
                 <button type="button" class="btn-amt" onclick="selectAmount(200, this)">RM 200</button>
                 <button type="button" class="btn-amt" onclick="selectAmount(300, this)">RM 300</button>
             </div>
-            <input type="number" id="custom_amount" class="input-custom" placeholder="Or enter custom amount (RM)" oninput="manualAmount(this.value)">
+            <input type="number" id="custom_amount" class="input-custom" placeholder="Or enter custom amount (RM)" min="1" oninput="this.value = this.value.replace(/[^0-9]/g, ''); manualAmount(this.value)">
 
             <div class="section-title">2. Payment Method</div>
             <div class="payment-methods">
@@ -276,11 +276,17 @@ include 'header_UI.php';
     }
 
     function manualAmount(val) {
-        currentSelectedAmount = val;
-        document.getElementById('amount').value = val;
-        document.querySelectorAll('.btn-amt').forEach(b => b.classList.remove('active'));
-        checkForm();
+    // 如果输入框有内容且小于 1，则强制设为 1
+    if (val !== "" && parseInt(val) < 1) {
+        val = 1;
+        document.getElementById('custom_amount').value = 1;
     }
+    
+    currentSelectedAmount = val;
+    document.getElementById('amount').value = val;
+    document.querySelectorAll('.btn-amt').forEach(b => b.classList.remove('active'));
+    checkForm();
+}
 
     function selectMethod(method, element) {
         currentSelectedMethod = method;
