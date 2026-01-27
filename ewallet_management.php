@@ -117,6 +117,18 @@ $f_min    = isset($_GET['f_min']) ? $_GET['f_min'] : '';
 $f_max    = isset($_GET['f_max']) ? $_GET['f_max'] : '';
 $f_target_type = isset($_GET['f_target_type']) ? $_GET['f_target_type'] : ''; // branch, activity, case
 
+// Determine active filter type for UI display
+$filterType = "";
+if (isset($_GET['filter_type'])) {
+    $filterType = $_GET['filter_type'];
+} else {
+    // Auto-detect if parameters are present to keep the UI open
+    if ($f_date_y || $f_date_m || $f_date_d) $filterType = 'date';
+    elseif ($f_type) $filterType = 'type';
+    elseif ($f_target_type) $filterType = 'target';
+    elseif ($f_min || $f_max) $filterType = 'amount';
+}
+
 // Pagination settings
 $limit = 5;
 $page_wl = isset($_GET['page_wl']) && is_numeric($_GET['page_wl']) ? (int)$_GET['page_wl'] : 1;
@@ -243,7 +255,17 @@ $end_wl = min($offset_wl + $limit, $total_wl_recs);
         .btn-export { background-color: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 5px; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; transition: background 0.3s; text-decoration: none; }
         .btn-export:hover { background-color: #218838; color: white; }
 
+        /* Updated Search & Filter Container (Consistent with Payment Management) */
         .admin-search-container { display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px 15px; border-radius: 8px; border: 1px solid #eee; flex-wrap: wrap; width: 100%; margin-top: 15px; box-sizing: border-box; }
+        
+        /* New Filter Styles */
+        .filter-group { display: flex; align-items: center; gap: 8px; }
+        .filter-select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; background-color: white; color: #555; outline: none; cursor: pointer; font-size: 13px; min-width: 130px; }
+        .filter-select:focus { border-color: var(--primary); }
+        .secondary-filter { display: none; animation: fadeIn 0.3s; }
+        .secondary-filter.active { display: block; display: flex; gap: 5px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
         .search-input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; outline: none; background: white; min-width: 200px; font-size: 13px; }
         .search-input:focus { border-color: var(--primary); }
         .btn-search { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px; display:flex; align-items:center; gap:5px; }
@@ -308,7 +330,6 @@ $end_wl = min($offset_wl + $limit, $total_wl_recs);
         .modal-row { display: flex; gap: 5px; }
         .modal-apply-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
         .modal-apply-btn:hover { opacity: 0.9; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -353,16 +374,61 @@ $end_wl = min($offset_wl + $limit, $total_wl_recs);
                     <form method="GET" class="admin-search-container">
                         <input type="hidden" name="sort" value="<?php echo $sort; ?>">
                         <input type="hidden" name="order" value="<?php echo $order; ?>">
-                        <input type="hidden" name="f_date_y" value="<?php echo $f_date_y; ?>">
-                        <input type="hidden" name="f_date_m" value="<?php echo $f_date_m; ?>">
-                        <input type="hidden" name="f_date_d" value="<?php echo $f_date_d; ?>">
-                        <input type="hidden" name="f_type" value="<?php echo $f_type; ?>">
-                        <input type="hidden" name="f_min" value="<?php echo $f_min; ?>">
-                        <input type="hidden" name="f_max" value="<?php echo $f_max; ?>">
-                        <input type="hidden" name="f_target_type" value="<?php echo $f_target_type; ?>">
-
                         <?php if($page_wl > 1 && !empty($_GET['search_wl'])) echo "<input type='hidden' name='page_wl' value='1'>"; ?>
                         
+                        <div class="filter-group">
+                            <i class="fas fa-filter" style="color:#666; margin-right:5px;"></i>
+                            <select name="filter_type" id="filterType" class="filter-select" onchange="toggleFilterInputs()">
+                                <option value="">Filter By...</option>
+                                <option value="date" <?php if($filterType == 'date') echo 'selected'; ?>>Date</option>
+                                <option value="type" <?php if($filterType == 'type') echo 'selected'; ?>>Transaction Type</option>
+                                <option value="target" <?php if($filterType == 'target') echo 'selected'; ?>>Context</option>
+                                <option value="amount" <?php if($filterType == 'amount') echo 'selected'; ?>>Amount</option>
+                            </select>
+                        </div>
+
+                        <div id="filter_date_container" class="secondary-filter">
+                            <select name="f_date_y" id="main_f_date_y" class="filter-select" style="width: 80px; min-width:80px;" onchange="updateDays('main_f_date_y', 'main_f_date_m', 'main_f_date_d')">
+                                <option value="">Year...</option>
+                                <?php 
+                                $currentYear = date('Y');
+                                for($y = 2021; $y <= $currentYear + 1; $y++) {
+                                    $sel = ($f_date_y == $y) ? 'selected' : '';
+                                    echo "<option value='$y' $sel>$y</option>";
+                                }
+                                ?>
+                            </select>
+                            <select name="f_date_m" id="main_f_date_m" class="filter-select" style="width: 100px; min-width:100px;" onchange="updateDays('main_f_date_y', 'main_f_date_m', 'main_f_date_d')">
+                                <option value="">Month...</option>
+                                <?php for($m=1; $m<=12; $m++): ?>
+                                    <option value="<?php echo $m; ?>" <?php echo ($f_date_m==$m)?'selected':''; ?>><?php echo date('M', mktime(0,0,0,$m,10)); ?></option>
+                                <?php endfor; ?>
+                            </select>
+                            <input type="number" name="f_date_d" id="main_f_date_d" placeholder="Day" class="filter-select" style="width: 60px; min-width:60px;" value="<?php echo $f_date_d; ?>" min="1" max="31">
+                        </div>
+
+                        <div id="filter_type_container" class="secondary-filter">
+                            <select name="f_type" class="filter-select">
+                                <option value="">All Types</option>
+                                <option value="Credit" <?php echo ($f_type=='Credit')?'selected':''; ?>>Credit (Top-up)</option>
+                                <option value="Debit" <?php echo ($f_type=='Debit')?'selected':''; ?>>Debit (Spent)</option>
+                            </select>
+                        </div>
+
+                        <div id="filter_target_container" class="secondary-filter">
+                            <select name="f_target_type" class="filter-select">
+                                <option value="">All Contexts</option>
+                                <option value="branch" <?php echo ($f_target_type=='branch')?'selected':''; ?>>Branch</option>
+                                <option value="activity" <?php echo ($f_target_type=='activity')?'selected':''; ?>>Activity</option>
+                                <option value="case" <?php echo ($f_target_type=='case')?'selected':''; ?>>Special Case</option>
+                            </select>
+                        </div>
+
+                        <div id="filter_amount_container" class="secondary-filter">
+                            <input type="number" min="0" step="0.01" name="f_min" placeholder="Min RM" class="filter-select" style="width:80px; min-width:80px;" value="<?php echo $f_min; ?>">
+                            <input type="number" min="0" step="0.01" name="f_max" placeholder="Max RM" class="filter-select" style="width:80px; min-width:80px;" value="<?php echo $f_max; ?>">
+                        </div>
+
                         <input type="text" name="search_wl" class="search-input" placeholder="Search Donor, Ref, Description..." value="<?php echo htmlspecialchars($search_wl); ?>">
                         <button type="submit" class="btn-search"><i class="fas fa-search"></i> Search</button>
 
@@ -658,8 +724,8 @@ $end_wl = min($offset_wl + $limit, $total_wl_recs);
 
                 <span class="modal-filter-label">Amount Range (RM):</span>
                 <div class="modal-row">
-                    <input type="number" step="0.01" name="f_min" placeholder="Min" class="modal-input" value="<?php echo $f_min; ?>">
-                    <input type="number" step="0.01" name="f_max" placeholder="Max" class="modal-input" value="<?php echo $f_max; ?>">
+                    <input type="number" min="0" step="0.01" name="f_min" placeholder="Min" class="modal-input" value="<?php echo $f_min; ?>">
+                    <input type="number" min="0" step="0.01" name="f_max" placeholder="Max" class="modal-input" value="<?php echo $f_max; ?>">
                 </div>
                 <button type="submit" class="modal-apply-btn">Apply Filter</button>
             </form>
@@ -698,6 +764,30 @@ $end_wl = min($offset_wl + $limit, $total_wl_recs);
                 dayInput.max = 31;
             }
         }
+
+        // --- NEW Toggle Filter Inputs Logic ---
+        function toggleFilterInputs() {
+            const type = document.getElementById('filterType').value;
+            // Hide all secondary containers first
+            document.querySelectorAll('.secondary-filter').forEach(el => { 
+                el.classList.remove('active'); 
+            });
+
+            if (type === 'date') {
+                document.getElementById('filter_date_container').classList.add('active');
+            } else if (type === 'type') {
+                document.getElementById('filter_type_container').classList.add('active');
+            } else if (type === 'target') {
+                document.getElementById('filter_target_container').classList.add('active');
+            } else if (type === 'amount') {
+                document.getElementById('filter_amount_container').classList.add('active');
+            }
+        }
+
+        // Run on load to set initial state
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleFilterInputs();
+        });
     </script>
 </body>
 </html>

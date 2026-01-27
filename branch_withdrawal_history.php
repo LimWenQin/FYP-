@@ -254,7 +254,7 @@ function buildUrl($params = []) {
 
         <div class="dashboard-content" style="padding-top: 10px;">
             <div class="page-header-compact">
-                <a href="branch_management_page.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Branch Management</a>
+                <a href="branch_management_page.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
                 <div class="header-title">
                     <h1>Withdrawal History</h1>
                     <p><?php echo htmlspecialchars($branchName); ?></p>

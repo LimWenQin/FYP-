@@ -10,14 +10,14 @@ if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
 include 'dataconnection.php';
 
 if (!isset($_GET['case_id'])) {
-    // 按之前要求，若无 ID 则关闭窗口
-    echo "<script>window.close();</script>";
+    // If no case_id, redirect to management page (changed from window.close)
+    header("Location: special_case_management.php");
     exit();
 }
 
 $caseId = intval($_GET['case_id']);
 
-// --- 1. 获取 Case 信息 & 筹款总额 ---
+// --- 1. Get Case Info & Total Raised ---
 $caseSql = "SELECT Case_Title, Raised_Amount FROM special_case WHERE Case_ID = $caseId";
 $caseRes = $conn->query($caseSql);
 if ($caseRes->num_rows == 0) die("Case not found.");
@@ -25,48 +25,48 @@ $caseData = $caseRes->fetch_assoc();
 $caseTitle = $caseData['Case_Title'];
 $totalRaised = floatval($caseData['Raised_Amount']);
 
-// --- 2. 获取筛选和排序参数 ---
+// --- 2. Get Filter & Sort Parameters ---
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $sort = isset($_GET['sort']) ? $_GET['sort'] : 'date'; 
 $order = isset($_GET['order']) ? $_GET['order'] : 'desc'; 
 
-// 日期筛选
+// Date Filter
 $filterDate = isset($_GET['f_date']) ? $_GET['f_date'] : '';
 $filterMonth = isset($_GET['f_month']) ? $_GET['f_month'] : '';
 $filterYear = isset($_GET['f_year']) ? $_GET['f_year'] : '';
 
-// 状态筛选 (多选)
+// Status Filter (Multiple)
 $filterStatus = isset($_GET['f_status']) ? $_GET['f_status'] : [];
 if (is_string($filterStatus)) $filterStatus = $filterStatus === '' ? [] : explode(',', $filterStatus);
 
-// 金额筛选
+// Amount Filter
 $minAmount = isset($_GET['min_amount']) && $_GET['min_amount'] !== '' ? floatval($_GET['min_amount']) : '';
 $maxAmount = isset($_GET['max_amount']) && $_GET['max_amount'] !== '' ? floatval($_GET['max_amount']) : '';
 
-// --- 3. 分页参数 ---
+// --- 3. Pagination Parameters ---
 $results_per_page = 10;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
 $start_from = ($page - 1) * $results_per_page;
 
-// --- 4. 统计 & 构建查询条件 ---
+// --- 4. Statistics & Build Query Conditions ---
 
-// 计算总提款 (仅 Approved/Completed) 用于计算余额
+// Calculate Total Withdrawn (Approved/Completed Only) for Balance
 $sqlWithdrawn = "SELECT SUM(Amount) as total FROM withdrawals WHERE Case_ID = $caseId AND (Status = 'Approved' OR Status = 'Completed')";
 $totalWithdrawn = (float)($conn->query($sqlWithdrawn)->fetch_assoc()['total'] ?? 0);
 $availableBalance = $totalRaised - $totalWithdrawn;
 
-// 构建列表 SQL 条件
+// Build List SQL Conditions
 $conditions = [];
-$conditions[] = "w.Case_ID = $caseId"; // 核心：过滤 Case ID
+$conditions[] = "w.Case_ID = $caseId"; // Core: Filter by Case ID
 
 if (!empty($search)) {
     $s = $conn->real_escape_string($search);
-    // 搜索 Admin 名字 或 Withdrawal ID
+    // Search Admin Name or Withdrawal ID
     $conditions[] = "(ad.Admin_Name LIKE '%$s%' OR w.Withdrawal_ID LIKE '%$s%')";
 }
 
-// 日期筛选
+// Date Filter
 if (!empty($filterDate)) {
     $d = $conn->real_escape_string($filterDate);
     $conditions[] = "DATE(w.Request_Date) = '$d'";
@@ -81,7 +81,7 @@ if (!empty($filterDate)) {
     }
 }
 
-// 状态筛选 (多选)
+// Status Filter (Multiple)
 if (!empty($filterStatus)) {
     $validStatuses = array_filter($filterStatus, function($v) { return $v !== '' && $v !== 'All'; });
     if (!empty($validStatuses)) {
@@ -90,7 +90,7 @@ if (!empty($filterStatus)) {
     }
 }
 
-// 金额筛选
+// Amount Filter
 if ($minAmount !== '') {
     $conditions[] = "w.Amount >= $minAmount";
 }
@@ -100,8 +100,8 @@ if ($maxAmount !== '') {
 
 $whereSql = "WHERE " . implode(" AND ", $conditions);
 
-// --- 5. 分页计算 ---
-// JOIN admin 表以获取 Requester Name
+// --- 5. Pagination Calculation ---
+// JOIN admin table to get Requester Name
 $countSql = "SELECT COUNT(*) as total FROM withdrawals w LEFT JOIN admin ad ON w.Admin_ID = ad.Admin_ID $whereSql";
 $countResult = $conn->query($countSql);
 $total_records = $countResult->fetch_assoc()['total'];
@@ -112,12 +112,12 @@ if ($page > $total_pages && $total_pages > 0) {
     $start_from = ($page - 1) * $results_per_page;
 }
 
-// 排序
+// Sorting
 $sortMap = ['date' => 'w.Request_Date', 'requester' => 'ad.Admin_Name', 'status' => 'w.Status', 'amount' => 'w.Amount'];
 $orderByCol = isset($sortMap[$sort]) ? $sortMap[$sort] : 'w.Request_Date';
 $orderDir = ($order === 'asc') ? 'ASC' : 'DESC';
 
-// --- 6. 数据查询 ---
+// --- 6. Data Query ---
 $sqlList = "SELECT w.*, ad.Admin_Name, ad.Admin_Email 
             FROM withdrawals w 
             LEFT JOIN admin ad ON w.Admin_ID = ad.Admin_ID
@@ -134,7 +134,7 @@ if ($result) {
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
 $end_record = min($start_from + $results_per_page, $total_records);
 
-// 辅助数据
+// Helper Data
 $years = range(date('Y'), 2023); 
 $months = [1=>'January', 2=>'February', 3=>'March', 4=>'April', 5=>'May', 6=>'June', 7=>'July', 8=>'August', 9=>'September', 10=>'October', 11=>'November', 12=>'December'];
 $allStatuses = ['Pending', 'Approved', 'Completed', 'Rejected'];
@@ -239,7 +239,7 @@ function buildUrl($params = []) {
 
         <div class="dashboard-content" style="padding-top: 10px;">
             <div class="page-header-compact">
-                <a href="#" onclick="window.close(); return false;" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Case</a>
+                <a href="special_case_management.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Special Case Management</a>
                 <div class="header-title">
                     <h1>Withdrawal History</h1>
                     <p><?php echo htmlspecialchars($caseTitle); ?></p>

@@ -458,14 +458,14 @@ $allCaseImagesMap = [];
                                         <div onclick="window.location.href='special_case_edit.php?id=<?php echo $case['Case_ID']; ?>'"><i class="fas fa-edit"></i> Edit Details</div>
 
                                         <?php if (!$isStaff): ?>
-                                            <a href="special_case_donation_history.php?case_id=<?php echo $case['Case_ID']; ?>" target="_blank"><i class="fas fa-file-invoice-dollar"></i> View Donor Payment History</a>
+                                            <a href="special_case_donation_history.php?case_id=<?php echo $case['Case_ID']; ?>"><i class="fas fa-file-invoice-dollar"></i> View Donor Payment History</a>
                                         <?php endif; ?>
 
                                         <?php if (!$isStaff): ?>
-                                            <a href="special_case_withdrawal_history.php?case_id=<?php echo $case['Case_ID']; ?>" target="_blank"><i class="fas fa-money-bill-wave"></i> Withdrawal History</a>
+                                            <a href="special_case_withdrawal_history.php?case_id=<?php echo $case['Case_ID']; ?>"><i class="fas fa-money-bill-wave"></i> Withdrawal History</a>
                                         <?php endif; ?>
 
-                                        <a href="special_case_comments.php?case_id=<?php echo $case['Case_ID']; ?>" target="_blank"><i class="fas fa-comments"></i> View Comments</a>
+                                        <a href="special_case_comments.php?case_id=<?php echo $case['Case_ID']; ?>"><i class="fas fa-comments"></i> View Comments</a>
 
                                         <a href="javascript:confirmDeleteSpecialCase(<?php echo $case['Case_ID']; ?>)" class="text-delete"><i class="fas fa-trash"></i> Delete</a>
                                     </div>
@@ -579,7 +579,8 @@ $allCaseImagesMap = [];
 
     <script>
         function goToDetailsPage(id) {
-            window.open('admin_special_case_details.php?id=' + id, '_blank');
+            // Updated to open in the same window, removing _blank
+            window.location.href = 'admin_special_case_details.php?id=' + id;
         }
 
         function toggleFilterInputs() {
