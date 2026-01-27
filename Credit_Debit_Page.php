@@ -243,6 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const cvcInput = document.getElementById('cvc');
 
     cardInput.addEventListener('input', function(e) {
+    cardInput.classList.remove('is-invalid'); // 只要在输入，就先移除错误样式
         let value = e.target.value.replace(/\D/g, ''); 
         let formattedValue = '';
         for (let i = 0; i < value.length; i++) {
@@ -268,7 +269,22 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     form.addEventListener('submit', function(e) {
-        const expValue = expInput.value; 
+    // 1. 获取卡号并去掉空格
+    const cardRawValue = cardInput.value.replace(/\s/g, ''); 
+    
+    // 2. 检查长度（通常 Visa/MasterCard 为 16 位，Amex 为 15 位）
+    // 如果你严格要求 16 位：
+    if (cardRawValue.length !== 16) {
+        e.preventDefault(); // 阻止提交
+        cardInput.classList.add('is-invalid');
+        Swal.fire({
+            title: 'Invalid Card Number',
+            text: 'Please enter a valid 16-digit card number.',
+            icon: 'warning',
+            confirmButtonColor: '#00a651'
+        });
+        return;
+    }
         
         if (expValue.length !== 5) {
             e.preventDefault();
