@@ -2,7 +2,7 @@
 // add_reward_item.php
 session_start();
 
-// 检查登录状态
+// Check login status
 if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
     header("Location: admin_login.php");
     exit();

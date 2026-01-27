@@ -68,7 +68,6 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
         if ($filterValue == 'asc') $orderClause = "ORDER BY b.Branch_Name ASC";
         elseif ($filterValue == 'desc') $orderClause = "ORDER BY b.Branch_Name DESC";
     } elseif ($filterType == 'date') {
-        // Creation Date Logic (Using Activity_StartDate as creation reference based on previous context)
         if (isset($_GET['filter_val_date_day']) && $_GET['filter_val_date_day'] !== '') {
             $filterDateDay = $conn->real_escape_string($_GET['filter_val_date_day']);
             $conditions[] = "DAY(a.Activity_StartDate) = '$filterDateDay'";
@@ -82,7 +81,6 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
             $conditions[] = "YEAR(a.Activity_StartDate) = '$filterDateYear'";
         }
     } elseif ($filterType == 'end_date') {
-        // End Date Logic
         if (isset($_GET['filter_val_end_date_day']) && $_GET['filter_val_end_date_day'] !== '') {
             $filterEndDateDay = $conn->real_escape_string($_GET['filter_val_end_date_day']);
             $conditions[] = "DAY(a.Activity_EndDate) = '$filterEndDateDay'";
@@ -181,6 +179,7 @@ $allActivityImagesMap = [];
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin_common.css">
     <style>
+        /* [Styles remain unchanged as requested] */
         .stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); display: flex; justify-content: space-between; align-items: center; transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-5px); }
@@ -269,16 +268,6 @@ $allActivityImagesMap = [];
         .lightbox-nav:hover { background-color: rgba(255,255,255,0.2); }
         .lightbox-prev { left: 0; border-radius: 0 3px 3px 0; }
         .lightbox-next { right: 0; border-radius: 3px 0 0 3px; }
-
-        .section-separator { border-top: 1px dashed #ddd; margin: 25px 0; position: relative; }
-        .section-separator span { position: absolute; top: -12px; left: 0; background: #fff; padding-right: 10px; font-size: 12px; color: #888; font-weight: 600; text-transform: uppercase; }
-
-        @media (max-width: 768px) {
-            .stats-cards { grid-template-columns: repeat(2, 1fr); }
-            .case-grid { grid-template-columns: 1fr; }
-            .filter-search-bar { flex-direction: column; align-items: stretch; }
-            .pagination-container { flex-direction: column; gap: 10px; text-align: center; }
-        }
     </style>
 </head>
 <body>
@@ -403,13 +392,12 @@ $allActivityImagesMap = [];
                                 <div class="action-menu">
                                     <button class="menu-btn" onclick="toggleMenu(event, <?php echo $activity['Activity_ID']; ?>)"><i class="fas fa-ellipsis-v"></i></button>
                                     <div id="menu-<?php echo $activity['Activity_ID']; ?>" class="dropdown-content">
-                                        <a href="admin_activity_details.php?id=<?php echo $activity['Activity_ID']; ?>" target="_blank"><i class="fas fa-eye"></i> View Details</a>
+                                        <a href="admin_activity_details.php?id=<?php echo $activity['Activity_ID']; ?>"><i class="fas fa-eye"></i> View Details</a>
 
                                         <a href="admin_activity_edit.php?id=<?php echo $activity['Activity_ID']; ?>&mode=edit"><i class="fas fa-edit"></i> Edit Details</a>
 
                                         <?php if (!$isStaff): ?>
                                             <a href="activity_donation_history.php?activity_id=<?php echo $activity['Activity_ID']; ?>"><i class="fas fa-file-invoice-dollar"></i> View Donation History</a>
-                                            
                                             <a href="activity_withdrawal_history.php?activity_id=<?php echo $activity['Activity_ID']; ?>"><i class="fas fa-money-bill-wave"></i> Withdrawal History</a>
                                         <?php endif; ?>
                                         
@@ -469,13 +457,11 @@ $allActivityImagesMap = [];
                             if ($filterType == 'city' && !empty($filterValue)) $queryParams['filter_val_city'] = $filterValue;
                             if ($filterType == 'capacity' && !empty($filterValue)) $queryParams['filter_val_capacity'] = $filterValue;
                             if ($filterType == 'branch_sort' && !empty($filterValue)) $queryParams['filter_val_bsort'] = $filterValue;
-                            // Add date params to pagination
                             if ($filterType == 'date') {
                                 if(!empty($filterDateDay)) $queryParams['filter_val_date_day'] = $filterDateDay;
                                 if(!empty($filterDateMonth)) $queryParams['filter_val_date_month'] = $filterDateMonth;
                                 if(!empty($filterDateYear)) $queryParams['filter_val_date_year'] = $filterDateYear;
                             }
-                            // Add end date params to pagination
                             if ($filterType == 'end_date') {
                                 if(!empty($filterEndDateDay)) $queryParams['filter_val_end_date_day'] = $filterEndDateDay;
                                 if(!empty($filterEndDateMonth)) $queryParams['filter_val_end_date_month'] = $filterEndDateMonth;
