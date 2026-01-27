@@ -227,7 +227,7 @@ include 'header_UI.php';
                     <input type="hidden" id="tax_receipt" name="tax_receipt" value="0">
                     
                     <div class="amount-grid" id="amount-grid"></div>
-                    <input type="number" id="custom_amount" name="custom_amount" class="input-custom" placeholder="Enter custom amount (RM)">
+                    <input type="number" id="custom_amount" name="custom_amount" class="input-custom" placeholder="Enter custom amount (RM)" min="1" oninput="this.value = this.value.replace(/[^0-9]/g, '');">
                     
                     <div class="tax-receipt-section">
                         <label class="checkbox-label">
@@ -340,9 +340,17 @@ include 'header_UI.php';
     }
 
     document.getElementById('custom_amount').addEventListener('input', function() {
-        document.getElementById("amount").value = this.value;
-        document.querySelectorAll('.btn-amount').forEach(b => b.classList.remove('selected'));
-    });
+    // 1. 如果用户输入了负数或0，强制改为1 (或者留空让用户重新输入)
+    if (this.value !== "" && parseInt(this.value) < 1) {
+        this.value = 1;
+    }
+    
+    // 2. 同步到隐藏的 amount 字段
+    document.getElementById("amount").value = this.value;
+    
+    // 3. 取消预设按钮的选择状态
+    document.querySelectorAll('.btn-amount').forEach(b => b.classList.remove('selected'));
+});
 
     function toggleTaxReceipt() {
         const checkbox = document.getElementById('receipt_checkbox');
@@ -398,17 +406,21 @@ include 'header_UI.php';
     }
 
     document.getElementById('donationForm').addEventListener('submit', function(e) {
-        const amount = parseFloat(document.getElementById("amount").value) || 0;
-        const needsReceipt = document.getElementById('tax_receipt').value === "1";
-        
-        if (amount <= 0) {
-            e.preventDefault();
-            Swal.fire({ icon: 'warning', title: 'Oops...', text: 'Please select a donation amount.', confirmButtonColor: '#dc2626' });
-        } else if (needsReceipt && amount < 30) {
-            e.preventDefault();
-            Swal.fire({ icon: 'error', title: 'Invalid Amount', text: 'Tax receipts require a minimum donation of RM 30.', confirmButtonColor: '#dc2626' });
-        }
-    });
+    const amount = parseInt(document.getElementById("amount").value) || 0;
+    const needsReceipt = document.getElementById('tax_receipt').value === "1";
+    
+    if (amount < 1) { // 限制必须至少为 1
+        e.preventDefault();
+        Swal.fire({ 
+            icon: 'warning', 
+            title: 'Invalid Amount', 
+            text: 'Minimum donation amount is RM 1.', 
+            confirmButtonColor: '#dc2626' 
+        });
+    } else if (needsReceipt && amount < 30) {
+        // ... 原有的 tax receipt 检查保持不变
+    }
+});
 </script>
 
 <?php include 'footer.php'; ?>

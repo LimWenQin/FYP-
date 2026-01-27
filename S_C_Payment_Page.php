@@ -234,7 +234,7 @@ include 'header_UI.php';
                         </div>
                         
                         <div class="amount-grid" id="amount-grid"></div>
-                        <input type="number" id="custom_amount" name="custom_amount" class="input-custom" placeholder="Enter custom amount (RM)">
+                        <input type="number" id="custom_amount" name="custom_amount" class="input-custom" placeholder="Enter custom amount (RM)" min="1" oninput="this.value = this.value.replace(/[^0-9]/g, '');">
                         
                         <div class="tax-receipt-section">
                             <label class="checkbox-label">
@@ -327,9 +327,13 @@ include 'header_UI.php';
     }
 
     document.getElementById('custom_amount').addEventListener('input', function() {
-        document.getElementById("amount").value = this.value;
-        document.querySelectorAll('.btn-amount').forEach(b => b.classList.remove('selected'));
-    });
+    // 如果用户输入的数字小于 1，自动纠正为 1 (仅在非空时判断)
+    if (this.value !== "" && parseInt(this.value) < 1) {
+        this.value = 1;
+    }
+    document.getElementById("amount").value = this.value;
+    document.querySelectorAll('.btn-amount').forEach(b => b.classList.remove('selected'));
+});
 
     function toggleTaxReceipt() {
         const checkbox = document.getElementById('receipt_checkbox');
@@ -385,25 +389,37 @@ include 'header_UI.php';
     }
 
     function resetForm() {
-        const form = document.getElementById('donationForm');
-        form.reset();
-        document.getElementById('amount').value = "";
-        document.getElementById('tax_receipt').value = "0";
-        document.getElementById('donation_type').value = "one-time"; 
-        document.getElementById('receipt_checkbox').checked = false;
-        renderButtons(defaultAmounts);
-    }
+    const form = document.getElementById('donationForm');
+    form.reset();
+    document.getElementById('amount').value = "";
+    document.getElementById('custom_amount').value = ""; // 确保清空显示
+    document.getElementById('tax_receipt').value = "0";
+    document.getElementById('donation_type').value = "one-time"; 
+    document.getElementById('receipt_checkbox').checked = false;
+    renderButtons(defaultAmounts);
+}
 
     document.getElementById('donationForm').addEventListener('submit', function(e) {
-        const amount = parseFloat(document.getElementById("amount").value) || 0;
-        const needsReceipt = document.getElementById('tax_receipt').value === "1";
-        
-        if (amount <= 0) {
-            e.preventDefault();
-            Swal.fire({ icon: 'warning', title: 'Oops...', text: 'Please select a donation amount.', confirmButtonColor: '#dc2626' });
-        } else if (needsReceipt && amount < 30) {
-            e.preventDefault();
-            Swal.fire({ icon: 'error', title: 'Invalid Amount', text: 'Tax receipts require a minimum donation of RM 30.', confirmButtonColor: '#dc2626' });
-        }
-    });
+    // 使用 parseInt 确保是整数
+    const amount = parseInt(document.getElementById("amount").value) || 0;
+    const needsReceipt = document.getElementById('tax_receipt').value === "1";
+    
+    if (amount < 1) { // 修改这里：禁止 0 和负数
+        e.preventDefault();
+        Swal.fire({ 
+            icon: 'warning', 
+            title: 'Invalid Amount', 
+            text: 'Please enter a valid donation amount (minimum RM 1).', 
+            confirmButtonColor: '#dc2626' 
+        });
+    } else if (needsReceipt && amount < 30) {
+        e.preventDefault();
+        Swal.fire({ 
+            icon: 'error', 
+            title: 'Invalid Amount', 
+            text: 'Tax receipts require a minimum donation of RM 30.', 
+            confirmButtonColor: '#dc2626' 
+        });
+    }
+});
 </script>
