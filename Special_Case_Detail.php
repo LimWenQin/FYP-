@@ -287,7 +287,8 @@ include 'header_UI.php';
         .comment-input { width: 100%; padding: 15px; border: 1px solid #ddd; border-radius: 8px; resize: none; font-family: inherit; margin-bottom: 10px; }
         .comment-submit { background: var(--primary-red); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .comment-item { display: flex; gap: 15px; padding: 15px 0; border-bottom: 1px solid #f0f0f0; }
-        .comment-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        /* 删除 .comment-avatar 样式或保留备用 */
+        
         .comment-body h4 { font-size: 14px; margin: 0 0 5px; color: #333; }
         .comment-date { font-size: 11px; color: #999; margin-left: 10px; font-weight: normal; }
         .comment-text { font-size: 14px; color: #555; line-height: 1.5; }
@@ -419,11 +420,8 @@ include 'header_UI.php';
                 </div>
 
                 <?php if ($comments_result->num_rows > 0): ?>
-                    <?php while($comment = $comments_result->fetch_assoc()): 
-                        $profilePic = !empty($comment['Donor_ProfilePicture']) ? $comment['Donor_ProfilePicture'] : 'images/default-avatar.png';
-                    ?>
+                    <?php while($comment = $comments_result->fetch_assoc()): ?>
                     <div class="comment-item">
-                        <img src="<?php echo htmlspecialchars($profilePic); ?>" class="comment-avatar" onerror="this.src='images/default-avatar.png'">
                         <div class="comment-body">
                             <h4>
                                 <?php echo htmlspecialchars($comment['Donor_Name']); ?>
