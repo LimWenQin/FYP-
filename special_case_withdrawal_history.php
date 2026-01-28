@@ -316,7 +316,7 @@ function buildUrl($params = []) {
                                     if ($st == 'Approved' || $st == 'Completed') $stClass = 'st-approved';
                                     elseif ($st == 'Rejected') $stClass = 'st-rejected';
                                 ?>
-                                <tr class="clickable-row" onclick="window.open('admin_withdrawal_details.php?id=<?php echo $w['Withdrawal_ID']; ?>', '_blank')">
+                                <tr class="clickable-row" onclick="window.location.href='admin_withdrawal_details.php?id=<?php echo $w['Withdrawal_ID']; ?>'">
                                     <td>
                                         <div style="font-weight:600;"><?php echo date('d M Y', strtotime($w['Request_Date'])); ?></div>
                                         <div class="sub-text"><?php echo date('h:i A', strtotime($w['Request_Date'])); ?></div>

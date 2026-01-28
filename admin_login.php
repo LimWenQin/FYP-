@@ -1,35 +1,40 @@
 <?php
+// admin_login.php
 session_start();
 include 'dataconnection.php';
 
 // 设置默认时区
 date_default_timezone_set('Asia/Kuala_Lumpur'); 
 
-// --- 逻辑修改 1: 处理 Email 显示逻辑 (优先显示刚才输入的，其次显示Cookie) ---
+// --- 逻辑修改 1: 处理 Email 显示逻辑 ---
 $display_email = "";
-
-// 如果有 Cookie，先赋值给 display_email
 if (isset($_COOKIE['admin_remember_email'])) {
     $display_email = $_COOKIE['admin_remember_email'];
 }
+
+$error = ""; // 初始化错误信息
 
 // 处理登录逻辑
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
     $email = mysqli_real_escape_string($conn, $_POST['email']);
     $password = $_POST['password']; 
     
-    // --- 逻辑修改 2: 如果用户刚刚提交了表单，无论对错，页面刷新后输入框都应该保留这个 Email ---
+    // 保留输入的 Email
     $display_email = $email;
 
     // 检查是否勾选 Remember Me
     if (isset($_POST['remember'])) {
         setcookie('admin_remember_email', $email, time() + (86400 * 30), "/");
     } else {
-        // 如果没勾选且登录成功(或者仅仅是为了清除旧cookie)，可以在这里清除
         if (isset($_COOKIE['admin_remember_email'])) {
             setcookie('admin_remember_email', '', time() - 3600, "/");
         }
     }
+
+    // --- 全局冻结参数 ---
+    $max_attempts = 5;
+    $lockout_time = 30 * 60; // 30分钟
+    $current_time = time();
 
     // --- 1. 优先查找 Admin 表 ---
     $sql_admin = "SELECT * FROM admin WHERE Admin_Email = '$email' AND Is_Deleted = 0";
@@ -40,13 +45,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
         $row = mysqli_fetch_assoc($result_admin);
         $admin_id = $row['Admin_ID'];
         
-        // --- 检查是否被冻结 (Admin Only Logic) ---
-        $max_attempts = 5;
-        $lockout_time = 30 * 60; // 30分钟
+        // --- [Admin] 检查是否被冻结 ---
         $attempts = $row['Admin_LoginAttempts'];
-        
         $last_failed = $row['Admin_LastFailedLogin'] ? strtotime($row['Admin_LastFailedLogin']) : 0;
-        $current_time = time();
 
         // 如果错误次数 >= 5，检查时间差
         if ($attempts >= $max_attempts) {
@@ -57,14 +58,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
                 $remaining_minutes = ceil(($lockout_time - $time_since_last_fail) / 60);
                 $error = "Account locked. Please try again in $remaining_minutes minutes.";
             } else {
-                // 冻结时间已过，自动解冻 (重置 DB)
+                // 冻结时间已过，自动解冻
                 mysqli_query($conn, "UPDATE admin SET Admin_LoginAttempts = 0 WHERE Admin_ID = $admin_id");
                 $attempts = 0; 
             }
         }
 
         // 如果没有报错 (没被冻结)，验证密码
-        if (!isset($error)) {
+        if (empty($error)) {
             if (password_verify($password, $row['Admin_Password'])) { 
                 // --- Admin 登录成功 ---
                 $_SESSION['admin_id'] = $row['Admin_ID'];
@@ -72,7 +73,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
                 $_SESSION['admin_email'] = $row['Admin_Email'];
                 $_SESSION['role'] = 'Admin';
                 
-                // 重置错误次数为 0，并更新最后登录时间
+                // 重置错误次数
                 mysqli_query($conn, "UPDATE admin SET Admin_LastLogin = NOW(), Admin_LoginAttempts = 0 WHERE Admin_ID = $admin_id");
                 
                 header("Location: admin_dashboard.php");
@@ -80,8 +81,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
             } else {
                 // --- Admin 密码错误 ---
                 $attempts++;
-                
-                // 更新数据库
                 mysqli_query($conn, "UPDATE admin SET Admin_LoginAttempts = $attempts, Admin_LastFailedLogin = NOW() WHERE Admin_ID = $admin_id");
 
                 if ($attempts >= $max_attempts) {
@@ -94,31 +93,62 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
         }
     } else {
         // --- 2. Admin 表没找到，检查 Staff 表 ---
-        // 只允许 Is_Deleted = 0 (未被 Block) 且 Staff_Status = 'Active' 的员工登录
         $sql_staff = "SELECT * FROM staff WHERE Staff_Email = '$email' AND Is_Deleted = 0 AND Staff_Status = 'Active'";
         $result_staff = mysqli_query($conn, $sql_staff);
 
         if (mysqli_num_rows($result_staff) > 0) {
             // === 是 Staff ===
             $row = mysqli_fetch_assoc($result_staff);
+            $staff_id = $row['Staff_ID'];
 
-            if (password_verify($password, $row['Staff_Password'])) {
-                // --- Staff 登录成功 ---
-                $_SESSION['staff_id'] = $row['Staff_ID'];
-                $_SESSION['staff_name'] = $row['Staff_FullName'];
-                $_SESSION['role'] = 'Staff';
+            // --- [Staff] 检查是否被冻结 (新增逻辑) ---
+            // 注意：请确保数据库 staff 表中有 Staff_LoginAttempts 和 Staff_LastFailedLogin 字段
+            $attempts = isset($row['Staff_LoginAttempts']) ? $row['Staff_LoginAttempts'] : 0;
+            $last_failed = isset($row['Staff_LastFailedLogin']) ? strtotime($row['Staff_LastFailedLogin']) : 0;
 
-                // --- 关键修改：检查是否第一次登录 ---
-                if ($row['Staff_IsFirstLogin'] == 1) {
-                    // 设置 Flag，admin_dashboard.php 会捕捉到并弹出 Modal
-                    $_SESSION['is_first_login'] = true; 
+            if ($attempts >= $max_attempts) {
+                $time_since_last_fail = $current_time - $last_failed;
+                
+                if ($time_since_last_fail < $lockout_time) {
+                    // 还在冻结期内
+                    $remaining_minutes = ceil(($lockout_time - $time_since_last_fail) / 60);
+                    $error = "Account locked. Please try again in $remaining_minutes minutes.";
+                } else {
+                    // 冻结时间已过，自动解冻
+                    mysqli_query($conn, "UPDATE staff SET Staff_LoginAttempts = 0 WHERE Staff_ID = $staff_id");
+                    $attempts = 0; 
                 }
+            }
 
-                header("Location: admin_dashboard.php");
-                exit();
-            } else {
-                // Staff 密码错误
-                $error = "Incorrect password.";
+            // [Staff] 验证密码
+            if (empty($error)) {
+                if (password_verify($password, $row['Staff_Password'])) {
+                    // --- Staff 登录成功 ---
+                    $_SESSION['staff_id'] = $row['Staff_ID'];
+                    $_SESSION['staff_name'] = $row['Staff_FullName'];
+                    $_SESSION['role'] = 'Staff';
+
+                    if ($row['Staff_IsFirstLogin'] == 1) {
+                        $_SESSION['is_first_login'] = true; 
+                    }
+
+                    // 重置错误次数
+                    mysqli_query($conn, "UPDATE staff SET Staff_LoginAttempts = 0 WHERE Staff_ID = $staff_id");
+
+                    header("Location: admin_dashboard.php");
+                    exit();
+                } else {
+                    // --- Staff 密码错误 ---
+                    $attempts++;
+                    mysqli_query($conn, "UPDATE staff SET Staff_LoginAttempts = $attempts, Staff_LastFailedLogin = NOW() WHERE Staff_ID = $staff_id");
+
+                    if ($attempts >= $max_attempts) {
+                        $error = "Account locked for 30 minutes due to 5 failed attempts.";
+                    } else {
+                        $remaining_attempts = $max_attempts - $attempts;
+                        $error = "Incorrect password. You have $remaining_attempts attempts remaining.";
+                    }
+                }
             }
         } else {
             // 两个表都没找到
@@ -138,10 +168,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; transition: background-color 0.8s ease, color 0.5s ease, border-color 0.5s ease; }
         
-        /* Updated Default Root Variables (Removed Stray Theme) */
         :root { --bg-color: #EFF6FF; --accent-color: #2563EB; --text-color: #5D4037; }
         
-        /* Theme Classes */
         body.theme-disabled { --bg-color: #EFF6FF; --accent-color: #2563EB; } 
         body.theme-orphan { --bg-color: #FFF1F2; --accent-color: #E11D48; }   
         body.theme-senior { --bg-color: #F0FDF4; --accent-color: #16A34A; }   
@@ -195,7 +223,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
         .login-btn { width: 100%; padding: 12px; border: none; border-radius: 8px; background-color: var(--accent-color); color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: background-color 0.5s ease; z-index: 2; position: relative; }
         .login-btn:hover { opacity: 0.9; }
         .footer-text { margin-top: auto; text-align: center; font-size: 10px; color: #aaa; z-index: 2; position: relative; }
-        .alert { padding: 10px; background: #fee2e2; color: #b91c1c; border-radius: 5px; font-size: 12px; margin-bottom: 15px; text-align: center; z-index: 2; position: relative; }
 
         .decor-shape { position: absolute; border-radius: 50%; background-color: var(--accent-color); opacity: 0.1; z-index: 1; filter: blur(40px); }
         .shape-1 { width: 300px; height: 300px; top: -100px; right: -100px; animation: float 6s ease-in-out infinite; }
@@ -205,9 +232,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(20px); } 100% { transform: translateY(0px); } }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+        /* --- Custom Floating Alert Styles (Only for Validation) --- */
+        .custom-alert { position: fixed; top: 20px; right: 20px; background: white; border-left: 5px solid; padding: 15px 20px; border-radius: 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 12px; z-index: 9999; transform: translateX(120%); transition: transform 0.3s ease-out; max-width: 350px; }
+        .custom-alert.show { transform: translateX(0); }
+        .custom-alert.error { border-color: #dc3545; } .custom-alert.error i { color: #dc3545; }
+        .alert-content h4 { margin: 0 0 5px; font-size: 14px; color: #333; } .alert-content p { margin: 0; font-size: 13px; color: #666; }
+
+        /* --- New: Inline Form Error Styles --- */
+        .error-message {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            animation: fadeIn 0.3s ease;
+        }
     </style>
 </head>
-<body class="theme-disabled"> <ul class="bg-circles">
+<body class="theme-disabled"> 
+    
+    <div id="customAlert" class="custom-alert"><i class="fas" id="alertIcon"></i><div class="alert-content"><h4 id="alertTitle">Title</h4><p id="alertMessage">Message</p></div></div>
+
+    <ul class="bg-circles">
         <li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li>
     </ul>
 
@@ -255,12 +309,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
             <h1>Welcome Back</h1>
             <p class="welcome-text">Login to access your dashboard.</p>
             
-            <?php if(isset($error)) { echo "<div class='alert'>$error</div>"; } ?>
-
-            <form action="" method="POST">
+            <form action="" method="POST" id="loginForm" novalidate onsubmit="return validateLogin(event)">
                 <div class="input-group">
                     <i class="fas fa-envelope"></i>
-                    <input type="email" name="email" placeholder="Email Address" required value="<?php echo htmlspecialchars($display_email); ?>">
+                    <input type="email" name="email" id="email" placeholder="Email Address" required value="<?php echo htmlspecialchars($display_email); ?>">
                 </div>
                 <div class="input-group">
                     <i class="fas fa-lock"></i>
@@ -273,6 +325,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
                     </label>
                     <a href="admin_forgot_password.php">Forgot Password?</a>
                 </div>
+
+                <?php if(!empty($error)): ?>
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-circle"></i> <?php echo $error; ?>
+                    </div>
+                <?php endif; ?>
+
                 <button type="submit" name="login_btn" class="login-btn">Login</button>
             </form>
             <div class="footer-text">© 2025 Love Bridge. Compassion in action.</div>
@@ -306,6 +365,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_btn'])) {
             } else {
                 pwdInput.type = 'password'; icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye');
             }
+        }
+
+        // --- Custom Alert Function (Only for Empty Input Validation) ---
+        function showSystemAlert(message, type = 'error') {
+            const alertBox = document.getElementById('customAlert');
+            const alertIcon = document.getElementById('alertIcon');
+            const alertTitle = document.getElementById('alertTitle');
+            const alertMsg = document.getElementById('alertMessage');
+            
+            alertBox.className = 'custom-alert ' + type;
+            if (type === 'error') { 
+                alertIcon.className = 'fas fa-exclamation-circle'; 
+                alertTitle.innerText = 'Error'; 
+            } else { 
+                alertIcon.className = 'fas fa-check-circle'; 
+                alertTitle.innerText = 'Success'; 
+            }
+            
+            alertMsg.innerText = message;
+            alertBox.classList.add('show');
+            setTimeout(() => { alertBox.classList.remove('show'); }, 4000);
+        }
+
+        // --- Validation Logic (Client Side) ---
+        function validateLogin(event) {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            if (!email || !password) {
+                // Prevent form submission
+                event.preventDefault(); 
+                // Show custom alert instead of browser tooltip (Top Right)
+                showSystemAlert('Please fill in both Email and Password.', 'error');
+                return false;
+            }
+            return true;
         }
     </script>
 </body>

@@ -83,7 +83,7 @@ $result = $conn->query($sql);
 
         <div class="dashboard-content">
             <div class="page-header-compact">
-                <a href="special_case_management.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Special Case Management</a>
+                <a href="special_case_management.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Special Case </a>
                 <div class="header-title">
                     <h1>Case Comments</h1>
                     <p><?php echo htmlspecialchars($caseTitle); ?></p>
