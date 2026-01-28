@@ -21,25 +21,25 @@ $caseId = intval($_GET['case_id']);
 $caseRes = $conn->query("SELECT Case_Title FROM special_case WHERE Case_ID = $caseId");
 $caseTitle = ($caseRes->num_rows > 0) ? $caseRes->fetch_assoc()['Case_Title'] : "Unknown Case";
 
-// --- 1. 获取筛选和排序参数 ---
+// --- 1. Get Filter & Sort Parameters ---
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $sort = isset($_GET['sort']) ? $_GET['sort'] : 'date'; 
 $order = isset($_GET['order']) ? $_GET['order'] : 'desc'; 
 
-// 日期特定筛选
+// Date Specific Filters
 $filterDate = isset($_GET['f_date']) ? $_GET['f_date'] : '';
 $filterMonth = isset($_GET['f_month']) ? $_GET['f_month'] : '';
 $filterYear = isset($_GET['f_year']) ? $_GET['f_year'] : '';
 
-// 支付方式筛选
+// Payment Method Filter
 $filterMethod = isset($_GET['f_method']) ? $_GET['f_method'] : '';
 
-// 金额范围筛选
+// Amount Range Filter
 $minAmount = isset($_GET['min_amount']) && $_GET['min_amount'] !== '' ? floatval($_GET['min_amount']) : '';
 $maxAmount = isset($_GET['max_amount']) && $_GET['max_amount'] !== '' ? floatval($_GET['max_amount']) : '';
 
-// --- 2. 构建 SQL 查询 ---
-// 注意：Special Case History 通常只显示成功的捐款
+// --- 2. Build SQL Query ---
+// Note: Special Case History typically shows only successful donations
 $whereClauses = ["o.Case_ID = $caseId", "(o.Order_Status = 'Completed' OR o.Order_Status = 'Success')"];
 
 if ($search) {
@@ -47,7 +47,7 @@ if ($search) {
     $whereClauses[] = "(d.Donor_Name LIKE '%$s%' OR o.Order_ID LIKE '%$s%' OR o.Order_TXN_Ref LIKE '%$s%' OR d.Donor_Email LIKE '%$s%')";
 }
 
-// 日期/月份/年份 筛选逻辑
+// Date/Month/Year Logic
 if ($filterDate) {
     $whereClauses[] = "DATE(o.Order_Created_At) = '$filterDate'";
 } elseif ($filterMonth && $filterYear) {
@@ -58,10 +58,10 @@ if ($filterDate) {
     $whereClauses[] = "YEAR(o.Order_Created_At) = '$filterYear'";
 }
 
-// 支付方式筛选
+// Payment Method Filter
 if ($filterMethod) {
     $fm = $conn->real_escape_string($filterMethod);
-    // 同时检查 payment 表和 orders 表，确保覆盖所有情况
+    // Check both payment table and orders table to ensure coverage
     $whereClauses[] = "(p.Payment_Method = '$fm' OR o.Order_PaymentMethod = '$fm')";
 }
 
@@ -72,31 +72,31 @@ if ($maxAmount !== '') {
     $whereClauses[] = "o.Order_Amount <= $maxAmount";
 }
 
-// 核心修复：定义 Display_Method 逻辑用于排序
-// 如果 payment 表中是空的，则使用 orders 表中的 Order_PaymentMethod
+// Core Fix: Define Display_Method Logic for sorting
+// If payment table is empty, use orders table Order_PaymentMethod
 $methodColumnSQL = "COALESCE(NULLIF(p.Payment_Method, ''), o.Order_PaymentMethod)";
 
-// 排序字段映射
+// Sort Field Mapping
 $sortMap = [
     'date' => 'o.Order_Created_At',
     'amount' => 'o.Order_Amount',
     'name' => 'd.Donor_Name',
     'donor' => 'd.Donor_Name', 
-    'method' => 'Display_Method' // 现在支持按 Method 排序
+    'method' => 'Display_Method' // Now supports sorting by Method
 ];
 $orderBy = isset($sortMap[$sort]) ? $sortMap[$sort] : 'o.Order_Created_At';
 $orderDir = ($order === 'asc') ? 'ASC' : 'DESC';
 
 $whereSql = implode(' AND ', $whereClauses);
 
-// 分页
+// Pagination
 $limit = 10; 
 $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
 if ($page < 1) $page = 1;
 $offset = ($page - 1) * $limit;
 
-// 主查询
-// 这里使用了 COALESCE 来修复 "N/A" 问题
+// Main Query
+// Using COALESCE to fix "N/A" issue
 $sql = "SELECT o.Order_ID, o.Order_Created_At, o.Order_Amount, o.Order_TXN_Ref, o.Order_Status,
                d.Donor_Name, d.Donor_Email, 
                $methodColumnSQL as Display_Method
@@ -113,7 +113,7 @@ if ($result) {
     while($row = $result->fetch_assoc()) $donations[] = $row;
 }
 
-// 总数查询 (用于分页)
+// Count Query (For Pagination)
 $countSql = "SELECT COUNT(*) as total 
              FROM orders o 
              JOIN donor d ON o.Donor_ID = d.Donor_ID 
@@ -123,7 +123,7 @@ $countRes = $conn->query($countSql);
 $totalRows = $countRes->fetch_assoc()['total'];
 $totalPages = ceil($totalRows / $limit);
 
-// 总捐款统计 (基于当前筛选)
+// Total Sum Statistics (Based on current filter)
 $sumSql = "SELECT SUM(o.Order_Amount) as total_sum
            FROM orders o 
            JOIN donor d ON o.Donor_ID = d.Donor_ID 
@@ -139,7 +139,7 @@ $start_record = ($total_records > 0) ? $offset + 1 : 0;
 $end_record = min($offset + $limit, $total_records);
 $totalRaised = $totalAmountFiltered;
 
-// 辅助数据 for UI
+// Helper Data for UI
 $years = range(date('Y'), 2023); 
 $months = [
     '1' => 'January', '2' => 'February', '3' => 'March', '4' => 'April',
@@ -147,7 +147,7 @@ $months = [
     '9' => 'September', '10' => 'October', '11' => 'November', '12' => 'December'
 ];
 
-// URL 构建函数
+// URL Builder Function
 function buildUrl($params = []) {
     $current = $_GET;
     $merged = array_merge($current, $params);
@@ -236,9 +236,9 @@ function buildUrl($params = []) {
     <div class="main-content" id="mainContent">
         <?php include 'admin_header.php'; ?>
 
-        <div class="dashboard-content" style="padding-top: 10px;">
+        <div class="dashboard-content">
             <div class="page-header-compact">
-                <a href="#" onclick="window.close(); return false;" class="back-btn"><i class="fas fa-arrow-left"></i> Back </a>
+                <a href="special_case_management.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Special Case Management</a>
                 <div class="header-title">
                     <h1>Donation History</h1>
                     <p>Case: <?php echo htmlspecialchars($caseTitle); ?></p>

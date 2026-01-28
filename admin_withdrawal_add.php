@@ -380,6 +380,9 @@ while($c = $cases->fetch_assoc()) {
                             <label class="form-label">Account Number</label>
                             <input type="text" name="bank_account" id="bank_account" class="form-input" readonly style="background-color: #f8f9fa;">
                             <span class="form-guide">Verify this matches the physical documents.</span>
+                            <a href="https://www.cimbclicks.com.my/" target="_blank" style="display:inline-block; margin-top:5px; font-size:12px; color:#d32f2f; font-weight:600; text-decoration:none;">
+                                <i class="fas fa-external-link-alt"></i> Go to CIMB Clicks
+                            </a>
                         </div>
                     </div>
 

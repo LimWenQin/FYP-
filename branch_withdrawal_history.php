@@ -16,34 +16,34 @@ if (!isset($_GET['branch_id'])) {
 
 $branchId = intval($_GET['branch_id']);
 
-// --- 1. 获取分行信息 ---
+// --- 1. Get Branch Info ---
 $branchSql = "SELECT Branch_Name FROM branch WHERE Branch_ID = $branchId";
 $branchRes = $conn->query($branchSql);
 if ($branchRes->num_rows == 0) die("Branch not found.");
 $branchRow = $branchRes->fetch_assoc();
 $branchName = $branchRow['Branch_Name'];
 
-// --- 2. 获取筛选和排序参数 ---
+// --- 2. Get Filter and Sort Parameters ---
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $sort = isset($_GET['sort']) ? $_GET['sort'] : 'date'; 
 $order = isset($_GET['order']) ? $_GET['order'] : 'desc'; 
 
-// 日期筛选
+// Date Filter
 $filterDate = isset($_GET['f_date']) ? $_GET['f_date'] : '';
 $filterMonth = isset($_GET['f_month']) ? $_GET['f_month'] : '';
 $filterYear = isset($_GET['f_year']) ? $_GET['f_year'] : '';
 
-// 状态筛选
+// Status Filter
 $filterStatus = isset($_GET['f_status']) ? $_GET['f_status'] : [];
 if (is_string($filterStatus)) $filterStatus = $filterStatus === '' ? [] : explode(',', $filterStatus);
 
-// 金额筛选
+// Amount Filter
 $minAmount = isset($_GET['min_amount']) && $_GET['min_amount'] !== '' ? floatval($_GET['min_amount']) : '';
 $maxAmount = isset($_GET['max_amount']) && $_GET['max_amount'] !== '' ? floatval($_GET['max_amount']) : '';
 
-// --- 3. 统计逻辑 (Branch Only) ---
+// --- 3. Statistics Logic (Branch Only) ---
 
-// 3.1 Total Raised (只算直接捐给 Branch 的)
+// 3.1 Total Raised (Only directly donated to Branch)
 $sqlRaised = "SELECT SUM(Order_Amount) as total 
               FROM orders o
               WHERE o.Branch_ID = $branchId 
@@ -53,7 +53,7 @@ $sqlRaised = "SELECT SUM(Order_Amount) as total
 $raisedRes = $conn->query($sqlRaised);
 $totalRaised = floatval($raisedRes->fetch_assoc()['total'] ?? 0);
 
-// 3.2 Total Withdrawn (只算 Branch 自身的提款)
+// 3.2 Total Withdrawn (Only Branch's own withdrawals)
 $sqlWithdrawn = "SELECT SUM(Amount) as total 
                  FROM withdrawals w
                  WHERE w.Branch_ID = $branchId 
@@ -67,7 +67,7 @@ $totalWithdrawn = floatval($withdrawnRes->fetch_assoc()['total'] ?? 0);
 $availableBalance = $totalRaised - $totalWithdrawn;
 
 
-// --- 4. 构建列表查询条件 ---
+// --- 4. Build List Query Conditions ---
 $conditions = [];
 $conditions[] = "w.Branch_ID = $branchId";
 $conditions[] = "w.Activity_ID IS NULL"; 
@@ -78,7 +78,7 @@ if (!empty($search)) {
     $conditions[] = "(ad.Admin_Name LIKE '%$s%' OR w.Withdrawal_ID LIKE '%$s%')";
 }
 
-// 日期筛选
+// Date Filter
 if (!empty($filterDate)) {
     $d = $conn->real_escape_string($filterDate);
     $conditions[] = "DATE(w.Request_Date) = '$d'";
@@ -93,7 +93,7 @@ if (!empty($filterDate)) {
     }
 }
 
-// 状态筛选
+// Status Filter
 if (!empty($filterStatus)) {
     $validStatuses = array_filter($filterStatus, function($v) { return $v !== '' && $v !== 'All'; });
     if (!empty($validStatuses)) {
@@ -102,7 +102,7 @@ if (!empty($filterStatus)) {
     }
 }
 
-// 金额筛选
+// Amount Filter
 if ($minAmount !== '') {
     $conditions[] = "w.Amount >= $minAmount";
 }
@@ -112,7 +112,7 @@ if ($maxAmount !== '') {
 
 $whereSql = "WHERE " . implode(" AND ", $conditions);
 
-// --- 5. 分页 ---
+// --- 5. Pagination ---
 $results_per_page = 10;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) $page = 1;
@@ -128,7 +128,7 @@ if ($page > $total_pages && $total_pages > 0) {
     $start_from = ($page - 1) * $results_per_page;
 }
 
-// --- 6. 数据查询 ---
+// --- 6. Data Query ---
 $sortMap = ['date' => 'w.Request_Date', 'requester' => 'ad.Admin_Name', 'status' => 'w.Status', 'amount' => 'w.Amount'];
 $orderByCol = isset($sortMap[$sort]) ? $sortMap[$sort] : 'w.Request_Date';
 $orderDir = ($order === 'asc') ? 'ASC' : 'DESC';
@@ -149,7 +149,7 @@ if ($result) {
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
 $end_record = min($start_from + $results_per_page, $total_records);
 
-// 辅助数据
+// Auxiliary Data
 $years = range(date('Y'), 2023); 
 $months = [1=>'January', 2=>'February', 3=>'March', 4=>'April', 5=>'May', 6=>'June', 7=>'July', 8=>'August', 9=>'September', 10=>'October', 11=>'November', 12=>'December'];
 $allStatuses = ['Pending', 'Approved', 'Completed', 'Rejected'];
@@ -254,7 +254,7 @@ function buildUrl($params = []) {
 
         <div class="dashboard-content" style="padding-top: 10px;">
             <div class="page-header-compact">
-                <a href="#" onclick="window.close(); return false;" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Branch</a>
+                <a href="branch_management_page.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
                 <div class="header-title">
                     <h1>Withdrawal History</h1>
                     <p><?php echo htmlspecialchars($branchName); ?></p>
@@ -331,7 +331,7 @@ function buildUrl($params = []) {
                                     if ($st == 'Approved' || $st == 'Completed') $stClass = 'st-approved';
                                     elseif ($st == 'Rejected') $stClass = 'st-rejected';
                                 ?>
-                                <tr class="clickable-row" onclick="window.open('admin_withdrawal_details.php?id=<?php echo $w['Withdrawal_ID']; ?>', '_blank')">
+                                <tr class="clickable-row" onclick="window.location.href='admin_withdrawal_details.php?id=<?php echo $w['Withdrawal_ID']; ?>'">
                                     <td>
                                         <div style="font-weight:600;"><?php echo date('d M Y', strtotime($w['Request_Date'])); ?></div>
                                         <div class="sub-text"><?php echo date('h:i A', strtotime($w['Request_Date'])); ?></div>

@@ -105,6 +105,19 @@ $f_min    = isset($_GET['f_min']) ? $_GET['f_min'] : '';
 $f_max    = isset($_GET['f_max']) ? $_GET['f_max'] : '';
 $f_method = isset($_GET['f_method']) ? $_GET['f_method'] : '';
 
+// Determine active filter type for UI display
+$filterType = "";
+if (isset($_GET['filter_type'])) {
+    $filterType = $_GET['filter_type'];
+} else {
+    // Auto-detect if parameters are present to keep the UI open
+    if ($f_date_y || $f_date_m || $f_date_d) $filterType = 'date';
+    elseif (!empty($f_role)) $filterType = 'role';
+    elseif ($f_target) $filterType = 'target';
+    elseif ($f_min || $f_max) $filterType = 'amount';
+    elseif ($f_method) $filterType = 'method';
+}
+
 $limit = 5; 
 $page_tx = isset($_GET['page_tx']) && is_numeric($_GET['page_tx']) ? (int)$_GET['page_tx'] : 1;
 if ($page_tx < 1) $page_tx = 1;
@@ -321,7 +334,17 @@ $chartData = getMonthlyRevenueChartData($conn);
         .btn-withdraw { background-color: #fd7e14; color: white; border: none; padding: 8px 15px; border-radius: 5px; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; transition: background 0.3s; text-decoration: none; margin-right: 8px; }
         .btn-withdraw:hover { background-color: #e6700c; color: white; }
 
+        /* Updated Search & Filter Container */
         .admin-search-container { display: flex; gap: 10px; align-items: center; background: #f8f9fa; padding: 10px 15px; border-radius: 8px; border: 1px solid #eee; flex-wrap: wrap; width: 100%; margin-top: 15px; box-sizing: border-box; }
+        
+        /* New Filter Styles (Matches Admin Management) */
+        .filter-group { display: flex; align-items: center; gap: 8px; }
+        .filter-select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; background-color: white; color: #555; outline: none; cursor: pointer; font-size: 13px; min-width: 130px; }
+        .filter-select:focus { border-color: var(--primary); }
+        .secondary-filter { display: none; animation: fadeIn 0.3s; }
+        .secondary-filter.active { display: block; display: flex; gap: 5px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
         .search-input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; outline: none; background: white; min-width: 200px; font-size: 13px; }
         .search-input:focus { border-color: var(--primary); }
         .btn-search { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px; display:flex; align-items:center; gap:5px; }
@@ -458,17 +481,70 @@ $chartData = getMonthlyRevenueChartData($conn);
                     <input type="hidden" name="sort" value="<?php echo $sort; ?>">
                     <input type="hidden" name="order" value="<?php echo $order; ?>">
                     
-                    <input type="hidden" name="f_date_y" value="<?php echo $f_date_y; ?>">
-                    <input type="hidden" name="f_date_m" value="<?php echo $f_date_m; ?>">
-                    <input type="hidden" name="f_date_d" value="<?php echo $f_date_d; ?>">
-                    <?php if(!empty($f_role)): foreach($f_role as $r): ?>
-                        <input type="hidden" name="f_role[]" value="<?php echo htmlspecialchars($r); ?>">
-                    <?php endforeach; endif; ?>
-                    
-                    <input type="hidden" name="f_target" value="<?php echo $f_target; ?>">
-                    <input type="hidden" name="f_min" value="<?php echo $f_min; ?>">
-                    <input type="hidden" name="f_max" value="<?php echo $f_max; ?>">
-                    <input type="hidden" name="f_method" value="<?php echo $f_method; ?>">
+                    <div class="filter-group">
+                        <i class="fas fa-filter" style="color:#666; margin-right:5px;"></i>
+                        <select name="filter_type" id="filterType" class="filter-select" onchange="toggleFilterInputs()">
+                            <option value="">Filter By...</option>
+                            <option value="date" <?php if($filterType == 'date') echo 'selected'; ?>>Date</option>
+                            <option value="role" <?php if($filterType == 'role') echo 'selected'; ?>>Role</option>
+                            <option value="target" <?php if($filterType == 'target') echo 'selected'; ?>>Target Type</option>
+                            <option value="amount" <?php if($filterType == 'amount') echo 'selected'; ?>>Amount</option>
+                            <option value="method" <?php if($filterType == 'method') echo 'selected'; ?>>Payment Method</option>
+                        </select>
+                    </div>
+
+                    <div id="filter_date_container" class="secondary-filter">
+                        <select name="f_date_y" id="main_f_date_y" class="filter-select" style="width: 80px; min-width:80px;" onchange="updateDays('main_f_date_y', 'main_f_date_m', 'main_f_date_d')">
+                            <option value="">Year...</option>
+                            <?php 
+                            $currentYear = date('Y');
+                            for($y = 2021; $y <= $currentYear + 1; $y++) {
+                                $sel = ($f_date_y == $y) ? 'selected' : '';
+                                echo "<option value='$y' $sel>$y</option>";
+                            }
+                            ?>
+                        </select>
+                        <select name="f_date_m" id="main_f_date_m" class="filter-select" style="width: 100px; min-width:100px;" onchange="updateDays('main_f_date_y', 'main_f_date_m', 'main_f_date_d')">
+                            <option value="">Month...</option>
+                            <?php for($m=1; $m<=12; $m++): ?>
+                                <option value="<?php echo $m; ?>" <?php echo ($f_date_m==$m)?'selected':''; ?>><?php echo date('M', mktime(0,0,0,$m,10)); ?></option>
+                            <?php endfor; ?>
+                        </select>
+                        <input type="number" name="f_date_d" id="main_f_date_d" placeholder="Day" class="filter-select" style="width: 60px; min-width:60px;" value="<?php echo $f_date_d; ?>" min="1" max="31">
+                    </div>
+
+                    <div id="filter_role_container" class="secondary-filter">
+                        <select name="f_role[]" class="filter-select">
+                            <option value="">Select Role...</option>
+                            <option value="Donor" <?php echo (in_array('Donor', $f_role)) ? 'selected' : ''; ?>>Donor</option>
+                            <option value="Admin" <?php echo (in_array('Admin', $f_role)) ? 'selected' : ''; ?>>Admin</option>
+                            <option value="Super Admin" <?php echo (in_array('Super Admin', $f_role)) ? 'selected' : ''; ?>>Super Admin</option>
+                        </select>
+                    </div>
+
+                    <div id="filter_target_container" class="secondary-filter">
+                        <select name="f_target" class="filter-select">
+                            <option value="">All Targets</option>
+                            <option value="branch" <?php echo ($f_target=='branch')?'selected':''; ?>>Branch</option>
+                            <option value="activity" <?php echo ($f_target=='activity')?'selected':''; ?>>Activity</option>
+                            <option value="case" <?php echo ($f_target=='case')?'selected':''; ?>>Special Case</option>
+                        </select>
+                    </div>
+
+                    <div id="filter_amount_container" class="secondary-filter">
+                        <input type="number" min="0" step="0.01" name="f_min" placeholder="Min RM" class="filter-select" style="width:80px; min-width:80px;" value="<?php echo $f_min; ?>">
+                        <input type="number" min="0" step="0.01" name="f_max" placeholder="Max RM" class="filter-select" style="width:80px; min-width:80px;" value="<?php echo $f_max; ?>">
+                    </div>
+
+                    <div id="filter_method_container" class="secondary-filter">
+                        <select name="f_method" class="filter-select">
+                            <option value="">All Methods</option>
+                            <option value="FPX" <?php echo ($f_method=='FPX')?'selected':''; ?>>FPX</option>
+                            <option value="Card" <?php echo ($f_method=='Card')?'selected':''; ?>>Credit/Debit Card</option>
+                            <option value="E-Wallet" <?php echo ($f_method=='E-Wallet')?'selected':''; ?>>E-Wallet</option>
+                            <option value="Bank Transfer" <?php echo ($f_method=='Bank Transfer')?'selected':''; ?>>Bank Transfer</option>
+                        </select>
+                    </div>
 
                     <input type="text" name="search_tx" class="search-input" placeholder="Search Ref, Name, Email, Method..." value="<?php echo htmlspecialchars($search_tx); ?>">
                     <button type="submit" class="btn-search"><i class="fas fa-search"></i> Search</button>
@@ -748,8 +824,8 @@ $chartData = getMonthlyRevenueChartData($conn);
 
                 <span class="modal-filter-label">Amount Range (RM):</span>
                 <div class="modal-row">
-                    <input type="number" step="0.01" name="f_min" placeholder="Min" class="modal-input" value="<?php echo $f_min; ?>">
-                    <input type="number" step="0.01" name="f_max" placeholder="Max" class="modal-input" value="<?php echo $f_max; ?>">
+                    <input type="number" min="0" step="0.01" name="f_min" placeholder="Min" class="modal-input" value="<?php echo $f_min; ?>">
+                    <input type="number" min="0" step="0.01" name="f_max" placeholder="Max" class="modal-input" value="<?php echo $f_max; ?>">
                 </div>
                 <button type="submit" class="modal-apply-btn">Apply Filter</button>
             </form>
@@ -848,6 +924,35 @@ $chartData = getMonthlyRevenueChartData($conn);
                 dayInput.max = 31;
             }
         }
+
+        // --- NEW Toggle Filter Inputs Logic ---
+        function toggleFilterInputs() {
+            const type = document.getElementById('filterType').value;
+            // Hide all secondary containers first
+            document.querySelectorAll('.secondary-filter').forEach(el => { 
+                el.classList.remove('active'); 
+                // We do NOT disable inputs here because this form submits everything.
+                // If we disable them, the values won't be sent.
+                // Instead, we just hide them visually.
+            });
+
+            if (type === 'date') {
+                document.getElementById('filter_date_container').classList.add('active');
+            } else if (type === 'role') {
+                document.getElementById('filter_role_container').classList.add('active');
+            } else if (type === 'target') {
+                document.getElementById('filter_target_container').classList.add('active');
+            } else if (type === 'amount') {
+                document.getElementById('filter_amount_container').classList.add('active');
+            } else if (type === 'method') {
+                document.getElementById('filter_method_container').classList.add('active');
+            }
+        }
+
+        // Run on load to set initial state
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleFilterInputs();
+        });
     </script>
 </body>
 </html>

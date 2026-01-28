@@ -161,11 +161,15 @@ function buildUrl($params = []) {
 
         .history-container { background: white; border-radius: 10px; padding: 30px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); max-width: 1000px; margin: 0 auto 30px; }
 
-        /* Stats Cards */
-        .balance-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        /* Stats Cards - Updated to 3 Columns */
+        .balance-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px; }
         .b-card { padding: 20px; border-radius: 8px; color: white; display: flex; flex-direction: column; justify-content: center; position: relative; overflow: hidden; }
-        .b-card-1 { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2); }
-        .b-card-2 { background: linear-gradient(135deg, #F28585 0%, #ff9a9a 100%); box-shadow: 0 4px 15px rgba(242, 133, 133, 0.3); }
+        
+        /* Updated Card Colors to Match Special Case */
+        .b-card-1 { background: linear-gradient(135deg, #17a2b8 0%, #36b9cc 100%); box-shadow: 0 4px 15px rgba(23, 162, 184, 0.2); } /* Raised - Blue/Teal */
+        .b-card-2 { background: linear-gradient(135deg, #F28585 0%, #ff9a9a 100%); box-shadow: 0 4px 15px rgba(242, 133, 133, 0.3); } /* Withdrawn - Red/Pink */
+        .b-card-3 { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2); } /* Balance - Green */
+        
         .b-label { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; margin-bottom: 5px; }
         .b-val { font-size: 28px; font-weight: 700; }
         .b-icon { position: absolute; right: 20px; bottom: 20px; font-size: 40px; opacity: 0.2; }
@@ -253,14 +257,19 @@ function buildUrl($params = []) {
                 
                 <div class="balance-cards">
                     <div class="b-card b-card-1">
-                        <span class="b-label">Available Activity Fund</span>
-                        <span class="b-val">RM <?php echo number_format($availableBalance, 2); ?></span>
-                        <i class="fas fa-wallet b-icon"></i>
+                        <span class="b-label">Total Raised</span>
+                        <span class="b-val">RM <?php echo number_format($totalRaised, 2); ?></span>
+                        <i class="fas fa-hand-holding-usd b-icon"></i>
                     </div>
                     <div class="b-card b-card-2">
                         <span class="b-label">Total Withdrawn</span>
                         <span class="b-val">RM <?php echo number_format($totalWithdrawn, 2); ?></span>
                         <i class="fas fa-money-bill-wave b-icon"></i>
+                    </div>
+                    <div class="b-card b-card-3">
+                        <span class="b-label">Available Activity Fund</span>
+                        <span class="b-val">RM <?php echo number_format($availableBalance, 2); ?></span>
+                        <i class="fas fa-wallet b-icon"></i>
                     </div>
                 </div>
 
@@ -316,7 +325,7 @@ function buildUrl($params = []) {
                                     if ($st == 'Approved' || $st == 'Completed') $stClass = 'st-approved';
                                     elseif ($st == 'Rejected') $stClass = 'st-rejected';
                                 ?>
-                                <tr class="clickable-row" onclick="window.open('admin_withdrawal_details.php?id=<?php echo $w['Withdrawal_ID']; ?>', '_blank')">
+                                <tr class="clickable-row" onclick="window.location.href='admin_withdrawal_details.php?id=<?php echo $w['Withdrawal_ID']; ?>'">
                                     <td>
                                         <div style="font-weight:600;"><?php echo date('d M Y', strtotime($w['Request_Date'])); ?></div>
                                         <div class="sub-text"><?php echo date('h:i A', strtotime($w['Request_Date'])); ?></div>

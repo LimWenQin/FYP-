@@ -5,7 +5,8 @@ include 'dataconnection.php';
 
 $alertType = "";
 $alertMsg = "";
-$isValidRequest = true; // 标记请求是否有效
+$isValidRequest = true; // 标记请求是否有效 (Token是否存在且未过期)
+$updateSuccess = false; // 新增：标记是否更新成功
 
 // 使用 null coalescing operator 防止 undefined index warning
 $token = $_GET['token'] ?? '';
@@ -47,7 +48,7 @@ if ($isValidRequest && isset($_POST['update_password'])) {
         $alertType = "error";
         $alertMsg = "Passwords do not match.";
     } else {
-        // --- 关键修改：检查新密码是否与旧密码相同 ---
+        // 检查新密码是否与旧密码相同
         $check_old_sql = "SELECT Admin_Password FROM admin WHERE Admin_Email = '$email'";
         $old_res = mysqli_query($conn, $check_old_sql);
         
@@ -71,11 +72,8 @@ if ($isValidRequest && isset($_POST['update_password'])) {
                     
                     $alertType = "success";
                     $alertMsg = "Password updated successfully! Redirecting to login...";
-                    
-                    // 为了让用户看到成功提示，延迟跳转
-                    echo "<script>setTimeout(function(){ window.location.href = 'admin_login.php'; }, 3000);</script>";
-                    // 防止表单再次显示
-                    $isValidRequest = false; 
+                    $updateSuccess = true; // 标记成功
+                    $isValidRequest = false; // 隐藏表单
                 } else {
                     $alertType = "error";
                     $alertMsg = "Database error: " . mysqli_error($conn);
@@ -207,14 +205,6 @@ if ($isValidRequest && isset($_POST['update_password'])) {
             color: #198754; 
         }
 
-        /* Floating Alert Styles */
-        .floating-alert { position: fixed; top: 20px; right: 20px; padding: 15px 20px; border-radius: 5px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 1100; display: flex; align-items: flex-start; gap: 10px; max-width: 400px; animation: slideIn 0.3s; }
-        .floating-alert div { line-height: 1.6; font-size: 14px; }
-        .floating-alert i { margin-top: 4px; }
-        .floating-alert-success { background: white; color: #28a745; border-left: 4px solid #28a745; }
-        .floating-alert-danger { background: white; color: #dc3545; border-left: 4px solid #dc3545; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
         .btn-login {
             display: block;
             text-align: center;
@@ -225,66 +215,73 @@ if ($isValidRequest && isset($_POST['update_password'])) {
         }
         .btn-login:hover { text-decoration: underline; }
         
-        .error-placeholder {
+        .placeholder-box {
             text-align: center;
             padding: 20px;
             color: #555;
         }
+        
+        /* Custom Alert from Admin Donor Add */
+        .custom-alert { position: fixed; top: 20px; right: 20px; background: white; border-left: 5px solid; padding: 15px 20px; border-radius: 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 12px; z-index: 9999; transform: translateX(120%); transition: transform 0.3s ease-out; max-width: 350px; }
+        .custom-alert.show { transform: translateX(0); }
+        .custom-alert.error { border-color: #dc3545; } .custom-alert.error i { color: #dc3545; }
+        .custom-alert.success { border-color: #28a745; } .custom-alert.success i { color: #28a745; }
+        .alert-content h4 { margin: 0 0 5px; font-size: 14px; color: #333; } .alert-content p { margin: 0; font-size: 13px; color: #666; }
     </style>
 </head>
 <body>
     
-    <?php if ($alertMsg != ""): ?>
-    <div class="floating-alert <?php echo ($alertType == 'success') ? 'floating-alert-success' : 'floating-alert-danger'; ?>" id="systemAlert">
-        <i class="fas <?php echo ($alertType == 'success') ? 'fa-check-circle' : 'fa-exclamation-circle'; ?>"></i>
-        <div><?php echo $alertMsg; ?></div>
-    </div>
-    <script>
-        // Auto-hide alert after 5 seconds if not a critical request error
-        <?php if($isValidRequest || $alertType == 'success'): ?>
-        setTimeout(() => { 
-            const alert = document.getElementById('systemAlert'); 
-            if(alert) alert.style.display = 'none'; 
-        }, 5000);
-        <?php endif; ?>
-    </script>
-    <?php endif; ?>
+    <div id="customAlert" class="custom-alert"><i class="fas" id="alertIcon"></i><div class="alert-content"><h4 id="alertTitle">Title</h4><p id="alertMessage">Message</p></div></div>
 
     <div class="container">
         <h2>Reset Password</h2>
         
-        <?php if($isValidRequest): ?>
-        <form method="POST" id="resetForm">
-            
-            <div class="input-group">
-                <input type="password" name="pass1" id="pass1" placeholder="New Password" required>
-                <i class="fa fa-eye toggle-password" onclick="togglePassword('pass1', this)"></i>
+        <?php if($updateSuccess): ?>
+            <div class="placeholder-box">
+                <i class="fas fa-check-circle" style="font-size: 50px; color: #28a745; margin-bottom: 20px;"></i>
+                <p style="font-size: 18px; font-weight: 600;">All Set!</p>
+                <p>Your password has been successfully updated.</p>
+                <p style="font-size: 14px; color: #888;">Redirecting to login page...</p>
+                
+                <script>
+                    setTimeout(function(){ window.location.href = 'admin_login.php'; }, 3000);
+                </script>
             </div>
 
-            <div class="requirements-box">
-                <span class="requirements-title">Password must contain:</span>
-                <ul class="requirement-list">
-                    <li id="req-length"><i class="fas fa-times"></i> Between 8 and 15 characters</li>
-                    <li id="req-upper"><i class="fas fa-times"></i> At least one uppercase letter (A-Z)</li>
-                    <li id="req-lower"><i class="fas fa-times"></i> At least one lowercase letter (a-z)</li>
-                    <li id="req-number"><i class="fas fa-times"></i> At least one number (0-9)</li>
-                    <li id="req-special"><i class="fas fa-times"></i> At least one special character (!@#$%^&*)</li>
-                </ul>
-            </div>
+        <?php elseif($isValidRequest): ?>
+            <form method="POST" id="resetForm" novalidate>
+                
+                <div class="input-group">
+                    <input type="password" name="pass1" id="pass1" placeholder="New Password" required>
+                    <i class="fa fa-eye toggle-password" onclick="togglePassword('pass1', this)"></i>
+                </div>
 
-            <div class="input-group">
-                <input type="password" name="pass2" id="pass2" placeholder="Confirm Password" required>
-                <i class="fa fa-eye toggle-password" onclick="togglePassword('pass2', this)"></i>
-            </div>
-            
-            <div id="match-message" style="font-size:13px; margin-bottom:15px; display:none;"></div>
+                <div class="requirements-box">
+                    <span class="requirements-title">Password must contain:</span>
+                    <ul class="requirement-list">
+                        <li id="req-length"><i class="fas fa-times"></i> Between 8 and 15 characters</li>
+                        <li id="req-upper"><i class="fas fa-times"></i> At least one uppercase letter (A-Z)</li>
+                        <li id="req-lower"><i class="fas fa-times"></i> At least one lowercase letter (a-z)</li>
+                        <li id="req-number"><i class="fas fa-times"></i> At least one number (0-9)</li>
+                        <li id="req-special"><i class="fas fa-times"></i> At least one special character (!@#$%^&*)</li>
+                    </ul>
+                </div>
 
-            <button type="submit" name="update_password" id="submitBtn">Update Password</button>
-        </form>
+                <div class="input-group">
+                    <input type="password" name="pass2" id="pass2" placeholder="Confirm Password" required>
+                    <i class="fa fa-eye toggle-password" onclick="togglePassword('pass2', this)"></i>
+                </div>
+                
+                <div id="match-message" style="font-size:13px; margin-bottom:15px; display:none;"></div>
+
+                <button type="submit" name="update_password" id="submitBtn">Update Password</button>
+            </form>
+
         <?php else: ?>
-            <div class="error-placeholder">
+            <div class="placeholder-box">
                 <i class="fas fa-link-slash" style="font-size: 40px; color: #dc3545; margin-bottom: 15px;"></i>
                 <p>Wait... Something went wrong with your request.</p>
+                <p style="font-size: 13px;">The link may be invalid or has expired.</p>
                 <a href="admin_forgot_password.php" class="btn-login">Request New Link</a>
                 <a href="admin_login.php" class="btn-login" style="margin-top:10px; color:#666;">Back to Login</a>
             </div>
@@ -292,6 +289,32 @@ if ($isValidRequest && isset($_POST['update_password'])) {
     </div>
 
     <script>
+        // Custom Alert Function (Copied from admin_donor_add.php)
+        function showSystemAlert(message, type = 'error') {
+            const alertBox = document.getElementById('customAlert');
+            const alertIcon = document.getElementById('alertIcon');
+            const alertTitle = document.getElementById('alertTitle');
+            const alertMsg = document.getElementById('alertMessage');
+            
+            alertBox.className = 'custom-alert ' + type;
+            if (type === 'error') { 
+                alertIcon.className = 'fas fa-exclamation-circle'; 
+                alertTitle.innerText = 'Error'; 
+            } else { 
+                alertIcon.className = 'fas fa-check-circle'; 
+                alertTitle.innerText = 'Success'; 
+            }
+            
+            alertMsg.innerText = message;
+            alertBox.classList.add('show');
+            setTimeout(() => { alertBox.classList.remove('show'); }, 4000);
+        }
+
+        // Display PHP Alert via JS if exists
+        <?php if($alertMsg != ""): ?>
+            showSystemAlert("<?php echo addslashes($alertMsg); ?>", "<?php echo $alertType; ?>");
+        <?php endif; ?>
+
         // 切换密码显示/隐藏
         function togglePassword(inputId, icon) {
             const input = document.getElementById(inputId);
@@ -414,8 +437,11 @@ if ($isValidRequest && isset($_POST['update_password'])) {
 
                 if (!isFormatValid || !isMatch) {
                     e.preventDefault(); // 阻止提交
-                    if(!isMatch) alert("Passwords do not match.");
-                    else alert("Please fulfill all password requirements.");
+                    if(!isMatch) {
+                        showSystemAlert("Passwords do not match.", "error");
+                    } else {
+                        showSystemAlert("Please fulfill all password requirements.", "error");
+                    }
                 }
             });
         }

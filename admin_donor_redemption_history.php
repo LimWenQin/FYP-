@@ -22,7 +22,7 @@ $donorRes = $conn->query($donorSql);
 if ($donorRes->num_rows == 0) die("Donor not found.");
 $donorName = $donorRes->fetch_assoc()['Donor_Name'];
 
-// --- 1. 获取参数 ---
+// --- 1. Get Parameters ---
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $sort = isset($_GET['sort']) ? $_GET['sort'] : 'date';
 $order = isset($_GET['order']) ? $_GET['order'] : 'desc';
@@ -42,7 +42,7 @@ $filterStatus = isset($_GET['f_status']) ? $_GET['f_status'] : '';
 $minPoints = isset($_GET['min_points']) && $_GET['min_points'] !== '' ? intval($_GET['min_points']) : '';
 $maxPoints = isset($_GET['max_points']) && $_GET['max_points'] !== '' ? intval($_GET['max_points']) : '';
 
-// --- 2. 构建查询 ---
+// --- 2. Build Query ---
 $conditions = [];
 $conditions[] = "r.Donor_ID = $donorId";
 
@@ -200,7 +200,7 @@ function buildUrl($params = []) {
         <?php include 'admin_header.php'; ?>
         <div class="dashboard-content" style="padding-top: 10px;">
             <div class="page-header-compact">
-                <a onclick="window.close(); return false;" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
+                <a href="admin_donor_page.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back</a>
                 <div class="header-title">
                     <h1>Redemption History</h1>
                     <p>Donor: <?php echo htmlspecialchars($donorName); ?></p>
@@ -245,22 +245,22 @@ function buildUrl($params = []) {
                         <?php if (count($redemptions) > 0): ?>
                             <?php foreach($redemptions as $r): ?>
                                 <?php
-                                    // [修复图片路径]
+                                    // [Fix Image Path]
                                     $photo = $r['Reward_PhotoPath'];
                                     $imgSrc = "";
                                     if (!empty($photo)) {
-                                        // 如果数据库里存的是完整路径 (包含 uploads/) 则直接用
+                                        // If stored as full path (containing uploads/) use it directly
                                         if (strpos($photo, 'uploads/') === 0) {
                                             $imgSrc = $photo;
                                         } else {
-                                            // 否则假设在 uploads/rewards/ 目录下
+                                            // Otherwise assume it's in uploads/rewards/ directory
                                             $imgSrc = "uploads/rewards/" . $photo;
                                         }
                                     } else {
                                         $imgSrc = "https://via.placeholder.com/40"; // Fallback
                                     }
 
-                                    // [修复 Status 颜色]
+                                    // [Fix Status Color]
                                     $st = $r['Redemption_Status'];
                                     $stClass = 'status-pending';
                                     if ($st == 'Shipped' || $st == 'Completed' || $st == 'Success') $stClass = 'status-success';

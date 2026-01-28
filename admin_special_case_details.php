@@ -150,8 +150,8 @@ if ($case['Case_Status'] == 'Upcoming') $statusClass = 'status-upcoming';
     <div class="detail-wrapper">
         <div class="top-bar">
             <div style="display:flex; gap:10px;">
-                <a href="javascript:void(0);" onclick="goBackAndClose()" class="back-link"><i class="fas fa-arrow-left"></i> Back to Special Case Management</a>
-                <a href="special_case_comments.php?case_id=<?php echo $id; ?>" target="_blank" class="back-link" style="color: #17a2b8;"><i class="fas fa-comments"></i> View Comments</a>
+                <a href="special_case_management.php" class="back-link"><i class="fas fa-arrow-left"></i> Back to Special Case Management</a>
+                <a href="special_case_comments.php?case_id=<?php echo $id; ?>" class="back-link" style="color: #17a2b8;"><i class="fas fa-comments"></i> View Comments</a>
             </div>
             <div style="font-size:12px; color:#999;">Case ID: #<?php echo str_pad($case['Case_ID'], 4, '0', STR_PAD_LEFT); ?></div>
         </div>
@@ -316,15 +316,6 @@ if ($case['Case_Status'] == 'Upcoming') $statusClass = 'status-upcoming';
     </div>
 
     <script>
-        // Logic to close tab and focus back on parent, or redirect
-        function goBackAndClose() {
-            window.close();
-            // Fallback if window.close() is blocked by browser (only works if script opened the window)
-            setTimeout(function() { 
-                if (!window.closed) window.location.href = 'special_case_management.php'; 
-            }, 100);
-        }
-
         // Gallery Slider Logic
         let slideIndex = 0;
         const slides = document.querySelectorAll('.gallery-img');

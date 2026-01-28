@@ -14,21 +14,25 @@ $isStaff = isset($_SESSION['staff_id']);
 date_default_timezone_set('Asia/Kuala_Lumpur');
 
 // --- AUTOMATIC STATUS UPDATE LOGIC ---
-$conn->query("UPDATE special_case SET Case_Status = 'Completed' WHERE (End_Date < CURDATE() OR Raised_Amount >= Target_Amount) AND Case_Status != 'Cancelled' AND Case_Status != 'Completed'");
-$conn->query("UPDATE special_case SET Case_Status = 'Active' WHERE Start_Date <= CURDATE() AND End_Date >= CURDATE() AND Raised_Amount < Target_Amount AND Case_Status != 'Cancelled' AND Case_Status != 'Completed' AND Case_Status != 'Active'");
-$conn->query("UPDATE special_case SET Case_Status = 'Upcoming' WHERE Start_Date > CURDATE() AND Case_Status != 'Cancelled' AND Case_Status != 'Completed' AND Case_Status != 'Upcoming'");
+// Only update active/upcoming items that are not deleted
+$conn->query("UPDATE special_case SET Case_Status = 'Completed' WHERE (End_Date < CURDATE() OR Raised_Amount >= Target_Amount) AND Case_Status != 'Cancelled' AND Case_Status != 'Completed' AND Is_Deleted = 0");
+$conn->query("UPDATE special_case SET Case_Status = 'Active' WHERE Start_Date <= CURDATE() AND End_Date >= CURDATE() AND Raised_Amount < Target_Amount AND Case_Status != 'Cancelled' AND Case_Status != 'Completed' AND Case_Status != 'Active' AND Is_Deleted = 0");
+$conn->query("UPDATE special_case SET Case_Status = 'Upcoming' WHERE Start_Date > CURDATE() AND Case_Status != 'Cancelled' AND Case_Status != 'Completed' AND Case_Status != 'Upcoming' AND Is_Deleted = 0");
 
-// --- DELETE ---
+// --- DELETE (SOFT DELETE) ---
+// Changed from DELETE to UPDATE Is_Deleted = 1 to fix Foreign Key Error
 if (isset($_GET['delete_case_id'])) {
     $delId = intval($_GET['delete_case_id']);
-    $conn->query("DELETE FROM special_case WHERE Case_ID = $delId");
+    // 使用软删除，避免外键报错
+    $conn->query("UPDATE special_case SET Is_Deleted = 1 WHERE Case_ID = $delId");
     header("Location: special_case_management.php?success=" . urlencode("Deleted successfully!"));
     exit();
 }
 
 // --- DATA PREPARATION FOR FILTERS ---
+// Ensure we only fetch data from non-deleted items
 $cities = [];
-$cityQ = $conn->query("SELECT DISTINCT Case_City FROM special_case WHERE Case_City != '' ORDER BY Case_City ASC");
+$cityQ = $conn->query("SELECT DISTINCT Case_City FROM special_case WHERE Case_City != '' AND Is_Deleted = 0 ORDER BY Case_City ASC");
 if($cityQ) while($c = $cityQ->fetch_assoc()) $cities[] = $c['Case_City'];
 
 $categories = ['Medical','Disability Support','Emergency Relief','Elderly Care','Children Support','Other Cases'];
@@ -39,7 +43,7 @@ $searchTerm = "";
 $filterType = "";
 $filterValue = "";
 
-// Date specific variables (Creation Date)
+// Date specific variables
 $filterDateDay = "";
 $filterDateMonth = "";
 $filterDateYear = "";
@@ -49,7 +53,8 @@ $filterEndDateDay = "";
 $filterEndDateMonth = "";
 $filterEndDateYear = "";
 
-$whereConditions = [];
+// Default condition: Don't show deleted items
+$whereConditions = ["Is_Deleted = 0"];
 $orderClause = "ORDER BY CASE 
                 WHEN Case_Status = 'Upcoming' THEN 1 
                 WHEN Case_Status = 'Active' THEN 2 
@@ -76,7 +81,6 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
         $filterValue = $conn->real_escape_string($_GET['filter_val_city']);
         $whereConditions[] = "Case_City = '$filterValue'";
     } elseif ($filterType == 'date') {
-        // Creation Date Logic
         if (isset($_GET['filter_val_date_day']) && $_GET['filter_val_date_day'] !== '') {
             $filterDateDay = $conn->real_escape_string($_GET['filter_val_date_day']);
             $whereConditions[] = "DAY(Created_At) = '$filterDateDay'";
@@ -90,7 +94,6 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
             $whereConditions[] = "YEAR(Created_At) = '$filterDateYear'";
         }
     } elseif ($filterType == 'end_date') {
-        // End Date Logic
         if (isset($_GET['filter_val_end_date_day']) && $_GET['filter_val_end_date_day'] !== '') {
             $filterEndDateDay = $conn->real_escape_string($_GET['filter_val_end_date_day']);
             $whereConditions[] = "DAY(End_Date) = '$filterEndDateDay'";
@@ -106,10 +109,7 @@ if (isset($_GET['filter_type']) && !empty($_GET['filter_type'])) {
     }
 }
 
-$whereClause = "";
-if (count($whereConditions) > 0) {
-    $whereClause = "WHERE " . implode(" AND ", $whereConditions);
-}
+$whereClause = "WHERE " . implode(" AND ", $whereConditions);
 
 // --- EXPORT TO EXCEL ---
 if (isset($_GET['action']) && $_GET['action'] == 'export_excel') {
@@ -168,11 +168,11 @@ if ($result && $result->num_rows > 0) {
 $start_record = ($total_records > 0) ? $start_from + 1 : 0;
 $end_record = min($start_from + $results_per_page, $total_records);
 
-// --- STATS ---
-$totalCases = $conn->query("SELECT COUNT(*) as c FROM special_case")->fetch_assoc()['c'];
-$activeCases = $conn->query("SELECT COUNT(*) as c FROM special_case WHERE Case_Status = 'Active'")->fetch_assoc()['c'];
-$completedCases = $conn->query("SELECT COUNT(*) as c FROM special_case WHERE Case_Status = 'Completed'")->fetch_assoc()['c'];
-$totalRaisedLifetime = $conn->query("SELECT SUM(Raised_Amount) as s FROM special_case")->fetch_assoc()['s'] ?: 0;
+// --- STATS (Updated to ignore Deleted items) ---
+$totalCases = $conn->query("SELECT COUNT(*) as c FROM special_case WHERE Is_Deleted = 0")->fetch_assoc()['c'];
+$activeCases = $conn->query("SELECT COUNT(*) as c FROM special_case WHERE Case_Status = 'Active' AND Is_Deleted = 0")->fetch_assoc()['c'];
+$completedCases = $conn->query("SELECT COUNT(*) as c FROM special_case WHERE Case_Status = 'Completed' AND Is_Deleted = 0")->fetch_assoc()['c'];
+$totalRaisedLifetime = $conn->query("SELECT SUM(Raised_Amount) as s FROM special_case WHERE Is_Deleted = 0")->fetch_assoc()['s'] ?: 0;
 
 $exportParams = $_GET;
 $exportParams['action'] = 'export_excel';
@@ -225,7 +225,7 @@ $allCaseImagesMap = [];
         .filter-select, .search-input { padding: 10px 15px; border: 1px solid var(--gray-light); border-radius: 5px; outline: none; background: white; }
         .search-input { flex: 1; min-width: 200px; }
         .secondary-filter { display: none; animation: fadeIn 0.3s; }
-        .secondary-filter.active { display: flex; gap: 5px; } /* Changed to flex for date inputs */
+        .secondary-filter.active { display: flex; gap: 5px; } 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
 
         .case-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; margin-top: 10px; margin-bottom: 30px; }
@@ -280,6 +280,12 @@ $allCaseImagesMap = [];
         .lightbox-nav:hover { background-color: rgba(255,255,255,0.2); }
         .lightbox-prev { left: 0; border-radius: 0 3px 3px 0; }
         .lightbox-next { right: 0; border-radius: 3px 0 0 3px; }
+
+        /* --- Custom Delete Modal Styles --- */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; border-radius: 10px; width: 90%; max-width: 400px; padding: 20px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .modal-header { margin-bottom: 20px; }
+        .modal-header h2 { margin: 0; font-size: 18px; }
     </style>
 </head>
 <body>
@@ -458,16 +464,16 @@ $allCaseImagesMap = [];
                                         <div onclick="window.location.href='special_case_edit.php?id=<?php echo $case['Case_ID']; ?>'"><i class="fas fa-edit"></i> Edit Details</div>
 
                                         <?php if (!$isStaff): ?>
-                                            <a href="special_case_donation_history.php?case_id=<?php echo $case['Case_ID']; ?>" target="_blank"><i class="fas fa-file-invoice-dollar"></i> View Donor Payment History</a>
+                                            <a href="special_case_donation_history.php?case_id=<?php echo $case['Case_ID']; ?>"><i class="fas fa-file-invoice-dollar"></i> View Donor Payment History</a>
                                         <?php endif; ?>
 
                                         <?php if (!$isStaff): ?>
-                                            <a href="special_case_withdrawal_history.php?case_id=<?php echo $case['Case_ID']; ?>" target="_blank"><i class="fas fa-money-bill-wave"></i> Withdrawal History</a>
+                                            <a href="special_case_withdrawal_history.php?case_id=<?php echo $case['Case_ID']; ?>"><i class="fas fa-money-bill-wave"></i> Withdrawal History</a>
                                         <?php endif; ?>
 
-                                        <a href="special_case_comments.php?case_id=<?php echo $case['Case_ID']; ?>" target="_blank"><i class="fas fa-comments"></i> View Comments</a>
-
-                                        <a href="javascript:confirmDeleteSpecialCase(<?php echo $case['Case_ID']; ?>)" class="text-delete"><i class="fas fa-trash"></i> Delete</a>
+                                        <a href="special_case_comments.php?case_id=<?php echo $case['Case_ID']; ?>"><i class="fas fa-comments"></i> View Comments</a>
+                                        
+                                        <div onclick="confirmDeleteSpecialCase(<?php echo $case['Case_ID']; ?>)" class="text-delete"><i class="fas fa-trash"></i> Delete</div>
                                     </div>
                                 </div>
                             </div>
@@ -570,6 +576,21 @@ $allCaseImagesMap = [];
         </div>
     </div>
 
+    <div class="modal" id="deleteModal">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #dc3545; color: white; justify-content:center; padding:15px; border-radius:5px 5px 0 0; margin-top:-20px; margin-left:-20px; margin-right:-20px;">
+                <h2 style="color:white; margin:0; font-size:18px;"><i class="fas fa-exclamation-triangle"></i> Delete Special Case</h2>
+            </div>
+            <div class="modal-body" style="padding-top:20px;">
+                <p style="color:#555; margin-bottom:20px;">Are you sure you want to delete this case?<br>This action cannot be undone.</p>
+                <div style="display: flex; justify-content: center; gap: 10px;">
+                    <button class="btn" style="background:#eee; color:#333;" onclick="document.getElementById('deleteModal').style.display='none'">Cancel</button>
+                    <a id="confirmDeleteBtn" href="#" class="btn btn-danger">Yes, Delete</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="imageLightbox" class="lightbox-modal">
         <span class="close-lightbox" onclick="closeLightbox()">&times;</span>
         <a class="lightbox-nav lightbox-prev" onclick="changeLightboxImage(-1)">&#10094;</a>
@@ -579,7 +600,8 @@ $allCaseImagesMap = [];
 
     <script>
         function goToDetailsPage(id) {
-            window.open('admin_special_case_details.php?id=' + id, '_blank');
+            // Updated to open in the same window, removing _blank
+            window.location.href = 'admin_special_case_details.php?id=' + id;
         }
 
         function toggleFilterInputs() {
@@ -630,6 +652,15 @@ $allCaseImagesMap = [];
                     if (event.key === "ArrowRight") changeLightboxImage(1);
                 }
             });
+            
+            // Close modal when clicking outside
+            window.onclick = function(event) {
+                if (!event.target.matches('.menu-btn') && !event.target.matches('.menu-btn *')) {
+                    document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
+                }
+                if (event.target.id == 'imageLightbox') closeLightbox();
+                if (event.target.id == 'deleteModal') document.getElementById('deleteModal').style.display = 'none';
+            }
         });
 
         // --- MENU LOGIC ---
@@ -639,15 +670,12 @@ $allCaseImagesMap = [];
             const menu = document.getElementById('menu-' + id);
             if (menu) menu.style.display = 'block';
         }
-        window.onclick = function(event) {
-            if (!event.target.matches('.menu-btn') && !event.target.matches('.menu-btn *')) {
-                document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
-            }
-            if (event.target.id == 'imageLightbox') closeLightbox();
-        }
 
+        // --- UPDATED DELETE LOGIC WITH MODAL ---
         function confirmDeleteSpecialCase(id) {
-            if(confirm("Are you sure you want to delete this case?")) window.location.href = `special_case_management.php?delete_case_id=${id}`;
+            const link = document.getElementById('confirmDeleteBtn');
+            link.href = 'special_case_management.php?delete_case_id=' + id;
+            document.getElementById('deleteModal').style.display = 'flex';
         }
 
         // --- LIGHTBOX JS LOGIC ---

@@ -211,7 +211,7 @@ $existingImages = $branch['Branch_Images']; // JSON string
             <h2 style="margin-bottom: 10px; font-size: 22px;">Updated!</h2>
             <p style="color: #666; line-height: 1.5;">Branch details updated successfully.</p>
             <div class="modal-btn-group">
-                <a href="branch_management_page.php" class="btn-clear" style="border: 1px solid #ddd; text-decoration:none;">Return to List</a>
+                <a href="branch_management_page.php" class="btn-cancel" style="border: 1px solid #ddd; background: white; color: #555;">Return to List</a>
                 <button type="button" class="btn-save" onclick="document.getElementById('successModal').style.display='none'">Continue Edit</button>
             </div>
         </div>

@@ -1,6 +1,6 @@
 <?php
 // reward_item_management.php
-ob_start(); // 开启输出缓冲区
+ob_start(); // Start output buffering
 session_start();
 
 // 1. Check Login
@@ -421,7 +421,7 @@ while($r = $supRes->fetch_assoc()) $suppliers[] = $r['Reward_Supplier'];
                 <div class="section-header">
                     <h2>Reward Items List</h2>
                     <div class="action-buttons">
-                        <a href="add_reward_item.php" class="btn btn-primary" target="_blank" rel="opener">
+                        <a href="add_reward_item.php" class="btn btn-primary">
                             <i class="fas fa-plus"></i> Add New Item
                         </a>
                         <a href="reward_item_management.php?action=export_excel" class="btn btn-success" target="_blank">
@@ -574,16 +574,16 @@ while($r = $supRes->fetch_assoc()) $suppliers[] = $r['Reward_Supplier'];
                                                     <i class="fas fa-ellipsis-v"></i>
                                                 </button>
                                                 <div id="menu-<?php echo $row['Reward_ID']; ?>" class="dropdown-content">
-                                                    <a href="reward_view_edit.php?id=<?php echo $row['Reward_ID']; ?>&mode=view" target="_blank" rel="opener">
+                                                    <a href="reward_view_edit.php?id=<?php echo $row['Reward_ID']; ?>&mode=view">
                                                         <i class="fas fa-eye"></i> View Details
                                                     </a>
-                                                    <a href="reward_view_edit.php?id=<?php echo $row['Reward_ID']; ?>&mode=edit" target="_blank" rel="opener">
+                                                    <a href="reward_view_edit.php?id=<?php echo $row['Reward_ID']; ?>&mode=edit">
                                                         <i class="fas fa-edit"></i> Edit Details
                                                     </a>
-                                                    <a href="update_stock.php?id=<?php echo $row['Reward_ID']; ?>" target="_blank" rel="opener">
+                                                    <a href="update_stock.php?id=<?php echo $row['Reward_ID']; ?>">
                                                         <i class="fas fa-boxes"></i> Update Stock
                                                     </a>
-                                                    <a href="view_history.php?id=<?php echo $row['Reward_ID']; ?>" target="_blank" rel="opener">
+                                                    <a href="view_history.php?id=<?php echo $row['Reward_ID']; ?>">
                                                         <i class="fas fa-history"></i> View History
                                                     </a>
                                                     <a href="reward_item_management.php?action=export_item_history&id=<?php echo $row['Reward_ID']; ?>" target="_blank">

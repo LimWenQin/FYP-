@@ -11,8 +11,8 @@ if (!isset($_SESSION['admin_id']) && !isset($_SESSION['staff_id'])) {
 include 'dataconnection.php';
 
 if (!isset($_GET['case_id'])) {
-    // 如果没有 case_id，关闭窗口
-    echo "<script>window.close();</script>";
+    // If no case_id, redirect to management page
+    header("Location: special_case_management.php");
     exit();
 }
 
@@ -81,48 +81,50 @@ $result = $conn->query($sql);
     <div class="main-content">
         <?php include 'admin_header.php'; ?>
 
-        <div class="page-header-compact">
-            <a href="#" onclick="window.close(); return false;" class="back-btn"><i class="fas fa-arrow-left"></i> Back </a>
-            <div class="header-title">
-                <h1>Case Comments</h1>
-                <p><?php echo htmlspecialchars($caseTitle); ?></p>
+        <div class="dashboard-content">
+            <div class="page-header-compact">
+                <a href="special_case_management.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Special Case </a>
+                <div class="header-title">
+                    <h1>Case Comments</h1>
+                    <p><?php echo htmlspecialchars($caseTitle); ?></p>
+                </div>
+            </div>
+
+            <div class="comments-container">
+                <?php if ($result && $result->num_rows > 0): ?>
+                    <?php while($row = $result->fetch_assoc()): 
+                        $initial = strtoupper(substr($row['Donor_Name'], 0, 1));
+                    ?>
+                    <div class="comment-card">
+                        <div class="comment-header">
+                            <div class="donor-info">
+                                <div class="donor-avatar"><?php echo $initial; ?></div>
+                                <div class="donor-details">
+                                    <h4><?php echo htmlspecialchars($row['Donor_Name']); ?></h4>
+                                    <span><?php echo htmlspecialchars($row['Donor_Email']); ?></span>
+                                </div>
+                            </div>
+                            <span class="comment-date"><i class="far fa-clock"></i> <?php echo date('d M Y, h:i A', strtotime($row['Created_At'])); ?></span>
+                        </div>
+                        <div class="comment-body">
+                            <?php echo nl2br(htmlspecialchars($row['Comment_Text'])); ?>
+                        </div>
+                        <div class="comment-actions">
+                            <a href="javascript:confirmDelete(<?php echo $row['Comment_ID']; ?>, <?php echo $caseId; ?>)" class="btn-delete">
+                                <i class="fas fa-trash-alt"></i> Delete Comment
+                            </a>
+                        </div>
+                    </div>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="far fa-comment-dots" style="font-size: 40px; margin-bottom: 10px;"></i>
+                        <p>No comments found for this case yet.</p>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
-
-        <div class="comments-container">
-            <?php if ($result && $result->num_rows > 0): ?>
-                <?php while($row = $result->fetch_assoc()): 
-                    $initial = strtoupper(substr($row['Donor_Name'], 0, 1));
-                ?>
-                <div class="comment-card">
-                    <div class="comment-header">
-                        <div class="donor-info">
-                            <div class="donor-avatar"><?php echo $initial; ?></div>
-                            <div class="donor-details">
-                                <h4><?php echo htmlspecialchars($row['Donor_Name']); ?></h4>
-                                <span><?php echo htmlspecialchars($row['Donor_Email']); ?></span>
-                            </div>
-                        </div>
-                        <span class="comment-date"><i class="far fa-clock"></i> <?php echo date('d M Y, h:i A', strtotime($row['Created_At'])); ?></span>
-                    </div>
-                    <div class="comment-body">
-                        <?php echo nl2br(htmlspecialchars($row['Comment_Text'])); ?>
-                    </div>
-                    <div class="comment-actions">
-                        <a href="javascript:confirmDelete(<?php echo $row['Comment_ID']; ?>, <?php echo $caseId; ?>)" class="btn-delete">
-                            <i class="fas fa-trash-alt"></i> Delete Comment
-                        </a>
-                    </div>
-                </div>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <div class="empty-state">
-                    <i class="far fa-comment-dots" style="font-size: 40px; margin-bottom: 10px;"></i>
-                    <p>No comments found for this case yet.</p>
-                </div>
-            <?php endif; ?>
         </div>
-    </div>
 
     <script>
         function confirmDelete(commentId, caseId) {

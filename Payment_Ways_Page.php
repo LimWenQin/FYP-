@@ -105,9 +105,10 @@ include 'header_UI.php';
     /* --- Top Layout: Summary + Video --- */
     .info-video-grid {
         display: grid;
-        grid-template-columns: 1fr 1.2fr; /* 左边 Summary 占 1份，右边视频占 1.2份 */
+        /* 将左边 Summary 改为 1.5份，右边视频缩减为 1份 */
+        grid-template-columns: 1.5fr 1fr; 
         gap: 30px;
-        align-items: stretch; /* 等高 */
+        align-items: stretch;
         margin-bottom: 50px;
     }
 
@@ -123,11 +124,19 @@ include 'header_UI.php';
     }
 
     .sc-header {
-        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-        padding: 25px 20px;
-        text-align: center; color: white;
+        /* 使用更有质感的渐变色 */
+        background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+        padding: 30px 20px; /* 增加上下间距 */
+        text-align: center; 
+        color: white;
     }
-    .sc-amount { font-size: 2.2rem; font-weight: 800; margin-top: 5px; }
+
+    .sc-amount { 
+        font-size: 2.8rem; /* 放大金额字体 */
+        font-weight: 800; 
+        margin-top: 5px; 
+        text-shadow: 0 2px 4px rgba(0,0,0,0.2); /* 增加文字阴影 */
+    }
     .sc-amount small { font-size: 1rem; margin-right: 5px; opacity: 0.9; }
 
     .sc-body { padding: 25px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
@@ -147,8 +156,11 @@ include 'header_UI.php';
         height: 100%; min-height: 300px;
     }
     .video-card video {
-        width: 100%; height: 100%; object-fit: cover;
-        opacity: 0.8; transition: opacity 0.3s;
+        width: 100%; 
+        height: 100%; 
+        object-fit: cover;
+        opacity: 0.6; /* 从 0.8 降低到 0.6，使其更不显眼 */
+        transition: opacity 0.3s;
     }
     .video-card:hover video { opacity: 1; }
     

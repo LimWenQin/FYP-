@@ -244,7 +244,7 @@ $malaysiaStates = ['Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Mela
         
         <div class="dashboard-content" style="padding-top: 10px;">
             <div class="page-header-compact">
-                <a href="activity_management.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back to List</a>
+                <a href="activity_management.php" class="back-btn"><i class="fas fa-arrow-left"></i> Back </a>
                 <div class="header-title">
                     <h1>Add New Activity</h1>
                     <p>Create a new fundraising event or activity.</p>
