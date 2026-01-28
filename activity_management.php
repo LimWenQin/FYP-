@@ -268,6 +268,12 @@ $allActivityImagesMap = [];
         .lightbox-nav:hover { background-color: rgba(255,255,255,0.2); }
         .lightbox-prev { left: 0; border-radius: 0 3px 3px 0; }
         .lightbox-next { right: 0; border-radius: 3px 0 0 3px; }
+
+        /* --- Custom Delete Modal Styles --- */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: white; border-radius: 10px; width: 90%; max-width: 400px; padding: 20px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .modal-header { margin-bottom: 20px; }
+        .modal-header h2 { margin: 0; font-size: 18px; }
     </style>
 </head>
 <body>
@@ -401,7 +407,7 @@ $allActivityImagesMap = [];
                                             <a href="activity_withdrawal_history.php?activity_id=<?php echo $activity['Activity_ID']; ?>"><i class="fas fa-money-bill-wave"></i> Withdrawal History</a>
                                         <?php endif; ?>
                                         
-                                        <a href="javascript:confirmDeleteActivity(<?php echo $activity['Activity_ID']; ?>)" class="text-delete"><i class="fas fa-trash"></i> Delete</a>
+                                        <div class="text-delete" onclick="confirmDeleteActivity(<?php echo $activity['Activity_ID']; ?>)"><i class="fas fa-trash"></i> Delete</div>
                                     </div>
                                 </div>
                             </div>
@@ -492,6 +498,21 @@ $allActivityImagesMap = [];
         </div>
     </div>
 
+    <div class="modal" id="deleteModal">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color: #dc3545; color: white; justify-content:center; padding:15px; border-radius:5px 5px 0 0; margin-top:-20px; margin-left:-20px; margin-right:-20px;">
+                <h2 style="color:white; margin:0; font-size:18px;"><i class="fas fa-exclamation-triangle"></i> Delete Activity</h2>
+            </div>
+            <div class="modal-body" style="padding-top:20px;">
+                <p style="color:#555; margin-bottom:20px;">Are you sure you want to delete this activity?<br>This action cannot be undone.</p>
+                <div style="display: flex; justify-content: center; gap: 10px;">
+                    <button class="btn" style="background:#eee; color:#333;" onclick="document.getElementById('deleteModal').style.display='none'">Cancel</button>
+                    <a id="confirmDeleteBtn" href="#" class="btn btn-danger">Yes, Delete</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="imageLightbox" class="lightbox-modal">
         <span class="close-lightbox" onclick="closeLightbox()">&times;</span>
         <a class="lightbox-nav lightbox-prev" onclick="changeLightboxImage(-1)">&#10094;</a><img class="lightbox-content" id="lightboxImage"><a class="lightbox-nav lightbox-next" onclick="changeLightboxImage(1)">&#10095;</a>
@@ -531,7 +552,12 @@ $allActivityImagesMap = [];
 
         function toggleMenu(e, id) { e.stopPropagation(); document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none'); const m = document.getElementById('menu-' + id); if (m) m.style.display = 'block'; }
         
-        function confirmDeleteActivity(id) { if (confirm('Delete this activity?')) window.location.href = 'activity_management.php?delete_activity_id=' + id; }
+        // --- Updated Delete Function ---
+        function confirmDeleteActivity(id) { 
+            const link = document.getElementById('confirmDeleteBtn');
+            link.href = 'activity_management.php?delete_activity_id=' + id;
+            document.getElementById('deleteModal').style.display = 'flex'; 
+        }
 
         const allActivityImages = <?php echo json_encode($allActivityImagesMap); ?>;
         let currentLightboxActivityId = null; let currentLightboxIndex = 0;
@@ -549,6 +575,7 @@ $allActivityImagesMap = [];
             window.addEventListener('click', function(event) {
                 if (!event.target.matches('.menu-btn') && !event.target.matches('.menu-btn *')) document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
                 if (event.target.id == 'imageLightbox') closeLightbox();
+                if (event.target.id == 'deleteModal') document.getElementById('deleteModal').style.display = 'none';
             });
             document.addEventListener('keydown', function(event) {
                 if (document.getElementById('imageLightbox').style.display === "flex") {
