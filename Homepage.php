@@ -127,17 +127,17 @@ if ($result_story && $result_story->num_rows > 0) {
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded) && count($decoded) > 0) {
                 $story_img = $decoded[0];
             } else {
-                // 如果不是 JSON，直接使用字符串，或者如果是单张图片路径
+            
                 $story_img = $row['Story_Image'];
             }
         }
 
-        // Generate Date (Use Story_Date if available, else Created_At)
+        
         $date_source = !empty($row['Story_Date']) ? $row['Story_Date'] : $row['Created_At'];
         $story_date = date('d M Y', strtotime($date_source));
 
-        // Create Link (假设详情页是 story_details.php)
-        $story_link = "story_details.php?id=" . $row['Story_ID'];
+       
+        $story_link = "New&Story.php?id=" . $row['Story_ID'];
 
         $stories[] = [
             "id" => $row['Story_ID'],
@@ -165,7 +165,7 @@ $result_act = $conn->query($query_act);
 if ($result_act && $result_act->num_rows > 0) {
     while ($row = $result_act->fetch_assoc()) {
         $is_ongoing = ($row['Activity_StartDate'] <= $today);
-        $details_link = "activity_details.php?id=" . $row['Activity_ID'];
+        $details_link = "donor_campaign_detail.php?id=" . $row['Activity_ID'];
 
         $activities[] = [
             "id" => $row['Activity_ID'],
