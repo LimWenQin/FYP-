@@ -2,10 +2,10 @@
 -- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
--- Host: 127.0.0.1
--- Generation Time: Jan 19, 2026 at 05:18 PM
--- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
+-- 主机： 127.0.0.1
+-- 生成日期： 2026-01-27 14:00:55
+-- 服务器版本： 10.4.32-MariaDB
+-- PHP 版本： 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -18,13 +18,13 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Database: `donation_system`
+-- 数据库： `donation_system`
 --
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `about_us_info`
+-- 表的结构 `about_us_info`
 --
 
 CREATE TABLE `about_us_info` (
@@ -45,7 +45,7 @@ CREATE TABLE `about_us_info` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `about_us_info`
+-- 转存表中的数据 `about_us_info`
 --
 
 INSERT INTO `about_us_info` (`id`, `hero_title`, `hero_description`, `story_title`, `story_content`, `vision_title`, `vision_desc`, `vision_points`, `mission_title`, `mission_desc`, `mission_points`, `core_values`, `focus_areas`, `updated_at`) VALUES
@@ -54,7 +54,7 @@ INSERT INTO `about_us_info` (`id`, `hero_title`, `hero_description`, `story_titl
 -- --------------------------------------------------------
 
 --
--- Table structure for table `activity`
+-- 表的结构 `activity`
 --
 
 CREATE TABLE `activity` (
@@ -88,7 +88,7 @@ CREATE TABLE `activity` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `activity`
+-- 转存表中的数据 `activity`
 --
 
 INSERT INTO `activity` (`Activity_ID`, `Activity_Name`, `Activity_Venue`, `Activity_Date`, `Activity_StartDate`, `Activity_EndDate`, `Activity_Description`, `Activity_Organizer`, `Activity_Contact_Name`, `Activity_Contact_Number`, `Activity_Contact_Email`, `Activity_Max_Participants`, `Activity_Images`, `Activity_Status`, `Activity_BankName`, `Activity_BankAccount`, `Activity_GetAmount`, `Activity_TargetAmount`, `Activity_Address1`, `Activity_Address2`, `Activity_Address3`, `Activity_City`, `Activity_State`, `Activity_PostalCode`, `Activity_Country`, `Branch_ID`, `Cancel_Reason`) VALUES
@@ -102,7 +102,7 @@ INSERT INTO `activity` (`Activity_ID`, `Activity_Name`, `Activity_Venue`, `Activ
 (8, 'Community Health Day - Free Checkup & Physio', 'Silver Years Haven Hall', '2026-03-15', '2026-03-15', '2026-03-15', 'Many elderly individuals living alone neglect their health due to financial constraints or lack of transport. In collaboration with volunteer doctors from Penang General Hospital, Silver Years Haven is hosting a \"Community Health Day\" open to the public. Services include free screenings for blood sugar, blood pressure, and cholesterol, as well as one-on-one medical consultations. A physiotherapist will also lead a workshop on fall prevention exercises. We are raising funds to purchase test strips, medical consumables, and reading glasses to be given away to low-income seniors.', 'Penang Medical Volunteers', 'Dr. Lim (Volunteer Doctor)', '+6012-2233445', 'health@lovebridge.org.my', 100, '[\"uploads\\/activities\\/act_1768130286_696386ee2c482_0.png\",\"uploads\\/activities\\/act_1768130286_696386ee2e3e2_1.png\"]', 'Upcoming', '', '', 0.00, 3000.00, '15, Jalan Georgetown', 'Heritage Zone', 'George Town', 'George Town', 'Penang', '10200', 'Malaysia', 3, NULL);
 
 --
--- Triggers `activity`
+-- 触发器 `activity`
 --
 DELIMITER $$
 CREATE TRIGGER `notify_activity_insert` AFTER INSERT ON `activity` FOR EACH ROW BEGIN
@@ -122,7 +122,7 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
--- Table structure for table `admin`
+-- 表的结构 `admin`
 --
 
 CREATE TABLE `admin` (
@@ -154,19 +154,19 @@ CREATE TABLE `admin` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `admin`
+-- 转存表中的数据 `admin`
 --
 
 INSERT INTO `admin` (`Admin_ID`, `Admin_Name`, `Admin_ContactNumber`, `Admin_ICNUMBER`, `Admin_Email`, `Admin_Password`, `Admin_DOB`, `Admin_Address1`, `Admin_Address2`, `Admin_Address3`, `Admin_City`, `Admin_State`, `Admin_PostalCode`, `Admin_Country`, `Admin_ProfilePicture`, `Admin_Role`, `Admin_Status`, `Admin_LastLogin`, `Admin_CreatedAt`, `Admin_UpdatedAt`, `Admin_Comment`, `Admin_LoginAttempts`, `Admin_LastFailedLogin`, `Is_Deleted`, `Admin_IsFirstLogin`) VALUES
 (1, 'Super Admin', '0123456789', '990101010101', 'admin@lovebridge.org.my', 'admin123', '1999-01-01', 'Level 12', 'Menara Love Bridge', 'Jalan Charity', 'Kuala Lumpur', 'Wilayah Persekutuan', '50000', 'Malaysia', NULL, 'Super Admin', 'Active', '2025-12-06 20:35:49', '2025-11-28 12:00:00', '2026-01-15 09:00:45', 'System Super Administrator', 3, '2026-01-15 09:00:45', 0, 1),
-(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$yRnaaAeLqift7YsGSVjF8.70L7.tQMHtDFrLkD7gbeapVr4KLfHR2', '2003-05-17', '11， jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', 'uploads/profiles/admin_2_1767838052.jpg', 'Super Admin', 'Active', '2026-01-18 13:00:06', '2025-12-06 17:31:10', '2026-01-18 13:00:06', 'Added via admin management system', 0, '2026-01-16 21:22:57', 0, 0),
+(2, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$yRnaaAeLqift7YsGSVjF8.70L7.tQMHtDFrLkD7gbeapVr4KLfHR2', '2003-05-17', '11， jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', 'uploads/profiles/admin_2_1767838052.jpg', 'Super Admin', 'Active', '2026-01-27 21:00:46', '2025-12-06 17:31:10', '2026-01-27 21:00:46', 'Added via admin management system', 0, '2026-01-27 20:58:48', 0, 0),
 (5, 'ujin', '+6019-9878299', '050218-05-1234', 'ujintan218@gmail.com', '$2y$10$1BvJVRIgBpkgfPOpeiXBOulnxttZFxJKfHEOtMyImfaLzjSUvkJhO', '2005-02-18', '', '', '', '', '', '', 'Malaysia', NULL, 'Admin', 'Active', '2026-01-08 22:00:05', '2026-01-08 21:55:12', '2026-01-08 23:33:10', '', 0, NULL, 0, 0),
-(6, 'Lim Wen Qin', '+6011-19848732', '060504-03-0201', 'qinwenlin989@gmail.com', '$2y$10$CpJi2tClyKoRBpDt4sR4B.QRW/yTjENkBVnKLReWKaGGts1eAKAUy', '2006-05-04', '', '', '', '', '', '', 'Malaysia', 'uploads/profiles/admin_1768558087_696a0e076968e.jpeg', 'Admin', 'Active', '2026-01-19 22:40:47', '2026-01-09 13:44:39', '2026-01-19 22:40:47', '', 0, NULL, 0, 0);
+(6, 'Lim Wen Qin', '+6011-19848732', '060504-03-0201', 'qinwenlin989@gmail.com', '$2y$10$CpJi2tClyKoRBpDt4sR4B.QRW/yTjENkBVnKLReWKaGGts1eAKAUy', '2006-05-04', '', '', '', '', '', '', 'Malaysia', 'uploads/profiles/admin_1768558087_696a0e076968e.jpeg', 'Admin', 'Active', '2026-01-19 01:06:18', '2026-01-09 13:44:39', '2026-01-19 01:06:18', '', 0, NULL, 0, 0);
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `admin_notifications`
+-- 表的结构 `admin_notifications`
 --
 
 CREATE TABLE `admin_notifications` (
@@ -181,7 +181,7 @@ CREATE TABLE `admin_notifications` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `admin_notifications`
+-- 转存表中的数据 `admin_notifications`
 --
 
 INSERT INTO `admin_notifications` (`AdminNotification_ID`, `Message`, `Contact_ID`, `Type`, `Link`, `Is_Read`, `Is_Deleted`, `Created_At`) VALUES
@@ -261,12 +261,67 @@ INSERT INTO `admin_notifications` (`AdminNotification_ID`, `Message`, `Contact_I
 (78, 'New Activity Created: 123', NULL, 'Target', 'activity_management.php', 1, 0, '2026-01-17 23:47:31'),
 (79, 'Activity Updated: \"Quiet Years\" - CNY Senior Celebration', NULL, 'Update', 'activity_management.php', 1, 0, '2026-01-18 00:20:27'),
 (80, 'New Fundraising Case: farhan', NULL, 'Target', NULL, 1, 0, '2026-01-18 03:23:52'),
-(81, 'New Donor Registered: LIM WEN QIN', NULL, 'New_Donor', 'admin_donor_page.php', 0, 0, '2026-01-19 00:33:23');
+(81, 'New Donor Registered: LIM WEN QIN', NULL, 'New_Donor', 'admin_donor_page.php', 0, 0, '2026-01-19 00:33:23'),
+(82, 'New Reward Redemption Order #4', NULL, 'Target', 'redemption_order_management.php', 0, 0, '2026-01-19 22:52:59'),
+(83, 'New Donation: MYR 20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-19 23:26:18'),
+(84, 'New Donation: MYR 20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-19 23:26:18'),
+(85, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 08:04:33'),
+(86, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 08:04:33'),
+(87, 'New Recurring Donation Setup: RM50.00', NULL, 'Donation', NULL, 0, 0, '2026-01-20 08:04:33'),
+(88, 'New Donation:  50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 08:04:48'),
+(89, 'New Donation:  50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 08:04:48'),
+(90, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 08:05:11'),
+(91, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 08:05:11'),
+(92, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 08:05:42'),
+(93, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 08:05:42'),
+(94, 'Case Update: Rebirth from Fire - Skin Graft Surgery for Xiao Mei raised RM200.00', NULL, 'Donation', NULL, 0, 0, '2026-01-20 08:05:42'),
+(95, 'New Donation: MYR 20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 08:10:50'),
+(96, 'New Donation: MYR 20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 08:10:50'),
+(97, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 09:42:19'),
+(98, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 09:42:19'),
+(99, 'New Tax Receipt Request: TXN-CD-20260120094219-326', NULL, 'receipt_request', 'admin_receipts.php', 0, 0, '2026-01-20 09:45:19'),
+(100, 'New Tax Receipt Request: TXN-CD-20260120094219-326', NULL, 'receipt_request', 'admin_receipts.php', 0, 0, '2026-01-20 09:45:19'),
+(101, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 09:49:50'),
+(102, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-20 09:49:50'),
+(103, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 21:21:11'),
+(104, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 21:21:11'),
+(105, 'New Donation: MYR 30.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 21:34:42'),
+(106, 'New Donation: MYR 30.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 21:34:42'),
+(107, 'New Donation: MYR 10.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 21:39:22'),
+(108, 'New Donation: MYR 10.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 21:39:22'),
+(109, 'Case Update: farhan raised RM10.00', NULL, 'Donation', NULL, 0, 0, '2026-01-21 21:39:22'),
+(110, 'New Donation: MYR 20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:33:23'),
+(111, 'New Donation: MYR 20.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:33:23'),
+(112, 'New Recurring Donation Setup: RM20.00', NULL, 'Donation', NULL, 0, 0, '2026-01-21 22:33:23'),
+(113, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:33:50'),
+(114, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:33:50'),
+(115, 'New Donation:  50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:34:06'),
+(116, 'New Donation:  50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:34:06'),
+(117, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:34:21'),
+(118, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:34:21'),
+(119, 'New Donation:  50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:34:57'),
+(120, 'New Donation:  50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:34:57'),
+(121, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:35:10'),
+(122, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:35:10'),
+(123, 'Case Update: Rebirth from Fire - Skin Graft Surgery for Xiao Mei raised RM250.00', NULL, 'Donation', NULL, 0, 0, '2026-01-21 22:35:10'),
+(124, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:35:36'),
+(125, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:35:36'),
+(126, 'Case Update: Rebirth from Fire - Skin Graft Surgery for Xiao Mei raised RM300.00', NULL, 'Donation', NULL, 0, 0, '2026-01-21 22:35:36'),
+(127, 'New Donation: MYR 100.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:39:48'),
+(128, 'New Donation: MYR 100.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:39:48'),
+(129, 'Case Update: Rebirth from Fire - Skin Graft Surgery for Xiao Mei raised RM400.00', NULL, 'Donation', NULL, 0, 0, '2026-01-21 22:39:48'),
+(130, 'New Donation: MYR 100.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:40:20'),
+(131, 'New Donation: MYR 100.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:40:20'),
+(132, 'Case Update: Rebirth from Fire - Skin Graft Surgery for Xiao Mei raised RM500.00', NULL, 'Donation', NULL, 0, 0, '2026-01-21 22:40:20'),
+(133, 'New Donation:  300.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:46:52'),
+(134, 'New Donation:  300.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:46:52'),
+(135, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:55:46'),
+(136, 'New Donation: MYR 50.00 from RONALD TAN BIN HONG', NULL, 'Donation', 'payment_management.php', 0, 0, '2026-01-21 22:55:46');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `branch`
+-- 表的结构 `branch`
 --
 
 CREATE TABLE `branch` (
@@ -298,18 +353,18 @@ CREATE TABLE `branch` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `branch`
+-- 转存表中的数据 `branch`
 --
 
 INSERT INTO `branch` (`Branch_ID`, `Branch_Name`, `Branch_Head`, `Branch_Head_Contact`, `Branch_Head_Email`, `Branch_Type`, `Branch_Capacity`, `Branch_EstablishedDate`, `Branch_Address1`, `Branch_Address2`, `Branch_Address3`, `Branch_City`, `Branch_State`, `Branch_PostalCode`, `Branch_Country`, `Branch_ContactNumber`, `Branch_Email`, `Branch_Description`, `Branch_Images`, `Admin_ID`, `Branch_OperationalStatus`, `Branch_BankName`, `Branch_BankAccount`, `Branch_CreatedAt`, `Is_Deleted`) VALUES
-(1, 'Love Bridge Four Ace Sanctuary', 'Mrs. Sarah Wong', '+6012-3456781', 'sarah.wong@lovebridge.org.my', 'Old Folks Home', 45, '2015-06-01', '22, Jalan Impian Emas 4, ', 'Taman Impian Emas, ', '', 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-1190233', 'fourace@lovebridge.org.my', 'Founded in 2015 and located in Skudai, Johor, the Four Ace Sanctuary is more than just a shelter; it is a home built on four core promises to our children: Academic excellence, Character building, Emotional health, and Social development. The facility features a comforting living area, a \"Digital Hope Laboratory\" equipped for computer learning, and an organic vegetable garden. We are dedicated to providing holistic education and care, committed to nurturing vulnerable children into the confident future leaders of tomorrow.', '[\"uploads/branches/br_1768128819_696381332f9bc_0.png\",\"uploads/branches/br_1768128849_696381517fb2d_0.jpg\",\"uploads/branches/br_1768137820_6963a45cef105_0.png\"]', 2, 'Open', NULL, NULL, '2025-12-15 23:02:23', 0),
-(2, 'KL Main Operations Hub', 'Mr. David Lee', '+6012-3456782', 'david.lee@lovebridge.org.my', 'Headquarters', 8, '2010-01-15', 'Ground Floor, Menara Love Bridge, ', 'Jalan Charity, Pudu, ', '', 'Kuala Lumpur', 'Kuala Lumpur', '55100 ', 'Malaysia', '+6011-12345633', 'admin@donationsystem.com', 'Serving as the operational heartbeat of the organization in the city center, this branch focuses on aiding the urban poor and managing disaster relief efforts. It operates a daily Soup Kitchen to feed the homeless, manages a central Food Bank warehouse for resource distribution, and houses the Quick Response Team (QRT) for emergency deployments. Additionally, the hub features a homeless transformation station that provides vocational training and sanitation facilities to help individuals reintegrate into society.', '[\"uploads/branches/br_1768128793_69638119eed3f_0.png\",\"uploads/branches/br_1768128793_69638119f05fc_1.png\",\"uploads/branches/br_1768128839_696381473f1bd_0.jpg\"]', 1, 'Open', NULL, NULL, '2025-12-15 23:02:23', 0),
-(3, 'Penang Silver Years Haven', 'Mr. Ronald Tan', '+6012-7212535', 'ronaldtan0404@gmail.com', 'Orphanage', 32, '2018-08-30', '15, Jalan Georgetown, ', 'Heritage Zone, George Town, ', '', 'Georgetown', 'Penang', '10200', 'Malaysia', '+6011-11190233', 'penang@lovebridge.org.my', 'Nestled within a heritage building in George Town, Penang, this center specializes in care for the elderly, particularly those with mild dementia or who have been abandoned. We utilize Reminiscence Therapy, featuring an environment designed to mimic the 1960s \"Nanyang\" style to provide comfort and familiarity. With 24-hour nursing care, physical therapy, and our unique \"Life Storybook\" project, we ensure that every resident enjoys a twilight year filled with dignity, respect, and joy.', '[\"uploads/branches/br_1767960081_6960ee113ef84_0.jpg\",\"uploads/branches/br_1768128774_6963810604e14_0.png\",\"uploads/branches/br_1768128774_69638106055dc_1.png\"]', 1, 'Open', 'CIMB', '7070169114', '2025-12-15 23:02:23', 0);
+(1, 'Love Bridge Four Ace Sanctuary', 'Mrs. Sarah Wong', '+6012-3456781', 'sarah.wong@lovebridge.org.my', 'Old Folks Home', 45, '2015-06-01', '22, Jalan Impian Emas 4, ', 'Taman Impian Emas, ', '', 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-1190233', 'fourace@lovebridge.org.my', 'Branch Description (简介)\r\n\"Located in Skudai, Four Ace Sanctuary is a safe haven for vulnerable children, founded on the belief that every child deserves a winning hand in life. We focus on four pillars: Academic Excellence, Character Building, Emotional Health, and Social Skills. Our facility includes a \'Digital Hope Lab\' for coding classes and an eco-garden where children learn responsibility. We don\'t just provide shelter; we nurture the next generation of confident leaders.\"\r\n\r\nThe Founding Story: \"The Fourth Ace\" (成立故事)\r\nIn 2015, founder Sarah Wong encountered a group of children wandering the streets while visiting a slum. She discovered that these children weren\'t lacking in intelligence, but rather that they were dealt a terrible hand in life—lacking parental guidance and educational resources. She decided to establish \"Four Ace,\" meaning that regardless of their background, as long as children are given these four trump cards—knowledge, character, emotional intelligence, and social skills—they can change their lives. That day, she sketched a plan on a napkin and transformed an old terraced house into the starting point for the children\'s life-changing journey.\r\n\r\n❤️ Impact Story: \"The Boy Who Traded Trash for Code\" (感人故事)\r\n\"When 9-year-old Hafiz first came to us, his hands were rough from scavenging scrap metal to buy food. He had never touched a computer. Today, thanks to our Digital Hope Lab, those same hands are writing code for his first website. Hafiz told us, \'I don\'t want to collect trash anymore; I want to build robots.\'\r\n\r\nYour donation doesn\'t just buy a meal; it buys a future. It funds the electricity for his computer, the books in his bag, and the mentorship that tells him: You matter. Help us deal a winning hand to more children like Hafiz.\"', '[\"uploads/branches/br_1768128849_696381517fb2d_0.jpg\",\"uploads/branches/br_1769004882_6970df524435e_0.png\",\"uploads/branches/br_1769004882_6970df524658f_1.png\"]', 2, 'Open', 'Maybank', '707016911412', '2025-12-15 23:02:23', 0),
+(2, 'KL Main Operations Hub', 'Mr. David Lee', '+6012-3456782', 'david.lee@lovebridge.org.my', 'Headquarters', 8, '2010-01-15', 'Ground Floor, Menara Love Bridge, ', 'Jalan Charity, Pudu, ', '', 'Kuala Lumpur', 'Kuala Lumpur', '55100 ', 'Malaysia', '+6011-12345633', 'admin@donationsystem.com', 'Branch Description (简介)\r\n\"Situated in the heart of Pudu, our HQ acts as the strategic heartbeat of Love Bridge. It houses our 24/7 Crisis Command Center for disaster relief and operates a daily Soup Kitchen serving the urban poor. Beyond food distribution, this hub features a \'Transformation Station\' offering hot showers, haircuts, and vocational training to help the homeless regain their dignity and reintegrate into society. This is where compassion meets action.\"\r\n\r\nThe Founding Story: \"The Midnight Van\" (成立故事)\r\nIn 2010, Love Bridge\'s prototype was simply a borrowed old van. One rainy night, David Lee and his friends drove through the back alleys of Kuala Lumpur, distributing leftover bread. When they saw an elderly man, soaked to the bone, kneeling in the rain, shivering for half a loaf of bread, David realized that simply \"giving food\" wasn\'t enough. They needed a permanent base, a place that not only filled their stomachs but also allowed them to wash away their weariness and get back on their feet. Thus, KL Operations Hub was born in an abandoned shophouse in Pudu, becoming the city\'s warmest beacon.\r\n\r\n❤️ Impact Story: \"A Shower, A Meal, A New Life\" (感人故事)\r\n\"Uncle Lim used to hide in the back alleys of Pudu, ashamed of his torn clothes and the smell of living on the streets. He hadn\'t spoken to anyone in weeks. That changed the night he found our Transformation Station. A simple hot shower and a clean set of clothes—funded by donors like you—restored his dignity.\r\n\r\nOver a warm bowl of curry from our Soup Kitchen, he finally smiled and asked for job training. Today, Uncle Lim is working again. It started with RM10 from a stranger. Will you be the one to give someone else their second chance today?\"', '[\"uploads/branches/br_1768128793_69638119eed3f_0.png\",\"uploads/branches/br_1768128793_69638119f05fc_1.png\",\"uploads/branches/br_1768128839_696381473f1bd_0.jpg\"]', 1, 'Open', 'CIMB', '7070169114', '2025-12-15 23:02:23', 0),
+(3, 'Penang Silver Years Haven', 'Mr. Ronald Tan', '+6012-7212535', 'ronaldtan0404@gmail.com', 'Orphanage', 32, '2018-08-30', '15, Jalan Georgetown, ', 'Heritage Zone, George Town, ', '', 'Georgetown', 'Penang', '10200', 'Malaysia', '+6011-11190233', 'penang@lovebridge.org.my', 'Branch Description (简介)\r\n\"Nestled in a heritage building in George Town, Silver Years Haven specializes in dementia care and elderly support for the abandoned. We utilize \'Reminiscence Therapy,\' recreating a 1960s environment to provide comfort and familiarity to residents losing their memories. We provide 24-hour specialized nursing care, ensuring that even if they forget the world, the world has not forgotten them.\"\r\n\r\nThe Founding Story: \"Time Travel\" (成立故事)\r\nIn 2018, Ronald Tan watched his grandmother, who suffered from Alzheimer\'s, scream in terror at a modern hospital because everything felt alien to her. He discovered that only old songs from the 1960s could calm her down. Inspired, he realized that if we can\'t cure memory loss, we can change the environment to match their memories. He rented a pre-war heritage building, kept the vintage tiles, and filled it with old radios and rattan furniture. Silver Years Haven was built as a \"Time Machine,\" helping lost seniors find their way home.\r\n\r\n❤️ Impact Story: \"Where Fear Turns to Peace\" (感人故事)\r\n\"Dementia is terrifying. For Madam Lee, waking up every day was a nightmare of unfamiliar faces. But at Silver Years Haven, the fear fades. Here, the retro tiles and 1960s music bring her back to her happiest days. She may not remember her name, but she remembers the lyrics to the old songs we play.\r\n\r\nMany of our residents have no family left to pay their bills. They rely entirely on your kindness for their diapers, medicine, and nursing care. Your contribution ensures that their final years are filled not with fear, but with love and dignity.\"', '[\"uploads/branches/br_1767960081_6960ee113ef84_0.jpg\",\"uploads/branches/br_1769004845_6970df2dd4013_0.png\",\"uploads/branches/br_1769004845_6970df2dd452c_1.png\"]', 1, 'Open', 'CIMB', '7070169114', '2025-12-15 23:02:23', 0);
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `case_comments`
+-- 表的结构 `case_comments`
 --
 
 CREATE TABLE `case_comments` (
@@ -321,7 +376,7 @@ CREATE TABLE `case_comments` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `case_comments`
+-- 转存表中的数据 `case_comments`
 --
 
 INSERT INTO `case_comments` (`Comment_ID`, `Case_ID`, `Donor_ID`, `Comment_Text`, `Created_At`) VALUES
@@ -330,7 +385,7 @@ INSERT INTO `case_comments` (`Comment_ID`, `Case_ID`, `Donor_ID`, `Comment_Text`
 -- --------------------------------------------------------
 
 --
--- Table structure for table `contact_messages`
+-- 表的结构 `contact_messages`
 --
 
 CREATE TABLE `contact_messages` (
@@ -346,14 +401,14 @@ CREATE TABLE `contact_messages` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `contact_messages`
+-- 转存表中的数据 `contact_messages`
 --
 
 INSERT INTO `contact_messages` (`Contact_ID`, `Name`, `Email`, `Phone`, `Title`, `Message`, `Attachment`, `Status`, `Created_At`) VALUES
 (17, 'LIM WEN QIN', 'lll8694798586@gmail.com', '011-12345678', 'a', 'qw', NULL, 'Read', '2026-01-06 00:46:27');
 
 --
--- Triggers `contact_messages`
+-- 触发器 `contact_messages`
 --
 DELIMITER $$
 CREATE TRIGGER `notify_message_insert` AFTER INSERT ON `contact_messages` FOR EACH ROW BEGIN
@@ -366,7 +421,7 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
--- Table structure for table `contact_settings`
+-- 表的结构 `contact_settings`
 --
 
 CREATE TABLE `contact_settings` (
@@ -381,7 +436,7 @@ CREATE TABLE `contact_settings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `contact_settings`
+-- 转存表中的数据 `contact_settings`
 --
 
 INSERT INTO `contact_settings` (`Setting_ID`, `Address`, `Phone`, `Whatsapp_Link`, `Email`, `Working_Hours`, `Map_Embed_Src`, `Updated_At`) VALUES
@@ -390,7 +445,7 @@ INSERT INTO `contact_settings` (`Setting_ID`, `Address`, `Phone`, `Whatsapp_Link
 -- --------------------------------------------------------
 
 --
--- Table structure for table `donor`
+-- 表的结构 `donor`
 --
 
 CREATE TABLE `donor` (
@@ -419,7 +474,7 @@ CREATE TABLE `donor` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `donor`
+-- 转存表中的数据 `donor`
 --
 
 INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_ContactNumber`, `Donor_ICNumber`, `Donor_Email`, `Donor_Password`, `Donor_Wallet`, `Donor_Address1`, `Donor_Address2`, `Donor_Address3`, `Donor_City`, `Donor_State`, `Donor_PostalCode`, `Donor_Country`, `Donor_DOB`, `Donor_Description`, `Donor_RegisteredAt`, `Donor_LastLogin`, `Donor_ProfilePicture`, `Is_Deleted`, `donor_reset_count`, `donor_last_reset_request`) VALUES
@@ -427,7 +482,7 @@ INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_ContactNumber`, `Donor_ICN
 (3, 'thong yuen zhen', '+6011-11190233', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$PNOaF1e8KP0y9i404VCz9OWhn3XVyLHx8roawWiJjvPR0hyRunfeW', 0.00, 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '2003-05-17', '', '2026-01-03 21:43:26', NULL, 'uploads/donors/donor_1767879100_695fb1bc6d8e7.png', 0, 1, NULL),
 (4, 'johndoe', '+6011-11190233', '', 'admin@donationsystem.com', NULL, 0.00, '', '', '', '', '', '', 'Malaysia', '0000-00-00', '', '2026-01-08 10:17:29', NULL, NULL, 0, 0, NULL),
 (5, 'thong', '+6011-11190233', '', 'thong@example.com', '$2y$10$yIcrpElLqaB33nLEva5rB.cfnVFib.XdekEbMYbJROuPcpHi.lshi', 0.00, '', '', '', '', '', '', 'Malaysia', '0000-00-00', '', '2026-01-11 01:09:57', NULL, NULL, 0, 0, NULL),
-(6, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', '$2y$10$xOPon039anG.Ft.X5qZCjuMJ.zwoKZBfFpWlAm61hiBHvnJZaHamK', 0.00, 'No19.jalan melawati 19, taman melawati', 'taman melawati', 'Skudai', 'Johor Bahru', 'Johor', '81300', 'Malaysia', '2005-04-04', '', '2026-01-11 21:21:48', NULL, NULL, 0, 4, NULL),
+(6, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', '$2y$10$xOPon039anG.Ft.X5qZCjuMJ.zwoKZBfFpWlAm61hiBHvnJZaHamK', 250.00, 'No19.jalan melawati 19, taman melawati', 'taman melawati', 'Skudai', 'Johor Bahru', 'Johor', '81300', 'Malaysia', '2005-04-04', '', '2026-01-11 21:21:48', NULL, NULL, 0, 4, NULL),
 (7, 'thong', '012-34567812', '691121011234', 'qinwenlin989@gmail.com', '$2y$10$EM8PfzEjVKw6tO3bgzOg0uX21x2Qhh8geTUFON816oItisuI2GMQK', 20.00, 'Blk 914Jurong West Street 91', 'taman abc', '', 'Skudai', 'Johor', '640914', 'Malaysia', '1969-11-21', '', '2026-01-15 10:03:57', NULL, NULL, 0, 2, NULL),
 (8, 'john', '+6011-11190233', '', 'user@donationsystem.my', '$2y$10$yj0hTeFgb8HPGcVTCUCJ/e8xbghBuFPUq3wHlVLBG2TRU8PcUO7rO', 0.00, '', '', '', '', '', '', 'Malaysia', '0000-00-00', '', '2026-01-15 10:48:37', NULL, NULL, 0, 0, NULL),
 (9, 'thong', '+6011-11190233', '030517', 'qinwen@gmail.org', '$2y$10$wAnF5LHfhwNjlio1fzpDvu/pZLmtNrXFiGKzQaVaSZKyb44cEKyby', 0.00, '', '', '', '', '', '', 'Malaysia', '2003-05-17', '', '2026-01-15 22:03:08', NULL, NULL, 1, 0, NULL),
@@ -436,7 +491,7 @@ INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_ContactNumber`, `Donor_ICN
 (12, 'LIM WEN QIN', '011-11234567', '', 'lll8694798586@gmail.com', '$2y$10$zRWNhEEie5nj0ck6IyXlPeBT0QlY6Gr9BIsamWGLt7EsSXXFRmp6W', 0.00, '', NULL, NULL, '', '', '', 'Malaysia', '1999-06-16', '', '2026-01-19 00:33:23', NULL, NULL, 0, 0, NULL);
 
 --
--- Triggers `donor`
+-- 触发器 `donor`
 --
 DELIMITER $$
 CREATE TRIGGER `notify_donor_insert` AFTER INSERT ON `donor` FOR EACH ROW BEGIN
@@ -463,7 +518,7 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
--- Table structure for table `donor_login_attempts`
+-- 表的结构 `donor_login_attempts`
 --
 
 CREATE TABLE `donor_login_attempts` (
@@ -475,7 +530,7 @@ CREATE TABLE `donor_login_attempts` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `donor_login_attempts`
+-- 转存表中的数据 `donor_login_attempts`
 --
 
 INSERT INTO `donor_login_attempts` (`id`, `email`, `ip_address`, `attempt_time`, `status`) VALUES
@@ -489,7 +544,7 @@ INSERT INTO `donor_login_attempts` (`id`, `email`, `ip_address`, `attempt_time`,
 -- --------------------------------------------------------
 
 --
--- Table structure for table `donor_password_reset`
+-- 表的结构 `donor_password_reset`
 --
 
 CREATE TABLE `donor_password_reset` (
@@ -507,7 +562,7 @@ CREATE TABLE `donor_password_reset` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `donor_password_reset`
+-- 转存表中的数据 `donor_password_reset`
 --
 
 INSERT INTO `donor_password_reset` (`reset_id`, `donor_id`, `reset_token`, `reset_email`, `reset_expires`, `reset_created`, `reset_updated`, `ip_address`, `user_agent`, `reset_status`, `reset_used`) VALUES
@@ -519,7 +574,7 @@ INSERT INTO `donor_password_reset` (`reset_id`, `donor_id`, `reset_token`, `rese
 -- --------------------------------------------------------
 
 --
--- Table structure for table `donor_security_logs`
+-- 表的结构 `donor_security_logs`
 --
 
 CREATE TABLE `donor_security_logs` (
@@ -534,7 +589,7 @@ CREATE TABLE `donor_security_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `donor_security_logs`
+-- 转存表中的数据 `donor_security_logs`
 --
 
 INSERT INTO `donor_security_logs` (`log_id`, `donor_id`, `log_type`, `log_action`, `ip_address`, `user_agent`, `log_details`, `log_date`) VALUES
@@ -549,7 +604,7 @@ INSERT INTO `donor_security_logs` (`log_id`, `donor_id`, `log_type`, `log_action
 -- --------------------------------------------------------
 
 --
--- Table structure for table `email_logs`
+-- 表的结构 `email_logs`
 --
 
 CREATE TABLE `email_logs` (
@@ -563,7 +618,7 @@ CREATE TABLE `email_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `email_logs`
+-- 转存表中的数据 `email_logs`
 --
 
 INSERT INTO `email_logs` (`Email_ID`, `To_Email`, `Title`, `Content`, `Status`, `Sent_At`, `Created_At`) VALUES
@@ -573,7 +628,7 @@ INSERT INTO `email_logs` (`Email_ID`, `To_Email`, `Title`, `Content`, `Status`, 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `headquarters`
+-- 表的结构 `headquarters`
 --
 
 CREATE TABLE `headquarters` (
@@ -593,7 +648,7 @@ CREATE TABLE `headquarters` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `headquarters`
+-- 转存表中的数据 `headquarters`
 --
 
 INSERT INTO `headquarters` (`HQ_ID`, `HQ_Name`, `HQ_ContactNumber`, `HQ_Email`, `HQ_Address`, `HQ_Description`, `HQ_Story`, `HQ_FoundingDate`, `HQ_Image`, `Updated_At`, `Headquarters_State`, `HQ_BankName`, `HQ_BankAccount`) VALUES
@@ -602,7 +657,7 @@ INSERT INTO `headquarters` (`HQ_ID`, `HQ_Name`, `HQ_ContactNumber`, `HQ_Email`, 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `login_attempts`
+-- 表的结构 `login_attempts`
 --
 
 CREATE TABLE `login_attempts` (
@@ -616,7 +671,7 @@ CREATE TABLE `login_attempts` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `notifications`
+-- 表的结构 `notifications`
 --
 
 CREATE TABLE `notifications` (
@@ -630,7 +685,7 @@ CREATE TABLE `notifications` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `orders`
+-- 表的结构 `orders`
 --
 
 CREATE TABLE `orders` (
@@ -660,7 +715,7 @@ CREATE TABLE `orders` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `orders`
+-- 转存表中的数据 `orders`
 --
 
 INSERT INTO `orders` (`Order_ID`, `Order_Name`, `Order_ContactNumber`, `Order_ICNumber`, `Order_Email`, `Order_Amount`, `Order_Points_Earned`, `Order_Currency`, `Order_PaymentMethod`, `Order_PaymentStatus`, `Order_Admin_Status`, `Order_TXN_Ref`, `Order_Type`, `Order_Status`, `Tax_Receipt_Status`, `Is_Deleted`, `Order_Created_At`, `Order_Updated_At`, `Donor_ID`, `Payment_ID`, `Branch_ID`, `Activity_ID`, `Case_ID`) VALUES
@@ -682,14 +737,36 @@ INSERT INTO `orders` (`Order_ID`, `Order_Name`, `Order_ContactNumber`, `Order_IC
 (20, 'thong', '012-34567812', '', 'qinwenlin989@gmail.com', 50.00, 0, '', '', '', 'Completed', 'TXN-TOPUP-20260115101937-547', 'Top-up', 'Completed', 'Not_Requested', 0, '2026-01-15 10:19:37', '2026-01-15 10:19:37', 7, 21, NULL, NULL, NULL),
 (21, 'thong', '012-34567812', '691121011234', 'qinwenlin989@gmail.com', 30.00, 0, 'MYR', '', 'Success', 'Completed', 'TXN-EW-20260115103029-579', 'Recurring', 'Completed', 'Rejected', 0, '2026-01-15 10:30:29', '2026-01-15 10:30:29', 7, 22, 2, NULL, NULL),
 (22, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 50.00, 0, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260117211754-890', 'Recurring', 'Completed', 'Not_Requested', 0, '2026-01-17 21:17:54', '2026-01-17 21:17:54', 11, 23, 2, NULL, NULL),
-(23, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 50.00, 0, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260117211906-993', 'One-time', 'Completed', 'Requested', 0, '2026-01-17 21:19:06', '2026-01-17 21:19:06', 11, 24, NULL, NULL, 8),
+(23, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 50.00, 0, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260117211906-993', 'One-time', 'Completed', 'Generated', 0, '2026-01-17 21:19:06', '2026-01-17 21:19:06', 11, 24, NULL, NULL, 8),
 (24, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 300.00, 0, '', 'TNG eWallet', '', 'Completed', 'TXN-TOPUP-20260117212116-248', 'Top-up', 'Completed', 'Not_Requested', 0, '2026-01-17 21:21:16', '2026-01-17 21:21:16', 11, 25, NULL, NULL, NULL),
 (25, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 300.00, 0, '', 'TNG eWallet', '', 'Completed', 'TXN-TOPUP-20260117212134-309', 'Top-up', 'Completed', 'Not_Requested', 0, '2026-01-17 21:21:34', '2026-01-17 21:21:34', 11, 26, NULL, NULL, NULL),
 (26, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 100.00, 0, 'MYR', 'System E-Wallet', 'Success', 'Completed', 'TXN-EW-20260117212201-255', 'One-time', 'Completed', 'Requested', 0, '2026-01-17 21:22:01', '2026-01-17 21:22:01', 11, 27, NULL, NULL, 3),
-(27, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 100.00, 0, 'MYR', 'System E-Wallet', 'Success', 'Completed', 'TXN-EW-20260117212324-565', 'One-time', 'Completed', 'Requested', 0, '2026-01-17 21:23:24', '2026-01-17 21:23:24', 11, 28, NULL, 3, NULL);
+(27, 'thong', '011-22334455', '030517010375', 'thong@gmail.org', 100.00, 0, 'MYR', 'System E-Wallet', 'Success', 'Completed', 'TXN-EW-20260117212324-565', 'One-time', 'Completed', 'Requested', 0, '2026-01-17 21:23:24', '2026-01-17 21:23:24', 11, 28, NULL, 3, NULL),
+(28, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 20.00, 2, 'MYR', 'Credit Card', 'Success', 'Completed', 'TXN-CD-20260119232618-638', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-19 23:26:18', '2026-01-19 23:26:18', 6, 29, NULL, NULL, NULL),
+(29, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, 'MYR', 'Credit Card', 'Success', 'Completed', 'TXN-CD-20260120080433-103', 'Recurring', 'Completed', 'Not_Requested', 0, '2026-01-20 08:04:33', '2026-01-20 08:04:33', 6, 30, 1, NULL, NULL),
+(30, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, '', 'TNG eWallet', '', 'Completed', 'TXN-TOPUP-20260120080448-728', 'Top-up', 'Completed', 'Not_Requested', 0, '2026-01-20 08:04:48', '2026-01-20 08:04:48', 6, 31, NULL, NULL, NULL),
+(31, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260120080511-828', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-20 08:05:11', '2026-01-20 08:05:11', 6, 32, 3, NULL, NULL),
+(32, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, 'MYR', 'System E-Wallet', 'Success', 'Completed', 'TXN-EW-20260120080542-668', 'One-time', 'Completed', 'Requested', 0, '2026-01-20 08:05:42', '2026-01-20 08:05:42', 6, 33, NULL, NULL, 8),
+(33, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 20.00, 2, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260120081050-776', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-20 08:10:50', '2026-01-20 08:10:50', 6, 34, NULL, NULL, NULL),
+(34, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, 'MYR', 'Credit Card', 'Success', 'Completed', 'TXN-CD-20260120094219-326', 'One-time', 'Completed', 'Generated', 0, '2026-01-20 09:42:19', '2026-01-20 09:42:19', 6, 35, 1, NULL, NULL),
+(35, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260120094950-466', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-20 09:49:50', '2026-01-20 09:49:50', 6, 36, NULL, NULL, NULL),
+(36, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260121212111-911', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-21 21:21:11', '2026-01-21 21:21:11', 6, 37, NULL, NULL, NULL),
+(37, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 30.00, 3, 'MYR', 'Credit Card', 'Success', 'Completed', 'TXN-CD-20260121213442-962', 'One-time', 'Completed', 'Generated', 0, '2026-01-21 21:34:42', '2026-01-21 21:34:42', 6, 38, 1, NULL, NULL),
+(38, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 10.00, 1, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260121213922-198', 'One-time', 'Completed', 'Requested', 0, '2026-01-21 21:39:22', '2026-01-21 21:39:22', 6, 39, NULL, NULL, 10),
+(39, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 20.00, 2, 'MYR', 'Credit Card', 'Success', 'Completed', 'TXN-CD-20260121223323-169', 'Recurring', 'Completed', 'Not_Requested', 0, '2026-01-21 22:33:23', '2026-01-21 22:33:23', 6, 40, 3, NULL, NULL),
+(40, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260121223350-983', 'One-time', 'Completed', 'Requested', 0, '2026-01-21 22:33:50', '2026-01-21 22:33:50', 6, 41, 3, NULL, NULL),
+(41, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, '', 'TNG eWallet', '', 'Completed', 'TXN-TOPUP-20260121223406-836', 'Top-up', 'Completed', 'Not_Requested', 0, '2026-01-21 22:34:06', '2026-01-21 22:34:06', 6, 42, NULL, NULL, NULL),
+(42, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, 'MYR', 'System E-Wallet', 'Success', 'Completed', 'TXN-EW-20260121223421-832', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-21 22:34:21', '2026-01-21 22:34:21', 6, 43, 3, NULL, NULL),
+(43, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, '', '', '', 'Completed', 'TXN-TOPUP-20260121223457-397', 'Top-up', 'Completed', 'Not_Requested', 0, '2026-01-21 22:34:57', '2026-01-21 22:34:57', 6, 44, NULL, NULL, NULL),
+(44, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, 'MYR', 'System E-Wallet', 'Success', 'Completed', 'TXN-EW-20260121223510-102', 'One-time', 'Completed', 'Requested', 0, '2026-01-21 22:35:10', '2026-01-21 22:35:10', 6, 45, NULL, NULL, 8),
+(45, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260121223536-713', 'One-time', 'Completed', 'Requested', 0, '2026-01-21 22:35:36', '2026-01-21 22:35:36', 6, 46, NULL, NULL, 8),
+(46, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 100.00, 10, 'MYR', 'TNG eWallet', 'Success', 'Completed', 'TXN-TNG-20260121223948-999', 'One-time', 'Completed', 'Not_Requested', 0, '2026-01-21 22:39:48', '2026-01-21 22:39:48', 6, 47, NULL, NULL, 8),
+(47, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 100.00, 10, 'MYR', 'Credit Card', 'Success', 'Completed', 'TXN-CD-20260121224020-460', 'One-time', 'Completed', 'Requested', 0, '2026-01-21 22:40:20', '2026-01-21 22:40:20', 6, 48, NULL, NULL, 8),
+(48, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 300.00, 30, '', 'TNG eWallet', '', 'Completed', 'TXN-TOPUP-20260121224652-335', 'Top-up', 'Completed', 'Not_Requested', 0, '2026-01-21 22:46:52', '2026-01-21 22:46:52', 6, 49, NULL, NULL, NULL),
+(49, 'RONALD TAN BIN HONG', '+6012-7212535', '050404-01-1183', 'ronaldtan0404@gmail.com', 50.00, 5, 'MYR', 'System E-Wallet', 'Success', 'Completed', 'TXN-REC-20260121225546-314', 'Recurring', 'Completed', 'Not_Requested', 0, '2026-01-21 22:55:46', '2026-01-21 22:55:46', 6, 50, 1, NULL, NULL);
 
 --
--- Triggers `orders`
+-- 触发器 `orders`
 --
 DELIMITER $$
 CREATE TRIGGER `after_tax_receipt_request` AFTER UPDATE ON `orders` FOR EACH ROW BEGIN
@@ -789,7 +866,7 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
--- Table structure for table `password_resets`
+-- 表的结构 `password_resets`
 --
 
 CREATE TABLE `password_resets` (
@@ -801,7 +878,7 @@ CREATE TABLE `password_resets` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `password_resets`
+-- 转存表中的数据 `password_resets`
 --
 
 INSERT INTO `password_resets` (`id`, `email`, `token`, `expires_at`, `created_at`) VALUES
@@ -811,7 +888,7 @@ INSERT INTO `password_resets` (`id`, `email`, `token`, `expires_at`, `created_at
 -- --------------------------------------------------------
 
 --
--- Table structure for table `payment`
+-- 表的结构 `payment`
 --
 
 CREATE TABLE `payment` (
@@ -828,7 +905,7 @@ CREATE TABLE `payment` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `payment`
+-- 转存表中的数据 `payment`
 --
 
 INSERT INTO `payment` (`Payment_ID`, `Payment_Method`, `Payment_Status`, `Payment_TXN_Ref`, `Payment_Amount`, `Payment_Paid_At`, `Payment_Bank_Name`, `Payment_Bank_Masked`, `Payment_Proof`, `Payment_Created_At`) VALUES
@@ -854,12 +931,34 @@ INSERT INTO `payment` (`Payment_ID`, `Payment_Method`, `Payment_Status`, `Paymen
 (25, 'TNG eWallet', 'Success', 'TXN-TOPUP-20260117212116-248', 300.00, '0000-00-00 00:00:00', 'TNG eWallet', 'Top-up Account', NULL, '2026-01-17 21:21:16'),
 (26, 'TNG eWallet', 'Success', 'TXN-TOPUP-20260117212134-309', 300.00, '0000-00-00 00:00:00', 'TNG eWallet', 'Top-up Account', NULL, '2026-01-17 21:21:34'),
 (27, 'System E-Wallet', 'Success', 'TXN-EW-20260117212201-255', 100.00, '2026-01-17 21:22:01', 'Internal Wallet', 'Wallet-Spending', NULL, '2026-01-17 21:22:01'),
-(28, 'System E-Wallet', 'Success', 'TXN-EW-20260117212324-565', 100.00, '2026-01-17 21:23:24', 'Internal Wallet', 'Wallet-Spending', NULL, '2026-01-17 21:23:24');
+(28, 'System E-Wallet', 'Success', 'TXN-EW-20260117212324-565', 100.00, '2026-01-17 21:23:24', 'Internal Wallet', 'Wallet-Spending', NULL, '2026-01-17 21:23:24'),
+(29, 'Credit Card', 'Success', 'TXN-CD-20260119232618-638', 20.00, '2026-01-19 23:26:18', 'MasterCard', '5235 **** **** 9700', NULL, '2026-01-19 23:26:18'),
+(30, 'Credit Card', 'Success', 'TXN-CD-20260120080433-103', 50.00, '2026-01-20 08:04:33', 'Visa Card', '4175 **** **** 0501', NULL, '2026-01-20 08:04:33'),
+(31, 'TNG eWallet', 'Success', 'TXN-TOPUP-20260120080448-728', 50.00, '0000-00-00 00:00:00', 'TNG eWallet', 'Top-up Account', NULL, '2026-01-20 08:04:48'),
+(32, 'TNG eWallet', 'Success', 'TXN-TNG-20260120080511-828', 50.00, '2026-01-20 08:05:11', 'TNG eWallet', 'QR Payment', NULL, '2026-01-20 08:05:11'),
+(33, 'System E-Wallet', 'Success', 'TXN-EW-20260120080542-668', 50.00, '2026-01-20 08:05:42', 'Internal Wallet', 'Wallet-Spending', NULL, '2026-01-20 08:05:42'),
+(34, 'TNG eWallet', 'Success', 'TXN-TNG-20260120081050-776', 20.00, '2026-01-20 08:10:50', 'TNG eWallet', 'QR Payment', NULL, '2026-01-20 08:10:50'),
+(35, 'Credit Card', 'Success', 'TXN-CD-20260120094219-326', 50.00, '2026-01-20 09:42:19', 'Visa Card', '4164 **** **** 1365', NULL, '2026-01-20 09:42:19'),
+(36, 'TNG eWallet', 'Success', 'TXN-TNG-20260120094950-466', 50.00, '2026-01-20 09:49:50', 'TNG eWallet', 'QR Payment', NULL, '2026-01-20 09:49:50'),
+(37, 'TNG eWallet', 'Success', 'TXN-TNG-20260121212111-911', 50.00, '2026-01-21 21:21:11', 'TNG eWallet', 'QR Payment', NULL, '2026-01-21 21:21:11'),
+(38, 'Credit Card', 'Success', 'TXN-CD-20260121213442-962', 30.00, '2026-01-21 21:34:42', 'Visa Card', '4111 **** **** 1111', NULL, '2026-01-21 21:34:42'),
+(39, 'TNG eWallet', 'Success', 'TXN-TNG-20260121213922-198', 10.00, '2026-01-21 21:39:22', 'TNG eWallet', 'QR Payment', NULL, '2026-01-21 21:39:22'),
+(40, 'Credit Card', 'Success', 'TXN-CD-20260121223323-169', 20.00, '2026-01-21 22:33:23', 'MasterCard', '5252 **** **** 4574', NULL, '2026-01-21 22:33:23'),
+(41, 'TNG eWallet', 'Success', 'TXN-TNG-20260121223350-983', 50.00, '2026-01-21 22:33:50', 'TNG eWallet', 'QR Payment', NULL, '2026-01-21 22:33:50'),
+(42, 'TNG eWallet', 'Success', 'TXN-TOPUP-20260121223406-836', 50.00, '0000-00-00 00:00:00', 'TNG eWallet', 'Top-up Account', NULL, '2026-01-21 22:34:06'),
+(43, 'System E-Wallet', 'Success', 'TXN-EW-20260121223421-832', 50.00, '2026-01-21 22:34:21', 'Internal Wallet', 'Wallet-Spending', NULL, '2026-01-21 22:34:21'),
+(44, '', 'Success', 'TXN-TOPUP-20260121223457-397', 50.00, '0000-00-00 00:00:00', 'Visa Card', '4141 **** **** 5126', NULL, '2026-01-21 22:34:57'),
+(45, 'System E-Wallet', 'Success', 'TXN-EW-20260121223510-102', 50.00, '2026-01-21 22:35:10', 'Internal Wallet', 'Wallet-Spending', NULL, '2026-01-21 22:35:10'),
+(46, 'TNG eWallet', 'Success', 'TXN-TNG-20260121223536-713', 50.00, '2026-01-21 22:35:36', 'TNG eWallet', 'QR Payment', NULL, '2026-01-21 22:35:36'),
+(47, 'TNG eWallet', 'Success', 'TXN-TNG-20260121223948-999', 100.00, '2026-01-21 22:39:48', 'TNG eWallet', 'QR Payment', NULL, '2026-01-21 22:39:48'),
+(48, 'Credit Card', 'Success', 'TXN-CD-20260121224020-460', 100.00, '2026-01-21 22:40:20', 'MasterCard', '5146 **** **** 6536', NULL, '2026-01-21 22:40:20'),
+(49, 'TNG eWallet', 'Success', 'TXN-TOPUP-20260121224652-335', 300.00, '0000-00-00 00:00:00', 'TNG eWallet', 'Top-up Account', NULL, '2026-01-21 22:46:52'),
+(50, 'System E-Wallet', 'Success', 'TXN-REC-20260121225546-314', 50.00, '2026-01-21 22:55:46', 'Recurring Auto', 'Wallet', NULL, '2026-01-21 22:55:46');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `point`
+-- 表的结构 `point`
 --
 
 CREATE TABLE `point` (
@@ -871,7 +970,7 @@ CREATE TABLE `point` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `point`
+-- 转存表中的数据 `point`
 --
 
 INSERT INTO `point` (`Points_ID`, `Points_Earned`, `Points_Total`, `Points_Updated_At`, `Donor_ID`) VALUES
@@ -879,11 +978,11 @@ INSERT INTO `point` (`Points_ID`, `Points_Earned`, `Points_Total`, `Points_Updat
 (2, 100, 65, '2026-01-04 23:11:46', 3),
 (3, 0, 0, '2026-01-08 10:17:29', 4),
 (4, 0, 0, '2026-01-11 01:09:57', 5),
-(5, 34, 34, '2026-01-12 12:57:41', 6),
-(6, 35, 35, '2026-01-12 12:57:41', 6),
-(7, 17, 17, '2026-01-12 12:57:41', 6),
-(8, 20, 20, '2026-01-12 12:57:41', 6),
-(9, 20, 20, '2026-01-12 12:57:41', 6),
+(5, 193, 188, '2026-01-21 22:55:46', 6),
+(6, 194, 188, '2026-01-21 22:55:46', 6),
+(7, 176, 188, '2026-01-21 22:55:46', 6),
+(8, 179, 188, '2026-01-21 22:55:46', 6),
+(9, 179, 188, '2026-01-21 22:55:46', 6),
 (10, 6006, 5956, '2026-01-15 10:33:20', 7),
 (11, 11, 5956, '2026-01-15 10:33:20', 7),
 (12, 0, 0, '2026-01-15 10:48:37', 8),
@@ -892,12 +991,16 @@ INSERT INTO `point` (`Points_ID`, `Points_Earned`, `Points_Total`, `Points_Updat
 (15, 55, 55, '2026-01-17 21:23:27', 11),
 (16, 70, 70, '2026-01-17 21:23:27', 11),
 (17, 70, 70, '2026-01-17 21:23:27', 11),
-(18, 0, 0, '2026-01-19 00:33:23', 12);
+(18, 0, 0, '2026-01-19 00:33:23', 12),
+(19, 145, 145, '2026-01-21 22:55:46', 6),
+(20, 80, 80, '2026-01-21 22:55:46', 6),
+(21, 70, 70, '2026-01-21 22:55:46', 6),
+(22, 35, 35, '2026-01-21 22:55:46', 6);
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `policy_acceptances`
+-- 表的结构 `policy_acceptances`
 --
 
 CREATE TABLE `policy_acceptances` (
@@ -913,7 +1016,7 @@ CREATE TABLE `policy_acceptances` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `privacy_policy`
+-- 表的结构 `privacy_policy`
 --
 
 CREATE TABLE `privacy_policy` (
@@ -926,7 +1029,7 @@ CREATE TABLE `privacy_policy` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `privacy_policy`
+-- 转存表中的数据 `privacy_policy`
 --
 
 INSERT INTO `privacy_policy` (`id`, `version`, `content`, `effective_date`, `created_at`, `is_active`) VALUES
@@ -935,7 +1038,7 @@ INSERT INTO `privacy_policy` (`id`, `version`, `content`, `effective_date`, `cre
 -- --------------------------------------------------------
 
 --
--- Table structure for table `receipt`
+-- 表的结构 `receipt`
 --
 
 CREATE TABLE `receipt` (
@@ -948,7 +1051,7 @@ CREATE TABLE `receipt` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `receipt`
+-- 转存表中的数据 `receipt`
 --
 
 INSERT INTO `receipt` (`Receipt_ID`, `Receipt_Receipt_Number`, `Receipt_Generated_At`, `Receipt_Receipt_File`, `Donor_ID`, `Order_ID`) VALUES
@@ -956,12 +1059,15 @@ INSERT INTO `receipt` (`Receipt_ID`, `Receipt_Receipt_Number`, `Receipt_Generate
 (2, 'REC-2026-000006', '2026-01-12 19:59:49', 'receipt_6.pdf', 6, 6),
 (3, 'REC-2026-000009', '2026-01-12 19:59:56', 'receipt_9.pdf', 6, 9),
 (4, 'REC-2026-000017', '2026-01-12 20:00:03', 'receipt_17.pdf', 6, 17),
-(5, 'REC-2026-000019', '2026-01-15 11:07:25', 'receipt_19.pdf', 7, 19);
+(5, 'REC-2026-000019', '2026-01-15 11:07:25', 'receipt_19.pdf', 7, 19),
+(6, 'REC-2026-000023', '2026-01-20 08:12:10', 'receipt_23.pdf', 11, 23),
+(7, 'REC-2026-000034', '2026-01-20 09:45:47', 'receipt_34.pdf', 6, 34),
+(8, 'REC-2026-000037', '2026-01-21 21:38:22', 'receipt_37.pdf', 6, 37);
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `recurring_donation`
+-- 表的结构 `recurring_donation`
 --
 
 CREATE TABLE `recurring_donation` (
@@ -982,16 +1088,18 @@ CREATE TABLE `recurring_donation` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `recurring_donation`
+-- 转存表中的数据 `recurring_donation`
 --
 
 INSERT INTO `recurring_donation` (`Recurring_ID`, `Recurring_Amount`, `Recurring_Payment_Method`, `Recurring_StartDate`, `Recurring_EndDate`, `Recurring_Deduction_Date`, `Last_Payment_Date`, `Recurring_Status`, `Recurring_Created_At`, `Recurring_Updated_At`, `Donor_ID`, `Branch_ID`, `Activity_ID`, `Case_ID`) VALUES
 (2, 100.00, 'TNG eWallet', '2025-12-15', NULL, '2026-01-01', NULL, 'Cancelled', '2025-12-15 22:28:06', '2025-12-15 22:28:51', 2, NULL, NULL, 3),
 (3, 30.00, '', '2026-01-15', NULL, '2026-02-15', NULL, 'Paused', '2026-01-15 10:30:29', '2026-01-15 10:34:52', 7, 2, NULL, NULL),
-(4, 50.00, 'TNG eWallet', '2026-01-17', NULL, '2026-02-17', NULL, 'Active', '2026-01-17 21:17:54', '2026-01-17 21:17:54', 11, 2, NULL, NULL);
+(4, 50.00, 'TNG eWallet', '2026-01-17', NULL, '2026-02-17', NULL, 'Active', '2026-01-17 21:17:54', '2026-01-17 21:17:54', 11, 2, NULL, NULL),
+(5, 50.00, 'Credit Card', '2026-01-20', NULL, '2026-01-25', '2026-01-21 22:55:46', 'Active', '2026-01-20 08:04:33', '2026-01-21 23:20:09', 6, 1, NULL, NULL),
+(6, 20.00, 'Credit Card', '2026-01-21', NULL, '2026-02-21', NULL, 'Active', '2026-01-21 22:33:23', '2026-01-21 22:56:27', 6, 3, NULL, NULL);
 
 --
--- Triggers `recurring_donation`
+-- 触发器 `recurring_donation`
 --
 DELIMITER $$
 CREATE TRIGGER `notify_recurring_insert` AFTER INSERT ON `recurring_donation` FOR EACH ROW BEGIN
@@ -1004,7 +1112,7 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
--- Table structure for table `redemption_order`
+-- 表的结构 `redemption_order`
 --
 
 CREATE TABLE `redemption_order` (
@@ -1032,16 +1140,17 @@ CREATE TABLE `redemption_order` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `redemption_order`
+-- 转存表中的数据 `redemption_order`
 --
 
 INSERT INTO `redemption_order` (`Redemption_ID`, `Redemption_Address1`, `Redemption_Address2`, `Redemption_Address3`, `Redemption_City`, `Redemption_State`, `Redemption_PostalCode`, `Redemption_Country`, `Redemption_ContactNumber`, `Redemption_PointsSpent`, `Redemption_Status`, `Redemption_CancelReason`, `Redemption_TrackingNumber`, `Redemption_Updated_At`, `Donor_ID`, `Reward_ID`, `Redemption_Quantity`, `Redemption_Shipped_At`, `Redemption_Est_Delivery_Date`, `Redemption_FollowUp_Sent`, `Redemption_Created_At`) VALUES
 (1, '11， jalan  silat lincah 10', NULL, NULL, 'Skudai', 'Johor', '81300', 'Malaysia', '+6011-11190233', 35, 'Cancelled', NULL, NULL, '2026-01-04 23:03:56', 3, 2, 1, NULL, NULL, 0, '2026-01-19 21:14:33'),
 (2, 'No 11, jalan silat lincah 10', 'Taman Selesa Jaya', '', 'Skudai', 'Johor', '81300', 'Malaysia', '11-11190233', 35, 'Shipped', NULL, 'JNT-123654798', '2026-01-13 20:08:54', 3, 2, 1, NULL, NULL, 0, '2026-01-19 21:14:33'),
-(3, 'Blk 914Jurong West Street 91', 'taman abc', '', 'Skudai', 'Johor', '640914', 'Malaysia', '012-34567812', 50, 'Pending', NULL, NULL, '2026-01-15 10:33:20', 7, 15, 1, NULL, NULL, 0, '2026-01-19 21:14:33');
+(3, 'Blk 914Jurong West Street 91', 'taman abc', '', 'Skudai', 'Johor', '640914', 'Malaysia', '012-34567812', 50, 'Pending', NULL, NULL, '2026-01-15 10:33:20', 7, 15, 1, NULL, NULL, 0, '2026-01-19 21:14:33'),
+(4, 'No19.jalan melawati 19, taman melawati', 'taman melawati', NULL, 'Johor Bahru', 'Johor', '81300', 'Malaysia', '+6012-7212535', 5, 'Processing', NULL, NULL, '2026-01-19 22:52:59', 6, 4, 1, NULL, NULL, 0, '2026-01-19 22:52:59');
 
 --
--- Triggers `redemption_order`
+-- 触发器 `redemption_order`
 --
 DELIMITER $$
 CREATE TRIGGER `notify_redemption_insert` AFTER INSERT ON `redemption_order` FOR EACH ROW BEGIN
@@ -1063,7 +1172,7 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
--- Table structure for table `reward_item`
+-- 表的结构 `reward_item`
 --
 
 CREATE TABLE `reward_item` (
@@ -1082,14 +1191,14 @@ CREATE TABLE `reward_item` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `reward_item`
+-- 转存表中的数据 `reward_item`
 --
 
 INSERT INTO `reward_item` (`Reward_ID`, `Reward_Code`, `Reward_ItemName`, `Reward_Category`, `Reward_Category_Note`, `Reward_Description`, `Reward_RequiredPoint`, `Reward_Supplier`, `Reward_Stock`, `Reward_ExpiryDate`, `Reward_Status`, `Reward_PhotoPath`) VALUES
 (1, 'HO-001', 'Handmade Organic Soap', 'Household', NULL, 'Natural lavender scented soap bars made with essential oils. Gentle on skin.', 12, 'Mama Earth Crafts', 50, NULL, 'Active', 'reward_1768482550_6968e6f6a0b03.jpg'),
 (2, 'AP-002', 'Batik Cotton Scarf', 'Apparel', NULL, 'Traditional Malaysian Batik hand-painted scarf. 100% Cotton, vibrant colors.', 35, 'East Coast Batik', 23, NULL, 'Active', 'reward_1768482787_6968e7e3eb582.jpg'),
 (3, 'HO-003', 'Rattan Coaster Set', 'Household', NULL, 'Set of 4 hand-woven rattan coasters. Durable and eco-friendly.', 15, 'Village Weavers', 40, NULL, 'Active', 'reward_1768482779_6968e7dbe170c.jpg'),
-(4, 'HA-004', 'Beaded Key Chain', 'Handicraft', NULL, 'Colorful hand-beaded keychain with traditional motifs. Random designs.', 5, 'Love Bridge Volunteers', 100, NULL, 'Active', 'reward_1768482771_6968e7d307f31.jpg'),
+(4, 'HA-004', 'Beaded Key Chain', 'Handicraft', NULL, 'Colorful hand-beaded keychain with traditional motifs. Random designs.', 5, 'Love Bridge Volunteers', 99, NULL, 'Active', 'reward_1768482771_6968e7d307f31.jpg'),
 (5, 'HO-005', 'Scented Soy Candle', 'Household', NULL, 'Eco-friendly soy wax candle in a glass jar. Lemongrass scent.', 20, 'Candle Studio', 30, NULL, 'Active', 'reward_1768482757_6968e7c5caa68.jpg'),
 (6, 'HO-006', 'Mengkuang Woven Mat', 'Household', NULL, 'Small woven mat suitable for table centerpiece or wall decoration.', 25, 'Kampung Heritage', 15, NULL, 'Active', 'reward_1768482747_6968e7bb402a2.jpg'),
 (7, 'HO-007', 'Clay Flower Pot', 'Household', NULL, 'Mini terracotta pot hand-painted with floral designs.', 10, 'Earth Pottery', 8, NULL, 'Low Stock', 'reward_1768482736_6968e7b0a895c.jpg'),
@@ -1110,7 +1219,7 @@ INSERT INTO `reward_item` (`Reward_ID`, `Reward_Code`, `Reward_ItemName`, `Rewar
 -- --------------------------------------------------------
 
 --
--- Table structure for table `reward_logs`
+-- 表的结构 `reward_logs`
 --
 
 CREATE TABLE `reward_logs` (
@@ -1123,7 +1232,7 @@ CREATE TABLE `reward_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `reward_logs`
+-- 转存表中的数据 `reward_logs`
 --
 
 INSERT INTO `reward_logs` (`Log_ID`, `Reward_ID`, `Admin_ID`, `Action_Type`, `Action_Details`, `Log_Created_At`) VALUES
@@ -1157,7 +1266,7 @@ INSERT INTO `reward_logs` (`Log_ID`, `Reward_ID`, `Admin_ID`, `Action_Type`, `Ac
 -- --------------------------------------------------------
 
 --
--- Table structure for table `special_case`
+-- 表的结构 `special_case`
 --
 
 CREATE TABLE `special_case` (
@@ -1196,7 +1305,7 @@ CREATE TABLE `special_case` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `special_case`
+-- 转存表中的数据 `special_case`
 --
 
 INSERT INTO `special_case` (`Case_ID`, `Case_Title`, `Case_LocationName`, `Case_Description`, `Case_Images`, `Target_Amount`, `Raised_Amount`, `Case_Status`, `Case_BankName`, `Case_BankAccount`, `Cancel_Reason`, `Completed_At`, `Created_At`, `Start_Date`, `End_Date`, `Case_Category`, `Case_Other_Category`, `Urgency`, `Donor_Count`, `Case_Deadline`, `Case_Organizer`, `Contact_Name`, `Contact_Number`, `Contact_Email`, `Case_Address1`, `Case_Address2`, `Case_Address3`, `Case_City`, `Case_State`, `Case_PostalCode`, `Case_Country`, `Case_Medical_Report`) VALUES
@@ -1207,11 +1316,11 @@ INSERT INTO `special_case` (`Case_ID`, `Case_Title`, `Case_LocationName`, `Case_
 (5, 'Standing Strong Again - Amputee Care for Grandma Halimah', 'Hospital Kuala Lumpur (HKL)', '72-year-old Puan Halimah, a diabetic for over 20 years, recently underwent a life-saving amputation of her left leg due to severe gangrene infection. Previously independent, she is now bedridden and unable to care for herself. Her healing process is slow and requires expensive silver ion dressings to prevent reinfection. We are seeking funds to provide her with a custom prosthetic leg, a lightweight wheelchair, wound care supplies, and diabetic nutritional milk. Your support will serve as her crutch, helping her regain her mobility and independence. ', '[\"uploads\\/cases\\/case_1768137269_6963a23522a13_0.png\",\"uploads\\/cases\\/case_1768137269_6963a23523daf_1.png\"]', 20000.00, 3000.00, 'Active', NULL, NULL, '', NULL, '2025-10-10 16:45:00', '2026-01-13', '2026-05-10', 'Elderly Care', NULL, 'medium', 0, NULL, 'Sentul Welfare Team', 'Puan Sarah (Volunteer)', '+6016-2233445', 'welfare@lovebridge.org.my', 'Unit 2-4, Flat Sri Perak', 'Bandar Baru Sentul', 'Sentul', 'Kuala Lumpur', 'Kuala Lumpur', '51000', 'Malaysia', NULL),
 (6, 'Shattered Hoop Dreams - Emergency Chemo Fund for Jason', 'Sunway Medical Centre', 'Jason, a 15-year-old basketball captain, thought he had a sports injury until a checkup revealed Osteosarcoma, an aggressive bone cancer eating away at his leg bone. To avoid amputation and save his life, he requires high-dose chemotherapy and complex limb-salvage surgery. The cost of RM 80,000 is impossible for his parents, who are market vendors. Jason asked his mother in tears, \"Will I ever play again?\" We are raising funds to pay for his surgery and chemotherapy, hoping to save not just his leg, but his life and his dreams. ', '[\"uploads\\/cases\\/case_1768137201_6963a1f1c0460_0.png\",\"uploads\\/cases\\/case_1768137279_6963a23f269b3_0.png\"]', 80000.00, 0.00, 'Active', NULL, NULL, '', NULL, '2026-01-11 16:44:25', '2026-01-11', '2026-07-11', 'Children Support', NULL, 'medium', 0, NULL, 'Youth Cancer Support', 'Mr. Lim (Father)', '+6012-1122334', 'hopeforjason@lovebridge.org.my', '12, Jalan Wawasan 2', 'Pusat Bandar Puchong', '', 'Puchong', 'Selangor', '47100', 'Malaysia', NULL),
 (7, 'Fighting for Love - Single Mom\'s Last Hope', 'Hospital Sultanah Aminah', '38-year-old Sarah has faced tragedy after tragedy. After losing her husband in a car accident two years ago, she became the sole provider for her two toddlers. Recently, she was diagnosed with Stage 3 Triple-Negative Breast Cancer, an aggressive form of the disease. The severe side effects of chemotherapy have forced her to stop working, cutting off the family\'s income. She fights with the mantra, \"I cannot die; my children are too young.\" This fund will cover her immunotherapy costs and living expenses for her children for one year. ', '[\"uploads\\/cases\\/case_1768137129_6963a1a9534de_0.png\",\"uploads\\/cases\\/case_1768137129_6963a1a9559b7_1.png\"]', 55000.00, 60100.00, 'Completed', NULL, NULL, '', '2026-01-15 10:16:27', '2026-01-11 16:46:33', '2026-01-11', '2026-08-11', 'Emergency Relief', NULL, 'medium', 1, NULL, 'Johor Women Aid', 'Sarah Binti Ali', '+6017-8899000', 'help.sarah@lovebridge.org.my', 'No 88, Jalan Kebudayaan', 'Taman Universiti', '', 'Skudai', 'Johor', '81300', 'Malaysia', NULL),
-(8, 'Rebirth from Fire - Skin Graft Surgery for Xiao Mei', 'Hospital Raja Permaisuri Bainun', 'A kitchen accident changed 5-year-old Xiao Mei’s life in an instant when boiling soup spilled over her, causing deep second-degree burns over 40% of her body. While she survived the initial trauma, severe scar contractures are now tightening around her skin, preventing her arm from straightening and affecting her growth. She endures nightly pain and itching. We are raising funds for multiple skin graft surgeries, laser scar treatments, and custom pressure garments to help restore her mobility and reduce the scarring. ', '[\"uploads\\/cases\\/case_1768137109_6963a195d04cc_0.png\",\"uploads\\/cases\\/case_1768137109_6963a195d2193_1.png\"]', 45000.00, 150.00, 'Active', NULL, NULL, '', NULL, '2026-01-11 16:48:45', '2026-01-13', '2026-10-13', 'Children Support', NULL, 'medium', 1, NULL, 'Perak Children Fund', 'Mrs. Wong (Mother)', '+6011-22334455', 'help.xiaomei@lovebridge.org.my', '77, Laluan Tasek Timur', 'Taman Tasek Indra', '', 'Ipoh', 'Perak', '31400', 'Malaysia', NULL),
-(10, 'farhan', '', 'too stress', '[\"uploads\\/cases\\/case_1768677832_696be1c833e86_0.jpg\"]', 22.00, 0.00, 'Active', 'AmBank', '1212121212121', '', NULL, '2026-01-18 03:23:52', '2026-01-18', '2026-01-20', 'Medical', NULL, 'medium', 0, NULL, 'farhan', 'wen qin', '+6011-11119233', 'fhfh@gmail.com', '', '', '', '', 'Johor', '', 'Malaysia', NULL);
+(8, 'Rebirth from Fire - Skin Graft Surgery for Xiao Mei', 'Hospital Raja Permaisuri Bainun', 'A kitchen accident changed 5-year-old Xiao Mei’s life in an instant when boiling soup spilled over her, causing deep second-degree burns over 40% of her body. While she survived the initial trauma, severe scar contractures are now tightening around her skin, preventing her arm from straightening and affecting her growth. She endures nightly pain and itching. We are raising funds for multiple skin graft surgeries, laser scar treatments, and custom pressure garments to help restore her mobility and reduce the scarring. ', '[\"uploads\\/cases\\/case_1768137109_6963a195d04cc_0.png\",\"uploads\\/cases\\/case_1768137109_6963a195d2193_1.png\"]', 45000.00, 500.00, 'Active', NULL, NULL, '', NULL, '2026-01-11 16:48:45', '2026-01-13', '2026-10-13', 'Children Support', NULL, 'medium', 6, NULL, 'Perak Children Fund', 'Mrs. Wong (Mother)', '+6011-22334455', 'help.xiaomei@lovebridge.org.my', '77, Laluan Tasek Timur', 'Taman Tasek Indra', '', 'Ipoh', 'Perak', '31400', 'Malaysia', NULL),
+(10, 'farhan', '', 'too stress', '[\"uploads\\/cases\\/case_1768677832_696be1c833e86_0.jpg\"]', 22.00, 10.00, 'Active', 'AmBank', '1212121212121', '', NULL, '2026-01-18 03:23:52', '2026-01-18', '2026-01-20', 'Medical', NULL, 'medium', 1, NULL, 'farhan', 'wen qin', '+6011-11119233', 'fhfh@gmail.com', '', '', '', '', 'Johor', '', 'Malaysia', NULL);
 
 --
--- Triggers `special_case`
+-- 触发器 `special_case`
 --
 DELIMITER $$
 CREATE TRIGGER `notify_case_insert` AFTER INSERT ON `special_case` FOR EACH ROW BEGIN
@@ -1233,7 +1342,7 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
--- Table structure for table `staff`
+-- 表的结构 `staff`
 --
 
 CREATE TABLE `staff` (
@@ -1259,23 +1368,25 @@ CREATE TABLE `staff` (
   `Staff_ProfilePicture` varchar(255) DEFAULT NULL,
   `Admin_ID` int(11) NOT NULL,
   `Is_Deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0=Active, 1=Deleted',
-  `Staff_IsFirstLogin` tinyint(1) DEFAULT 1
+  `Staff_IsFirstLogin` tinyint(1) DEFAULT 1,
+  `Staff_LoginAttempts` int(11) DEFAULT 0,
+  `Staff_LastFailedLogin` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `staff`
+-- 转存表中的数据 `staff`
 --
 
-INSERT INTO `staff` (`Staff_ID`, `Staff_FullName`, `Staff_ContactNumber`, `Staff_ICNumber`, `Staff_Email`, `Staff_Password`, `Staff_DOB`, `Staff_Address1`, `Staff_Address2`, `Staff_Address3`, `Staff_City`, `Staff_State`, `Staff_PostalCode`, `Staff_Country`, `Staff_Comment`, `Staff_Role`, `Staff_Status`, `Branch_ID`, `Staff_JoinDate`, `Staff_ProfilePicture`, `Admin_ID`, `Is_Deleted`, `Staff_IsFirstLogin`) VALUES
-(1, 'Lim Wen Qin', '+6011-11190233', '030303-01-0303', 'lim.wen.qin@student.mmu.edu.my', '$2y$10$wI3ynrr3', '2003-03-03', '19, jalan bukit beruang utama 6', 'taman buklit beruang utama', '', 'melaka', 'Melaka', '75450', 'Malaysia', '', 'Staff', 'Active', NULL, '2025-12-07', 'uploads/staff_profiles/staff_1765123541_6935a5d520873.png', 2, 0, 1),
-(4, 'steve', '+6012-34567898', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$s4PtchL9.Lhy9dcKmrf0.eCM1qrxynsrSq4cLqR.c2XypF7q7F7w2', '2003-05-17', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-08', NULL, 2, 0, 1),
-(6, 'john', '+6012-3456789', '010203-04-0506', 'johndoe123@gmail.com', '$2y$10$FAwwBFD1hIOcrWPKJlvJbOLod5Za.bTjk1l5YsaTUbaRAAWs74tDy', '2001-02-03', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-08', NULL, 2, 0, 1),
-(8, 'ronald tan bin hong', '+6012-7212535', '010203-04-0506', 'ronaldtan0404@gmail.com', '$2y$10$n.Y6jwngCWE/KxeYcAX6ouE6vwq63ZhL1bHHfbtXhxY5ihQa7O8WK', '2001-02-06', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-09', NULL, 2, 0, 0),
-(9, 'thong', '+6011-11190233', '030517', 'thong@gmail.org', '$2y$10$b7ruWGX5udro8Hs0jXtAm.LRsO97eDzswp/YGRSNifATt7497zZJK', '2003-05-17', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-15', NULL, 2, 0, 1),
-(10, 'jojo', '+6011-11190233', '030517-01-0373', 'jojo@example.com', '$2y$10$Ry.gVthd/LQITzeT/fyth.Hv6Y0LGwVxRQLqnoaXXp1EaX46hCYfa', '2003-05-17', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-16', NULL, 2, 0, 1);
+INSERT INTO `staff` (`Staff_ID`, `Staff_FullName`, `Staff_ContactNumber`, `Staff_ICNumber`, `Staff_Email`, `Staff_Password`, `Staff_DOB`, `Staff_Address1`, `Staff_Address2`, `Staff_Address3`, `Staff_City`, `Staff_State`, `Staff_PostalCode`, `Staff_Country`, `Staff_Comment`, `Staff_Role`, `Staff_Status`, `Branch_ID`, `Staff_JoinDate`, `Staff_ProfilePicture`, `Admin_ID`, `Is_Deleted`, `Staff_IsFirstLogin`, `Staff_LoginAttempts`, `Staff_LastFailedLogin`) VALUES
+(1, 'Lim Wen Qin', '+6011-11190233', '030303-01-0303', 'lim.wen.qin@student.mmu.edu.my', '$2y$10$wI3ynrr3', '2003-03-03', '19, jalan bukit beruang utama 6', 'taman buklit beruang utama', '', 'melaka', 'Melaka', '75450', 'Malaysia', '', 'Staff', 'Active', NULL, '2025-12-07', 'uploads/staff_profiles/staff_1765123541_6935a5d520873.png', 2, 0, 1, 0, NULL),
+(4, 'steve', '+6012-34567898', '030517-01-0373', 'thongyuenzhen@gmail.com', '$2y$10$s4PtchL9.Lhy9dcKmrf0.eCM1qrxynsrSq4cLqR.c2XypF7q7F7w2', '2003-05-17', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-08', NULL, 2, 0, 1, 0, NULL),
+(6, 'john', '+6012-3456789', '010203-04-0506', 'johndoe123@gmail.com', '$2y$10$FAwwBFD1hIOcrWPKJlvJbOLod5Za.bTjk1l5YsaTUbaRAAWs74tDy', '2001-02-03', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-08', NULL, 2, 0, 1, 0, NULL),
+(8, 'ronald tan bin hong', '+6012-7212535', '010203-04-0506', 'ronaldtan0404@gmail.com', '$2y$10$n.Y6jwngCWE/KxeYcAX6ouE6vwq63ZhL1bHHfbtXhxY5ihQa7O8WK', '2001-02-06', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-09', NULL, 2, 0, 0, 3, '2026-01-27 20:59:19'),
+(9, 'thong', '+6011-11190233', '030517', 'thong@gmail.org', '$2y$10$b7ruWGX5udro8Hs0jXtAm.LRsO97eDzswp/YGRSNifATt7497zZJK', '2003-05-17', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-15', NULL, 2, 0, 1, 0, NULL),
+(10, 'jojo', '+6011-11190233', '030517-01-0373', 'jojo@example.com', '$2y$10$Ry.gVthd/LQITzeT/fyth.Hv6Y0LGwVxRQLqnoaXXp1EaX46hCYfa', '2003-05-17', '', '', '', '', '', '', 'Malaysia', '', 'Staff', 'Active', NULL, '2026-01-16', NULL, 2, 0, 1, 0, NULL);
 
 --
--- Triggers `staff`
+-- 触发器 `staff`
 --
 DELIMITER $$
 CREATE TRIGGER `notify_staff_insert` AFTER INSERT ON `staff` FOR EACH ROW BEGIN
@@ -1288,7 +1399,7 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
--- Table structure for table `staff_activity`
+-- 表的结构 `staff_activity`
 --
 
 CREATE TABLE `staff_activity` (
@@ -1301,7 +1412,7 @@ CREATE TABLE `staff_activity` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `story`
+-- 表的结构 `story`
 --
 
 CREATE TABLE `story` (
@@ -1318,20 +1429,18 @@ CREATE TABLE `story` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `story`
+-- 转存表中的数据 `story`
 --
 
 INSERT INTO `story` (`Story_ID`, `Story_Date`, `Story_Title`, `Story_Author`, `Story_Category`, `Story_Description`, `Story_Image`, `Story_Status`, `Created_At`, `Updated_At`) VALUES
-(2, NULL, 'EMERGENCY: \"Operation Ark\" Launched for East Coast Flood Victims', 'Love Bridge Pahang', 'News', 'The Northeast Monsoon has struck hard. Following continuous heavy rainfall, severe flooding has displaced over 5,000 families in Kelantan and Terengganu. In response, Love Bridge has officially activated \"Operation Ark\" from our KL Main Operations Hub.\r\n\r\nOur Quick Response Team (QRT) is currently deploying inflatable boats to reach cut-off areas in Kota Bharu. We are urgently appealing for public donations to procure clean water tablets, hygiene kits, and dry food packs. Every minute counts in disaster relief. Join us to be the lifeline for those stranded in the floods.', 'uploads/stories/1768137483_Gemini_Generated_Image_lm00oxlm00oxlm00.png', 'Published', '2026-01-11 21:18:03', '2026-01-19 22:29:51'),
+(2, NULL, 'EMERGENCY: \"Operation Ark\" Launched for East Coast Flood Victims', 'Love Bridge Pahang', 'Donor Story', 'The Northeast Monsoon has struck hard. Following continuous heavy rainfall, severe flooding has displaced over 5,000 families in Kelantan and Terengganu. In response, Love Bridge has officially activated \"Operation Ark\" from our KL Main Operations Hub.\r\n\r\nOur Quick Response Team (QRT) is currently deploying inflatable boats to reach cut-off areas in Kota Bharu. We are urgently appealing for public donations to procure clean water tablets, hygiene kits, and dry food packs. Every minute counts in disaster relief. Join us to be the lifeline for those stranded in the floods.', 'uploads/stories/1768137483_Gemini_Generated_Image_lm00oxlm00oxlm00.png', 'Published', '2026-01-11 21:18:03', '2026-01-19 00:37:08'),
 (3, '2026-01-08', 'Join Us for \"Dreams Take Flight\": A Valentine’s Date with 45 Angels', 'Love Bridge Education Fund', 'News', 'This Valentine’s Day, why not share your love with those who need it most? Our Johor branch, Four Ace Sanctuary, is hosting a special open day titled \"Dreams Take Flight\". We are inviting 20 enthusiastic volunteers to spend the afternoon with our 45 wonderful children.\r\n\r\nThe itinerary includes an \"Ice-Breaking\" session, a drawing contest, and a KFC charity lunch. It is not just about the food or games; it is about showing these children that they are seen, heard, and loved. Registration is now open on our volunteer portal.', 'uploads/stories/1768137557_Gemini_Generated_Image_kaic4tkaic4tkaic.png', 'Published', '2026-01-11 21:19:17', '2026-01-19 14:39:15'),
-(5, NULL, 'From a Cold Chair to a Warm Embrace: Mr. Boon’s Journey', 'Youth Cancer Support', 'Donor Story', 'The Silent Struggle In the sterile, fluorescent-lit hallway of the public hospital, 62-year-old Mr. Boon sat motionless, his gaze fixed on the floor. The bandage on his arm was a fresh reminder of a grueling dialysis session, but his pain went deeper than that. For 40 years, he was a proud lorry driver, but mild kidney failure took his license and his livelihood. With his savings drained, he sat there hungry, forced to make a heartbreaking choice: buy a meal to end his 24-hour fast, or save the few coins he had for the bus ride home. He felt abandoned by the world he once helped build.\r\n\r\nThe Wave of Support But we refused to let him fade away on that cold metal chair. When we shared Mr. Boon’s story, your response was immediate and overwhelming. Donations poured in to cover his \"Gap Expenses\"—the critical funds needed for his special dietary meals, non-subsidized medication, and safe transport. You didn\'t just donate money; you sent a message that he still mattered.\r\n\r\nDignity Restored The transformation was immediate. Yesterday, for the first time in months, Mr. Boon didn\'t have to choose between food and a bus ticket. After his treatment, he enjoyed a warm, nutritious meal you paid for. The defeated slump in his shoulders was gone, replaced by a look of relief. He held our hands, eyes shining with tears, and said, \"I thought I was useless now that I can\'t drive, but you made me feel like a human being again.\" You didn\'t just save his health; you gave him back his dignity.', '[\"uploads\\/stories\\/story_1768757122_696d1782db834_0.png\"]', 'Published', '2026-01-19 01:25:22', '2026-01-19 01:56:18'),
-(6, NULL, 'Aiman, The Future Engineer', 'Perak Children Fund', 'Donor Story', 'Deep in the rural outskirts of Kuala Krai, Kelantan, 11-year-old Aiman was fighting a losing battle for his education. While his peers in the city attended Zoom classes and researched on Google, Aiman studied by the flickering light of a kerosene lamp. His home had unstable electricity, often plunging into darkness during critical study hours.\r\n\r\nHis father, a dedicated rubber tapper, woke up at 4:00 AM every day to work the plantation, but the rainy season had severely impacted the rubber yield, slashing the family\'s income. They barely had enough for food, let alone an internet data plan or a smartphone. Aiman, once a top student, began to fade into the background. He felt a deep sense of shame when he couldn\'t submit his digital homework on time, watching helplessly as his grades slipped despite his desperate desire to learn. The digital divide wasn\'t just slowing him down; it was threatening to extinguish his potential entirely.\r\n\r\nYour generous donation became the turning point in Aiman\'s life. The fund provided him with a high-quality refurbished tablet and a prepaid 12-month high-speed data plan. For the first time, Aiman didn\'t have to squint in the dark or worry about data running out mid-lesson.\r\n\r\nThe change was immediate and profound. Aiman devoured digital learning materials, watching science tutorials and completing assignments the moment they were assigned. His confidence soared. In his most recent final exams, Aiman didn\'t just pass; he achieved the highest score in Science across his entire grade. When asked about his future, he no longer hesitates. He holds his tablet proudly and says, \"I want to be a Civil Engineer. I want to build better roads and bridges for my village so we are never cut off again.\" You didn’t just give him a gadget; you gave him the tools to build his future.', '[\"uploads\\/stories\\/story_1768838128_696e53f0950c7_0.png\"]', 'Published', '2026-01-19 23:55:28', '2026-01-19 23:55:28'),
-(7, NULL, 'Pak Cik Razak – Rebuilding Home and Dignity', 'Community Care Team', 'Donor Story', 'For decades, Pak Cik Razak’s wooden ancestral home in Hulu Langat was his sanctuary, filled with memories of his late wife and children growing up. But when the relentless monsoon rains hit, the water rose terrifyingly fast, submerging the house up to the roof. When the waters finally receded, they left behind thick, foul-smelling mud and total devastation.\r\n\r\nAt 65, Pak Cik Razak lost everything that made a house a home. His refrigerator was destroyed, leaving him unable to store fresh produce or insulin for his health conditions. His mattress was a waterlogged ruin. Forced to sleep on a thin, damp mat on the hard wooden floor, his arthritis flared up agonizingly, making it difficult to even stand up in the morning. With no stove and no fridge, he survived for weeks on dry biscuits and tap water, his spirit breaking a little more each day as he looked at the wreckage of his life.\r\n\r\nThe community’s compassion turned the tide for Pak Cik Razak. Through the \"Home Restoration\" fund, donors provided a crucial lifeline. A team of volunteers arrived to shovel out the mud and scrub the walls, showing him he wasn\'t alone.\r\n\r\nMore importantly, the funds purchased a Basic Home Restoration Kit. He received a brand-new, supportive mattress that allowed him to sleep without pain for the first time in a month. A new small refrigerator and a rice cooker meant he could finally stop eating dry rations and cook a warm, nutritious meal. Sitting on his clean floor, eating hot rice, Pak Cik Razak smiled—not just because his hunger was fed, but because his dignity had been restored. He now has a safe, dry haven to spend his golden years.', '[\"uploads\\/stories\\/story_1768838427_696e551bb1a92_0.png\"]', 'Published', '2026-01-20 00:00:27', '2026-01-20 00:00:27');
+(5, NULL, 'From a Cold Chair to a Warm Embrace: Mr. Boon’s Journey', 'Youth Cancer Support', 'Donor Story', 'The Silent Struggle In the sterile, fluorescent-lit hallway of the public hospital, 62-year-old Mr. Boon sat motionless, his gaze fixed on the floor. The bandage on his arm was a fresh reminder of a grueling dialysis session, but his pain went deeper than that. For 40 years, he was a proud lorry driver, but mild kidney failure took his license and his livelihood. With his savings drained, he sat there hungry, forced to make a heartbreaking choice: buy a meal to end his 24-hour fast, or save the few coins he had for the bus ride home. He felt abandoned by the world he once helped build.\r\n\r\nThe Wave of Support But we refused to let him fade away on that cold metal chair. When we shared Mr. Boon’s story, your response was immediate and overwhelming. Donations poured in to cover his \"Gap Expenses\"—the critical funds needed for his special dietary meals, non-subsidized medication, and safe transport. You didn\'t just donate money; you sent a message that he still mattered.\r\n\r\nDignity Restored The transformation was immediate. Yesterday, for the first time in months, Mr. Boon didn\'t have to choose between food and a bus ticket. After his treatment, he enjoyed a warm, nutritious meal you paid for. The defeated slump in his shoulders was gone, replaced by a look of relief. He held our hands, eyes shining with tears, and said, \"I thought I was useless now that I can\'t drive, but you made me feel like a human being again.\" You didn\'t just save his health; you gave him back his dignity.', '[\"uploads\\/stories\\/story_1768757122_696d1782db834_0.png\"]', 'Published', '2026-01-19 01:25:22', '2026-01-19 01:56:18');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `system_pages`
+-- 表的结构 `system_pages`
 --
 
 CREATE TABLE `system_pages` (
@@ -1344,7 +1453,7 @@ CREATE TABLE `system_pages` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `team_members`
+-- 表的结构 `team_members`
 --
 
 CREATE TABLE `team_members` (
@@ -1357,7 +1466,7 @@ CREATE TABLE `team_members` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `team_members`
+-- 转存表中的数据 `team_members`
 --
 
 INSERT INTO `team_members` (`Team_ID`, `Name`, `Position`, `Description`, `Images`, `Created_At`) VALUES
@@ -1368,7 +1477,7 @@ INSERT INTO `team_members` (`Team_ID`, `Name`, `Position`, `Description`, `Image
 -- --------------------------------------------------------
 
 --
--- Table structure for table `terms_conditions`
+-- 表的结构 `terms_conditions`
 --
 
 CREATE TABLE `terms_conditions` (
@@ -1381,7 +1490,7 @@ CREATE TABLE `terms_conditions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `terms_conditions`
+-- 转存表中的数据 `terms_conditions`
 --
 
 INSERT INTO `terms_conditions` (`id`, `version`, `content`, `effective_date`, `created_at`, `is_active`) VALUES
@@ -1390,7 +1499,7 @@ INSERT INTO `terms_conditions` (`id`, `version`, `content`, `effective_date`, `c
 -- --------------------------------------------------------
 
 --
--- Table structure for table `wallet_transaction`
+-- 表的结构 `wallet_transaction`
 --
 
 CREATE TABLE `wallet_transaction` (
@@ -1404,7 +1513,7 @@ CREATE TABLE `wallet_transaction` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `wallet_transaction`
+-- 转存表中的数据 `wallet_transaction`
 --
 
 INSERT INTO `wallet_transaction` (`Wallet_Trans_ID`, `Donor_ID`, `Order_ID`, `Transaction_Type`, `Amount`, `Description`, `Created_At`) VALUES
@@ -1421,12 +1530,19 @@ INSERT INTO `wallet_transaction` (`Wallet_Trans_ID`, `Donor_ID`, `Order_ID`, `Tr
 (11, 11, 24, 'Credit', 300.00, 'Top-up via TNG eWallet', '2026-01-17 21:21:16'),
 (12, 11, 25, 'Credit', 300.00, 'Top-up via TNG eWallet', '2026-01-17 21:21:34'),
 (13, 11, 26, '', 100.00, 'Donate to Case: Operation \"Fix A Heart\" - Urgent Fund for Baby Ali', '2026-01-17 21:22:01'),
-(14, 11, 27, '', 100.00, 'Donate to Activity: 2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', '2026-01-17 21:23:24');
+(14, 11, 27, '', 100.00, 'Donate to Activity: 2026 Monsoon Flood - East Coast Emergency Relief (Operation Ark)', '2026-01-17 21:23:24'),
+(15, 6, 30, 'Credit', 50.00, 'Top-up via TNG eWallet', '2026-01-20 08:04:48'),
+(16, 6, 32, '', 50.00, 'Donate to Case: Rebirth from Fire - Skin Graft Surgery for Xiao Mei', '2026-01-20 08:05:42'),
+(17, 6, 41, 'Credit', 50.00, 'Top-up via TNG eWallet', '2026-01-21 22:34:06'),
+(18, 6, 42, '', 50.00, 'Donation by E-Wallet', '2026-01-21 22:34:21'),
+(19, 6, 43, 'Credit', 50.00, 'Top-up via Credit/Debit Card', '2026-01-21 22:34:57'),
+(20, 6, 44, '', 50.00, 'Donate to Case: Rebirth from Fire - Skin Graft Surgery for Xiao Mei', '2026-01-21 22:35:10'),
+(21, 6, 48, 'Credit', 300.00, 'Top-up via TNG eWallet', '2026-01-21 22:46:52');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `withdrawals`
+-- 表的结构 `withdrawals`
 --
 
 CREATE TABLE `withdrawals` (
@@ -1446,7 +1562,7 @@ CREATE TABLE `withdrawals` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data for table `withdrawals`
+-- 转存表中的数据 `withdrawals`
 --
 
 INSERT INTO `withdrawals` (`Withdrawal_ID`, `Branch_ID`, `Case_ID`, `Activity_ID`, `Amount`, `Status`, `Request_Date`, `Processed_Date`, `Bank_Name`, `Bank_Account`, `Reference_Proof`, `Admin_ID`, `Approved_By`) VALUES
@@ -1455,44 +1571,44 @@ INSERT INTO `withdrawals` (`Withdrawal_ID`, `Branch_ID`, `Case_ID`, `Activity_ID
 (3, 2, NULL, 3, 150.00, 'Pending', '2026-01-18 00:58:51', NULL, 'N/A', 'N/A', '[\"uploads\\/withdrawals\\/wd_1768669131_696bbfcb7e5da_0.jpg\"]', 2, NULL);
 
 --
--- Indexes for dumped tables
+-- 转储表的索引
 --
 
 --
--- Indexes for table `about_us_info`
+-- 表的索引 `about_us_info`
 --
 ALTER TABLE `about_us_info`
   ADD PRIMARY KEY (`id`);
 
 --
--- Indexes for table `activity`
+-- 表的索引 `activity`
 --
 ALTER TABLE `activity`
   ADD PRIMARY KEY (`Activity_ID`),
   ADD KEY `Activity_BrANCH_ID_FK` (`Branch_ID`);
 
 --
--- Indexes for table `admin`
+-- 表的索引 `admin`
 --
 ALTER TABLE `admin`
   ADD PRIMARY KEY (`Admin_ID`);
 
 --
--- Indexes for table `admin_notifications`
+-- 表的索引 `admin_notifications`
 --
 ALTER TABLE `admin_notifications`
   ADD PRIMARY KEY (`AdminNotification_ID`),
   ADD KEY `Contact_ID` (`Contact_ID`);
 
 --
--- Indexes for table `branch`
+-- 表的索引 `branch`
 --
 ALTER TABLE `branch`
   ADD PRIMARY KEY (`Branch_ID`),
   ADD KEY `branch_admin_id_fk` (`Admin_ID`);
 
 --
--- Indexes for table `case_comments`
+-- 表的索引 `case_comments`
 --
 ALTER TABLE `case_comments`
   ADD PRIMARY KEY (`Comment_ID`),
@@ -1500,25 +1616,25 @@ ALTER TABLE `case_comments`
   ADD KEY `Donor_ID` (`Donor_ID`);
 
 --
--- Indexes for table `contact_messages`
+-- 表的索引 `contact_messages`
 --
 ALTER TABLE `contact_messages`
   ADD PRIMARY KEY (`Contact_ID`);
 
 --
--- Indexes for table `contact_settings`
+-- 表的索引 `contact_settings`
 --
 ALTER TABLE `contact_settings`
   ADD PRIMARY KEY (`Setting_ID`);
 
 --
--- Indexes for table `donor`
+-- 表的索引 `donor`
 --
 ALTER TABLE `donor`
   ADD PRIMARY KEY (`Donor_ID`);
 
 --
--- Indexes for table `donor_login_attempts`
+-- 表的索引 `donor_login_attempts`
 --
 ALTER TABLE `donor_login_attempts`
   ADD PRIMARY KEY (`id`),
@@ -1526,32 +1642,32 @@ ALTER TABLE `donor_login_attempts`
   ADD KEY `attempt_time` (`attempt_time`);
 
 --
--- Indexes for table `donor_password_reset`
+-- 表的索引 `donor_password_reset`
 --
 ALTER TABLE `donor_password_reset`
   ADD PRIMARY KEY (`reset_id`),
   ADD KEY `donor_id` (`donor_id`);
 
 --
--- Indexes for table `donor_security_logs`
+-- 表的索引 `donor_security_logs`
 --
 ALTER TABLE `donor_security_logs`
   ADD PRIMARY KEY (`log_id`);
 
 --
--- Indexes for table `email_logs`
+-- 表的索引 `email_logs`
 --
 ALTER TABLE `email_logs`
   ADD PRIMARY KEY (`Email_ID`);
 
 --
--- Indexes for table `headquarters`
+-- 表的索引 `headquarters`
 --
 ALTER TABLE `headquarters`
   ADD PRIMARY KEY (`HQ_ID`);
 
 --
--- Indexes for table `login_attempts`
+-- 表的索引 `login_attempts`
 --
 ALTER TABLE `login_attempts`
   ADD PRIMARY KEY (`id`),
@@ -1559,14 +1675,14 @@ ALTER TABLE `login_attempts`
   ADD KEY `idx_ip_time` (`ip_address`,`attempt_time`);
 
 --
--- Indexes for table `notifications`
+-- 表的索引 `notifications`
 --
 ALTER TABLE `notifications`
   ADD PRIMARY KEY (`Notification_ID`),
   ADD KEY `Notification_Donor_ID_FK` (`Donor_ID`);
 
 --
--- Indexes for table `orders`
+-- 表的索引 `orders`
 --
 ALTER TABLE `orders`
   ADD PRIMARY KEY (`Order_ID`),
@@ -1577,7 +1693,7 @@ ALTER TABLE `orders`
   ADD KEY `Order_Branch_ID_FK` (`Branch_ID`);
 
 --
--- Indexes for table `password_resets`
+-- 表的索引 `password_resets`
 --
 ALTER TABLE `password_resets`
   ADD PRIMARY KEY (`id`),
@@ -1585,20 +1701,20 @@ ALTER TABLE `password_resets`
   ADD KEY `idx_token` (`token`);
 
 --
--- Indexes for table `payment`
+-- 表的索引 `payment`
 --
 ALTER TABLE `payment`
   ADD PRIMARY KEY (`Payment_ID`);
 
 --
--- Indexes for table `point`
+-- 表的索引 `point`
 --
 ALTER TABLE `point`
   ADD PRIMARY KEY (`Points_ID`),
   ADD KEY `Point_Donor_ID_FK` (`Donor_ID`);
 
 --
--- Indexes for table `policy_acceptances`
+-- 表的索引 `policy_acceptances`
 --
 ALTER TABLE `policy_acceptances`
   ADD PRIMARY KEY (`id`),
@@ -1608,7 +1724,7 @@ ALTER TABLE `policy_acceptances`
   ADD KEY `idx_session` (`session_id`);
 
 --
--- Indexes for table `privacy_policy`
+-- 表的索引 `privacy_policy`
 --
 ALTER TABLE `privacy_policy`
   ADD PRIMARY KEY (`id`),
@@ -1616,7 +1732,7 @@ ALTER TABLE `privacy_policy`
   ADD KEY `idx_effective_date` (`effective_date`);
 
 --
--- Indexes for table `receipt`
+-- 表的索引 `receipt`
 --
 ALTER TABLE `receipt`
   ADD PRIMARY KEY (`Receipt_ID`),
@@ -1625,7 +1741,7 @@ ALTER TABLE `receipt`
   ADD KEY `Receipt_Order_ID_FK` (`Order_ID`);
 
 --
--- Indexes for table `recurring_donation`
+-- 表的索引 `recurring_donation`
 --
 ALTER TABLE `recurring_donation`
   ADD PRIMARY KEY (`Recurring_ID`),
@@ -1635,7 +1751,7 @@ ALTER TABLE `recurring_donation`
   ADD KEY `RecurringDonation_Case_ID_FK` (`Case_ID`);
 
 --
--- Indexes for table `redemption_order`
+-- 表的索引 `redemption_order`
 --
 ALTER TABLE `redemption_order`
   ADD PRIMARY KEY (`Redemption_ID`),
@@ -1643,14 +1759,14 @@ ALTER TABLE `redemption_order`
   ADD KEY `RedemptionOrder_Reward_ID_FK` (`Reward_ID`);
 
 --
--- Indexes for table `reward_item`
+-- 表的索引 `reward_item`
 --
 ALTER TABLE `reward_item`
   ADD PRIMARY KEY (`Reward_ID`),
   ADD KEY `Reward_Code` (`Reward_Code`);
 
 --
--- Indexes for table `reward_logs`
+-- 表的索引 `reward_logs`
 --
 ALTER TABLE `reward_logs`
   ADD PRIMARY KEY (`Log_ID`),
@@ -1658,13 +1774,13 @@ ALTER TABLE `reward_logs`
   ADD KEY `Log_Admin_FK` (`Admin_ID`);
 
 --
--- Indexes for table `special_case`
+-- 表的索引 `special_case`
 --
 ALTER TABLE `special_case`
   ADD PRIMARY KEY (`Case_ID`);
 
 --
--- Indexes for table `staff`
+-- 表的索引 `staff`
 --
 ALTER TABLE `staff`
   ADD PRIMARY KEY (`Staff_ID`),
@@ -1672,7 +1788,7 @@ ALTER TABLE `staff`
   ADD KEY `staff_branch_id_fk` (`Branch_ID`);
 
 --
--- Indexes for table `staff_activity`
+-- 表的索引 `staff_activity`
 --
 ALTER TABLE `staff_activity`
   ADD PRIMARY KEY (`StaffActivity_ID`),
@@ -1680,26 +1796,26 @@ ALTER TABLE `staff_activity`
   ADD KEY `StaffActivity_Activity_ID_FK` (`Activity_ID`);
 
 --
--- Indexes for table `story`
+-- 表的索引 `story`
 --
 ALTER TABLE `story`
   ADD PRIMARY KEY (`Story_ID`);
 
 --
--- Indexes for table `system_pages`
+-- 表的索引 `system_pages`
 --
 ALTER TABLE `system_pages`
   ADD PRIMARY KEY (`Page_ID`),
   ADD UNIQUE KEY `Page_Key` (`Page_Key`);
 
 --
--- Indexes for table `team_members`
+-- 表的索引 `team_members`
 --
 ALTER TABLE `team_members`
   ADD PRIMARY KEY (`Team_ID`);
 
 --
--- Indexes for table `terms_conditions`
+-- 表的索引 `terms_conditions`
 --
 ALTER TABLE `terms_conditions`
   ADD PRIMARY KEY (`id`),
@@ -1707,7 +1823,7 @@ ALTER TABLE `terms_conditions`
   ADD KEY `idx_effective_date` (`effective_date`);
 
 --
--- Indexes for table `wallet_transaction`
+-- 表的索引 `wallet_transaction`
 --
 ALTER TABLE `wallet_transaction`
   ADD PRIMARY KEY (`Wallet_Trans_ID`),
@@ -1715,7 +1831,7 @@ ALTER TABLE `wallet_transaction`
   ADD KEY `Order_ID` (`Order_ID`);
 
 --
--- Indexes for table `withdrawals`
+-- 表的索引 `withdrawals`
 --
 ALTER TABLE `withdrawals`
   ADD PRIMARY KEY (`Withdrawal_ID`),
@@ -1723,256 +1839,256 @@ ALTER TABLE `withdrawals`
   ADD KEY `Activity_ID` (`Activity_ID`);
 
 --
--- AUTO_INCREMENT for dumped tables
+-- 在导出的表使用AUTO_INCREMENT
 --
 
 --
--- AUTO_INCREMENT for table `about_us_info`
+-- 使用表AUTO_INCREMENT `about_us_info`
 --
 ALTER TABLE `about_us_info`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
--- AUTO_INCREMENT for table `activity`
+-- 使用表AUTO_INCREMENT `activity`
 --
 ALTER TABLE `activity`
   MODIFY `Activity_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
--- AUTO_INCREMENT for table `admin`
+-- 使用表AUTO_INCREMENT `admin`
 --
 ALTER TABLE `admin`
   MODIFY `Admin_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
--- AUTO_INCREMENT for table `admin_notifications`
+-- 使用表AUTO_INCREMENT `admin_notifications`
 --
 ALTER TABLE `admin_notifications`
-  MODIFY `AdminNotification_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=82;
+  MODIFY `AdminNotification_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=137;
 
 --
--- AUTO_INCREMENT for table `branch`
+-- 使用表AUTO_INCREMENT `branch`
 --
 ALTER TABLE `branch`
   MODIFY `Branch_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
--- AUTO_INCREMENT for table `case_comments`
+-- 使用表AUTO_INCREMENT `case_comments`
 --
 ALTER TABLE `case_comments`
   MODIFY `Comment_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
--- AUTO_INCREMENT for table `contact_messages`
+-- 使用表AUTO_INCREMENT `contact_messages`
 --
 ALTER TABLE `contact_messages`
   MODIFY `Contact_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
--- AUTO_INCREMENT for table `contact_settings`
+-- 使用表AUTO_INCREMENT `contact_settings`
 --
 ALTER TABLE `contact_settings`
   MODIFY `Setting_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
--- AUTO_INCREMENT for table `donor`
+-- 使用表AUTO_INCREMENT `donor`
 --
 ALTER TABLE `donor`
   MODIFY `Donor_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
--- AUTO_INCREMENT for table `donor_login_attempts`
+-- 使用表AUTO_INCREMENT `donor_login_attempts`
 --
 ALTER TABLE `donor_login_attempts`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
--- AUTO_INCREMENT for table `donor_password_reset`
+-- 使用表AUTO_INCREMENT `donor_password_reset`
 --
 ALTER TABLE `donor_password_reset`
   MODIFY `reset_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
--- AUTO_INCREMENT for table `donor_security_logs`
+-- 使用表AUTO_INCREMENT `donor_security_logs`
 --
 ALTER TABLE `donor_security_logs`
   MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
--- AUTO_INCREMENT for table `email_logs`
+-- 使用表AUTO_INCREMENT `email_logs`
 --
 ALTER TABLE `email_logs`
   MODIFY `Email_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
--- AUTO_INCREMENT for table `headquarters`
+-- 使用表AUTO_INCREMENT `headquarters`
 --
 ALTER TABLE `headquarters`
   MODIFY `HQ_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
--- AUTO_INCREMENT for table `login_attempts`
+-- 使用表AUTO_INCREMENT `login_attempts`
 --
 ALTER TABLE `login_attempts`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `notifications`
+-- 使用表AUTO_INCREMENT `notifications`
 --
 ALTER TABLE `notifications`
   MODIFY `Notification_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `orders`
+-- 使用表AUTO_INCREMENT `orders`
 --
 ALTER TABLE `orders`
-  MODIFY `Order_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
+  MODIFY `Order_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;
 
 --
--- AUTO_INCREMENT for table `password_resets`
+-- 使用表AUTO_INCREMENT `password_resets`
 --
 ALTER TABLE `password_resets`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
--- AUTO_INCREMENT for table `payment`
+-- 使用表AUTO_INCREMENT `payment`
 --
 ALTER TABLE `payment`
-  MODIFY `Payment_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+  MODIFY `Payment_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=51;
 
 --
--- AUTO_INCREMENT for table `point`
+-- 使用表AUTO_INCREMENT `point`
 --
 ALTER TABLE `point`
-  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `Points_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
--- AUTO_INCREMENT for table `policy_acceptances`
+-- 使用表AUTO_INCREMENT `policy_acceptances`
 --
 ALTER TABLE `policy_acceptances`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `privacy_policy`
+-- 使用表AUTO_INCREMENT `privacy_policy`
 --
 ALTER TABLE `privacy_policy`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
--- AUTO_INCREMENT for table `receipt`
+-- 使用表AUTO_INCREMENT `receipt`
 --
 ALTER TABLE `receipt`
-  MODIFY `Receipt_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `Receipt_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
--- AUTO_INCREMENT for table `recurring_donation`
+-- 使用表AUTO_INCREMENT `recurring_donation`
 --
 ALTER TABLE `recurring_donation`
-  MODIFY `Recurring_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `Recurring_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
--- AUTO_INCREMENT for table `redemption_order`
+-- 使用表AUTO_INCREMENT `redemption_order`
 --
 ALTER TABLE `redemption_order`
-  MODIFY `Redemption_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `Redemption_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
--- AUTO_INCREMENT for table `reward_item`
+-- 使用表AUTO_INCREMENT `reward_item`
 --
 ALTER TABLE `reward_item`
   MODIFY `Reward_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
--- AUTO_INCREMENT for table `reward_logs`
+-- 使用表AUTO_INCREMENT `reward_logs`
 --
 ALTER TABLE `reward_logs`
   MODIFY `Log_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
 
 --
--- AUTO_INCREMENT for table `special_case`
+-- 使用表AUTO_INCREMENT `special_case`
 --
 ALTER TABLE `special_case`
   MODIFY `Case_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
--- AUTO_INCREMENT for table `staff`
+-- 使用表AUTO_INCREMENT `staff`
 --
 ALTER TABLE `staff`
   MODIFY `Staff_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
--- AUTO_INCREMENT for table `staff_activity`
+-- 使用表AUTO_INCREMENT `staff_activity`
 --
 ALTER TABLE `staff_activity`
   MODIFY `StaffActivity_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `story`
+-- 使用表AUTO_INCREMENT `story`
 --
 ALTER TABLE `story`
-  MODIFY `Story_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `Story_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
--- AUTO_INCREMENT for table `system_pages`
+-- 使用表AUTO_INCREMENT `system_pages`
 --
 ALTER TABLE `system_pages`
   MODIFY `Page_ID` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `team_members`
+-- 使用表AUTO_INCREMENT `team_members`
 --
 ALTER TABLE `team_members`
   MODIFY `Team_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
--- AUTO_INCREMENT for table `terms_conditions`
+-- 使用表AUTO_INCREMENT `terms_conditions`
 --
 ALTER TABLE `terms_conditions`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
--- AUTO_INCREMENT for table `wallet_transaction`
+-- 使用表AUTO_INCREMENT `wallet_transaction`
 --
 ALTER TABLE `wallet_transaction`
-  MODIFY `Wallet_Trans_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+  MODIFY `Wallet_Trans_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
 
 --
--- AUTO_INCREMENT for table `withdrawals`
+-- 使用表AUTO_INCREMENT `withdrawals`
 --
 ALTER TABLE `withdrawals`
   MODIFY `Withdrawal_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
--- Constraints for dumped tables
+-- 限制导出的表
 --
 
 --
--- Constraints for table `activity`
+-- 限制表 `activity`
 --
 ALTER TABLE `activity`
   ADD CONSTRAINT `Activity_BrANCH_ID_FK` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`);
 
 --
--- Constraints for table `branch`
+-- 限制表 `branch`
 --
 ALTER TABLE `branch`
   ADD CONSTRAINT `branch_admin_id_fk` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`);
 
 --
--- Constraints for table `case_comments`
+-- 限制表 `case_comments`
 --
 ALTER TABLE `case_comments`
   ADD CONSTRAINT `case_comments_ibfk_1` FOREIGN KEY (`Case_ID`) REFERENCES `special_case` (`Case_ID`),
   ADD CONSTRAINT `case_comments_ibfk_2` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 --
--- Constraints for table `notifications`
+-- 限制表 `notifications`
 --
 ALTER TABLE `notifications`
   ADD CONSTRAINT `Notification_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 --
--- Constraints for table `orders`
+-- 限制表 `orders`
 --
 ALTER TABLE `orders`
   ADD CONSTRAINT `Order_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
@@ -1982,27 +2098,27 @@ ALTER TABLE `orders`
   ADD CONSTRAINT `Order_Payment_ID_FK` FOREIGN KEY (`Payment_ID`) REFERENCES `payment` (`Payment_ID`);
 
 --
--- Constraints for table `point`
+-- 限制表 `point`
 --
 ALTER TABLE `point`
   ADD CONSTRAINT `Point_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 --
--- Constraints for table `policy_acceptances`
+-- 限制表 `policy_acceptances`
 --
 ALTER TABLE `policy_acceptances`
   ADD CONSTRAINT `policy_acceptances_ibfk_1` FOREIGN KEY (`terms_version_id`) REFERENCES `terms_conditions` (`id`),
   ADD CONSTRAINT `policy_acceptances_ibfk_2` FOREIGN KEY (`privacy_version_id`) REFERENCES `privacy_policy` (`id`);
 
 --
--- Constraints for table `receipt`
+-- 限制表 `receipt`
 --
 ALTER TABLE `receipt`
   ADD CONSTRAINT `Receipt_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`),
   ADD CONSTRAINT `Receipt_Order_ID_FK` FOREIGN KEY (`Order_ID`) REFERENCES `orders` (`Order_ID`);
 
 --
--- Constraints for table `recurring_donation`
+-- 限制表 `recurring_donation`
 --
 ALTER TABLE `recurring_donation`
   ADD CONSTRAINT `RecurringDonation_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
@@ -2011,42 +2127,42 @@ ALTER TABLE `recurring_donation`
   ADD CONSTRAINT `RecurringDonation_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`);
 
 --
--- Constraints for table `redemption_order`
+-- 限制表 `redemption_order`
 --
 ALTER TABLE `redemption_order`
   ADD CONSTRAINT `RedemptionOrder_Donor_ID_FK` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`),
   ADD CONSTRAINT `RedemptionOrder_Reward_ID_FK` FOREIGN KEY (`Reward_ID`) REFERENCES `reward_item` (`Reward_ID`);
 
 --
--- Constraints for table `reward_logs`
+-- 限制表 `reward_logs`
 --
 ALTER TABLE `reward_logs`
   ADD CONSTRAINT `Log_Admin_FK` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`),
   ADD CONSTRAINT `Log_Reward_FK` FOREIGN KEY (`Reward_ID`) REFERENCES `reward_item` (`Reward_ID`) ON DELETE CASCADE;
 
 --
--- Constraints for table `staff`
+-- 限制表 `staff`
 --
 ALTER TABLE `staff`
   ADD CONSTRAINT `staff_admin_id_fk` FOREIGN KEY (`Admin_ID`) REFERENCES `admin` (`Admin_ID`),
   ADD CONSTRAINT `staff_branch_id_fk` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`);
 
 --
--- Constraints for table `staff_activity`
+-- 限制表 `staff_activity`
 --
 ALTER TABLE `staff_activity`
   ADD CONSTRAINT `StaffActivity_Activity_ID_FK` FOREIGN KEY (`Activity_ID`) REFERENCES `activity` (`Activity_ID`),
   ADD CONSTRAINT `StaffActivity_Staff_ID_FK` FOREIGN KEY (`Staff_ID`) REFERENCES `staff` (`Staff_ID`);
 
 --
--- Constraints for table `wallet_transaction`
+-- 限制表 `wallet_transaction`
 --
 ALTER TABLE `wallet_transaction`
   ADD CONSTRAINT `wallet_transaction_ibfk_1` FOREIGN KEY (`Donor_ID`) REFERENCES `donor` (`Donor_ID`) ON DELETE CASCADE,
   ADD CONSTRAINT `wallet_transaction_ibfk_2` FOREIGN KEY (`Order_ID`) REFERENCES `orders` (`Order_ID`) ON DELETE SET NULL;
 
 --
--- Constraints for table `withdrawals`
+-- 限制表 `withdrawals`
 --
 ALTER TABLE `withdrawals`
   ADD CONSTRAINT `withdrawals_ibfk_1` FOREIGN KEY (`Branch_ID`) REFERENCES `branch` (`Branch_ID`),
