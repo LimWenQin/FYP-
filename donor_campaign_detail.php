@@ -1,6 +1,6 @@
 <?php
 include 'dataconnection.php';
-// include 'header_function.php'; // 如果需要
+include 'header_function.php'; 
 
 // 1. 安全检查：获取 ID
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
@@ -29,7 +29,7 @@ $target = $activity['Activity_TargetAmount'];
 $raised = $activity['Activity_GetAmount'];
 $progress = ($target > 0) ? min(($raised / $target) * 100, 100) : 0;
 
-// --- 图片处理 (JSON 解码) ---
+// --- 图片处理 ---
 $defaultImage = 'images/campaign-default.jpg';
 $images = [];
 $dbImage = isset($activity['Activity_Images']) ? $activity['Activity_Images'] : '';
@@ -37,39 +37,55 @@ $dbImage = isset($activity['Activity_Images']) ? $activity['Activity_Images'] : 
 if (!empty($dbImage)) {
     $decoded = json_decode($dbImage, true);
     if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-        $images = $decoded; // 这是一个数组
+        $images = $decoded; 
     } else {
-        $images[] = $dbImage; // 如果不是JSON，就当单张图片处理
+        $images[] = $dbImage; 
     }
 } else {
     $images[] = $defaultImage;
 }
-$mainImage = $images[0]; // 默认显示第一张
+$mainImage = $images[0]; 
 
-// --- 状态判断 (复制之前的逻辑) ---
-$currentDate = date('Y-m-d');
+// ==========================================
+// ⚠️ 状态修正逻辑 (STATUS FIX)
+// ==========================================
+
+// 1. 强制设定测试时间 (为了配合 2026 数据库)
+$currentDate = '2026-01-30'; 
+// 上线时请恢复为: $currentDate = date('Y-m-d');
+
 $startDate = $activity['Activity_StartDate'];
 $endDate = $activity['Activity_EndDate'];
 $status = $activity['Activity_Status'];
 
-$isOngoing = false;
-$statusLabel = "Ended";
-$statusColor = "gray";
+$statusLabel = "Completed";
+$statusColor = "#757575"; // Gray
+$canDonate = false; // 控制按钮是否可点
 
+// 2. 优先信任数据库状态
 if ($status == 'Active') {
-    if ($currentDate >= $startDate && $currentDate <= $endDate) {
-        $isOngoing = true;
+    // 如果数据库是 Active，检查是否过期
+    if ($currentDate > $endDate) {
+        // 虽然写着 Active 但日期已过 -> 视为结束
+        $statusLabel = "Completed";
+        $statusColor = "#757575";
+        $canDonate = false;
+    } else {
+        // 只要没过期 (包括还没到的)，都算 Ongoing
         $statusLabel = "Ongoing";
         $statusColor = "#4CAF50"; // Green
-    } elseif ($currentDate < $startDate) {
-        $statusLabel = "Upcoming";
-        $statusColor = "#FF9800"; // Orange
-    } else {
-        $statusLabel = "Completed";
-        $statusColor = "#757575"; // Gray
+        $canDonate = true; // ✅ 开启捐款按钮
     }
-} else {
+} 
+elseif ($status == 'Upcoming') {
+    $statusLabel = "Upcoming";
+    $statusColor = "#FF9800"; // Orange
+    $canDonate = false;
+} 
+else {
     $statusLabel = "Completed";
+    $statusColor = "#757575";
+    $canDonate = false;
 }
 
 include 'header_UI.php';
@@ -273,6 +289,8 @@ include 'header_UI.php';
             margin-bottom: 15px;
             gap: 10px;
             box-shadow: 0 4px 15px rgba(229, 57, 53, 0.4);
+            border: none; /* 确保 button 也没有边框 */
+            cursor: pointer;
         }
         .btn-donate-large:hover {
             background: var(--dark-red);
@@ -311,7 +329,7 @@ include 'header_UI.php';
 
         @media (max-width: 900px) {
             .detail-container { grid-template-columns: 1fr; }
-            .sidebar-card { position: static; margin-bottom: 30px; order: -1; /* 手机端把捐款卡片放上面 */ }
+            .sidebar-card { position: static; margin-bottom: 30px; order: -1; }
             .main-image { height: 300px; }
         }
     </style>
@@ -321,8 +339,8 @@ include 'header_UI.php';
 <div class="detail-container">
     
     <div class="left-col">
-        <a href="Campaign_Page.php" style="display:inline-block; margin-bottom:20px; color:#666; text-decoration:none;">
-            <i class="fas fa-arrow-left"></i> Back to Campaigns
+        <a href="javascript:history.back()" style="display:inline-block; margin-bottom:20px; color:#666; text-decoration:none;">
+            <i class="fas fa-arrow-left"></i> Back
         </a>
 
         <div class="content-card">
@@ -392,7 +410,7 @@ include 'header_UI.php';
                 </div>
             </div>
 
-            <?php if ($isOngoing): ?>
+            <?php if ($canDonate): ?>
                 <a href="S_C_Payment_Page.php?activity_id=<?php echo $activity_id; ?>" 
                    class="btn-donate-large"
                    onclick="return checkLogin(event)">

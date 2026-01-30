@@ -2,15 +2,20 @@
 include 'dataconnection.php';
 include 'header_function.php'; 
 
-
+// --- 1. FIXED STATISTICS QUERY ---
+// Adjusted to count based on the new logic so the top counters match the grid
+$current_date_sql = date('Y-m-d');
 $stats_query = "SELECT 
     COUNT(*) as total_campaigns,
     SUM(Activity_GetAmount) as total_raised,
     SUM(CASE 
-        WHEN Activity_Status = 'Active' AND Activity_StartDate <= CURDATE() AND Activity_EndDate >= CURDATE() THEN 1 
+        WHEN Activity_Status = 'Active' 
+             AND Activity_StartDate <= '$current_date_sql' 
+             AND Activity_EndDate >= '$current_date_sql' THEN 1 
         ELSE 0 
     END) as active_now_count
 FROM activity";
+
 $stats_result = $conn->query($stats_query);
 $stats_data = $stats_result->fetch_assoc();
 
@@ -18,24 +23,26 @@ $total_campaigns_stat = $stats_data['total_campaigns'] ?? 0;
 $total_raised_stat = $stats_data['total_raised'] ?? 0;
 $active_now_stat = $stats_data['active_now_count'] ?? 0;
 
-
+// --- 2. PAGINATION & FILTER SETUP ---
 $filter = isset($_GET['filter']) ? $_GET['filter'] : 'all';
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $items_per_page = 6; 
 $offset = ($page - 1) * $items_per_page;
 
+$where_clause = "1=1"; 
 
-$where_clause = "1=1"; // 默认查询全部
-
+// --- 3. FIXED FILTER LOGIC ---
+// Updated to handle 'Upcoming' status correctly
 switch ($filter) {
     case 'ongoing':
         $where_clause = "Activity_Status = 'Active' AND Activity_StartDate <= CURDATE() AND Activity_EndDate >= CURDATE()";
         break;
     case 'upcoming':
-        $where_clause = "Activity_Status = 'Active' AND Activity_StartDate > CURDATE()";
+        // Includes manual 'Upcoming' OR 'Active' but start date is in future
+        $where_clause = "(Activity_Status = 'Upcoming' OR (Activity_Status = 'Active' AND Activity_StartDate > CURDATE()))";
         break;
     case 'past':
-        // Past 定义：状态为Completed 或者 日期已过
+        // Includes manual 'Completed' OR 'Active' but end date is passed
         $where_clause = "(Activity_Status = 'Completed' OR Activity_EndDate < CURDATE())";
         break;
     default: // 'all'
@@ -43,25 +50,24 @@ switch ($filter) {
         break;
 }
 
-
-// --- 4. 获取当前筛选条件下的总数量 (用于计算页数) ---
+// --- 4. PAGINATION CALCULATION ---
 $count_sql = "SELECT COUNT(*) as total FROM activity WHERE $where_clause";
 $count_res = $conn->query($count_sql);
 $total_items = $count_res->fetch_assoc()['total'];
 $total_pages = ceil($total_items / $items_per_page);
 
-
-// --- 5. 获取当前页数据 ---
-// 保持你原本的排序逻辑：进行中 -> 即将开始 -> 已结束
+// --- 5. FETCH DATA ---
 $query = "SELECT * FROM activity 
           WHERE $where_clause 
           ORDER BY 
             CASE 
+                -- Prioritize Ongoing
                 WHEN Activity_Status = 'Active' AND Activity_StartDate <= CURDATE() AND Activity_EndDate >= CURDATE() THEN 1
-                WHEN Activity_Status = 'Active' AND Activity_StartDate > CURDATE() THEN 2
-                WHEN Activity_Status = 'Completed' OR Activity_EndDate < CURDATE() THEN 3
-                ELSE 4
-            END,
+                -- Then Upcoming
+                WHEN Activity_Status = 'Upcoming' OR (Activity_Status = 'Active' AND Activity_StartDate > CURDATE()) THEN 2
+                -- Then Past
+                ELSE 3
+            END ASC,
             Activity_StartDate ASC
           LIMIT $items_per_page OFFSET $offset";
 
@@ -216,7 +222,6 @@ include 'header_UI.php';
             flex-wrap: wrap;
         }
         
-        /* 这里的 filter-btn 现在是 <a> 标签 */
         .filter-btn {
             background: var(--white);
             border: 2px solid var(--primary-red);
@@ -336,7 +341,7 @@ include 'header_UI.php';
             color: var(--text);
             margin-bottom: 15px;
             line-height: 1.3;
-            /* 控制标题高度 */
+            /* Control title height */
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
@@ -606,22 +611,29 @@ include 'header_UI.php';
                     $endDate = $campaign['Activity_EndDate'];
                     $status = $campaign['Activity_Status'];
                     
-                   
-                    if ($status == 'Active') {
-                        if ($currentDate >= $startDate && $currentDate <= $endDate) {
-                            $campaignStatus = 'ongoing';
-                            $badgeClass = 'badge-ongoing';
-                            $badgeText = 'Ongoing';
-                        } elseif ($currentDate < $startDate) {
-                            $campaignStatus = 'upcoming';
-                            $badgeClass = 'badge-upcoming';
-                            $badgeText = 'Upcoming';
-                        } else {
-                            $campaignStatus = 'past';
-                            $badgeClass = 'badge-past';
-                            $badgeText = 'Completed';
-                        }
-                    } else {
+                    // --- 6. FIXED DISPLAY LOGIC ---
+                    // Explicitly handle "Upcoming" and "Completed" from Database
+                    
+                    if ($status == 'Completed') {
+                        // Manually completed in DB
+                        $campaignStatus = 'past';
+                        $badgeClass = 'badge-past';
+                        $badgeText = 'Completed';
+                    } 
+                    elseif ($status == 'Upcoming' || ($status == 'Active' && $currentDate < $startDate)) {
+                        // "Upcoming" in DB OR "Active" but date is in future
+                        $campaignStatus = 'upcoming';
+                        $badgeClass = 'badge-upcoming';
+                        $badgeText = 'Upcoming';
+                    } 
+                    elseif ($status == 'Active' && $currentDate >= $startDate && $currentDate <= $endDate) {
+                        // Active and within dates
+                        $campaignStatus = 'ongoing';
+                        $badgeClass = 'badge-ongoing';
+                        $badgeText = 'Ongoing';
+                    } 
+                    else {
+                        // Fallback (e.g. Active but date passed)
                         $campaignStatus = 'past';
                         $badgeClass = 'badge-past';
                         $badgeText = 'Completed';
@@ -635,7 +647,7 @@ include 'header_UI.php';
                     <div class="campaign-card">
                         <div class="campaign-image-wrapper">
                             <?php 
-                            // JSON 图片处理
+                            // JSON Image Handling
                             $defaultImage = 'images/campaign-default.jpg';
                             $imagePath = $defaultImage;
                             
@@ -774,7 +786,7 @@ include 'header_UI.php';
     <?php include 'footer.php'; ?>
 
     <script>
-        // 图片点击放大函数
+        // Zoom Image
         function showImage(src, title) {
             Swal.fire({
                 imageUrl: src,
@@ -790,7 +802,7 @@ include 'header_UI.php';
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-           
+            
             const totalCampaigns = <?php echo $total_campaigns_stat; ?>;
             const activeCampaigns = <?php echo $active_now_stat; ?>;
             const totalRaised = <?php echo $total_raised_stat; ?>;

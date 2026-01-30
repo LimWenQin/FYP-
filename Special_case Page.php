@@ -2,7 +2,7 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-// --- 1. 定义分类配置 (Emergency红色，其他橙色) ---
+
 $categories = [
     'emergency' => [
         'db_name' => 'Emergency Relief', 
@@ -52,8 +52,9 @@ foreach ($categories as $key => $data) {
 $category_filter = isset($_GET['category']) ? $_GET['category'] : 'all';
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 
-// --- 3. 构建查询条件 ---
-$where_conditions = ["Case_Status IN ('Active', 'Completed')"];
+// --- 3. 构建查询条件 (已修正) ---
+// 这里加入了 "Is_Deleted = 0" 以过滤掉已删除的数据
+$where_conditions = ["Case_Status IN ('Active', 'Completed')", "Is_Deleted = 0"];
 
 if ($category_filter !== 'all') {
     if (isset($categories[$category_filter])) {
@@ -270,15 +271,16 @@ include 'header_UI.php';
     <div class="case-container">
         <div class="stats-container">
             <?php 
-            $total_query = "SELECT COUNT(*) as total, SUM(Raised_Amount) as total_raised FROM special_case WHERE Case_Status IN ('Active', 'Completed')";
+            // 修正统计逻辑：只计算未删除的
+            $total_query = "SELECT COUNT(*) as total, SUM(Raised_Amount) as total_raised FROM special_case WHERE Case_Status IN ('Active', 'Completed') AND Is_Deleted = 0";
             $total_result = $conn->query($total_query);
             $stats = $total_result->fetch_assoc();
             
-            $urgent_count_query = "SELECT COUNT(*) as count FROM special_case WHERE Case_Status IN ('Active', 'Completed') AND Case_Category = 'Emergency Relief'";
+            $urgent_count_query = "SELECT COUNT(*) as count FROM special_case WHERE Case_Status IN ('Active', 'Completed') AND Case_Category = 'Emergency Relief' AND Is_Deleted = 0";
             $urgent_result = $conn->query($urgent_count_query);
             $urgent_count = $urgent_result->fetch_assoc()['count'];
             
-            $total_donors_query = "SELECT SUM(Donor_Count) as total_donors FROM special_case WHERE Case_Status IN ('Active', 'Completed')";
+            $total_donors_query = "SELECT SUM(Donor_Count) as total_donors FROM special_case WHERE Case_Status IN ('Active', 'Completed') AND Is_Deleted = 0";
             $donors_result = $conn->query($total_donors_query);
             $total_donors = $donors_result->fetch_assoc()['total_donors'] ?? 0;
             ?>

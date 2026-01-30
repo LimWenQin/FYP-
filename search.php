@@ -1,9 +1,16 @@
 <?php
 // search.php
-// 1. 引入数据库连接和头部
 include 'dataconnection.php';
 include 'header_function.php';
 include 'header_UI.php';
+
+// ==========================================
+// ⚠️ 时间修正 (TIME FIX)
+// ==========================================
+// 你的数据库活动都在 2026年。为了测试看到效果，我们这里强制设定“今天”是 2026年1月30日。
+// 上线时，请把下面这行改成: $currentDate = date('Y-m-d');
+$currentDate = '2026-01-30'; 
+// ==========================================
 
 $search_query = "";
 $activity_results = [];
@@ -18,6 +25,7 @@ if (isset($_GET['query'])) {
         $param = "%" . $search_query . "%";
 
         // --- A. 搜索 Activities ---
+        // 修正：移除了 'Is_Deleted' 防止报错 (因为你的 Activity 表没有这个栏位)
         $sql_act = "SELECT * FROM activity 
                     WHERE (Activity_Name LIKE ? OR Activity_Description LIKE ?) 
                     AND Activity_Status = 'Active'";
@@ -29,10 +37,12 @@ if (isset($_GET['query'])) {
             $stmt->close();
         }
 
-        // --- B. 搜索 Special Cases (字段修正为 Case_Images) ---
+        // --- B. 搜索 Special Cases ---
+        // 注意：如果你已经在 special_case 表加了 Is_Deleted 字段，请取消下面那行的注释
         $sql_case = "SELECT * FROM special_case 
                      WHERE (Case_Title LIKE ? OR Case_Description LIKE ?) 
-                     AND Case_Status = 'Active'";
+                     AND Case_Status IN ('Active', 'Completed')";
+                     // AND Is_Deleted = 0"; // <--- 如果你有加这个字段，请取消注释
 
         if ($stmt = $conn->prepare($sql_case)) {
             $stmt->bind_param("ss", $param, $param);
@@ -65,7 +75,7 @@ if (isset($_GET['query'])) {
         body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; }
         .search-header {
             background-color: #333;
-            background-image: url('images/hero_1.jpg'); 
+            background-image: url('https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=1950&q=80'); 
             background-size: cover;
             background-position: center;
             padding: 60px 0;
@@ -108,16 +118,22 @@ if (isset($_GET['query'])) {
         .card-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
         .card-item:hover .card-img { transform: scale(1.05); }
         .card-body { padding: 25px; flex-grow: 1; display: flex; flex-direction: column; }
+        
         .badge-tag {
             display: inline-block; padding: 5px 12px; border-radius: 20px; 
             font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-bottom: 15px; width: fit-content;
         }
-        .tag-case { background: #fee2e2; color: #dc2626; }
-        .tag-activity { background: #dbeafe; color: #2563eb; }
+        /* Dynamic Status Colors */
+        .tag-urgent { background: #fee2e2; color: #dc2626; }
+        .tag-normal { background: #f3f4f6; color: #4b5563; }
+        .tag-ongoing { background: #dcfce7; color: #166534; }
+        .tag-upcoming { background: #ffedd5; color: #9a3412; }
+        .tag-ended { background: #f3f4f6; color: #4b5563; }
         .tag-story { background: #d1fae5; color: #059669; }
+
         .card-title { font-size: 1.25rem; font-weight: 700; color: #222; margin: 0 0 10px 0; line-height: 1.4; }
         .card-desc { font-size: 0.95rem; color: #666; line-height: 1.6; margin-bottom: 20px; flex-grow: 1; 
-                     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+                      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         .progress-container { margin-bottom: 20px; }
         .progress-bar-bg { height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
         .progress-fill { height: 100%; border-radius: 4px; }
@@ -156,41 +172,60 @@ if (isset($_GET['query'])) {
         <h2 class="section-heading">Fundraising Cases</h2>
         <div class="results-grid">
             <?php foreach ($case_results as $row): 
-                // 图片处理逻辑
-                $img = 'images/default_case.jpg';
+                // 图片处理逻辑 (支持 JSON 和 字符串)
+                $img = 'images/case-default.jpg';
                 if (!empty($row['Case_Images'])) {
                     $decoded = json_decode($row['Case_Images'], true);
                     if (is_array($decoded) && !empty($decoded)) {
-                        $img = $decoded[0]; // 取 JSON 数组第一张图
+                        $img = $decoded[0]; // 如果是 JSON 数组，取第一张
                     } else {
-                        $img = $row['Case_Images'];
+                        $img = $row['Case_Images']; // 如果是普通路径，直接使用
                     }
                 }
 
+                // 进度条
                 $percent = 0;
-                if ($row['Target_Amount'] > 0) {
-                    $percent = ($row['Raised_Amount'] / $row['Target_Amount']) * 100;
+                $raised = $row['Raised_Amount'] ?? 0;
+                $target = $row['Target_Amount'] ?? 1;
+                if ($target > 0) {
+                    $percent = ($raised / $target) * 100;
                     $percent = min(100, $percent);
+                }
+
+                // Status Badge 逻辑
+                $badgeText = "Special Case";
+                $badgeClass = "tag-normal";
+                
+                if (isset($row['Urgency']) && $row['Urgency'] == 'high') {
+                    $badgeText = "Urgent Case";
+                    $badgeClass = "tag-urgent";
+                }
+                if ($row['Case_Status'] == 'Completed' || $percent >= 100) {
+                    $badgeText = "Completed";
+                    $badgeClass = "tag-ended";
                 }
             ?>
             <div class="card-item">
                 <div class="card-img-wrap">
-                    <img src="<?php echo htmlspecialchars($img); ?>" class="card-img" alt="Case">
+                    <img src="<?php echo htmlspecialchars($img); ?>" 
+                         class="card-img" 
+                         alt="Case"
+                         onerror="this.src='images/case-default.jpg'"> 
                 </div>
                 <div class="card-body">
-                    <span class="badge-tag tag-case">Urgent Case</span>
+                    <span class="badge-tag <?php echo $badgeClass; ?>"><?php echo $badgeText; ?></span>
                     <h3 class="card-title"><?php echo htmlspecialchars($row['Case_Title']); ?></h3>
                     <div class="progress-container">
                         <div class="progress-bar-bg">
                             <div class="progress-fill fill-red" style="width: <?php echo $percent; ?>%;"></div>
                         </div>
                         <div class="fund-stats">
-                            <span class="raised-txt">RM <?php echo number_format($row['Raised_Amount']); ?></span>
-                            <span style="color:#999;">Goal: RM <?php echo number_format($row['Target_Amount']); ?></span>
+                            <span class="raised-txt">RM <?php echo number_format($raised); ?></span>
+                            <span style="color:#999;">Goal: RM <?php echo number_format($target); ?></span>
                         </div>
                     </div>
                     <p class="card-desc"><?php echo htmlspecialchars(strip_tags($row['Case_Description'])); ?></p>
-                    <a href="Special_case Page.php?case_id=<?php echo $row['Case_ID']; ?>" class="btn-view btn-case">
+                    <a href="Special_Case_Detail.php?case_id=<?php echo $row['Case_ID']; ?>" class="btn-view btn-case">
                         View Details <i class="fas fa-arrow-right"></i>
                     </a>
                 </div>
@@ -203,7 +238,8 @@ if (isset($_GET['query'])) {
         <h2 class="section-heading">Campaigns & Activities</h2>
         <div class="results-grid">
             <?php foreach ($activity_results as $row): 
-                $img = 'images/activity_default.jpg';
+                // Activity 图片处理 (支持 JSON 和 Picture 字段)
+                $img = 'images/campaign-default.jpg';
                 if (!empty($row['Activity_Images'])) {
                     $decoded = json_decode($row['Activity_Images'], true);
                     if (is_array($decoded) && !empty($decoded)) {
@@ -216,25 +252,48 @@ if (isset($_GET['query'])) {
                 }
 
                 $percent = 0;
-                if ($row['Activity_TargetAmount'] > 0) {
-                    $percent = ($row['Activity_GetAmount'] / $row['Activity_TargetAmount']) * 100;
+                $raised = $row['Activity_GetAmount'] ?? 0;
+                $target = $row['Activity_TargetAmount'] ?? 1;
+                if ($target > 0) {
+                    $percent = ($raised / $target) * 100;
                     $percent = min(100, $percent);
+                }
+
+                // 动态 Status Badge 逻辑 (加入时间判断)
+                $statusText = "Completed";
+                $statusClass = "tag-ended";
+                $start = $row['Activity_StartDate'];
+                $end = $row['Activity_EndDate'];
+
+                if ($row['Activity_Status'] == 'Active') {
+                    if ($currentDate < $start) {
+                        $statusText = "Upcoming";
+                        $statusClass = "tag-upcoming";
+                    } elseif ($currentDate > $end) {
+                        $statusText = "Completed";
+                        $statusClass = "tag-ended";
+                    } else {
+                        $statusText = "Ongoing";
+                        $statusClass = "tag-ongoing";
+                    }
                 }
             ?>
             <div class="card-item">
                 <div class="card-img-wrap">
-                    <img src="<?php echo htmlspecialchars($img); ?>" class="card-img" alt="Activity">
-                </div>
+                    <img src="<?php echo htmlspecialchars($img); ?>" 
+                         class="card-img" 
+                         alt="Activity"
+                         onerror="this.src='images/campaign-default.jpg'"> </div>
                 <div class="card-body">
-                    <span class="badge-tag tag-activity">Campaign</span>
+                    <span class="badge-tag <?php echo $statusClass; ?>"><?php echo $statusText; ?></span>
                     <h3 class="card-title"><?php echo htmlspecialchars($row['Activity_Name']); ?></h3>
                     <div class="progress-container">
                         <div class="progress-bar-bg">
                             <div class="progress-fill fill-blue" style="width: <?php echo $percent; ?>%;"></div>
                         </div>
                         <div class="fund-stats">
-                            <span style="color:#2563eb;">RM <?php echo number_format($row['Activity_GetAmount']); ?></span>
-                            <span style="color:#999;">Goal: RM <?php echo number_format($row['Activity_TargetAmount']); ?></span>
+                            <span style="color:#2563eb;">RM <?php echo number_format($raised); ?></span>
+                            <span style="color:#999;">Goal: RM <?php echo number_format($target); ?></span>
                         </div>
                     </div>
                     <p class="card-desc"><?php echo htmlspecialchars(strip_tags($row['Activity_Description'])); ?></p>
@@ -251,11 +310,23 @@ if (isset($_GET['query'])) {
         <h2 class="section-heading">Stories & Updates</h2>
         <div class="results-grid">
             <?php foreach ($story_results as $row): 
-                $img = !empty($row['Story_Image']) ? $row['Story_Image'] : 'images/default_story.jpg';
+                // --- Story 图片处理逻辑 (支持 JSON 和 字符串) ---
+                $img = 'images/default_story.jpg';
+                if (!empty($row['Story_Image'])) {
+                    $decoded = json_decode($row['Story_Image'], true);
+                    if (is_array($decoded) && !empty($decoded)) {
+                        $img = $decoded[0]; // JSON 数组取第一张
+                    } else {
+                        $img = $row['Story_Image']; // 直接路径
+                    }
+                }
             ?>
             <div class="card-item">
                 <div class="card-img-wrap">
-                    <img src="<?php echo htmlspecialchars($img); ?>" class="card-img" alt="Story">
+                    <img src="<?php echo htmlspecialchars($img); ?>" 
+                         class="card-img" 
+                         alt="Story"
+                         onerror="this.src='images/default_story.jpg'">
                 </div>
                 <div class="card-body">
                     <span class="badge-tag tag-story"><?php echo htmlspecialchars($row['Story_Category'] ?? 'Story'); ?></span>
