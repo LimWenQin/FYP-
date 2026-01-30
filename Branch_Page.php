@@ -73,7 +73,7 @@ include 'header_UI.php';
 
 <style>
     /* -----------------------------------------------------------
-       STYLE COPIED & ADAPTED FROM New&Story.php
+       STYLE COPIED & ADAPTED
     ----------------------------------------------------------- */
     :root {
         --primary-red: #e53935;
@@ -150,19 +150,14 @@ include 'header_UI.php';
         gap: 40px;
     }
 
-    /* Card Logic for Selection */
-    .branch-label {
-        cursor: pointer;
+    /* --- 修改：Wrapper 样式替代原来的 label --- */
+    .branch-wrapper {
         display: block;
         height: 100%;
         margin: 0;
+        /* cursor: pointer;  <-- 删除了这一行，因为不需要整张卡片可点 */
     }
     
-    /* Hide Radio Button */
-    .branch-label input[type="radio"] {
-        display: none;
-    }
-
     /* Card Styles */
     .story-card {
         background: var(--white);
@@ -178,19 +173,18 @@ include 'header_UI.php';
         transform: translateY(0);
     }
 
-    /* Hover Effect */
-    .branch-label:hover .story-card {
+    /* Hover Effect - 仍然保留浮起效果，但去掉边框变色暗示点击 */
+    .branch-wrapper:hover .story-card {
         transform: translateY(-10px);
         box-shadow: 0 20px 40px rgba(229, 57, 53, 0.2);
-        border-color: var(--lighter-red);
+        /* border-color: var(--lighter-red); <-- 删除边框变色，减少“可点击”的误导 */
     }
 
     .story-image-container {
         position: relative;
         height: 300px;
         overflow: hidden;
-        /* Add cursor zoom-in to indicate it's clickable */
-        cursor: zoom-in; 
+        cursor: zoom-in; /* 图片保留放大镜图标 */
     }
 
     .story-image {
@@ -200,7 +194,7 @@ include 'header_UI.php';
         transition: transform 0.6s ease;
     }
 
-    .branch-label:hover .story-image {
+    .branch-wrapper:hover .story-image {
         transform: scale(1.05);
     }
 
@@ -289,6 +283,7 @@ include 'header_UI.php';
         display: inline-flex;
         align-items: center;
         gap: 5px;
+        cursor: pointer; /* 确保链接有手型图标 */
     }
 
     .read-more-link:hover {
@@ -306,11 +301,9 @@ include 'header_UI.php';
         .story-image-container { height: 200px; }
     }
 
-    /* -------------------------------------------
-       NEW: LIGHTBOX / ZOOM STYLES
-    ------------------------------------------- */
+    /* Lightbox Styles */
     .lightbox-overlay {
-        display: none; /* Hidden by default */
+        display: none;
         position: fixed;
         z-index: 10000;
         top: 0;
@@ -357,60 +350,56 @@ include 'header_UI.php';
 </div>
 
 <div class="stories-container">
-    <form action="Payment_Page.php" method="POST" id="branchForm">
-        <div class="stories-grid">
+    <div class="stories-grid">
+        
+        <?php foreach ($branches_list as $branch): 
+            $imgSrc = isset($branch['decoded_images'][0]) ? $branch['decoded_images'][0] : 'images/story-default.jpg';
+            $isHQ = ($branch['Branch_Type'] === 'Headquarters');
+            $badgeClass = $isHQ ? 'story-badge badge-hq' : 'story-badge';
+        ?>
+        
+        <div class="branch-wrapper">
             
-            <?php foreach ($branches_list as $branch): 
-                $imgSrc = isset($branch['decoded_images'][0]) ? $branch['decoded_images'][0] : 'images/story-default.jpg';
-                $isHQ = ($branch['Branch_Type'] === 'Headquarters');
-                $badgeClass = $isHQ ? 'story-badge badge-hq' : 'story-badge';
-            ?>
-            
-            <label class="branch-label">
-                <input type="radio" name="branch_id" value="<?php echo $branch['Branch_ID']; ?>" onclick="this.form.submit()">
+            <div class="story-card">
+                <div class="story-image-container">
+                    <img src="<?php echo htmlspecialchars($imgSrc); ?>" 
+                         alt="<?php echo htmlspecialchars($branch['Branch_Name']); ?>" 
+                         class="story-image"
+                         onerror="this.src='images/hero_3.jpg';"
+                         onclick="openLightbox(event, '<?php echo htmlspecialchars($imgSrc); ?>')">
+                    
+                    <span class="<?php echo $badgeClass; ?>"><?php echo htmlspecialchars($branch['Branch_Type']); ?></span>
+                </div>
 
-                <div class="story-card">
-                    <div class="story-image-container">
-                        <img src="<?php echo htmlspecialchars($imgSrc); ?>" 
-                             alt="<?php echo htmlspecialchars($branch['Branch_Name']); ?>" 
-                             class="story-image"
-                             onerror="this.src='images/hero_3.jpg';"
-                             onclick="openLightbox(event, '<?php echo htmlspecialchars($imgSrc); ?>')">
-                        
-                        <span class="<?php echo $badgeClass; ?>"><?php echo htmlspecialchars($branch['Branch_Type']); ?></span>
+                <div class="story-content">
+                    <div class="story-header">
+                        <div class="story-meta">
+                            <span><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($branch['Branch_City']); ?></span>
+                            <?php if($isHQ): ?>
+                                <span><i class="fas fa-star"></i> Central Hub</span>
+                            <?php endif; ?>
+                        </div>
+                        <h3 class="story-title"><?php echo htmlspecialchars($branch['Branch_Name']); ?></h3>
                     </div>
 
-                    <div class="story-content">
-                        <div class="story-header">
-                            <div class="story-meta">
-                                <span><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($branch['Branch_City']); ?></span>
-                                <?php if($isHQ): ?>
-                                    <span><i class="fas fa-star"></i> Central Hub</span>
-                                <?php endif; ?>
-                            </div>
-                            <h3 class="story-title"><?php echo htmlspecialchars($branch['Branch_Name']); ?></h3>
-                        </div>
+                    <div class="story-description-container">
+                        <p class="story-description">
+                            <?php echo htmlspecialchars($branch['Branch_Description']); ?>
+                        </p>
+                    </div>
 
-                        <div class="story-description-container">
-                            <p class="story-description">
-                                <?php echo htmlspecialchars($branch['Branch_Description']); ?>
-                            </p>
-                        </div>
-
-                        <div class="story-footer">
-                            <a href="Branch_Details.php?id=<?php echo $branch['Branch_ID']; ?>" 
-                               class="read-more-link"
-                               onclick="event.stopPropagation();">
-                               Read More <i class="fas fa-arrow-right"></i>
-                            </a>
-                        </div>
+                    <div class="story-footer">
+                        <a href="Branch_Details.php?id=<?php echo $branch['Branch_ID']; ?>" 
+                           class="read-more-link">
+                           Read More <i class="fas fa-arrow-right"></i>
+                        </a>
                     </div>
                 </div>
-            </label>
-            <?php endforeach; ?>
-
+            </div>
         </div>
-    </form>
+        <?php endforeach; ?>
+
+    </div>
 </div>
 
 <div id="imageLightbox" class="lightbox-overlay" onclick="closeLightbox()">
@@ -420,12 +409,8 @@ include 'header_UI.php';
 
 <script>
     function openLightbox(event, imageSrc) {
-        // 1. Prevent Default Action
         event.preventDefault(); 
-        
-        // 2. STOP PROPAGATION (The most important part)
-        // This stops the click event from bubbling up to the <label> tag.
-        // Therefore, the form submission is NEVER triggered.
+        // 既然外层没有 form 了，这里其实不需要 stopPropagation，但保留着也没问题
         event.stopPropagation(); 
 
         var lightbox = document.getElementById('imageLightbox');

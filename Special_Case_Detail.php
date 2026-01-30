@@ -69,9 +69,10 @@ if ($result->num_rows == 0) {
 
 $case = $result->fetch_assoc();
 
-// 4. 查询捐赠者列表
-$donor_query = "SELECT o.Order_Name, o.Order_Amount, o.Order_Created_At 
+// 4. 查询捐赠者列表 (修改：LEFT JOIN donor 表以获取头像)
+$donor_query = "SELECT o.Order_Name, o.Order_Amount, o.Order_Created_At, d.Donor_ProfilePicture 
                 FROM orders o 
+                LEFT JOIN donor d ON o.Donor_ID = d.Donor_ID
                 WHERE o.Case_ID = ? AND o.Order_PaymentStatus = 'Success' 
                 ORDER BY o.Order_Created_At DESC LIMIT 20";
 $stmt_donors = $conn->prepare($donor_query);
@@ -79,7 +80,7 @@ $stmt_donors->bind_param("i", $case_id);
 $stmt_donors->execute();
 $donors_result = $stmt_donors->get_result();
 
-// 5. 查询评论列表
+// 5. 查询评论列表 (已包含头像)
 $comment_query = "SELECT c.*, d.Donor_Name, d.Donor_ProfilePicture 
                   FROM case_comments c 
                   JOIN donor d ON c.Donor_ID = d.Donor_ID 
@@ -114,21 +115,18 @@ if (!empty($dbImage)) {
 }
 $mainImage = $images[0];
 
-// --- [新增] 处理医疗报告图片 (支持多张) ---
+// 处理医疗报告图片
 $medical_images = [];
 $dbMedical = isset($case['Case_Medical_Report']) ? $case['Case_Medical_Report'] : '';
 
 if (!empty($dbMedical)) {
-    // 尝试当作 JSON 解码
     $decodedMed = json_decode($dbMedical, true);
     if (json_last_error() === JSON_ERROR_NONE && is_array($decodedMed)) {
         $medical_images = $decodedMed;
     } else {
-        // 如果不是 JSON，就当作单张图片路径
         $medical_images[] = $dbMedical;
     }
 }
-// ----------------------------------------
 
 $isCompleted = ($case['Case_Status'] === 'Completed') || ($progress >= 100);
 $statusLabel = $isCompleted ? "Completed" : "Active";
@@ -154,8 +152,10 @@ include 'header_UI.php';
             --dark-red: #c62828;
             --light-gray: #f5f5f5;
             --text-color: #333;
-            --medical-blue: #1976d2; /* 新增医疗蓝色 */
+            --medical-blue: #1976d2;
             --medical-bg: #e3f2fd;
+            /* 新增浅绿色变量 */
+            --money-green: #4caf50; 
         }
 
         body {
@@ -198,7 +198,7 @@ include 'header_UI.php';
         .section-title { font-size: 20px; font-weight: 700; margin: 30px 0 15px; border-left: 4px solid var(--primary-red); padding-left: 10px; color: #333; }
         .description-text { line-height: 1.8; color: #555; font-size: 16px; white-space: pre-line; }
 
-        /* --- [新增样式] 医疗报告区域 --- */
+        /* 医疗报告区域 */
         .medical-container {
             background-color: var(--medical-bg);
             border-radius: 10px;
@@ -246,7 +246,6 @@ include 'header_UI.php';
             text-align: center;
             padding: 3px;
         }
-        /* --------------------------- */
 
         .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; background: #fff5f5; padding: 20px; border-radius: 10px; margin-top: 20px; }
         .info-item label { display: block; font-size: 12px; color: #888; text-transform: uppercase; font-weight: bold; }
@@ -276,18 +275,24 @@ include 'header_UI.php';
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
-        /* Donor List */
+        /* --- 修改：Donor List Styles --- */
         .donor-item { display: flex; align-items: center; gap: 15px; padding: 15px; border-bottom: 1px solid #f0f0f0; }
+        
         .donor-info h4 { font-size: 14px; margin: 0; color: #333; }
         .donor-info span { font-size: 12px; color: #888; }
-        .donor-amount { margin-left: auto; font-weight: bold; color: var(--primary-red); }
+        
+        /* 修改：浅绿色 */
+        .donor-amount { margin-left: auto; font-weight: bold; color: var(--money-green); }
+
+        /* --- 新增：Avatar Styles --- */
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid #eee; flex-shrink: 0; }
+        .default-avatar { width: 40px; height: 40px; border-radius: 50%; background: #e0e0e0; color: #666; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; flex-shrink: 0; text-transform: uppercase; }
 
         /* Comments */
         .comment-box { margin-bottom: 20px; }
         .comment-input { width: 100%; padding: 15px; border: 1px solid #ddd; border-radius: 8px; resize: none; font-family: inherit; margin-bottom: 10px; }
         .comment-submit { background: var(--primary-red); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .comment-item { display: flex; gap: 15px; padding: 15px 0; border-bottom: 1px solid #f0f0f0; }
-        /* 删除 .comment-avatar 样式或保留备用 */
         
         .comment-body h4 { font-size: 14px; margin: 0 0 5px; color: #333; }
         .comment-date { font-size: 11px; color: #999; margin-left: 10px; font-weight: normal; }
@@ -399,6 +404,15 @@ include 'header_UI.php';
                 <?php if ($donors_result->num_rows > 0): ?>
                     <?php while($donor = $donors_result->fetch_assoc()): ?>
                     <div class="donor-item">
+                        <?php 
+                        if (!empty($donor['Donor_ProfilePicture'])) {
+                            echo '<img src="'.htmlspecialchars($donor['Donor_ProfilePicture']).'" class="user-avatar" alt="Donor">';
+                        } else {
+                            $initial = strtoupper(substr($donor['Order_Name'], 0, 1));
+                            echo '<div class="default-avatar">'.$initial.'</div>';
+                        }
+                        ?>
+                        
                         <div class="donor-info">
                             <h4><?php echo htmlspecialchars($donor['Order_Name']); ?></h4>
                             <span><?php echo date('M d, Y h:i A', strtotime($donor['Order_Created_At'])); ?></span>
@@ -422,6 +436,15 @@ include 'header_UI.php';
                 <?php if ($comments_result->num_rows > 0): ?>
                     <?php while($comment = $comments_result->fetch_assoc()): ?>
                     <div class="comment-item">
+                        <?php 
+                        if (!empty($comment['Donor_ProfilePicture'])) {
+                            echo '<img src="'.htmlspecialchars($comment['Donor_ProfilePicture']).'" class="user-avatar" alt="User">';
+                        } else {
+                            $initial = strtoupper(substr($comment['Donor_Name'], 0, 1));
+                            echo '<div class="default-avatar">'.$initial.'</div>';
+                        }
+                        ?>
+                        
                         <div class="comment-body">
                             <h4>
                                 <?php echo htmlspecialchars($comment['Donor_Name']); ?>
