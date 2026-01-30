@@ -2,8 +2,8 @@
 include 'dataconnection.php';
 include 'header_function.php'; 
 
-// --- 1. FIXED STATISTICS QUERY ---
-// Adjusted to count based on the new logic so the top counters match the grid
+
+
 $current_date_sql = date('Y-m-d');
 $stats_query = "SELECT 
     COUNT(*) as total_campaigns,

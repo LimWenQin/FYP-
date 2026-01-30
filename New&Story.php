@@ -8,30 +8,30 @@ $categories = [
     'news' => [
         'name' => 'News',
         'icon' => 'fas fa-newspaper',
-        'color' => '#1976d2', // 蓝色
+        'color' => '#1976d2', 
         'sql_condition' => "Story_Category LIKE '%News%'"
     ],
     'story' => [
         'name' => 'Donor Stories',
         'icon' => 'fas fa-heart',
-        'color' => '#e53935', // 红色
+        'color' => '#e53935', 
         'sql_condition' => "Story_Category NOT LIKE '%News%'" // 假设非News的都是Story
     ]
 ];
 
-// 获取 URL 参数
+
 $category_filter = isset($_GET['category']) ? $_GET['category'] : 'all';
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 
-// --- 2. 构建查询条件 ---
-$where_clause = "1=1"; // 默认查询所有
+
+$where_clause = "1=1"; 
 
 if ($category_filter !== 'all' && isset($categories[$category_filter])) {
     $where_clause = $categories[$category_filter]['sql_condition'];
 }
 
 // 分页逻辑
-$items_per_page = 4; // 每页显示 4 个故事
+$items_per_page = 4; 
 $offset = ($page - 1) * $items_per_page;
 
 // --- 3. 获取总数 (用于分页) ---
@@ -41,7 +41,7 @@ $total_stories = $count_result->fetch_assoc()['total'];
 $total_pages = ceil($total_stories / $items_per_page);
 
 // --- 4. 获取当前页数据 ---
-// 按照日期倒序排列
+
 $query = "SELECT * FROM story WHERE $where_clause ORDER BY Story_Date DESC LIMIT $items_per_page OFFSET $offset";
 $result = $conn->query($query);
 
@@ -64,7 +64,7 @@ include 'header_UI.php';
             --light-red: #ff5252;
             --lighter-red: #ffcdd2;
             
-            /* 新增蓝色变量 */
+           
             --primary-blue: #1976d2; 
             
             --white: #ffffff;
@@ -94,7 +94,6 @@ include 'header_UI.php';
             flex-direction: column;
         }
         
-        /* --- Header Styles (保持 Special Case 的风格但用 Story 的背景) --- */
         .stories-header {
             background: url('https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80'); 
             background-size: cover;

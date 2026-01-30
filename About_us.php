@@ -156,7 +156,7 @@ include 'header_UI.php';
             </div>
         </div>
 
-        <h2 class="section-title">Our Team</h2>
+        <h2 class="section-title">Our Founder</h2>
         <div class="team-section">
             <div class="team-grid">
                 <?php
@@ -191,7 +191,7 @@ include 'header_UI.php';
                             <?php
                         }
                     } else {
-                        echo "<p style='text-align:center; grid-column: 1/-1;'>No team members found.</p>";
+                        echo "<p style='text-align:center; grid-column: 1/-1;'>No founder found.</p>";
                     }
                 }
                 ?>

@@ -289,11 +289,11 @@ include 'header_UI.php';
                     <img src="<?php echo htmlspecialchars($a_src); ?>" class="showcase-img" alt="Activity">
                 </div>
                 <div class="showcase-content">
-                    <span class="badge-tag tag-activity">Upcoming Activity</span>
+                    <span class="badge-tag tag-activity">Upcoming Campaign</span>
                     <h3 class="sc-title"><?php echo htmlspecialchars($activity['Activity_Name']); ?></h3>
                     <p class="sc-desc"><?php echo htmlspecialchars(substr($activity['Activity_Description'], 0, 180)) . '...'; ?></p>
                     <a href="S_C_Payment_Page.php?activity_id=<?php echo $activity['Activity_ID']; ?>" class="btn-support" style="background:#2563eb; color:white;">
-                        <i class="fas fa-calendar-check"></i> Join Activity
+                        <i class="fas fa-calendar-check"></i> Join Campaign
                     </a>
                 </div>
             </div>

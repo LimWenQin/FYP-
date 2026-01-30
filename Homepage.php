@@ -1,5 +1,5 @@
 <?php
-// 1. 启动 Session
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -7,12 +7,10 @@ if (session_status() === PHP_SESSION_NONE) {
 include 'dataconnection.php'; 
 include 'header_UI.php';
 
-// --- 2. 检查登录状态 ---
+
 $logged_in = isset($_SESSION['donor_id']) && !empty($_SESSION['donor_id']);
 
-// ==========================================
-// [核心逻辑] 自动检查并更新满额的案例状态
-// ==========================================
+
 $auto_update_sql = "UPDATE special_case 
                     SET Case_Status = 'Completed', Completed_At = NOW() 
                     WHERE Case_Category = 'Emergency Relief' 
@@ -21,7 +19,7 @@ $auto_update_sql = "UPDATE special_case
                     AND Target_Amount > 0";
 $conn->query($auto_update_sql);
 
-// --- 3. 获取 Special Cases (Emergency Relief) 用于主页轮播 ---
+
 $special_cases = [];
 $query_sc = "SELECT * FROM special_case 
              WHERE Case_Category = 'Emergency Relief' 
@@ -32,7 +30,6 @@ $result_sc = $conn->query($query_sc);
 
 if ($result_sc && $result_sc->num_rows > 0) {
     while ($row = $result_sc->fetch_assoc()) {
-        // Image Handling
         $image_url = "https://images.unsplash.com/photo-1579684385127-1ef15d508118?ixlib=rb-1.2.1&auto=format&fit=crop&w=1600&q=80"; 
         if (!empty($row['Case_Images'])) {
             $decoded = json_decode($row['Case_Images'], true);
@@ -71,7 +68,7 @@ if ($result_sc && $result_sc->num_rows > 0) {
     }
 }
 
-// --- 4. 定义捐款种类数组 ---
+
 $donation_categories = [
     'emergency' => [
         'db_name' => 'Emergency Relief', 
@@ -151,7 +148,7 @@ if ($result_story && $result_story->num_rows > 0) {
     }
 }
 
-// --- 6. 获取活动 (Activity/Campaigns) ---
+
 $activities = [];
 $today = date('Y-m-d');
 
@@ -227,17 +224,17 @@ if ($logged_in) {
             padding: 0;
         }
 
-        /* --- Special Case Hero Slider (Styles unchanged) --- */
+        
         .special-case-hero {
             position: relative;
             height: 85vh; 
             min-height: 600px;
             overflow: hidden;
-            margin-bottom: 0px; /* Removed margin to connect with intro */
+            margin-bottom: 0px; 
             background-color: #000; 
         }
 
-        /* ... [保留所有 Slider 相关的 CSS，这里省略重复部分以节省篇幅] ... */
+       
         .special-case-slides { position: relative; width: 100%; height: 100%; }
         .special-case-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1s ease-in-out; visibility: hidden; }
         .special-case-slide.active { opacity: 1; z-index: 1; visibility: visible; }
@@ -559,7 +556,7 @@ if ($logged_in) {
         </section>
 
         <section class="stories-section">
-            <h2 class="section-title">Latest News & Stories</h2>
+            <h2 class="section-title"> News & Stories</h2>
             <div class="stories-grid">
                 <?php if(count($stories) > 0): ?>
                     <?php foreach ($stories as $story): ?>
@@ -587,7 +584,7 @@ if ($logged_in) {
         </section>
 
         <section class="activities-section">
-            <h2 class="section-title">Upcoming & Ongoing Activities</h2>
+            <h2 class="section-title">Campaigns</h2>
             <div class="activities-grid">
                 <?php if(count($activities) > 0): ?>
                     <?php foreach ($activities as $act): ?>

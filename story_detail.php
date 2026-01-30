@@ -211,7 +211,7 @@ include 'header_UI.php'; // Include your UI header
     <div class="detail-container">
         <div class="back-nav">
             <a href="New&Story.php" class="btn-back">
-                <i class="fas fa-arrow-left"></i> Back to News & Stories
+                <i class="fas fa-arrow-left"></i> Back to News & Story
             </a>
         </div>
 

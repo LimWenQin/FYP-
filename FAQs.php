@@ -389,9 +389,6 @@ include 'header_UI.php';
                     <a href="mailto:support@lovebridge.org" class="contact-btn">
                         <i class="fas fa-envelope"></i> Email Us
                     </a>
-                    <a href="tel:+60123456789" class="contact-btn">
-                        <i class="fas fa-phone"></i> Call Us
-                    </a>
                     <a href="Contact_Us.php" class="contact-btn">
                         <i class="fas fa-comments"></i> Contact Us
                     </a>
