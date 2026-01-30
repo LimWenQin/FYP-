@@ -627,7 +627,7 @@ $chartData = getMonthlyRevenueChartData($conn);
                                     </td>
                                     <td><span style="font-size:13px; color:#555;"><?php echo $txn['Method']; ?></span></td>
                                     <td>
-                                        <a href="<?php echo $detailsLink; ?>" class="btn-action" target="_blank" title="View Details">
+                                        <a href="<?php echo $detailsLink; ?>" class="btn-action" title="View Details">
                                             <i class="fas fa-eye"></i>
                                         </a>
                                     </td>

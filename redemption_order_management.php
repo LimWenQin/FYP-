@@ -443,7 +443,7 @@ $years = range($currentYear, 2020);
 
         <div class="dashboard-content">
             <div class="welcome-section">
-                <h1>Redemption Orders</h1>
+                <h1>Redemption Orders Management</h1>
                 <p>Manage reward redemptions, approve requests, and track shipping.</p>
             </div>
 

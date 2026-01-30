@@ -189,8 +189,8 @@ elseif (strcasecmp($dbType, 'Debit') === 0 || stripos($desc, 'Donate') !== false
             </div>
             
             <div class="action-buttons">
-                <button class="btn-back" onclick="window.close();">
-                    <i class="fas fa-arrow-left"></i> Close
+                <button class="btn-back" onclick="history.back()">
+                    <i class="fas fa-arrow-left"></i> Back
                 </button>
                 
                 <button class="btn-print" onclick="window.print()">

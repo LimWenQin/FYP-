@@ -132,15 +132,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit_withdrawal'])) 
         $stmt->bind_param("iiidsssii", $branch_id, $activity_id, $case_id, $w_amount, $w_bank_name, $w_bank_acc, $proof_json, $currentAdminId, $currentAdminId);
         
         if ($stmt->execute()) {
-            // Notification
+            // Notification Logic (Modified: Only insert ONCE)
             $newMsg = "New Withdrawal: RM " . number_format($w_amount, 2) . " (Auto-Approved) by " . $adminName;
-            $allAdmins = $conn->query("SELECT Admin_ID FROM admin WHERE Is_Deleted = 0");
-            while($rw = $allAdmins->fetch_assoc()) {
-                $recipientID = $rw['Admin_ID'];
-                $nStmt = $conn->prepare("INSERT INTO admin_notifications (Message, Type, Link, Is_Read, Created_At) VALUES (?, 'Payment', 'payment_management.php?tab=withdrawals', 0, NOW())");
-                $nStmt->bind_param("s", $newMsg);
-                $nStmt->execute();
-            }
+            
+            // 之前的代码在这里使用了 while 循环遍历所有 admin 插入，导致重复。
+            // 现在改为只插入一次。因为 admin_notifications 表没有 Recipient_ID，
+            // 所有 Admin 在 admin_notifications_all.php 都会看到这一条公共通知。
+            
+            $nStmt = $conn->prepare("INSERT INTO admin_notifications (Message, Type, Link, Is_Read, Created_At) VALUES (?, 'Payment', 'payment_management.php?tab=withdrawals', 0, NOW())");
+            $nStmt->bind_param("s", $newMsg);
+            $nStmt->execute();
+            $nStmt->close();
 
             // Redirect to self with success flag to show modal
             header("Location: admin_withdrawal_add.php?success=1");

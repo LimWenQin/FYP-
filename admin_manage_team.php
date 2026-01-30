@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Team Members</title>
+    <title>Manage Founder</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin_common.css">
     <style>
@@ -238,11 +238,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="dashboard-content">
         <div class="page-header-area">
             <div>
-                <h2>Manage Team Members</h2>
+                <h2>Manage Founder</h2>
                 <p>Add, edit, or remove team members displayed on the "About Us" page.</p>
             </div>
             <button class="btn-add-new" onclick="openModal()">
-                <i class="fas fa-plus"></i> Add Member
+                <i class="fas fa-plus"></i> Add Founder
             </button>
         </div>
 

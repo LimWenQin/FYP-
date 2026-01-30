@@ -107,7 +107,7 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
         .btn-print { background: #F28585; color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; transition: background 0.3s; }
         .btn-print:hover { background: #e07070; }
         
-        /* Back 按钮样式，做成按钮的样子但其实是链接 */
+        /* Back 按钮样式 */
         .btn-back { background: #6c757d; color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; transition: background 0.3s; text-decoration: none; }
         .btn-back:hover { background: #5a6268; }
 
@@ -316,9 +316,9 @@ $processedDate = !empty($row['Processed_Date']) ? date('d M Y, h:i A', strtotime
             </div>
             
             <div class="action-buttons">
-                <a href="branch_withdrawal_history.php?branch_id=<?php echo $row['Branch_ID']; ?>" class="btn-back">
+                <button class="btn-back" onclick="history.back()">
                     <i class="fas fa-arrow-left"></i> Back
-                </a>
+                </button>
                 <button class="btn-print" onclick="window.print()">
                     <i class="fas fa-print"></i> Print Details
                 </button>

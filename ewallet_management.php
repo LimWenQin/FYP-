@@ -540,7 +540,7 @@ $end_wl = min($offset_wl + $limit, $total_wl_recs);
                                         </td>
 
                                         <td>
-                                            <a href="admin_ewallet_details.php?id=<?php echo $txnID; ?>" class="btn-action" target="_blank" title="View Wallet Details">
+                                            <a href="admin_ewallet_details.php?id=<?php echo $txnID; ?>" class="btn-action" title="View Wallet Details">
                                                 <i class="fas fa-eye"></i>
                                             </a>
                                         </td>
