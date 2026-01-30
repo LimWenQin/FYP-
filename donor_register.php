@@ -14,6 +14,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $name = trim($_POST['name']);
     
     // --- 处理电话号码 ---
+    // 逻辑保持不变：用户输入不带0，后台补0
     $raw_contact = trim($_POST['contact']);
     $contact = '0' . $raw_contact; 
 
@@ -467,7 +468,7 @@ include 'header_UI.php';
                                    value="<?php echo htmlspecialchars($contact); ?>" 
                                    required>
                         </div>
-                        <span class="form-help">Do not enter '0' at the start (e.g., 12-XXXXXXX)</span>
+                        <span class="form-help">Phone number must start with 1 (e.g. 12-3456789)</span>
                         <div class="field-error-msg" id="contactError">Contact Number is required.</div>
                     </div>
                 </div>
@@ -501,7 +502,7 @@ include 'header_UI.php';
                             <div class="requirement-item invalid" id="numberReq"><i class="fas fa-times"></i> Must contain at least one Number</div>
                             <div class="requirement-item invalid" id="specialReq"><i class="fas fa-times"></i> Must contain at least one Special character (e.g. !@#)</div>
                         </div>
-                         <div class="field-error-msg" id="passwordError">Password is required.</div>
+                          <div class="field-error-msg" id="passwordError">Password is required.</div>
                     </div>
                     
                     <div class="form-group">
@@ -704,23 +705,51 @@ include 'header_UI.php';
             }
             nameInput.addEventListener('input', validateName);
             
-            // --- Contact Validation ---
+            // ============================================================
+            // --- 【修改】 Contact Logic - 与 Profile Page 一致 ---
+            // ============================================================
+            
+            // 1. 输入监听：自动格式化 (XX-XXXXXXX) 并禁止首位输 0
+            contactInput.addEventListener('input', function(e) {
+                let val = e.target.value.replace(/\D/g, ''); // 移除非数字
+
+                // 如果用户尝试输入 0 开头，移除它
+                if (val.startsWith('0')) {
+                    val = val.substring(1);
+                }
+
+                // 自动添加横杠
+                if (val.length > 2) val = val.substring(0, 2) + '-' + val.substring(2);
+                if (val.length > 11) val = val.substring(0, 11); // 限制最大长度 (2位 + 1横杠 + 8位 = 11字符)
+
+                e.target.value = val;
+                
+                // 实时移除错误提示 (如果有输入)
+                if(val.length >= 2) {
+                    const currentError = document.getElementById('contactError').innerText;
+                    if(currentError.includes("Phone number must start with 1")) {
+                         setFieldState('contactError', false);
+                    }
+                }
+            });
+
+            // 2. 验证逻辑：检查是否以 1 开头，且长度符合要求
             function validateContact() {
                  if(!contactInput.value) return true;
                  
                  const rawValue = contactInput.value.replace(/\D/g, '');
 
-                 // 1. Check if it starts with '0' -> ERROR
-                 if (rawValue.length > 0 && rawValue.charAt(0) === '0') {
-                      phoneGroup.classList.add('error');
-                      setFieldState('contactError', true, "Do not include the leading '0'.");
-                      return false;
+                 // Check 1: Must start with 1
+                 if (rawValue.length > 0 && rawValue.charAt(0) !== '1') {
+                     phoneGroup.classList.add('error');
+                     setFieldState('contactError', true, "Phone number must start with 1 (e.g. 12-3456789).");
+                     return false;
                  }
                  
-                 // 2. Check Length
-                 if(rawValue.length < 9) {
+                 // Check 2: Length (9 to 10 digits excluding the implicit 0)
+                 if(rawValue.length < 9 || rawValue.length > 10) {
                       phoneGroup.classList.add('error');
-                      setFieldState('contactError', true, "Please enter a valid contact number.");
+                      setFieldState('contactError', true, "Invalid length. Please check your number.");
                       return false;
                  } else {
                       phoneGroup.classList.remove('error');
@@ -729,6 +758,8 @@ include 'header_UI.php';
                  }
             }
             contactInput.addEventListener('blur', validateContact);
+            // ============================================================
+
 
             // --- Password Strength UI ---
             const passwordStrengthBar = document.getElementById('passwordStrengthBar');
@@ -787,27 +818,6 @@ include 'header_UI.php';
                     element.querySelector('i').className = 'fas fa-times';
                 }
             }
-            
-            // --- Contact Input Handler (Prevent typing 0) ---
-            contactInput.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, ''); 
-                
-                if (value.startsWith('0')) {
-                    value = value.substring(1);
-                }
-
-                if (value.length > 2) value = value.substring(0, 2) + '-' + value.substring(2);
-                if (value.length > 11) value = value.substring(0, 11); 
-                
-                e.target.value = value;
-                
-                if(value.length >= 2) {
-                    const currentError = document.getElementById('contactError').innerText;
-                    if(currentError === "Do not include the leading '0'.") {
-                         setFieldState('contactError', false);
-                    }
-                }
-            });
 
             // --- 4. FINAL SUBMISSION HANDLER ---
             form.addEventListener('submit', function(e) {
