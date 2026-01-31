@@ -374,9 +374,9 @@ body {
             <div class="contact-box">
                 <h3>Contact Our Privacy Officer</h3>
                 <p>If you have any questions, concerns, or requests regarding your privacy or this Privacy Policy, please contact our dedicated Privacy Officer:</p>
-                <p><strong>Email:</strong> privacy@lovebridge.org</p>
-                <p><strong>Phone:</strong> +1 (800) 123-4567</p>
-                <p><strong>Mail:</strong> Love Bridge Privacy Officer, 123 Charity Street, Hope City, HC 12345</p>
+                <p><strong>Email:</strong> lovebridge1201@gmail.com</p>
+                <p><strong>Phone:</strong> +60 11-1119 0233</p>
+                
                 <p>We typically respond to privacy inquiries within 3-5 business days.</p>
             </div>
         </div>
