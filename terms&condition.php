@@ -493,7 +493,7 @@ include 'header_UI.php';
         <div class="main-container">
             <p>&copy; <?php echo date('Y'); ?> Love Bridge Donation Platform. All rights reserved.</p>
             <p>Love Bridge is a registered charity organization in Malaysia. Registration No: PPM-123-456-789</p>
-            <p><a href="terms.php">Terms & Conditions</a> | <a href="privacy.php">Privacy Policy</a> | <a href="contact.php">Contact Us</a> | <a href="donate.php">Make a Donation</a></p>
+            <p><a href="terms&condition.php">Terms & Conditions</a> | <a href="privacy.php">Privacy Policy</a> | <a href="Contact_us.php">Contact Us</a></p>
         </div>
     </div>
     
