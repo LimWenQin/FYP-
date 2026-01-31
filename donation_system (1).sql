@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jan 31, 2026 at 06:02 PM
+-- Generation Time: Jan 31, 2026 at 06:57 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -326,7 +326,7 @@ CREATE TABLE `donor` (
 --
 
 INSERT INTO `donor` (`Donor_ID`, `Donor_Name`, `Donor_ContactNumber`, `Donor_ICNumber`, `Donor_Email`, `Donor_Password`, `Donor_Wallet`, `Donor_Address1`, `Donor_Address2`, `Donor_Address3`, `Donor_City`, `Donor_State`, `Donor_PostalCode`, `Donor_Country`, `Donor_DOB`, `Donor_Description`, `Donor_RegisteredAt`, `Donor_LastLogin`, `Donor_ProfilePicture`, `Is_Deleted`, `donor_reset_count`, `donor_last_reset_request`) VALUES
-(12, 'LIM WEN QIN', '011-11234567', '', 'lll8694798586@gmail.com', '$2y$10$zRWNhEEie5nj0ck6IyXlPeBT0QlY6Gr9BIsamWGLt7EsSXXFRmp6W', 0.00, '', NULL, NULL, '', '', '', 'Malaysia', '1999-06-16', '', '2026-01-19 00:33:23', NULL, NULL, 0, 0, NULL);
+(12, 'LIM WEN QIN', '011-11234567', '911111063214', 'lll8694798586@gmail.com', '$2y$10$zRWNhEEie5nj0ck6IyXlPeBT0QlY6Gr9BIsamWGLt7EsSXXFRmp6W', 0.00, '', '', '', '', '', '', 'Malaysia', '1991-11-11', '', '2026-01-19 00:33:23', NULL, NULL, 0, 1, NULL);
 
 --
 -- Triggers `donor`
@@ -387,6 +387,13 @@ CREATE TABLE `donor_password_reset` (
   `reset_used` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `donor_password_reset`
+--
+
+INSERT INTO `donor_password_reset` (`reset_id`, `donor_id`, `reset_token`, `reset_email`, `reset_expires`, `reset_created`, `reset_updated`, `ip_address`, `user_agent`, `reset_status`, `reset_used`) VALUES
+(8, 12, '5166975e3663ceb0e7c5d323ae01f9f06974b9778f7ba19d81a4b71049503e4a', 'lll8694798586@gmail.com', '2026-02-01 01:26:39', '2026-02-01 01:11:39', NULL, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0', 'pending', 0);
+
 -- --------------------------------------------------------
 
 --
@@ -403,6 +410,14 @@ CREATE TABLE `donor_security_logs` (
   `log_details` text DEFAULT NULL,
   `log_date` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `donor_security_logs`
+--
+
+INSERT INTO `donor_security_logs` (`log_id`, `donor_id`, `log_type`, `log_action`, `ip_address`, `user_agent`, `log_details`, `log_date`) VALUES
+(8, NULL, 'password_reset', 'failed_reset_attempt', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0', 'Non-existent: qinwenlin989@gmail.com', '2026-02-01 01:10:39'),
+(9, 12, 'password_reset', 'reset_email_sent', '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0', 'Success', '2026-02-01 01:11:43');
 
 -- --------------------------------------------------------
 
@@ -720,7 +735,7 @@ CREATE TABLE `privacy_policy` (
 --
 
 INSERT INTO `privacy_policy` (`id`, `version`, `content`, `effective_date`, `created_at`, `is_active`) VALUES
-(1, '1.0', '<h2>Love Bridge Donation Platform - Privacy Policy</h2>\r\n<p><strong>Effective Date:</strong> [CURRENT_DATE]</p>\r\n\r\n<h3>1. Information We Collect</h3>\r\n<p>We collect information you provide directly, such as when you make a donation, including name, email address, and payment information.</p>\r\n\r\n<h3>2. How We Use Your Information</h3>\r\n<p>We use your information to process donations, send receipts, communicate about our programs, and improve our services.</p>\r\n\r\n<h3>3. Information Sharing</h3>\r\n<p>We do not sell or rent your personal information. We may share information with payment processors and as required by law.</p>\r\n\r\n<h3>4. Data Security</h3>\r\n<p>We implement reasonable security measures to protect your information, but no system is 100% secure.</p>\r\n\r\n<h3>5. Your Choices</h3>\r\n<p>You may opt out of promotional communications at any time. Required transactional communications will still be sent.</p>\r\n\r\n<h3>6. Changes to This Policy</h3>\r\n<p>We may update this policy periodically. We will notify users of material changes via email or platform notice.</p>\r\n\r\n<h3>7. Contact Us</h3>\r\n<p>For privacy-related questions, contact privacy@lovebridge.org.</p>', '2026-01-06', '2026-01-05 17:01:32', 1);
+(1, '1.0', '<h2>Love Bridge Donation Platform - Privacy Policy</h2>\r\n<p><strong>Effective Date:</strong> [CURRENT_DATE]</p>\r\n\r\n<h3>1. Information We Collect</h3>\r\n<p>We collect information you provide directly, such as when you make a donation, including name, email address, and payment information.</p>\r\n\r\n<h3>2. How We Use Your Information</h3>\r\n<p>We use your information to process donations, send receipts, communicate about our programs, and improve our services.</p>\r\n\r\n<h3>3. Information Sharing</h3>\r\n<p>We do not sell or rent your personal information. We may share information with payment processors and as required by law.</p>\r\n\r\n<h3>4. Data Security</h3>\r\n<p>We implement reasonable security measures to protect your information, but no system is 100% secure.</p>\r\n\r\n<h3>5. Your Choices</h3>\r\n<p>You may opt out of promotional communications at any time. Required transactional communications will still be sent.</p>\r\n\r\n<h3>6. Changes to This Policy</h3>\r\n<p>We may update this policy periodically. We will notify users of material changes via email or platform notice.</p>\r\n\r\n<h3>7. Changes to This Policy</h3>\r\n<p>We may update this policy periodically. We will notify you of material changes via email or through our platform.</p>\r\n\r\n\r\n\r\n', '2026-01-06', '2026-01-05 17:01:32', 1);
 
 -- --------------------------------------------------------
 
@@ -1530,13 +1545,13 @@ ALTER TABLE `donor_login_attempts`
 -- AUTO_INCREMENT for table `donor_password_reset`
 --
 ALTER TABLE `donor_password_reset`
-  MODIFY `reset_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `reset_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `donor_security_logs`
 --
 ALTER TABLE `donor_security_logs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `email_logs`

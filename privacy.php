@@ -72,14 +72,7 @@ if (!$policy) {
         <p>We use cookies to improve your experience on our platform. You can control cookie settings through your browser.</p>
         
         <h3>7. Changes to This Policy</h3>
-        <p>We may update this policy periodically. We will notify you of material changes via email or through our platform.</p>
-        
-        <h3>8. Contact Us</h3>
-        <p>For privacy-related questions or to exercise your rights, contact our Privacy Officer at privacy@lovebridge.org or write to us at:</p>
-        <p>Love Bridge Privacy Officer<br>
-        123 Charity Street<br>
-        Hope City, HC 12345<br>
-        Email: privacy@lovebridge.org</p>',
+        <p>We may update this policy periodically. We will notify you of material changes via email or through our platform.</p>',
         'effective_date' => date('Y-m-d')
     ];
 }
