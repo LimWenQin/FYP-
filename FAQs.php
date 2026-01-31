@@ -345,7 +345,7 @@ include 'header_UI.php';
                     
                     <div class="faq-item">
                         <div class="faq-question">
-                            <span>How can I see my donation history?</span>
+                            <span>How can I see my donation record?</span>
                             <i class="fas fa-chevron-down"></i>
                         </div>
                         <div class="faq-answer">
