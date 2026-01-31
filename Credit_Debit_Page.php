@@ -156,6 +156,7 @@ include 'header_UI.php';
     .btn-confirm:hover { background: #008f45; color: white; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 166, 81, 0.3); }
     .card-row { display: flex; gap: 20px; }
     .card-col { flex: 1; }
+    .is-invalid {border-color: #dc3545 !important;}
 </style>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -268,31 +269,38 @@ document.addEventListener('DOMContentLoaded', function() {
         e.target.value = e.target.value.replace(/\D/g, ''); 
     });
 
-    form.addEventListener('submit', function(e) {
-    // 1. 获取卡号并去掉空格
-    const cardRawValue = cardInput.value.replace(/\s/g, ''); 
-    
-    // 2. 检查长度（通常 Visa/MasterCard 为 16 位，Amex 为 15 位）
-    // 如果你严格要求 16 位：
-    if (cardRawValue.length !== 16) {
-        e.preventDefault(); // 阻止提交
-        cardInput.classList.add('is-invalid');
-        Swal.fire({
-            title: 'Invalid Card Number',
-            text: 'Please enter a valid 16-digit card number.',
-            icon: 'warning',
-            confirmButtonColor: '#00a651'
-        });
-        return;
-    }
-        
-        if (expValue.length !== 5) {
+form.addEventListener('submit', function(e) {
+        // 1. 获取输入值
+        const cardRawValue = cardInput.value.replace(/\s/g, ''); 
+        const expValue = expInput.value; // 刚才丢失的定义在这里
+
+        // 2. 验证卡号长度 (必须是 16 位)
+        if (cardRawValue.length !== 16) {
             e.preventDefault();
-            expInput.classList.add('is-invalid');
-            Swal.fire({ title: 'Error', text: 'Please enter a valid expiration date (MM/YY).', icon: 'warning', confirmButtonColor: '#00a651' });
+            cardInput.classList.add('is-invalid');
+            Swal.fire({
+                title: 'Invalid Card Number',
+                text: 'Please enter a valid 16-digit card number.',
+                icon: 'warning',
+                confirmButtonColor: '#00a651'
+            });
             return;
         }
 
+        // 3. 验证过期日期格式 (MM/YY)
+        if (expValue.length !== 5 || !expValue.includes('/')) {
+            e.preventDefault();
+            expInput.classList.add('is-invalid');
+            Swal.fire({ 
+                title: 'Error', 
+                text: 'Please enter a valid expiration date (MM/YY).', 
+                icon: 'warning', 
+                confirmButtonColor: '#00a651' 
+            });
+            return;
+        }
+
+        // 4. 解析日期逻辑
         const [mmStr, yyStr] = expValue.split('/');
         const mm = parseInt(mmStr, 10);
         const yy = parseInt(yyStr, 10);
@@ -302,23 +310,33 @@ document.addEventListener('DOMContentLoaded', function() {
         const currentYearShort = parseInt(fullCurrentYear.toString().substr(-2)); 
         const currentMonth = now.getMonth() + 1; 
 
-        // 1. 验证月份是否合法 (01-12)
-        if (mm < 1 || mm > 12) {
+        // --- 判定 A: 验证月份是否合法 (01-12) ---
+        if (isNaN(mm) || mm < 1 || mm > 12) {
             e.preventDefault();
             expInput.classList.add('is-invalid');
-            Swal.fire({ title: 'Invalid Month', text: 'Please enter a month between 01 and 12.', icon: 'error', confirmButtonColor: '#00a651' });
+            Swal.fire({ 
+                title: 'Invalid Month', 
+                text: 'Please enter a month between 01 and 12.', 
+                icon: 'error', 
+                confirmButtonColor: '#00a651' 
+            });
             return;
         }
 
-        // 2. 验证是否已过期 (不能早于当前月)
+        // --- 判定 B: 验证是否已过期 ---
         if (yy < currentYearShort || (yy === currentYearShort && mm < currentMonth)) {
             e.preventDefault(); 
             expInput.classList.add('is-invalid');
-            Swal.fire({ title: 'Card Expired', text: 'The expiration date entered has already passed.', icon: 'error', confirmButtonColor: '#00a651' });
+            Swal.fire({ 
+                title: 'Card Expired', 
+                text: 'The expiration date entered has already passed.', 
+                icon: 'error', 
+                confirmButtonColor: '#00a651' 
+            });
             return;
         }
 
-        // ⭐ 3. [新增逻辑] 验证是否超过 5 年 (逻辑检查)
+        // --- 判定 C: 验证是否超过 5 年 ---
         const maxYearAllowed = currentYearShort + 5;
         if (yy > maxYearAllowed) {
             e.preventDefault();
@@ -331,6 +349,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             return;
         }
+        
+        // 如果一切通过，表单将正常提交
     });
 
     function identifyCardType(number) {
