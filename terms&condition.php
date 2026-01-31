@@ -476,9 +476,9 @@ include 'header_UI.php';
                 <div class="term-content">
                     <p>These Terms & Conditions are governed by the laws of Malaysia. Any disputes shall be subject to the exclusive jurisdiction of the courts of Malaysia.</p>
                     <p>For questions about these Terms & Conditions or our donation policies, please contact us:</p>
-                    <p><strong>Email:</strong> donations@lovebridge.org<br>
-                    <strong>Phone:</strong> +603-1234 5678<br>
-                    <strong>Address:</strong> Love Bridge Foundation, 123 Charity Street, Kuala Lumpur, 50480 Malaysia</p>
+                    <p><strong>Email:</strong> lovebridge1201@gmail.com<br>
+                    <strong>Phone:</strong> +60 11-1119 0233<br>
+                    <strong>Address:</strong> Love Bridge Foundation, 123, Jalan Love Bridge, 75450 Melaka, Malaysia</p>
                 </div>
             </div>
         </div>
