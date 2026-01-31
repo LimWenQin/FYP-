@@ -352,7 +352,7 @@ include 'header_UI.php';
                             <p>Your complete donation history is available in your profile:</p>
                             <ol>
                                 <li>Log in to your account</li>
-                                <li>Go to "Profile" and select "Donation History"</li>
+                                <li>Go to "Profile" and select "Donation Records"</li>
                                 <li>You'll see a list of all your donations with dates, amounts, and campaign details</li>
                                 <li>You can receive your donation history as a PDF in your email</li>
                             </ol>
