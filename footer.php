@@ -108,8 +108,8 @@
                     <ul class="footer-links">
                         <li style="color: #b3b3b3; margin-bottom: 15px;">
                             <span style="color: #fff; font-weight:bold;">Address:</span><br>
-                            123, Jalan Love Bridge,<br>
-                            75450 Melaka, Malaysia
+                            Level 12, Menara Love Bridge, Jalan Charity,<br> 50450 Kuala Lumpur, Malaysia
+
                         </li>
                         <li>
                             <span style="color: #fff; font-weight:bold;">Phone:</span><br>
@@ -129,7 +129,7 @@
             <div class="copyright-section" style="width: 100%;">
                 <a href="terms&condition.php">Terms & Conditions</a>
                 |
-                <span style="margin: 0 10px;">Copyright &copy; 2025 All rights reserved | Love Bridge</span>
+                <span style="margin: 0 10px;">Copyright &copy; 2026 All rights reserved | Love Bridge</span>
                 |
                 <a href="privacy.php">Privacy Policy</a>
             </div>

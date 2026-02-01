@@ -279,7 +279,11 @@ include 'header_UI.php';
                     <div class="info-icon">📍</div>
                     <div class="info-details">
                         <h4>Our Headquarters</h4>
-                        <p><?php echo $site_info['Address']; ?></p>
+                        <p>
+      
+        Level 12, Menara Love Bridge, Jalan Charity,<br>
+        50450 Kuala Lumpur, Malaysia
+    </p>
                     </div>
                 </div>
                 <div class="info-item">
@@ -298,13 +302,7 @@ include 'header_UI.php';
                         <a href="mailto:<?php echo $site_info['Email']; ?>"><?php echo $site_info['Email']; ?></a>
                     </div>
                 </div>
-                <div class="info-item">
-                    <div class="info-icon">⏰</div>
-                    <div class="info-details">
-                        <h4>Working Hours</h4>
-                        <p><?php echo $site_info['Working_Hours']; ?></p>
-                    </div>
-                </div>
+               
             </div>
 
             <div class="contact-form">
