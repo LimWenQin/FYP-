@@ -464,7 +464,7 @@ include 'header_UI.php';
                 
                 <div class="help-links">
                     <a href="donor_login.php" class="help-link"><i class="fas fa-arrow-left"></i> Back to Login</a>
-                    <a href="contact_us.php" class="help-link">Need Help?</a>
+                   
                 </div>
 
             <?php elseif ($email_sent): ?>
