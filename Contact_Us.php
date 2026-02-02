@@ -321,9 +321,9 @@ include 'header_UI.php';
                     </div>
                     
                     <div class="form-group">
-                        <label for="phone">Phone Number</label>
+                        <label for="phone">Phone Number *</label>
                         <input type="tel" id="phone" name="phone" class="form-control" 
-                               value="<?php echo isset($phone) ? htmlspecialchars($phone) : ''; ?>">
+                               value="<?php echo isset($phone) ? htmlspecialchars($phone) : ''; ?>"required>
                     </div>
 
                     <div class="form-group">
