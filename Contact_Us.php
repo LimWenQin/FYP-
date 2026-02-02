@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $email_stmt->execute();
             $email_stmt->close();
             
-            $_SESSION['success_message'] = "Thank you! We received your message and attachment.";
+            $_SESSION['success_message'] = "Thank you! We received your message.";
             
             $name = $email = $phone = $title = $message = '';
             
