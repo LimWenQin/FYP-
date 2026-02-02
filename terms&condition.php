@@ -385,7 +385,7 @@ include 'header_UI.php';
                 <div class="term-title">Tax Deductibility</div>
                 <div class="term-content">
                     <p>Love Bridge is a registered charitable organization. Donations may be tax-deductible according to applicable tax laws in your jurisdiction.</p>
-                    <p>Official donation receipts will be issued for all donations of RM20 or more, or upon request for smaller amounts. Receipts are typically issued within 30 days of the donation date.</p>
+                    <p>Official donation receipts will be issued for all donations of RM30 or more, or upon request for smaller amounts. Receipts are typically issued within 30 days of the donation date.</p>
                     <p>Donors are responsible for consulting with their tax advisors regarding the deductibility of their contributions.</p>
                 </div>
             </div>
@@ -411,7 +411,7 @@ include 'header_UI.php';
                 <div class="term-number">9</div>
                 <div class="term-title">Minimum and Maximum Donations</div>
                 <div class="term-content">
-                    <p>Love Bridge accepts donations of RM10 or more through our online platform. There is no maximum donation limit, though exceptionally large donations may require additional verification for security purposes.</p>
+                    <p>Love Bridge accepts donations with MYR through our online platform. There is no maximum donation limit, though exceptionally large donations may require additional verification for security purposes.</p>
                     <p>For donations exceeding RM10,000, please contact our donor relations team for personalized assistance and additional payment options.</p>
                 </div>
             </div>
