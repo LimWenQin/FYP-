@@ -386,7 +386,7 @@ include 'header_UI.php';
                 <p>Our support team is here to help you with any questions you may have about Love Bridge.</p>
                 
                 <div class="contact-buttons">
-                    <a href="mailto:support@lovebridge.org" class="contact-btn">
+                    <a href="mailto:lovebridge1201@gmail.com" class="contact-btn">
                         <i class="fas fa-envelope"></i> Email Us
                     </a>
                     <a href="Contact_Us.php" class="contact-btn">
