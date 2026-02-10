@@ -103,9 +103,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_admin'])) {
     } elseif (!validateIcDobMatch($icNumber, $dob)) {
         $errorMessage = "Invalid IC Number (Format, Length, or State Code mismatch with DOB).";
     } else {
-        $checkEmail = $conn->query("SELECT Admin_ID FROM admin WHERE Admin_Email = '$email'");
-        if ($checkEmail && $checkEmail->num_rows > 0) {
-            $errorMessage = "Email already exists.";
+        // --- MODIFIED EMAIL CHECK (Check both Admin and Staff tables) ---
+        $emailExists = false;
+
+        // Check Admin Table
+        $checkAdmin = $conn->query("SELECT Admin_ID FROM admin WHERE Admin_Email = '$email'");
+        if ($checkAdmin && $checkAdmin->num_rows > 0) {
+            $emailExists = true;
+        }
+
+        // Check Staff Table
+        $checkStaff = $conn->query("SELECT Staff_ID FROM staff WHERE Staff_Email = '$email'");
+        if ($checkStaff && $checkStaff->num_rows > 0) {
+            $emailExists = true;
+        }
+
+        if ($emailExists) {
+            $errorMessage = "Email already exists in the system (Staff or Admin). Please use a different email.";
         } else {
             $rawPassword = generateStrongRandomPassword(12);
             $hashedPassword = password_hash($rawPassword, PASSWORD_DEFAULT);

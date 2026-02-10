@@ -91,14 +91,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_admin'])) {
     if (!validateIcDobMatch($icNumber, $dob)) {
         $errorMessage = "Invalid IC Number or Mismatch with DOB.";
     } else {
-        $sql = "UPDATE admin SET Admin_Name = '$fullName', Admin_ContactNumber = '$contact', Admin_ICNUMBER = '$icNumber', Admin_Email = '$email', Admin_DOB = '$dob', Admin_Address1 = '$address1', Admin_Address2 = '$address2', Admin_Address3 = '$address3', Admin_City = '$city', Admin_State = '$state', Admin_PostalCode = '$postalCode', Admin_Status = '$status', Admin_Role = '$role', Admin_Comment = '$comment' $imageUpdateSQL WHERE Admin_ID = $adminId";
+        // --- ADDED CHECK START: Check duplicate email in Admin (exclude self) and Staff ---
+        $emailExists = false;
         
-        if ($conn->query($sql)) {
-            $result = $conn->query("SELECT * FROM admin WHERE Admin_ID = $adminId");
-            $admin = $result->fetch_assoc();
-            $saveSuccess = true;
+        // Check Admin Table (exclude current ID)
+        $checkAdmin = $conn->query("SELECT Admin_ID FROM admin WHERE Admin_Email = '$email' AND Admin_ID != $adminId");
+        if ($checkAdmin && $checkAdmin->num_rows > 0) $emailExists = true;
+
+        // Check Staff Table
+        $checkStaff = $conn->query("SELECT Staff_ID FROM staff WHERE Staff_Email = '$email'");
+        if ($checkStaff && $checkStaff->num_rows > 0) $emailExists = true;
+
+        if ($emailExists) {
+            $errorMessage = "Email already exists in the system (Admin or Staff). Please use a different email.";
         } else {
-            $errorMessage = "Error updating: " . $conn->error;
+            // --- ADDED CHECK END ---
+            $sql = "UPDATE admin SET Admin_Name = '$fullName', Admin_ContactNumber = '$contact', Admin_ICNUMBER = '$icNumber', Admin_Email = '$email', Admin_DOB = '$dob', Admin_Address1 = '$address1', Admin_Address2 = '$address2', Admin_Address3 = '$address3', Admin_City = '$city', Admin_State = '$state', Admin_PostalCode = '$postalCode', Admin_Status = '$status', Admin_Role = '$role', Admin_Comment = '$comment' $imageUpdateSQL WHERE Admin_ID = $adminId";
+            
+            if ($conn->query($sql)) {
+                $result = $conn->query("SELECT * FROM admin WHERE Admin_ID = $adminId");
+                $admin = $result->fetch_assoc();
+                $saveSuccess = true;
+            } else {
+                $errorMessage = "Error updating: " . $conn->error;
+            }
         }
     }
 }

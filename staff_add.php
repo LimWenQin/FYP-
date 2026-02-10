@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
     $postalCode = mysqli_real_escape_string($conn, trim($_POST['postal_code']));
     $country = mysqli_real_escape_string($conn, "Malaysia");
     $role = "Staff"; $status = mysqli_real_escape_string($conn, $_POST['status']);
-    $comment = mysqli_real_escape_string($conn, $_POST['comment']); // Map "Remarks" input to "Staff_Comment" DB column
+    $comment = mysqli_real_escape_string($conn, $_POST['comment']); 
     $adminId = isset($_SESSION['admin_id']) ? $_SESSION['admin_id'] : (isset($_SESSION['staff_id']) ? $_SESSION['staff_id'] : 1);
 
     $profilePicturePath = null;
@@ -93,9 +93,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
     } elseif (!validateIcDobMatch($icNumber, $dob)) {
         $errorMessage = "Invalid IC Number (Format, Length, or State Code mismatch with DOB).";
     } else {
-        $checkEmail = $conn->query("SELECT Staff_ID FROM staff WHERE Staff_Email = '$email'");
-        if ($checkEmail && $checkEmail->num_rows > 0) {
-            $errorMessage = "Email already exists.";
+        // --- MODIFIED EMAIL CHECK (Check both Staff and Admin tables) ---
+        $emailExists = false;
+
+        // Check Staff Table
+        $checkStaff = $conn->query("SELECT Staff_ID FROM staff WHERE Staff_Email = '$email'");
+        if ($checkStaff && $checkStaff->num_rows > 0) {
+            $emailExists = true;
+        }
+
+        // Check Admin Table
+        $checkAdmin = $conn->query("SELECT Admin_ID FROM admin WHERE Admin_Email = '$email'");
+        if ($checkAdmin && $checkAdmin->num_rows > 0) {
+            $emailExists = true;
+        }
+
+        if ($emailExists) {
+            $errorMessage = "Email already exists in the system (Staff or Admin). Please use a different email.";
         } else {
             $rawPassword = generateStrongRandomPassword(12);
             $hashedPassword = password_hash($rawPassword, PASSWORD_DEFAULT);
@@ -117,7 +131,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
                 } catch (Exception $e) {
                     // Email failed but staff created
                 }
-                // Instead of redirecting, set success flag
                 $saveSuccess = true;
             } else { $errorMessage = "DB Error: " . $conn->error; }
         }
@@ -139,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
             align-items: center;
             justify-content: space-between;
             margin-bottom: 20px;
-            padding-top: 10px; /* Reduced top padding */
+            padding-top: 10px; 
         }
         .back-btn {
             display: inline-flex;
@@ -160,7 +173,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
         .header-title {
             flex: 1;
             text-align: center;
-            /* Offset the center alignment slightly to account for the back button width to make it visually centered */
             padding-right: 120px; 
         }
         .header-title h1 { margin: 0; font-size: 24px; color: #333; font-weight: 700; }
@@ -177,16 +189,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
         .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
         .required { color: red; margin-left: 3px; font-weight: bold; }
         .form-guide { font-size: 12px; color: #6c757d; margin-top: 5px; display: block; font-style: italic; background: #fbfbfb; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #ddd; }
-        
-        /* Readonly/Disabled styling */
         .readonly-field { background-color: #f8f9fa; color: #555; pointer-events: none; }
-
-        /* Phone Format */
         .phone-format { display: flex; align-items: center; } 
         .phone-prefix { padding: 12px 15px; background: #f8f9fa; border: 1px solid var(--gray-light); border-right: none; border-radius: 5px 0 0 5px; color: var(--gray); font-size: 14px; } 
         .phone-input { border-radius: 0 5px 5px 0 !important; }
         
-        /* Image Upload Styles */
         .file-upload { text-align: left; } 
         .profile-picture-preview { 
             width: 120px; height: 120px; border-radius: 50%; border: 4px solid #f8f9fa; 
@@ -198,7 +205,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
         .file-upload-label { display: inline-block; padding: 8px 15px; background: #f8f9fa; border: 1px dashed #ccc; border-radius: 5px; cursor: pointer; font-size: 13px; transition: all 0.3s; } 
         .file-upload input[type="file"] { display: none; } 
         
-        /* Close 'X' Button for Image */
         .remove-img-btn {
             position: absolute;
             top: 0;
@@ -221,8 +227,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
         .remove-img-btn:hover { transform: scale(1.1); background: #bd2130; }
 
         .button-group { display: flex; justify-content: flex-end; gap: 15px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
-        
-        /* Buttons */
         .btn-clear { padding: 12px 25px; background: white; color: #555; border: 1px solid #ddd; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px; }
         .btn-clear:hover { background: #f8f9fa; border-color: #aaa; color: #333; transform: translateY(-1px); }
         .btn-save { padding: 12px 25px; background: linear-gradient(135deg, #F28585 0%, #ff9a9a 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(242, 133, 133, 0.3); display: inline-flex; align-items: center; gap: 8px; }
@@ -257,7 +261,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
         .alert-content h4 { margin: 0 0 5px; font-size: 14px; color: #333; }
         .alert-content p { margin: 0; font-size: 13px; color: #666; }
 
-        /* Success Modal */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center; }
         .success-modal { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .success-icon { width: 70px; height: 70px; background: #e6f4ea; border-radius: 50%; color: #28a745; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 20px; }
@@ -468,7 +471,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
             showSystemAlert("<?php echo addslashes($errorMessage); ?>", 'error');
         <?php endif; ?>
 
-        // --- Validation Logic (Modified to use System Alert) ---
+        // --- Validation Logic ---
         function validateName(input) { input.value = input.value.replace(/[^a-zA-Z\s]/g, ''); }
         
         function validateEmailDetailed(email) {
@@ -522,7 +525,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
         function showFieldError(inputId, message) {
             const input = document.getElementById(inputId); if (!input) return;
             input.classList.add('input-error');
-            // We can also keep the inline error text if you want, but user emphasized avoiding 'localhost' alerts
             let parent = input.parentNode;
             if (parent.classList.contains('phone-format')) parent = parent.parentNode; 
             let errorDiv = parent.querySelector('.inline-error');
@@ -585,11 +587,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
             if (input.files && input.files[0]) { 
                 const reader = new FileReader(); 
                 reader.onload = function(e) { 
-                    // Remove existing content except the button
                     const btn = removeBtn.cloneNode(true);
                     container.innerHTML = `<img src="${e.target.result}" alt="Preview">`; 
                     container.appendChild(btn);
-                    // Re-attach event listener or just use the onclick in HTML
                     btn.style.display = 'flex';
                 }; 
                 reader.readAsDataURL(input.files[0]); 
@@ -599,17 +599,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_staff'])) {
         function removeImage(inputId, containerId) {
             const input = document.getElementById(inputId); 
             const container = document.getElementById(containerId);
-            
             input.value = ''; 
             
-            // Restore default icon
             container.innerHTML = `
                 <div class="default-avatar-icon"><i class="fas fa-user"></i></div>
                 <button type="button" id="removeImgBtn" class="remove-img-btn" style="display: none;" onclick="removeImage('add_profile_picture', 'add-preview-container')">
                     <i class="fas fa-times"></i>
                 </button>
             `;
-            
             showSystemAlert("Image removed.", 'success');
         }
 

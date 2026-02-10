@@ -91,15 +91,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_staff'])) {
     if (!validateIcDobMatch($icNumber, $dob)) {
         $errorMessage = "Invalid IC Number or Mismatch with DOB.";
     } else {
-        $sql = "UPDATE staff SET Staff_FullName = '$fullName', Staff_ContactNumber = '$contact', Staff_ICNumber = '$icNumber', Staff_Email = '$email', Staff_DOB = '$dob', Staff_Address1 = '$address1', Staff_Address2 = '$address2', Staff_Address3 = '$address3', Staff_City = '$city', Staff_State = '$state', Staff_PostalCode = '$postalCode', Staff_Status = '$status', Staff_Comment = '$comment' $imageUpdateSQL WHERE Staff_ID = $staffId";
-        
-        if ($conn->query($sql)) {
-            // Re-fetch data to show updated values
-            $staffResult = $conn->query("SELECT * FROM staff WHERE Staff_ID = $staffId");
-            $staff = $staffResult->fetch_assoc();
-            $saveSuccess = true;
+        // --- MODIFIED EMAIL CHECK (Check both Staff and Admin tables) ---
+        $emailExists = false;
+
+        // Check Staff Table (exclude current ID)
+        $checkStaff = $conn->query("SELECT Staff_ID FROM staff WHERE Staff_Email = '$email' AND Staff_ID != $staffId");
+        if ($checkStaff && $checkStaff->num_rows > 0) {
+            $emailExists = true;
+        }
+
+        // Check Admin Table (all admins)
+        $checkAdmin = $conn->query("SELECT Admin_ID FROM admin WHERE Admin_Email = '$email'");
+        if ($checkAdmin && $checkAdmin->num_rows > 0) {
+            $emailExists = true;
+        }
+
+        if ($emailExists) {
+            $errorMessage = "Email already exists in the system (Staff or Admin). Please use a different email.";
         } else {
-            $errorMessage = "Error updating: " . $conn->error;
+            $sql = "UPDATE staff SET Staff_FullName = '$fullName', Staff_ContactNumber = '$contact', Staff_ICNumber = '$icNumber', Staff_Email = '$email', Staff_DOB = '$dob', Staff_Address1 = '$address1', Staff_Address2 = '$address2', Staff_Address3 = '$address3', Staff_City = '$city', Staff_State = '$state', Staff_PostalCode = '$postalCode', Staff_Status = '$status', Staff_Comment = '$comment' $imageUpdateSQL WHERE Staff_ID = $staffId";
+            
+            if ($conn->query($sql)) {
+                // Re-fetch data to show updated values
+                $staffResult = $conn->query("SELECT * FROM staff WHERE Staff_ID = $staffId");
+                $staff = $staffResult->fetch_assoc();
+                $saveSuccess = true;
+            } else {
+                $errorMessage = "Error updating: " . $conn->error;
+            }
         }
     }
 }
