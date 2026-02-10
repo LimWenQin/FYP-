@@ -2,10 +2,8 @@
 include 'dataconnection.php';
 include 'header_function.php';
 
-
 $current_date = date('Y-m-d');
 $min_date = date('Y-m-d', strtotime('-100 years')); 
-
 
 $show_login_modal = false;
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
@@ -13,7 +11,6 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
 }
 
 $logged_in = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
-
 
 $donor = [
     "Donor_Name" => "",
@@ -30,7 +27,6 @@ $donor = [
     "Donor_DOB" => "",
     "Donor_ProfilePicture" => ""
 ];
-
 
 if ($logged_in && isset($_SESSION['donor_id'])) {
     $query = "SELECT * FROM donor WHERE Donor_ID = ?";
@@ -49,7 +45,6 @@ if ($logged_in && isset($_SESSION['donor_id'])) {
     }
     $stmt->close();
 }
-
 
 $delete_success = false; 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_account'])) {
@@ -74,12 +69,10 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
     
-    // 【修改点 1】PHP 验证：只允许字母和空格 (移除了 /)
     if (!preg_match("/^[a-zA-Z\s]+$/", $name)) {
         echo "<script>alert('Error: Name must contain only letters and spaces.'); window.history.back();</script>";
         exit();
     }
-
    
     $profile_picture = $donor['Donor_ProfilePicture']; 
     
@@ -116,7 +109,6 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
         }
     }
     
-    
     $raw_contact = $_POST['contact'];
     $contact = '0' . $raw_contact; 
 
@@ -129,7 +121,6 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
     $state = $_POST['state']; 
     $postalcode = $_POST['postalcode'];
     $country = "Malaysia"; 
-    
     
     $update_query = "UPDATE donor SET 
         Donor_Name = ?, 
@@ -161,7 +152,6 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
         $update_message = "Profile updated successfully!";
         $_SESSION['donor_name'] = $name;
         
-      
         $donor['Donor_Name'] = $name;
         $donor['Donor_Email'] = $email;
         $donor['Donor_ContactNumber'] = $contact;
@@ -182,12 +172,9 @@ if (!$delete_success && $_SERVER['REQUEST_METHOD'] == 'POST' && $logged_in && is
 }
 
 function calculateProfileCompletion($donor) {
-    
     $total_fields = 10; 
     $completed_fields = 0;
-   
     $fields_to_check = ['Donor_Name', 'Donor_Email', 'Donor_ContactNumber', 'Donor_ICNumber', 'Donor_DOB', 'Donor_Address1', 'Donor_City', 'Donor_State', 'Donor_PostalCode', 'Donor_Country', 'Donor_ProfilePicture'];
-   
     $fields_to_check = array_slice($fields_to_check, 0, 10);
 
     foreach ($fields_to_check as $field) {
@@ -305,6 +292,21 @@ include 'header_UI.php';
         .action-buttons { display: flex; gap: 15px; margin-top: 25px; }
         .submit-btn { background: linear-gradient(135deg, #f79c34ff); color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; flex: 1; transition: transform 0.2s; }
         .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
+        
+        /* DISABLED BUTTON STYLE */
+        .submit-btn:disabled {
+            background: #9ca3af; /* Gray color */
+            background-image: none;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+        .submit-btn:disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
         .delete-btn { background: linear-gradient(135deg, var(--primary-red), var(--dark-red)); color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; flex: 1; transition: transform 0.2s; }
         .delete-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(220,38,38,0.3); }
         
@@ -619,7 +621,6 @@ include 'header_UI.php';
       
         nameInput.addEventListener('input', function(e) {
             const val = e.target.value;
-            // 【修改点 2】JS 验证：只允许字母和空格 (移除了 /)
             const regex = /^[A-Za-z\s]*$/;
             
             if (!regex.test(val)) {
@@ -737,7 +738,7 @@ include 'header_UI.php';
                     dobInput.setAttribute('readonly', true);
                 }
 
-                const validStateCodes = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40','41','42','43','44','45','46','47','48','49','50','51','52','53','54','55','56','57','58','59'];
+                const validStateCodes = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40','41','42','43','44','45','46','47','48','49','50','51','52','53','54','59'];
 
                 if (!validStateCodes.includes(stateCode)) {
                     icError.innerText = "Invalid IC Number: State code '" + stateCode + "' does not exist.";
@@ -756,7 +757,6 @@ include 'header_UI.php';
             
         
             const nameVal = nameInput.value.trim();
-            // 【修改点 3】提交验证：只允许字母和空格 (移除了 /)
             const nameRegex = /^[A-Za-z\s]+$/;
             if (nameVal === '') {
                 isValid = false;
@@ -848,21 +848,21 @@ include 'header_UI.php';
                     icError.style.display = 'block'; icGroup.classList.add('error');
                 } else {
                     
-                     const month = parseInt(cleanIC.substring(2, 4), 10);
-                     const day = parseInt(cleanIC.substring(4, 6), 10);
-                     const stateCode = cleanIC.substring(6, 8);
-                     const validStateCodes = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16'];
-                     
-                     if (month < 1 || month > 12 || day < 1 || day > 31) {
-                         isValid = false;
-                         icError.innerText = "Invalid IC Number: Invalid Date.";
-                         icError.style.display = 'block'; icGroup.classList.add('error');
-                     } else if (!validStateCodes.includes(stateCode) && parseInt(stateCode) > 59) {
+                      const month = parseInt(cleanIC.substring(2, 4), 10);
+                      const day = parseInt(cleanIC.substring(4, 6), 10);
+                      const stateCode = cleanIC.substring(6, 8);
+                      const validStateCodes = ['01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16'];
+                      
+                      if (month < 1 || month > 12 || day < 1 || day > 31) {
+                          isValid = false;
+                          icError.innerText = "Invalid IC Number: Invalid Date.";
+                          icError.style.display = 'block'; icGroup.classList.add('error');
+                      } else if (!validStateCodes.includes(stateCode) && parseInt(stateCode) > 59) {
                         
-                         isValid = false;
-                         icError.innerText = "Invalid IC Number: Invalid State Code.";
-                         icError.style.display = 'block'; icGroup.classList.add('error');
-                     }
+                          isValid = false;
+                          icError.innerText = "Invalid IC Number: Invalid State Code.";
+                          icError.style.display = 'block'; icGroup.classList.add('error');
+                      }
                 }
             }
 
@@ -942,11 +942,13 @@ include 'header_UI.php';
 
         document.addEventListener('DOMContentLoaded', function() {
             const inputs = document.querySelectorAll('.track-field');
+            const icInput = document.getElementById('icnumber');
+            
             inputs.forEach(input => {
                 input.addEventListener('input', updateProgress);
                 input.addEventListener('change', updateProgress);
             });
-            const icInput = document.getElementById('icnumber');
+
             if (icInput.value.trim() !== '') { 
                 let val = icInput.value.replace(/\D/g, '');
                 if (val.length > 8) {
@@ -957,6 +959,60 @@ include 'header_UI.php';
                 handleICInput(icInput.value); 
             }
             updateProgress();
+
+            // =======================================================
+            // Logic to Disable/Enable Button based on changes
+            // 逻辑：根据是否有更改来禁用/启用按钮
+            // =======================================================
+            
+            const updateBtn = document.getElementById('updateBtn');
+            const profileForm = document.getElementById('profileForm');
+            // Select relevant inputs
+            const formInputs = profileForm.querySelectorAll('input:not([type="hidden"]), select, textarea');
+            const originalData = {};
+
+            // 1. Disable button initially
+            // 1. 初始状态禁用按钮
+            updateBtn.disabled = true;
+
+            // 2. Capture initial values after a small delay 
+            //    (to allow IC formatting above to finish first)
+            // 2. 稍微延迟后捕捉初始值（等待上面的 IC 格式化完成）
+            setTimeout(() => {
+                formInputs.forEach(input => {
+                    if (input.type !== 'file') {
+                        originalData[input.id || input.name] = input.value;
+                    }
+                });
+            }, 100);
+
+            // 3. Function to check for changes
+            // 3. 检查更改的函数
+            function checkForChanges() {
+                let hasChanged = false;
+
+                formInputs.forEach(input => {
+                    if (input.type === 'file') {
+                        // If file selected, it's a change
+                        if (input.files.length > 0) hasChanged = true;
+                    } else {
+                        const key = input.id || input.name;
+                        // Use loose equality (!=) to handle slight type differences
+                        if (input.value != originalData[key]) {
+                            hasChanged = true;
+                        }
+                    }
+                });
+
+                updateBtn.disabled = !hasChanged;
+            }
+
+            // 4. Attach listeners
+            // 4. 添加监听器
+            formInputs.forEach(input => {
+                input.addEventListener('input', checkForChanges);
+                input.addEventListener('change', checkForChanges);
+            });
         });
     </script>
 </body>
